@@ -1,0 +1,75 @@
+
+// Counts items from your hyperlambda table in your fine-tune database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   hyperlambda.hyperlambda_id.mt:long
+   hyperlambda.hyperlambda_id.lt:long
+   hyperlambda.hyperlambda_id.mteq:long
+   hyperlambda.hyperlambda_id.lteq:long
+   hyperlambda.hyperlambda_id.neq:long
+   hyperlambda.hyperlambda_id.eq:long
+   hyperlambda.code.like:string
+   hyperlambda.code.mt:string
+   hyperlambda.code.lt:string
+   hyperlambda.code.mteq:string
+   hyperlambda.code.lteq:string
+   hyperlambda.code.neq:string
+   hyperlambda.code.eq:string
+   hyperlambda.prompt.like:string
+   hyperlambda.prompt.mt:string
+   hyperlambda.prompt.lt:string
+   hyperlambda.prompt.mteq:string
+   hyperlambda.prompt.lteq:string
+   hyperlambda.prompt.neq:string
+   hyperlambda.prompt.eq:string
+
+// Meta data description for endpoint
+.description:Counts items from your hyperlambda table in your fine-tune database
+
+// Type of endpoint
+.type:crud-count
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|fine-tune]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:hyperlambda
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

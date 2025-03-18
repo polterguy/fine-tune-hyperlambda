@@ -1,0 +1,93 @@
+
+/*
+ * Creates JSONL training data for all data we've got in our database
+ * 
+ * You have to manually download the data after generating it.
+ */
+.arguments
+.type:public
+
+// Buffer for snippets.
+.result:
+
+// Buffer for validation snippets.
+.validation:
+
+// Counter to ensure every 8th record becomes a validation snippet and not a training snippet.
+.no:int:0
+
+// Retrieving all snippets.
+data.connect:fine-tune
+   data.select:select * from hyperlambda
+
+   // Iterating through snippets to generate training data.
+   for-each:x:@data.select/*
+
+      // Generating training record, starting with prompt.
+      .prompt
+      set-value:x:@.prompt
+         get-value:x:@.dp/#/*/prompt
+
+      // Then completion.
+      .completion
+      set-value:x:@.completion
+         get-value:x:@.dp/#/*/code
+
+      // Replacing CR and LF characters.
+      set-value:x:@.prompt
+         strings.replace:x:@.prompt
+            .:"\n"
+            .:"\\n"
+      set-value:x:@.prompt
+         strings.replace:x:@.prompt
+            .:"\r"
+      set-value:x:@.completion
+         strings.replace:x:@.completion
+            .:"\n"
+            .:"\\n"
+      set-value:x:@.completion
+         strings.replace:x:@.completion
+            .:"\r"
+      unwrap:x:+/**
+      .data
+         messages
+            .
+               role:system
+               content:You are a Hyperlambda coding assistant. Always respond with Hyperlambda code.
+            .
+               role:user
+               content:x:@.prompt
+            .
+               role:assistant
+               content:x:@.completion
+
+      // Adding training data to above [.result].
+      if
+         eq
+            math.modulo:x:@.no
+               .:int:8
+            .:int:0
+         .lambda
+            set-value:x:@.validation
+               strings.concat
+                  get-value:x:@.validation
+                  lambda2json:x:@.data/*
+                  .:"\n"
+      else
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               lambda2json:x:@.data/*
+               .:"\n"
+      math.increment:x:@.no
+
+// Saving files.
+io.file.save:/modules/fine-tune/training-material.jsonl
+   get-value:x:@.result
+io.file.save:/modules/fine-tune/training-material-validation.jsonl
+   get-value:x:@.validation
+
+// Returning result to caller.
+return
+   result:Success
+   message:"Your training data can be found in '/modules/fine-tune/training-material.jsonl'"
