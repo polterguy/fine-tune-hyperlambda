@@ -1,0 +1,39 @@
+
+/*
+ * Returns existing Hyperlambda training data
+ * 
+ * Pass in [no] being the snippet number to retrieve.
+ * Notice, if this function returns nothing, there are no more training data left and you are done.
+ * The method will return the next [no] to use upon consecutive invocations.
+ */
+.arguments
+   no:int
+.type:public
+
+data.connect:fine-tune
+
+   data.select:select * from hyperlambda where hyperlambda_id > @id
+      @id:x:@.arguments/*/no
+   for-each:x:@data.select/*
+      if
+         and
+            not
+               strings.contains:x:@.dp/#/*/code
+                  .:"# Python equivalent"
+            mt
+               openai.tokenize:x:@.dp/#/*/code
+               .:int:100
+            lt
+               openai.tokenize:x:@.dp/#/*/code
+               .:int:500
+         .lambda
+            hyper2lambda:x:@.dp/#/*/code
+            unwrap:x:+/*/*
+            insert-before:x:@hyper2lambda/0
+               .
+                  ..:x:@.dp/#/*/prompt
+            lambda2hyper:x:@hyper2lambda/*
+               comments:true
+            yield
+               hyperlambda:x:@lambda2hyper
+               no:x:@.dp/#/*/hyperlambda_id

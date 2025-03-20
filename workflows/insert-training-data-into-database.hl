@@ -1,0 +1,57 @@
+
+/*
+ * Inserts new training data into the type
+ * 
+ * Pass in [no] being the snippet ID you're currently handling.
+ */
+.arguments
+   no:int
+   python:string
+.type:public
+
+data.connect:fine-tune
+
+   data.select:select * from hyperlambda where hyperlambda_id = @id
+      @id:x:@.arguments/*/no
+   .snippet
+   hyper2lambda:x:@data.select/*/*/code
+      comments:true
+   strings.concat
+      get-value:x:@data.select/*/*/prompt
+      .:" - With Python equivalent"
+   unwrap:x:+/*/*
+   insert-before:x:@hyper2lambda/0
+      .
+         ..:x:@strings.concat
+   lambda2hyper:x:@hyper2lambda/*
+      comments:true
+   set-value:x:@.snippet
+      strings.concat
+         get-value:x:@lambda2hyper
+         .:"\r\n\r\n"
+         .:"/*\r\n\r\n"
+         .:"# Python equivalent\r\n"
+         get-value:x:@.arguments/*/python
+         .:"\r\n\r\n*/"
+
+   // Making sure we've got valid Hyperlambda.
+   hyper2lambda:x:@.snippet
+      comments:true
+
+   // Generating a unique filename.
+   .filename
+   set-value:x:@.filename
+      strings.concat
+         .:/etc/hyperlambda-training-material/hl/
+         crypto.random
+            min:5
+            max:5
+         .:synthetic-
+         get-value:x:@.arguments/*/no
+         .:".hl"
+   if
+      io.file.exists:x:@.filename
+      .lambda
+         throw:"We've already generated training data for this snippet"
+   io.file.save:x:@.filename
+      get-value:x:@.snippet
