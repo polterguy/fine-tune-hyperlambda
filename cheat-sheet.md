@@ -113,6 +113,8 @@ By default, all values are **strings**, but explicit typing is supported.
  */
 ```
 
+Single line comments **MUST** be on a separate line, typically above the node(s) it's commenting.
+
 ---
 
 ## **7. Math Operations**
