@@ -5,6 +5,7 @@
  * You have to manually download the data after generating it.
  */
 .arguments
+   validation:bool
 .type:public
 
 // Buffer for snippets.
@@ -80,10 +81,14 @@ data.connect:fine-tune
 
       // Adding training data to above [.result].
       if
-         eq
-            math.modulo:x:@.no
-               .:int:8
-            .:int:0
+         and
+            eq
+               get-value:x:@.arguments/*/validation
+               .:bool:true
+            eq
+               math.modulo:x:@.no
+                  .:int:8
+               .:int:0
          .lambda
             set-value:x:@.validation
                strings.concat
@@ -101,8 +106,9 @@ data.connect:fine-tune
 // Saving files.
 io.file.save:/modules/fine-tune-hyperlambda/training-material.jsonl
    get-value:x:@.result
-io.file.save:/modules/fine-tune-hyperlambda/training-material-validation.jsonl
-   get-value:x:@.validation
+if:x:@.arguments/*/validation
+   io.file.save:/modules/fine-tune-hyperlambda/training-material-validation.jsonl
+      get-value:x:@.validation
 
 // Returning result to caller.
 return
