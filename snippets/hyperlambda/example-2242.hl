@@ -1,19 +1,52 @@
 
-// Hyperlambda endpoint taking arguments. The SQL query selects distinct email, first name, last name, and genre name of customers who listen to rock music from the Chinook database.
+// Write a Hyperlambda script to return all available template snippets from the backend, including prompt and completion details.
 .arguments
-   filter:string
+   private:bool
 
-// Connecting to database.
-data.connect:chinook
-   database-type:sqlite
+// Making sure user has access to invoked endpoint.
+auth.ticket.verify:root
 
-   // Parametrizing [data.select].
-   add:x:./*/data.select
-      get-nodes:x:@.arguments/*
+// Contains list of templates we find.
+.result
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name like @filter\n  order by c.Email\n"
-      database-type:sqlite
+// Listing files recursively.
+io.file.list-recursively:/modules/
+io.file.list-recursively:/system/
+for-each:x:../*/io.file.list-recursively/*
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+   // Checking if this is a template file.
+   if
+      and
+         strings.ends-with:x:@.dp/#
+            .:.md
+         strings.contains:x:@.dp/#
+            .:/ts-templates/
+      .lambda
+
+         /*
+          * This is a template file.
+          * 
+          * Figuring out its prompt and completion.
+          */
+         load-file:x:@.dp/#
+         strings.split:x:@load-file
+            .:"\n"
+         .prompt
+         set-value:x:@.prompt
+            strings.trim:x:@strings.split/0
+         .completion
+         remove-nodes:x:@strings.split/0
+         set-value:x:@.completion
+            strings.join:x:@strings.split/*
+               .:"\n"
+         set-value:x:@.completion
+            strings.trim:x:@.completion
+         unwrap:x:+/*/*/*
+         add:x:@.result
+            .
+               .
+                  prompt:x:@.prompt
+                  completion:x:@.completion
+
+// Returning result to caller.
+return-nodes:x:@.result/*

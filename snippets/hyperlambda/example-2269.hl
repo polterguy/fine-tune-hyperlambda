@@ -1,10 +1,35 @@
 
-// Creates a new item in DATABASE_NAME database and its TABLE_NAME table.
-data.connect:DATABASE_NAME
-   database-type:sqlite
+// Hyperlambda script that creates a log item using specified arguments like type, content, and meta information.
+.arguments
+   type:string
+   content:string
+   meta:*
 
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:TABLE_NAME
-      values
+/*
+ * Ensures user is authorized to access endpoint.
+ * Notice, we only allow authenticated users to access this endpoint.
+ * What roles they belong to is not important, as long as they're authenticated.
+ */
+auth.ticket.verify
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/content
+validators.enum:x:@.arguments/*/type
+   .:info
+   .:error
+   .:debug
+   .:fatal
+
+// Creating a log entry using the specified type of logger.
+add:x:../*/log-invocation
+   get-nodes:x:@.arguments/*/meta/*
+set-name:x:../*/log-invocation
+   strings.concat
+      .:log.
+      get-value:x:@.arguments/*/type
+log-invocation:x:@.arguments/*/content
+
+// Returning success to caller.
+return
+   result:success

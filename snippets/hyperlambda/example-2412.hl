@@ -1,20 +1,30 @@
-// Connects to sakila with database transactions
-data.connect:sakila
-   data.transaction.create
-      data.execute:delete from film_actor
 
-      /*
-       * If you uncomment the line below the
-       * transaction will be committed, resulting
-       * in that everything from your film_actor
-       * table will be deleted.
-       */
-      //data.transaction.commit
+// Creates an item in your cloudlets table in your [generic|hub] database according to the specified arguments.
+.arguments
+   created:date
+   name:string
+   plan:string
+   cluster:string
+   user:string
 
-data.connect:sakila
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   /*
-    * Notice, this still returns 5462 items, since
-    * transaction was implicitly rolled back above.
-    */
-   data.scalar:select count(*) from film_actor
+// Opening up database connection.
+data.connect:[generic|hub]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:cloudlets
+      return-id:bool:true
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      id:x:@data.create

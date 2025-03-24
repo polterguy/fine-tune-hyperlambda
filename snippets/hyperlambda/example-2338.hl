@@ -1,71 +1,121 @@
 
-// Returns a single object from NetSuite to caller
-.arguments
+// Hyperlambda script to create a system message using OpenAI and GPT-4 based on a specified template, URL, and instruction.
+slots.create:magic.ai.create-system-message
 
-   // Mandatory argument declaring the type of entity we want to retrieve.
-   type:string
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/url
+   validators.mandatory:x:@.arguments/*/template
+   validators.mandatory:x:@.arguments/*/instruction
+   validators.url:x:@.arguments/*/url
 
-   // Mandatory argument declaring the ID of the entity we should return.
-   id:long
+   // Retrieving context.
+   execute:magic.http.scrape-url
+      url:x:@.arguments/*/url
+   if
+      not-null:x:@execute
+      .lambda
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/id
-validators.mandatory:x:@.arguments/*/type
+         // Oops ...!!
+         throw:Could not scrape URL
+            public:bool:true
+            status:x:@execute
 
-/*
- * Returns an access token for NetSuite.
- * 
- * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
- * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
- * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
- */
-execute:magic.workflows.actions.execute
-   name:netsuite-get-access-token
-   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
-   arguments
-
-// Creating our idempotency key to prevent replay attacks.
-guid.new
-
-// Creating invocation URL.
-.url
-set-value:x:@.url
-   strings.concat
-      .:"https://"
-      config.get:"magic:netsuite:account-id"
-      .:.suitetalk.api.netsuite.com/services/rest/record/v1
-      .:/
-      get-value:x:@.arguments/*/type
-      .:/
-      get-value:x:@.arguments/*/id
-
-// Invoking our HTTP GET endpoint, now correctly parametrised.
-http.get:x:@.url
-   token:x:--/execute/=netsuite-get-access-token/*/access-token
-   headers
-      X-NetSuite-Idempotency-Key:x:@guid.new
-
-// Converts the result to a lambda object.
-json2lambda:x:@http.get/*/content
-
-// Cleaning up redundant stuff.
-remove-nodes:x:@json2lambda/*/category
-remove-nodes:x:@json2lambda/**/links
-
-// Sanity checking above invocation.
-if
-   not
+   // Building our context based upon the [url] specified.
+   .context:
+   while
       and
-         mte:x:@http.get
-            .:int:200
-         lt:x:@http.get
-            .:int:300
-   .lambda
+         exists:x:@execute/0
+         lt
+            openai.tokenize:x:@.context
+            .:int:4000
+      .lambda
 
-      // Oops, error ...!!
-      lambda2hyper:x:@json2lambda
-      log.error:x:@lambda2hyper
-      throw:Could not get entity from NetSuite, check your log for details.
+         // Temporary value.
+         .tmp
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.context
+               .:"\n\n"
+               get-value:x:@execute/0/*/prompt
+               .:"\n\n"
+               get-value:x:@execute/0/*/completion
+         if
+            lt
+               openai.tokenize:x:@.tmp
+               .:int:4000
+            .lambda
 
-// Returning our entity to caller.
-return:x:@json2lambda/*
+               // Still below [max_tokes].
+               set-value:x:@.context
+                  get-value:x:@.tmp
+
+         // Removing top snippet.
+         remove-nodes:x:@execute/0/*/snippets/0
+         if
+            not-exists:x:@execute/0/*/snippets/0
+            .lambda
+
+               // Removing currently iterated URL.
+               remove-nodes:x:@execute/0
+
+   // Trimming result.
+   set-value:x:@.context
+      strings.trim:x:@.context
+
+   // Retrieving OpenAI API token from configuration settings.
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+
+   // Invokes OpenAI.
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:gpt-4o
+         max_tokens:int:3600
+         temperature:decimal:0.3
+         messages
+            .
+               role:system
+               content:x:@.arguments/*/instruction
+            .
+               role:user
+               content:x:@.arguments/*/template
+            .
+               role:user
+               content:x:@.context
+
+   // Sanity checking above invocation.
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+
+         // Oops, error - Logging error and returning status 500 to caller.
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+         throw:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+
+   // Returning answer to caller.
+   strings.replace:x:@http.post/*/content/*/choices/0/*/message/*/content
+      .:"\r"
+      .:
+   strings.replace:x:-
+      .:"\n"
+      .:"\n"
+   return:x:-

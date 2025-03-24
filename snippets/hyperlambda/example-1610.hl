@@ -1,31 +1,12 @@
+// Delete an item by ID with authorization, specifying a short timeout
+http.delete:"https://api.example.com/items/123"
 
-// Hyperlambda script that sets the reCAPTCHA key and secret to the specified values, ensuring the user is authorized.
-.arguments
-   key:string
-   secret:string
+   // attach query parameters instead of hardcoding them in URL
+   query
+      category:cars
 
-// Making sure user is allowed to invoke endpoint
-auth.ticket.verify:root
+   // include Bearer token for auth if required by the API
+   token:XYZ_SECRET_TOKEN_123
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/key
-validators.mandatory:x:@.arguments/*/secret
-
-// Updating settings.
-config.load
-json2lambda:x:-
-remove-nodes:x:@json2lambda/*/magic/*/auth/*/recaptcha
-unwrap:x:+/*/*/*
-add:x:@json2lambda/*/magic/*/auth
-   .
-      recaptcha
-         key:x:@.arguments/*/key
-         secret:x:@.arguments/*/secret
-
-// Saving updated settings.
-lambda2json:x:@json2lambda/*
-config.save:x:-
-
-// Retrieving key configuration setting and returning to caller.
-return-nodes
-   result:success
+   // abort if no response within 5 seconds
+   timeout:int:5

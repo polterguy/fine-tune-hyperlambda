@@ -1,12 +1,59 @@
 
-// Hyperlambda snippet that loops through messages and logs them.
+/*
+ * Returns total discounts applied for quotes during period
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
+.arguments
 
-// Loops through messages and logs them.
-.messages
-   message1:Welcome to our service!
-   message2:Your order has been shipped.
-   message3:Your payment was successful.
-for-each:x:@.messages/*
+   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
+   min_date:string
 
-   // Logging each message.
-   log.info:x:@.dp/#
+   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
+   max_date:string
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items on [min_date].
+   if
+      and
+         exists:x:@.arguments/*/min_date
+         not-null:x:@.arguments/*/min_date
+      .lambda
+         convert:x:@.arguments/*/min_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.mt:x:@convert
+
+   // Checking if we're filtering items on [max_date].
+   if
+      and
+         exists:x:@.arguments/*/max_date
+         not-null:x:@.arguments/*/max_date
+      .lambda
+         convert:x:@.arguments/*/max_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.lt:x:@convert
+
+   // Reading records.
+   mssql.read
+      table:addv_Cotizaciones
+      columns
+         sum((Quantity * [Unit Price]) - Amount)
+            as:TotalDiscountsApplied
+      where
+         and
+      limit:-1
+   
+   // Returning result of above invocation to caller.
+   yield
+      result:x:@mssql.read/*

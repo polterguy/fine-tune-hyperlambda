@@ -1,98 +1,56 @@
 
-// Scrape URL
+// Read or list records from your CustomerCustomerDemo table in your northwind database
 .arguments
 
-   // If specified declares the name of the machine learning type from where the invocation originated.
-   _type:string
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
 
-   // Mandatory argument and the actual URL to scrape.
-   url:string
+   // Offset into the dataset of where to start retrieving records
+   offset:long
 
-// Scrapes the specified URL and returns the content as Markdown
-execute:magic.workflows.actions.execute
-   name:openai-scrape-url
-   filename:/modules/openai/workflows/actions/openai-scrape-url.hl
-   arguments
-      url:x:@.arguments/*/url
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
 
-/*
- * Now we need to make sure we don't overflow the type's maximum context tokens.
- * 
- * Notice, in case workflow is executed without a [_type] argument, we default
- * the context size to 100,000.
- */
-.max-tokens:int:100000
-if
-   and
-      exists:x:@.arguments/*/_type
-      not-null:x:@.arguments/*/_type
-   .lambda
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
 
-      // We've got a machine learning type, finding its maximum context token count.
-      data.connect:[generic|magic]
-         database-type:sqlite
-         data.scalar:select max_context_tokens from ml_types where type = @type
-            database-type:sqlite
-            @type:x:@.arguments/*/_type
-         set-value:x:@.max-tokens
-            convert:x:@data.scalar
-               type:int
+   // Optional filtering args
+   CustomerCustomerDemo.CustomerID.like:string
+   CustomerCustomerDemo.CustomerID.eq:string
+   CustomerCustomerDemo.CustomerTypeID.like:string
+   CustomerCustomerDemo.CustomerTypeID.eq:string
 
-      /*
-       * Checking if we're about to overflow the max context tokens,
-       * such that we can try to remove URLs until we're below threshold.
-       */
-      .json
-      set-value:x:@.json
-         lambda2json:x:@execute/*
-      while
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:CustomerCustomerDemo
+      columns
+         CustomerCustomerDemo.CustomerID
+         CustomerCustomerDemo.CustomerTypeID
+      where
          and
-            exists:x:@execute/*/urls/0
-            mt
-               openai.tokenize:x:@.json
-               get-value:x:@.max-tokens
-         .lambda
 
-            // We need to prune the result, removing the last URL until we're below threshold.
-            remove-nodes:x:@execute/*/urls/0/-
-
-            // Updating above JSON.
-            set-value:x:@.json
-               lambda2json:x:@execute/*
-
-      // Checking if we've remove all URLs.
-      if
-         not
-            exists:x:@execute/*/urls/0
-         .lambda
-
-            // Zero URLs in result set, making sure we don't return [urls] at all.
-            remove-nodes:x:@execute/*/urls
-
-      /*
-       * Now pruning actual result until we're below threshold.
-       * 
-       * This is in case removing all URLs didn't prune enough tokens.
-       */
-      while
-         mt
-            openai.tokenize:x:@.json
-            get-value:x:@.max-tokens
-         .lambda
-
-            // Removing 10% of [result] until we're below threshold.
-            math.multiply
-               strings.length:x:@execute/*/result
-               .:decimal:0.9
-            set-value:x:@execute/*/result
-               strings.substring:x:@execute/*/result
-                  .:int:0
-                  convert:x:@math.multiply
-                     type:int
-
-            // Updating JSON result such that next iteration can correctly calculate tokens.
-            set-value:x:@.json
-               lambda2json:x:@execute/*
-
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

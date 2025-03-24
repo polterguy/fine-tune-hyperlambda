@@ -1,8 +1,31 @@
-/*
- * This example tries to crop an image by removing too many pixels,
- * causing an error since the total crop size exceeds the image dimensions.
- */
-image.crop
-   file:/input.jpg
-   left:int:500
-   right:int:500
+
+// Hyperlambda script that sets the reCAPTCHA key and secret to the specified values, ensuring the user is authorized.
+.arguments
+   key:string
+   secret:string
+
+// Making sure user is allowed to invoke endpoint
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/key
+validators.mandatory:x:@.arguments/*/secret
+
+// Updating settings.
+config.load
+json2lambda:x:-
+remove-nodes:x:@json2lambda/*/magic/*/auth/*/recaptcha
+unwrap:x:+/*/*/*
+add:x:@json2lambda/*/magic/*/auth
+   .
+      recaptcha
+         key:x:@.arguments/*/key
+         secret:x:@.arguments/*/secret
+
+// Saving updated settings.
+lambda2json:x:@json2lambda/*
+config.save:x:-
+
+// Retrieving key configuration setting and returning to caller.
+return-nodes
+   result:success

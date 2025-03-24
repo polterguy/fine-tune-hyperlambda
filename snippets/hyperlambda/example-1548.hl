@@ -1,25 +1,41 @@
 
-// Retrieves the specified [username] and return information associated with the user.
+// Workflow action executing the specified shell/bash command with the specified arguments, and returns the result to caller as a string
 .arguments
-   username
+   command
       type:string
       mandatory:bool:true
-.icon:supervisor_account
+   args
+      type:string
+      mandatory:bool:false
+   structured
+      type:bool
+      mandatory:bool:false
+.icon:rocket_launch
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/command
 
-// Opens up database connection.
-data.connect:[generic|magic]
+// Checking if we've got arguments.
+if
+   exists:x:@.arguments/*/args
+   .lambda
 
-   // Inserting user into database.
-   data.read
-      table:users
-      columns
-         username
-         created
-      where
-         and
-            username.eq:x:@.arguments/*/username
-   yield
-      created:x:@data.read/*/*/created
+      // Adding argument to invocation below.
+      add:x:../*/system.execute
+         .
+            get-value:x:@.arguments/*/args
+
+// Executes shell command
+system.execute:x:@.arguments/*/command
+   structured:x:@.arguments/*/structured
+
+/*
+ * Checking if caller wanted structured results, at which point we return an array
+ * containing lines returned from above invocation.
+ */
+if:x:@.arguments/*/structured
+   return-nodes:x:@system.execute/*
+
+// Returning result of above invocation to caller.
+yield
+   result:x:@system.execute

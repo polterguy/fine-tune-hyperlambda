@@ -1,313 +1,137 @@
 
-// Write a Hyperlambda script to query an endpoint with an instruction and a query, using OpenAI to process the context.
+// Write a Hyperlambda script for an OpenAI chat endpoint to handle conversations using 'gpt-xxx' models, including streaming and lead email handling.
 .arguments
-   session:string
-   query:string
-   instruction:string
+   prompt:string
+   type:string
+   references:bool
+   chat:bool
    recaptcha_response:string
+   user_id:string
+   session:string
+   stream:bool
+   data:string
+   referrer:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/session
-validators.string:x:@.arguments/*/session
-   min:5
-   max:50
-validators.mandatory:x:@.arguments/*/query
-validators.string:x:@.arguments/*/query
-   min:2
-   max:200
-validators.mandatory:x:@.arguments/*/instruction
-validators.string:x:@.arguments/*/instruction
-   min:5
-   max:750
+// Executing all registered interceptor slots.
+add:x:+/*/arguments
+   get-nodes:x:@.arguments/*
+execute:magic.misc.execute-slots
+   namespace:magic.openai.chat-interceptor.
+   arguments
 
-/*
- * Checking if backend is configured to use reCAPTCHA, and if so,
- * making sure we ensure the frontend supplied a [recaptcha_response],
- * and invoking slot responsible for verifying reCAPTCHA value.
- */
-config.get:"magic:auth:recaptcha:key"
-if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-   .lambda
+// Invoking slot containing commonalities for all endpoints.
+insert-before:x:../*/signal/*/.callback
+   get-nodes:x:@.arguments/*
+signal:magic.ai.endpoint-common
+   .callback
 
-      // [recaptcha_response] is a mandatory field.
-      validators.mandatory:x:@.arguments/*/recaptcha_response
-
-      // Retrieving secret and invoking slot responsible for verifying reCAPTCHA value.
-      config.get:"magic:auth:recaptcha:secret"
-      validators.recaptcha:x:@.arguments/*/recaptcha_response
-         min:decimal:0.3
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-
-// Buffer for context data.
-.context
-
-// Checking if caller supplied a URL or a search query.
-if
-   or
-      strings.starts-with:x:@.arguments/*/query
-         .:"http://"
-      strings.starts-with:x:@.arguments/*/query
-         .:"https://"
-   .lambda
-
-      // Caller supplied a URL.
-      strings.concat
-         .:"Scraping URL: "
-         get-value:x:@.arguments/*/query
-      unwrap:x:+/**
-      sockets.signal:x:@.arguments/*/session
-         args
-            message:x:@strings.concat
-            type:system
-      sleep:100
-
-      // Scraping specified URL.
-      unwrap:x:+/*
-      signal:magic.ai.url.get
-         url:x:@.arguments/*/query
-      unwrap:x:+/*
-      signal:magic.ai.html.extract
-         url:x:@.arguments/*/query
-         images:bool:true
-         code:bool:true
-         lists:bool:true
-         main:bool:true
-         html:x:@signal/@signal
-
-      // Building our context making sure we don't overflow 10,000 tokens.
-      .tmp:
-      while
-         and
-            exists:x:@signal/*/snippets/0
-            lt
-               openai.tokenize:x:@.tmp
-               .:int:5000
-         .lambda
-
-            // Updating [.context] to current value of [.tmp].
-            set-value:x:@.context
-               get-value:x:@.tmp
-
-            // Checking if prompt is not-null and existing.
-            if
-               and
-                  exists:x:@signal/*/snippets/0/*/prompt
-                  not-null:x:@signal/*/snippets/0/*/prompt
-                  neq:x:@signal/*/snippets/0/*/prompt
-                     .:
-               .lambda
-
-                  // We have a prompt.
-                  set-value:x:@.tmp
-                     strings.concat
-                        get-value:x:@.tmp
-                        .:"\n"
-                        .:"\n"
-                        get-value:x:@signal/*/snippets/0/*/prompt
-
-            // Checking if completion is not-null and existing.
-            if
-               and
-                  exists:x:@signal/*/snippets/0/*/completion
-                  not-null:x:@signal/*/snippets/0/*/completion
-                  neq:x:@signal/*/snippets/0/*/completion
-                     .:
-               .lambda
-
-                  // We have a completion.
-                  set-value:x:@.tmp
-                     strings.concat
-                        get-value:x:@.tmp
-                        .:"\n"
-                        .:"\n"
-                        get-value:x:@signal/*/snippets/0/*/completion
-
-            // Removing top snippet.
-            remove-nodes:x:@signal/*/snippets/0
-else
-
-   // Caller supplied a search query, informing caller that we're searching.
-   strings.concat
-      .:"Searching DuckDuckGo for: "
-      get-value:x:@.arguments/*/query
-   unwrap:x:+/**
-   sockets.signal:x:@.arguments/*/session
-      args
-         message:x:@strings.concat
-         type:system
-   sleep:100
-
-   // Caller supplied a search query.
-   unwrap:x:+/*
-   signal:magic.ai.create-search-context
-      query:x:@.arguments/*/query
-      max_tokens:int:5000
-      session:x:@.arguments/*/session
-   set-value:x:@.context
-      strings.trim:x:@signal
-
-// Trimming context.
-set-value:x:@.context
-   strings.trim:x:@.context
-
-// Adding all arguments to [fork] invocation.
-insert-before:x:./*/fork/0
-   get-nodes:x:@.arguments
-   get-nodes:x:@.context
-
-// Signaling caller on sockets.
-openai.tokenize:x:@.arguments/*/instruction
-openai.tokenize:x:@.context
-strings.concat
-   .:"Invoking OpenAI with "
-   get-value:x:@openai.tokenize
-   .:" context tokens and "
-   get-value:x:@openai.tokenize/@openai.tokenize
-   .:" instruction tokens"
-unwrap:x:+/**
-sockets.signal:x:@.arguments/*/session
-   args
-      message:x:@strings.concat
-      type:system
-sleep:100
-
-// Creating a fork to take advantage of SSE features of OpenAI.
-fork
-
-   // Making sure we catch exceptions.
-   try
-
-      // Retrieving OpenAI API token to use.
-      .token
-      set-value:x:@.token
-         strings.concat
-            .:"Bearer "
-            get-first-value
-               get-value:x:@.arguments/*/api_key
-               config.get:"magic:openai:key"
-
-      // Unwrapping [.session] inside our [.sse].
-      unwrap:x:+/*/.sse/*/.session
-
-      // Invoking OpenAI, now with a decorated prompt and an SSE callback.
-      http.post:"https://api.openai.com/v1/chat/completions"
-         convert:true
-         .sse
-
-            // Our socket channel for notifying client of new tokens.
-            .session:x:@.arguments/*/session
-
-            // Verifying OpenAI sent us actual content.
-            if
-               and
-                  exists:x:@.arguments/*/message
-                  not-null:x:@.arguments/*/message
-                  strings.starts-with:x:@.arguments/*/message
-                     .:"data:"
-               .lambda
-
-                  // Parsing message sent to us from OpenAI.
-                  strings.substring:x:@.arguments/*/message
-                     .:int:5
-                  strings.trim:x:@strings.substring
-
-                  // Making sure OpenAI sent us something at all.
-                  if
-                     neq:x:@strings.trim
-                        .:
-                     .lambda
-
-                        // Checking if we're done.
-                        if
-                           eq:x:@strings.trim
-                              .:[DONE]
-                           .lambda
-
-                              // OpenAI is done.
-                              sockets.signal:x:@.session
-                                 args
-                                    finished:bool:true
-                        else
-
-                           // More data to come.
-                           json2lambda:x:@strings.trim
-
-                           // Updating finish reason if we were given a reason.
-                           if
-                              and
-                                 exists:x:@json2lambda/*/choices/0/*/finish_reason
-                                 not-null:x:@json2lambda/*/choices/0/*/finish_reason
-                              .lambda
-
-                                 // Signaling client what finish reason we have.
-                                 unwrap:x:+/*/*
-                                 sockets.signal:x:@.session
-                                    args
-                                       finish_reason:x:@json2lambda/*/choices/0/*/finish_reason
-
-                           // Making sure we have a message.
-                           if
-                              and
-                                 not-null:x:@json2lambda/*/choices/0/*/delta/*/content
-                                 neq:x:@json2lambda/*/choices/0/*/delta/*/content
-                                    .:
-                              .lambda
-
-                                 // Appending content to above [.result].
-                                 set-value:x:@.result
-                                    strings.concat
-                                       get-value:x:@.result
-                                       get-value:x:@json2lambda/*/choices/0/*/delta/*/content
-
-                                 // Signaling client with the newly acquired data from OpenAI.
-                                 unwrap:x:+/*/*
-                                 sockets.signal:x:@.session
-                                    args
-                                       message:x:@json2lambda/*/choices/0/*/delta/*/content
-         headers
-            Authorization:x:@.token
-            Content-Type:application/json
-            Accept:text/event-stream
-         payload
-            model:gpt-4o
-            max_tokens:int:4000
-            temperature:decimal:0.3
-            stream:bool:true
-            messages
-               .
-                  role:system
-                  content:x:@.arguments/*/instruction
-               .
-                  role:system
-                  content:x:@.context
-
-      // Sanity checking above invocation.
+      // Checking if prompt contains an email address.
       if
-         not
-            and
-               mte:x:@http.post
-                  .:int:200
-               lt:x:@http.post
-                  .:int:300
+         and
+            strings.contains:x:@.arguments/*/prompt
+               .:@
+            not-null:x:@.arguments/*/contact_us
+            neq:x:@.arguments/*/contact_us
+               .:
+            not-null:x:@.arguments/*/lead_email
+            neq:x:@.arguments/*/lead_email
+               .:
          .lambda
 
-            // Oops, error - Logging error and returning status 500 to caller.
-            throw:x:@http.post/*/content/*/error/*/message
+            /*
+             * Prompt contains an email address, and model is configured with a
+             * lead email address or [contact_us]/[lead_email] property - Hence
+             * treating prompt as a lead if we can, sending an email to lead email
+             * address with the conversation.
+             */
+            unwrap:x:+/*
+            signal:magic.ai.send-lead-email
+               type:x:@.arguments/*/type
+               prompt:x:@.arguments/*/prompt
+               session:x:@.arguments/*/session
+               user_id:x:@.arguments/*/user_id
+               lead_email:x:@.arguments/*/lead_email
+               contact_us:x:@.arguments/*/contact_us
+            if:x:@signal
+               unwrap:x:+/*
+               return
+                  db_time:decimal:-1
+                  finish_reason:cached
+                  result:x:@.arguments/*/contact_us
+
+      // Checking if [referrer] argument was given, and if not, using HTTP Referrer header.
+      .referrer
+      if
+         and
+            exists:x:@.arguments/*/referrer
+            not-null:x:@.arguments/*/referrer
+            neq:x:@.arguments/*/referrer
+               .:
+         .lambda
+
+            // Referrer argument specified.
+            set-value:x:@.referrer
+               get-value:x:@.arguments/*/referrer
       else
 
-         // Success! Logging as such!
-         log.info:Invoking OpenAI was a success
-   .catch
+         // No referrer argument, defaulting to HTTP header
+         set-value:x:@.referrer
+            request.headers.get:Referer
 
-      // Oops!
-      log.error:x:@.arguments/*/message
+      // Checking if max-tokens have been overridden.
+      .tokens
+      set-value:x:@.tokens
+         config.get:"magic:openai:max_tokens"
 
-// Returning success to caller.
-return
-   result:success
+      // Checking what type of model this is, and invoking correct slot accordingly.
+      if
+         or
+            strings.starts-with:x:@.arguments/*/model
+               .:gpt
+            strings.starts-with:x:@.arguments/*/model
+               .:o1-
+            strings.starts-with:x:@.arguments/*/model
+               .:o3-
+            neq:x:@.slot
+               .:magic.ai.chat
+         .lambda
+
+            // Retrieving Referrer value and passing into slot.
+            unwrap:x:+/*/*
+            add:x:./*/signal
+               .
+                  referrer:x:@.referrer
+            remove-nodes:x:@.arguments/*/referrer
+
+            // Invoking chat slot.
+            add:x:./*/signal
+               get-nodes:x:@.arguments/*
+
+            // Checking if max_tokens have been overridden.
+            if
+               not-null:x:@.tokens
+               .lambda
+                  set-value:x:@.lambda/@.lambda/*/signal/*/model_size
+                     convert:x:@.tokens
+                        type:int
+
+            // Invoking chat slot and returning result to caller.
+            signal:x:@.arguments/*/completion_slot
+            return-nodes:x:@signal/*
+      else
+
+         // Retrieving Referrer value and passing into slot.
+         unwrap:x:+/*/*
+         add:x:./*/signal
+            .
+               referrer:x:@.referrer
+         remove-nodes:x:@.arguments/*/referrer
+
+         // Invoking completion slot.
+         add:x:./*/signal
+            get-nodes:x:@.arguments/*
+         signal:magic.ai.completion
+         return-nodes:x:@signal/*
+
+// Returning result of worker slot to caller.
+return-nodes:x:@signal/*

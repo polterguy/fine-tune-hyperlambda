@@ -1,88 +1,44 @@
+// Submits feedback and handles all common HTTP status codes using [switch] and [throw] with correct value syntax
 
-/*
- * Lists customers
- * 
- * Optionally apply limit, offset or filter as you see fit
- */
 .arguments
 
-   // Optional filtering argument allowing to filter items on name, no, address, phone, email, etc.
-   filter:string
+// Final feedback submission result
+.feedback.status
 
-   // Optional maximum number of records to return. Defaults to 10 if not specified.
-   limit:long
+// Send HTTP POST to feedback API
+http.post:"https://api.feedbackly.io/v1/submit"
+   convert:true
+   payload
+      name:Sarah Lee
+      email:sarah.lee@example.com
+      message:This platform is fantastic!
 
-   // Optional offset into records of where to start returning items.
-   offset:long
+// Branch based on HTTP status code
+switch:x:@http.post
 
-// Making sure user is authorised to access the workflow.
-auth.ticket.verify:mnhc-admin
+   case:int:200
+      set-value:x:@.feedback.status
+         .:Feedback submitted successfully
 
-// Getting limit value, defaulting to 10
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:10
+   case:int:400
+      throw:400 Bad Request – Please check your input data
 
-// Getting offset value, defaulting to 0
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
+   case:int:401
+      throw:401 Unauthorized – You must log in to submit feedback
 
-// Opening up database connection.
-mssql.connect:[production|MNDG_LSC18-1]
+   case:int:403
+      throw:403 Forbidden – You don’t have permission to perform this action
 
-   // Checking if we're filtering items.
-   if
-      and
-         exists:x:@.arguments/*/filter
-         not-null:x:@.arguments/*/filter
-         neq:x:@.arguments/*/filter
-            .:
-      .lambda
+   case:int:404
+      throw:404 Not Found – The feedback endpoint does not exist
 
-         // Creating our filtering condition. To filter on additional columns, add these columns here.
-         .fields
-            .:No_
-            .:Name
-            .:Address
-            .:"Address 2"
-            .:City
-            .:Post Code
-            .:County
-            .:Contact
-            .:"Phone No_"
-            .:Mobile Phone No_
-            .:Customer Posting Group
-            .:Customer Price Group
-            .:"Salesperson Code"
-            .:Customer Disc_ Group
-            .:E-Mail
-         for-each:x:@.fields/*
-            .condition
-               cond
-            set-name:x:@.condition/*
-               strings.concat
-                  get-value:x:@.dp/#
-                  .:.like
-            set-value:x:@.condition/*
-               strings.concat
-                  .:%
-                  get-value:x:@.arguments/*/filter
-                  .:%
-            add:x:@mssql.connect/*/mssql.read/*/where/*/or
-               get-nodes:x:@.condition/*
+   case:int:500
+      throw:500 Internal Server Error – Please try again later
 
-   // Reading records.
-   mssql.read
-      table:addv_Clientes
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         or
-   
-   // Returning result of above invocation to caller.
-   return-nodes:x:@mssql.read/*
+   default
+      set-value:x:@.feedback.status
+         .:Unhandled response – unknown status code
+
+// Return the result
+yield
+   result:x:@.feedback.status

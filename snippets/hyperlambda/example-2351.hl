@@ -1,30 +1,26 @@
-
-// Hyperlambda script to list all files in a specified folder, with an optional filter to match file names.
+/*
+ * Returns all active companies the specified director is part of
+ * 
+ * director_id is required
+ */
 .arguments
-   folder:string
-   filter:string
+   director_id:long
+   limit:long
+   offset:long
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+data.connect:[mssql|director_db]
+   database-type:mssql
 
-// Listing all files in specified folder.
-io.file.list:x:@.arguments/*/folder
+   data.select:@"
+select d.org_number, b.company_name, d.role_name
+   from directors d
+      inner join basic b on d.org_number = b.org_number
+   where d.director_id = @id and d.active = 1
+   limit @limit offset @offset"
+      database-type:mssql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
 
-// Checking if we have a filter, and if so, only return files matching filter.
-if
-   exists:x:@.arguments/*/filter
-   .lambda
-
-      // Filtering out files not matching filter condition.
-      for-each:x:@io.file.list/*
-         if
-            strings.contains:x:@.dp/#
-               get-value:x:@.arguments/*/filter
-            .lambda
-               add:x:@for-each/./*/return-nodes
-                  get-nodes:x:@.dp/#
-      return-nodes
-else
-
-   // Returning all files from above invocation to caller.
-   return-nodes:x:@io.file.list/*
+   yield
+      companies:x:@data.select/*

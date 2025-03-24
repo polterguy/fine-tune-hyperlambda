@@ -1,13 +1,22 @@
 
-// Generate a Hyperlambda snippet that fetches a photo title from an API.
+// Create a Hyperlambda script to retrieve all URLs from the sitemap of a specified website.
+.url:"https://ainiro.io"
 
-// Fetches a photo title.
-http.get:"https://jsonplaceholder.typicode.com/photos/1"
+// will contain all URLs from website
+.urls
 
-   // Converts response.
-   convert:true
+// Retrieving main sitemap.
+strings.concat
+   get-value:x:@.url
+   .:/sitemap.xml
+http.get:x:@strings.concat
+xml2lambda:x:@http.get/*/content
 
-// Stores the photo title in [.photo_title]
-.photo_title
-set-value:x:@.photo_title
-   get-value:x:@http.get/*/content/*/title
+// Iterating through each URL referenced in main sitemap.
+for-each:x:"@xml2lambda/*/urlset/*/url/*/loc/*/\\#text"
+
+   // Getting XML from currently iterated sitemap subset.
+   unwrap:x:+/*/*
+   add:x:@.urls
+      .
+         .:x:@.dp/#

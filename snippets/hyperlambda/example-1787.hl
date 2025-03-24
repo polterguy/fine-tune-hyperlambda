@@ -1,8 +1,36 @@
-// Upload a file to replace an existing resource using HTTP PUT
-http.put:"https://api.example.com/upload/README"
 
-   // read file from /files/documents/README.md and send as request body
-   filename:/documents/README.md
+// Hyperlambda script that executes startup files, create the magic database, and apply default configuration settings.
+io.file.execute:/system/sql/magic.startup/mssql/magic.db.mssql.databases.hl
+io.file.execute:/system/sql/magic.startup/mysql/magic.db.mysql.databases.hl
+io.file.execute:/system/sql/magic.startup/pgsql/magic.db.pgsql.databases.hl
+io.file.execute:/system/sql/magic.startup/sqlite/magic.db.sqlite.databases.hl
 
-   // set a 30-second timeout instead of default
-   timeout:int:30
+// Creating our magic database.
+io.file.execute:/system/ensure-magic-database.hl
+
+// Executing all magic.startup Hyperlambda files.
+io.file.list-recursively:/system/
+io.file.list-recursively:/modules/
+for-each:x:./*/io.file.list-recursively/*
+
+   // Checking if file is a startup Hyperlambda file.
+   if
+      and
+         strings.contains:x:@.dp/#
+            .:/magic.startup/
+         strings.ends-with:x:@.dp/#
+            .:.hl
+      .lambda
+
+         // Executing file.
+         strings.concat
+            .:"Executing startup file '"
+            get-value:x:@.dp/#
+            .:.
+         console.log:x:-
+         try
+            io.file.execute:x:@.dp/#
+         .catch
+            log.error:Error while executing startup file
+               exception:x:@.arguments/*/message
+               file:x:@.dp/#

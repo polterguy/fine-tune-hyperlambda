@@ -1,40 +1,13 @@
 
-// Delete one record from your comments table in your cms database
-.arguments
+// Generate a Hyperlambda snippet that fetches a photo title from an API.
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+// Fetches a photo title.
+http.get:"https://jsonplaceholder.typicode.com/photos/1"
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-validators.mandatory:x:@.arguments/*/id
+   // Converts response.
+   convert:true
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:comments
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   add:x:./*/sockets.signal
-      get-nodes:x:@auth.ticket.verify
-   set-name:x:./*/sockets.signal/*/auth.ticket.verify
-      .:roles
-   sockets.signal:cms.comments.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Stores the photo title in [.photo_title]
+.photo_title
+set-value:x:@.photo_title
+   get-value:x:@http.get/*/content/*/title

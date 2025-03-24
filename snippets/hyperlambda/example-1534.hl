@@ -1,40 +1,62 @@
 
-// Deletes one record from your category table in your sakila database without authorization. Log invocation.
+// Returns minimum, maximum, average or sum from your CustomerCustomerDemo table in your northwind database
 .arguments
 
-   // Primary key of record to delete, mandatory argument
-   category_id:long
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
 
-// Logging invocation.
-auth.ticket.get
-lambda2hyper:x:@.arguments/*
-log.info:sakila.category entry deleted
-   username:x:@auth.ticket.get
-   arguments:x:@lambda2hyper
-validators.mandatory:x:@.arguments/*/category_id
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+
+   // Optional filtering arguments
+   CustomerCustomerDemo.CustomerID.like:string
+   CustomerCustomerDemo.CustomerID.eq:string
+   CustomerCustomerDemo.CustomerTypeID.like:string
+   CustomerCustomerDemo.CustomerTypeID.eq:string
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:CustomerCustomerDemo.CustomerID
+   .:CustomerCustomerDemo.CustomerTypeID
 
 // Opening up our database connection.
-data.connect:[generic|sakila]
+data.connect:[generic|northwind]
    database-type:sqlite
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 
-   // Deleting item from database.
-   data.delete
+   // Reading data from database.
+   data.read
       database-type:sqlite
-      table:category
+      table:CustomerCustomerDemo
+      columns
+         aggregate_functor
+            as:result
       where
          and
+      limit:long:1
 
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:sakila.category.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

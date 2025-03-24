@@ -1,9 +1,28 @@
-/*
- * Concatenate multiple strings with spaces between each word.
- */
-.data
-   .:I
-   .:love
-   .:Hyperlambda
-strings.join:x:-/*
-// Result: "I love Hyperlambda"
+// Attempts to fetch a random cat fact, throws on 500, fallback message otherwise
+
+// Buffer node to store our fact
+.cat-fact
+
+// Retrieving a random cat fact
+http.get:"https://meowfacts.herokuapp.com/"
+   convert:true
+
+// Making sure it's a success
+if
+   and
+      mte:x:@http.get
+         .:int:200
+      lt:x:@http.get
+         .:int:300
+   .lambda
+      set-value:x:@.cat-fact
+         get-value:x:@http.get/*/content/*/data/0
+else-if
+   eq:x:@http.get
+      .:int:500
+   .lambda
+      throw
+         .:Server error while fetching cat fact (500)
+else
+   set-value:x:@.cat-fact
+      .:Failed to fetch cat fact

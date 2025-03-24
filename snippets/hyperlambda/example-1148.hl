@@ -1,81 +1,80 @@
 
-// Hyperlambda endpoint that sends an email to the cloudlet owner with specified details, ensuring the email body is transformed into HTML.
+// Hyperlambda workflow action returning [max_tokens] context from the specified [url].
 .arguments
+   url
+      type:string
+      mandatory:bool:true
+   max_tokens
+      type:int
+      default:int:4000
+   throw
+      type:boolean
+      default:bool:false
+.icon:extension
 
-   // Mandatory argument being the reply to name of the person sending the email.
-   reply-to:string
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/url
 
-   // Mandatory argument being the email address of the person sending the email.
-   reply-to-email:string
+// Applying default values for optional arguments.
+validators.default:x:@.arguments
+   max_tokens:int:4000
 
-   // Mandatory argument being the subject line of the email.
-   subject:string
+// Retrieving context.
+execute:magic.http.scrape-url
+   url:x:@.arguments/*/url
+if
+   and
+      get-value:x:@.arguments/*/throw
+      not-null:x:@execute
+   .lambda
+      throw:Could not scrape URL
+         public:bool:true
+         status:x:@execute
 
-   // Mandatory argument being the body of the email to send. This argument can be Markdown at which point it will be automatically transformed into HTML.
-   body:string
+// Building our context return value.
+.context:
+while
+   and
+      exists:x:@execute/0
+      lt
+         openai.tokenize:x:@.context
+         convert:x:@.arguments/*/max_tokens
+            type:int
+   .lambda
 
-// HTML encodes the specified [html] and returns to caller.
-execute:magic.workflows.actions.execute
-   name:html-encode-body
-   filename:/misc/workflows/actions/misc/html-encode.hl
-   arguments
-      html:x:@.arguments/*/body
+      // Temporary value.
+      .tmp
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@.context
+            .:"\n\n"
+            get-value:x:@execute/0/*/prompt
+            .:"\n\n"
+            get-value:x:@execute/0/*/completion
+      if
+         lt
+            openai.tokenize:x:@.tmp
+            convert:x:@.arguments/*/max_tokens
+               type:int
+         .lambda
 
-// HTML encodes the specified [html] and returns to caller.
-execute:magic.workflows.actions.execute
-   name:html-encode-subject
-   filename:/misc/workflows/actions/misc/html-encode.hl
-   arguments
-      html:x:@.arguments/*/subject
+            // Still below [max_tokes].
+            set-value:x:@.context
+               get-value:x:@.tmp
 
-// Transforms the specified [markdown] to HTML and returns to caller.
-execute:magic.workflows.actions.execute
-   name:markdown2html
-   filename:/misc/workflows/actions/misc/markdown2html.hl
-   arguments
-      markdown:x:--/execute/=html-encode-body/*/content
+      // Removing top snippet.
+      remove-nodes:x:@execute/0/*/snippets/0
+      if
+         not-exists:x:@execute/0/*/snippets/0
+         .lambda
 
-/*
- * Returns the specified [key] configuration setting.
- * 
- * Notice, to traverse into for instance magic.foo.bar, you'll have to colon separate
- * your path as follows "magic:foo:bar".
- */
-execute:magic.workflows.actions.execute
-   name:config-name
-   filename:/misc/workflows/actions/misc/config.hl
-   arguments
-      key:"magic:smtp:from:name"
+            // Removing currently iterated URL.
+            remove-nodes:x:@execute/0
 
-/*
- * Returns the specified [key] configuration setting.
- * 
- * Notice, to traverse into for instance magic.foo.bar, you'll have to colon separate
- * your path as follows "magic:foo:bar".
- */
-execute:magic.workflows.actions.execute
-   name:config-email
-   filename:/misc/workflows/actions/misc/config.hl
-   arguments
-      key:"magic:smtp:from:address"
+// Trimming result.
+set-value:x:@.context
+   strings.trim:x:@.context
 
-/*
- * Send an email to the specified [name]/[email] recipient, with the specified [subject] and [body].
- * 
- * Optionally supply [from] and [from-email] as name/email sender, and/or [reply-to] and [reply-to-email]
- * as the email to reply to. If you don't supply [from] or [from-email] then this action will use the
- * default sender settings from your configuration.
- */
-execute:magic.workflows.actions.execute
-   name:email
-   filename:/misc/workflows/actions/misc/email.hl
-   arguments
-      reply-to:x:@.arguments/*/reply-to
-      subject:x:--/execute/=html-encode-subject/*/content
-      body:x:--/execute/=markdown2html/*/html
-      html:bool:true
-      name:x:--/execute/=config-name/*/value
-      email:x:--/execute/=config-email/*/value
-      reply-to-email:x:@.arguments/*/reply-to-email
-return
-   result:success
+// Returning result to caller.
+yield
+   context:x:@.context

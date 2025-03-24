@@ -1,34 +1,34 @@
 
-// Deletes the user's account entirely on server.
+// Write a Hyperlambda script to save an OpenAI API key to the configuration object.
 .arguments
+   key:string
 
-// Ensuring user is authenticated to invoke endpoint.
-auth.ticket.verify:guest
+// Making sure user has access to invoked endpoint.
+auth.ticket.verify:root
 
-// Retrieving currently authenticated user.
-auth.ticket.get
+// Sanity checking invocation
+validators.mandatory:x:@.arguments/*/key
+validators.string:x:@.arguments/*/key
+   min:20
+   max:500
 
-// Verifying user doesn't have any cloudlets.
-data.connect:[generic|hub]
-   data.read
-      table:cloudlets
-      where
-         and
-            user.eq:x:@auth.ticket.get
-   if
-      exists:x:@data.read/*/*
-      .lambda
-         throw:You have to delete all cloudlets before you delete your account
-            public:true
-            status:400
+// Loading configuration.
+config.load
+json2lambda:x:@config.load
 
-// Deleting user from magic database.
-data.connect:[generic|magic]
-   data.delete
-      table:users
-      where
-         and
-            username.eq:x:@auth.ticket.get
+// Removing existing API key.
+remove-nodes:x:@json2lambda/*/magic/*/openai
+
+// Adding specified key to configuration.
+unwrap:x:+/*/*/*
+add:x:@json2lambda/*/magic
+   .
+      openai
+         key:x:@.arguments/*/key
+
+// Transforming to JSON and saving configuration.
+lambda2json:x:@json2lambda/*
+config.save:x:@lambda2json
 
 // Returning success to caller.
 return

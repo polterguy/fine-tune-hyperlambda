@@ -1,7 +1,27 @@
-/*
- * An empty string is considered a value and is not null.
- */
 
-.data
-   foo:""
-null:x:@.data/*/foo
+// Creates an impersonation token that can be used to pay for a cloudlet on behalf of another user.
+
+// Endpoint CANNOT be given any arguments, and if user invokes with query parameters, the endpoint will throw an exception
+.arguments
+
+// Ensuring user is authorised to invoke endpoint.
+auth.ticket.verify:root, guest
+
+// Retrieving currently authenticated user's username.
+auth.ticket.get
+
+// Creates an impersonation JWT ticket that does not expire before 12 months from now.
+math.add
+   date.now
+   time
+      days:365
+auth.ticket.create
+   username:x:@auth.ticket.get
+   expires:x:@math.add
+   roles
+      .:impersonated
+
+// Returns ticket to caller.
+unwrap:x:+/*
+return
+   ticket:x:@auth.ticket.create

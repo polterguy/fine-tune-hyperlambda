@@ -1,24 +1,64 @@
-/*
- * Sends a POST request to an internal user service with a user ID.
- * Verifies that the status code is 2xx and yields the full response content.
- */
 
+// Hyperlambda workflow action to execute a SQL statement with specified 'database-type', 'connection-string', 'database', and 'sql'. Include optional 'params'. Validate mandatory fields and enums.
 .arguments
-   id:int
+   database-type
+      type:enum
+      mandatory:bool:true
+      values
+         .:sqlite
+         .:mssql
+         .:mysql
+         .:pgsql
+   connection-string
+      type:string
+      mandatory:bool:true
+   database
+      type:string
+      mandatory:bool:true
+   sql
+      type:sql
+      mandatory:bool:true
+   params
+      type:key-value
+      mandatory:bool:false
+.icon:backup
 
-http.post:"https://internal.api.example.com/users/lookup"
-   convert:true
-   payload
-      userId:x:@.arguments/*/id
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/sql
+validators.enum:x:@.arguments/*/database-type
+   .:sqlite
+   .:mssql
+   .:mysql
+   .:pgsql
 
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      yield
-         result:x:@http.post/*/content/*
-else
-   throw:User lookup failed
+// Applying defaults.
+validators.default:x:@.arguments
+   connection-string:generic
+   database-type:sqlite
+   database:magic
+
+// Connection string to actually use as we connect.
+.connection-string
+
+// Caller supplied an explicit [connection-string] argument.
+set-value:x:@.connection-string
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connection-string
+      .:|
+      get-value:x:@.arguments/*/database
+      .:]
+
+// Connecting to database.
+data.connect:x:@.connection-string
+   database-type:x:@.arguments/*/database-type
+
+   // Parametrizing SQL.
+   add:x:./*/data.execute
+      get-nodes:x:@.arguments/*/params/*
+
+   // Executing SQL.
+   data.execute:x:@.arguments/*/sql
+      database-type:x:@.arguments/*/database-type
+   yield
+      affected:x:@data.execute

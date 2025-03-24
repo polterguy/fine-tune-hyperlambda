@@ -1,113 +1,167 @@
 
-// Write a Hyperlambda script to add a specified table to a specified database.
+// Hyperlambda script that verifies an OpenID Connect JWT token and returns a valid application JWT token, handling nonce and issuer verification.
 .arguments
-   databaseType:string
-   connectionString:string
-   databaseName:string
-   generate:bool
+   token:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+/*
+ * Verifying token.
+ * 
+ * Notice, this will throw an exception if token is not valid.
+ */
+auth.token.verify
+   token:x:@.arguments/*/token
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/connectionString
-validators.mandatory:x:@.arguments/*/databaseName
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:sqlite
-   .:pgsql
-   .:mssql
-
-// SQLite special case, simply implying deleting file on disc.
+// Verifying nonce from token to avoid replay attacks.
+cache.get:x:@auth.token.verify/*/nonce
 if
-   eq:x:@.arguments/*/databaseType
-      .:sqlite
+   neq:x:@cache.get
+      get-value:x:@auth.token.verify/*/issuer
    .lambda
 
-      // Checking if caller only wants to generate SQL.
-      if:x:@.arguments/*/generate
-         return
-            result:/* SQLite does not support drop database syntax */
+      // Oops ...!!
+      throw:Nonce is not valid!
+         status:int:400
+         public:bool:true
 
-      // Deleting the file for our database.
-      strings.concat
-         .:/data/
-         get-value:x:@.arguments/*/databaseName
-         .:.db
-      io.file.delete:x:-
+// Removing nonce from cache to avoid replay attacks.
+cache.set:x:@auth.token.verify/*/nonce
 
-      // Flushing connections cache.
-      sqlite.connections.flush
-else
+// Verifying issuer is active.
+.active:bool:false
+execute-file:/system/auth/openid-providers.get.hl
+   createNonce:bool:false
+for-each:x:@execute-file/*
+   if
+      eq:x:@.dp/#/*/issuer
+         get-value:x:@auth.token.verify/*/issuer
+      .lambda
+         set-value:x:@.active
+            .:bool:true
+if
+   eq:x:@.issuer
+      .:bool:false
+   .lambda
 
-   // Buffer to hold SQL and 'master' database.
-   .sql
-   .master
+      // Oops ...!
+      throw:Not a recognized OpenID provider
+         status:400
+         public:bool:true
 
-   // Creating our correct SQL according to [databaseType].
-   switch:x:@.arguments/*/databaseType
-      case:mysql
-         set-value:x:@.master
-            .:information_schema
-         set-value:x:@.sql
-            strings.concat
-               .:drop database `
-               get-value:x:@.arguments/*/databaseName
-               .:`;
-      case:pgsql
-         set-value:x:@.master
-            .:template1
-         set-value:x:@.sql
-            strings.concat
-               .:"revoke connect on database \""
-               get-value:x:@.arguments/*/databaseName
-               .:"\" from public; "
-               .:"select pid, pg_terminate_backend(pid) from pg_stat_activity "
-               .:"where datname = '"
-               get-value:x:@.arguments/*/databaseName
-               .:"'; "
-               .:"drop database \""
-               get-value:x:@.arguments/*/databaseName
-               .:"\";"
-      case:mssql
-         set-value:x:@.master
-            .:master
-         set-value:x:@.sql
-            strings.concat
-               .:alter database [
-               .:x:@.arguments/*/databaseName
-               .:"] set single_user with rollback immediate; "
-               .:drop database [
-               get-value:x:@.arguments/*/databaseName
-               .:];
+// Buffer for extra information.
+.extra
 
-   // Checking if caller only wants to generate SQL statement.
-   if:x:@.arguments/*/generate
-      unwrap:x:+/*
-      return
-         sql:x:@.sql
+// External OpenID provider has been verified, now we need to check to see if user exists in local database.
+data.connect:magic
 
-   // Opening up database connection and executing SQL.
-   strings.concat
-      .:[
-      get-value:x:@.arguments/*/connectionString
-      .:|
-      get-value:x:@.master
-      .:]
-   data.connect:x:@strings.concat
-      database-type:x:@.arguments/*/databaseType
-      data.execute:x:@.sql
-         database-type:x:@.arguments/*/databaseType
+   // Checking if user exists.
+   data.read
+      table:users
+      where
+         and
+            username.eq:x:@auth.token.verify/*/email
+   if
+      exists:x:@data.read/*
+      .lambda
 
-// Flushing database cache.
-strings.concat
-   .:magic.sql.databases.
-   get-value:x:@.arguments/*/databaseType
-   :.
-   get-value:x:@.arguments/*/connectionString
-cache.set:x:-
+         /*
+          * User has been previously created.
+          * 
+          * Invoking [magic.auth.authenticate] that does the heavy lifting, and creates our JWT token,
+          * making sure we return that token to caller.
+          * 
+          * Notice, we ignore the password!
+          */
+         execute:magic.auth.authenticate
+            password-check:bool:false
+            username:x:@auth.token.verify/*/email
 
-// Returning result to caller.
-return
-   result:success
+         // Retrieving extra information.
+         data.connect:magic
+            data.read
+               table:users_extra
+               where
+                  and
+                     user.eq:x:@auth.token.verify/*/email
+                     or
+                        type.eq:name
+                        type.eq:email
+            for-each:x:@data.read/*
+               set-name:x:./*/add/*/*
+                  get-value:x:@.dp/#/*/type
+               set-value:x:./*/add/*/*
+                  get-value:x:@.dp/#/*/value
+               add:x:@.extra
+                  .
+                     .
+
+         // Returns the authentication JWT ticket created above to caller.
+         yield
+            ticket:x:@execute/*/ticket
+            extra:x:@.extra/*
+
+   // First time login, creating a new user with username being email address.
+   data.create
+      table:users
+      values
+         username:x:@auth.token.verify/*/email
+         password:openid-connect
+
+   // Associating user with "guest" role.
+   data.create
+      table:users_roles
+      values
+         user:x:@auth.token.verify/*/email
+         role:guest
+
+   // Storing email as extra field.
+   data.create
+      table:users_extra
+      values
+         user:x:@auth.token.verify/*/email
+         type:email
+         value:x:@auth.token.verify/*/email
+
+   // Checking to see if we've got a name value, and if we do we associate it with the user we create.
+   if
+      exists:x:@auth.token.verify/*/name
+      .lambda
+
+         // We've got name, storing it.
+         data.create
+            table:users_extra
+            values
+               user:x:@auth.token.verify/*/email
+               type:name
+               value:x:@auth.token.verify/*/name
+
+   // Retrieving extra information.
+   data.connect:magic
+      data.read
+         table:users_extra
+         where
+            and
+               user.eq:x:@auth.token.verify/*/email
+               or
+                  type.eq:name
+                  type.eq:email
+      for-each:x:@data.read/*
+         set-name:x:./*/add/*/*
+            get-value:x:@.dp/#/*/type
+         set-value:x:./*/add/*/*
+            get-value:x:@.dp/#/*/value
+         add:x:@.extra
+            .
+               .
+
+/*
+ * Invoking [magic.auth.authenticate] that does the heavy lifting, and creates our JWT token,
+ * making sure we return that token to caller.
+ */
+execute:magic.auth.authenticate
+   username:x:@auth.token.verify/*/email
+   password-check:bool:false
+
+// Returns the authentication JWT ticket created above to caller.
+yield
+   ticket:x:@execute/*/ticket
+   extra:x:@.extra/*

@@ -1,139 +1,20 @@
 /*
- * Lists all transactions from NetSuite
- * 
- * Returns id, tranid, status, total, entity, and customer entity from transactions in your NetSuite account.
- *
- * This function will sort items such that the most recent transactions are returned first.
+ * This example demonstrates nested `try` blocks to handle specific exceptions differently.
+ * The outer `try` block handles general exceptions, while the inner `try` block
+ * specifically handles the [io.file.load] invocation.
  */
-.arguments
 
-   // Optionally how many rows to maximumly return. Defaults to 25 unless specified.
-   limit:long
+// Buffer node for file's content
+.file-content
 
-   // Optional ID of transaction from where to start returning rows. Defaults to nothing.
-   from:string
+try
+   try
+      io.file.load:x:@.file-path
+      set-value:x:@.file-content
+         .:x:@io.file.load
+   .catch
+      log.error:File not found
+.catch
+   log.error:An unexpected error occurred during file processing.
 
-   // Optional filtering argument the entityid must match. For instance 'xyz' here will match customers with entityid of 'xyz_1' and 'entity-2-xyz_2'.
-   filter:string
-
-   // Optional status code for transactions to return. A = active, H = on hold, G = good, C = closed, B = billed, and Y = paid.
-   status:string
-
-   // Optional type of transactions to return. SalesOrd = sales order, etc.
-   type:string
-
-   // Mandatory argument for subsidiary ID to retrieve transactions for.
-   subsidiaryid:long
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/subsidiaryid
-
-// Checking if caller supplied -1 as limit.
-if
-   or
-      and
-         exists:x:@.arguments/*/limit
-         not-null:x:@.arguments/*/limit
-         eq
-            convert:x:@.arguments/*/limit
-               type:long
-            .:long:-1
-      mt
-         convert:x:@.arguments/*/limit
-            type:long
-         .:long:25
-   .lambda
-
-      // Defaulting limit to 25 to avoid returning too many records.
-      set-value:x:@.arguments/*/limit
-         .:long:25
-      add:x:../*/return-nodes
-         .
-            warning:We can only retrieve a maximum of 25 transactions at the same time, ask for more transactions to see more transactions.
-
-// Dynamically creating our query.
-.q
-set-value:x:@.q
-   strings.concat
-      .:@"select
-   t.id,
-   t.tranid,
-   t.status,
-   t.total,
-   t.entity,
-   t.type,
-   c.entityid,
-   t.transactionnumber,
-   t.trandate,
-   t.email,
-   t.shipcarrier
-from transaction t
-join customer c on t.entity = c.id
-join subsidiary s on c.subsidiary = s.id
-where s.id = "
-      get-value:x:@.arguments/*/subsidiaryid
-
-// Checking if we're doing paging.
-if
-   exists:x:@.arguments/*/from
-   .lambda
-      set-value:x:@.q
-         strings.concat
-            get-value:x:@.q
-            .:" and t.id < "
-            get-value:x:@.arguments/*/from
-
-// Checking if we're doing filtering.
-if
-   exists:x:@.arguments/*/filter
-   .lambda
-      set-value:x:@.q
-         strings.concat
-            get-value:x:@.q
-            .:" and upper(c.entityid) like upper('%"
-            get-value:x:@.arguments/*/filter
-            .:"%')"
-
-// Checking if we've got a status code.
-if
-   exists:x:@.arguments/*/status
-   .lambda
-      set-value:x:@.q
-         strings.concat
-            get-value:x:@.q
-            .:" and t.status = '"
-            get-value:x:@.arguments/*/status
-            .:"'"
-
-// Checking if we've got a type code.
-if
-   exists:x:@.arguments/*/type
-   .lambda
-      set-value:x:@.q
-         strings.concat
-            get-value:x:@.q
-            .:" and t.type = '"
-            get-value:x:@.arguments/*/type
-            .:"'"
-
-// Adding limit.
-set-value:x:@.q
-   strings.concat
-      get-value:x:@.q
-      .:" order by t.id desc fetch first "
-      get-first-value
-         get-value:x:@.arguments/*/limit
-         .:long:25
-      .:" rows only"
-
-// Logging the generated query for debugging.
-log.info:x:@.q
-
-// Forwarding heavy lifting to core file.
-execute-file:/modules/netsuite/workflows/workflows/netsuite-query.hl
-   q:x:@.q
-
-// Returning result to caller.
-add:x:../*/return-nodes
-   get-nodes:x:@execute-file/*
-return-nodes
+// Since the [.file-path] node doesn't exist, the above will throw an exception when executing [io.file.load].

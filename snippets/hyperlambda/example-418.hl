@@ -1,13 +1,43 @@
 
-// Provide a Hyperlambda example where a comment's body is retrieved from an API.
+// Updates an existing item in your clusters table in your [generic|hub] database according to the specified arguments.
+.arguments
+   id:string
+   country:string
+   name:string
+   enabled:bool
 
-// Invokes an HTTP GET endpoint to fetch a comment's body.
-http.get:"https://jsonplaceholder.typicode.com/comments/1"
+// Only root users can execute endpoint
+auth.ticket.verify:root
 
-   // Converts JSON to lambda.
-   convert:true
+// Verifying user is authorized to access endpoint.
+validators.mandatory:x:@.arguments/*/id
 
-// Stores the comment body in [.comment_body]
-.comment_body
-set-value:x:@.comment_body
-   get-value:x:@http.get/*/content/*/body
+// Opening up our database connection.
+data.connect:[generic|hub]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+
+   // Invoking our update slot.
+   data.update
+      table:clusters
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning success to caller.
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

@@ -1,195 +1,201 @@
 
-/*
- * Distinct Keyword Search from comments table in cms database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
- */
+// Returns minimum, maximum, average, sum or count from your address table in your sakila database grouped by a column without authorization
 .arguments
 
-   // Mandatory query for records to search for
-   query:string
+   // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME
+   group_column:string
 
-   // Optional number of records to return, defaults to 10 if not specified. Pass in -1 to return all records
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
    limit:long
 
-   // Optional offset into the dataset of where to start retrieving records
+   // Offset into the dataset of where to start retrieving records
    offset:long
 
-// Make sure the user has provided a query.
-validators.mandatory:x:@.arguments/*/query
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
 
-// Apply defaults if not specified.
-validators.default:x:@.arguments
-   limit:long:10
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
 
-// Split the user's query into individual keywords, separated by spaces.
-.words
-add:x:@.words
-   strings.split:x:@.arguments/*/query
-      .:" "
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum, avg or count
+   aggregate_function:string
 
-// Enforce lower characters for each keyword, and guard against SQL injection.
-.no:int:0
-for-each:x:@.words/*
-   set-value:x:@.dp/#
-      strings.to-lower:x:@.dp/#
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
 
-// Specify which columns to search against.
-.columns
-   .:content
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
 
-// Connect to the specified database.
-data.connect:[generic|cms]
+   // Filtering
+   address.address_id.mt:long
+   address.address_id.lt:long
+   address.address_id.mteq:long
+   address.address_id.lteq:long
+   address.address_id.neq:long
+   address.address_id.eq:long
+   address.address.like:string
+   address.address.mt:string
+   address.address.lt:string
+   address.address.mteq:string
+   address.address.lteq:string
+   address.address.neq:string
+   address.address.eq:string
+   address.address2.like:string
+   address.address2.mt:string
+   address.address2.lt:string
+   address.address2.mteq:string
+   address.address2.lteq:string
+   address.address2.neq:string
+   address.address2.eq:string
+   address.district.like:string
+   address.district.mt:string
+   address.district.lt:string
+   address.district.mteq:string
+   address.district.lteq:string
+   address.district.neq:string
+   address.district.eq:string
+   address.city_id.mt:long
+   address.city_id.lt:long
+   address.city_id.mteq:long
+   address.city_id.lteq:long
+   address.city_id.neq:long
+   address.city_id.eq:long
+   address.postal_code.like:string
+   address.postal_code.mt:string
+   address.postal_code.lt:string
+   address.postal_code.mteq:string
+   address.postal_code.lteq:string
+   address.postal_code.neq:string
+   address.postal_code.eq:string
+   address.phone.like:string
+   address.phone.mt:string
+   address.phone.lt:string
+   address.phone.mteq:string
+   address.phone.lteq:string
+   address.phone.neq:string
+   address.phone.eq:string
+   address.last_update.mt:date
+   address.last_update.lt:date
+   address.last_update.mteq:date
+   address.last_update.lteq:date
+   address.last_update.neq:date
+   address.last_update.eq:date
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/group_column
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+   .:count
+
+// Sanity checking group column.
+validators.enum:x:@.arguments/*/group_column
+   .:address.address_id
+   .:address.address
+   .:address.address2
+   .:address.district
+   .:address.city_id
+   .:address.postal_code
+   .:address.phone
+   .:address.last_update
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:address.address_id
+   .:address.address
+   .:address.address2
+   .:address.district
+   .:address.city_id
+   .:address.postal_code
+   .:address.phone
+   .:address.last_update
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|sakila]
    database-type:sqlite
 
-   // Start building our SQL.
-   .sql:select *, (
+   // Making sure we're using the correct group column
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
 
-   // 1) Dynamically create the full text by concatenating all columns we want to search.
-   .fields
-   for-each:x:@.columns/*
+   // Making sure we return group column as a part of the result
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+
+   // Changing name of aggregate column returned to caller.
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+
+   // Removing group column to simplify adding other arguments
+   remove-nodes:x:@.arguments/*/group_column
+
+   // Adding paging arguments
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
       strings.concat
-         .:coalesce(
-         get-value:x:@.dp/#
-         .:", '')"
-      unwrap:x:+/*/*
-      add:x:@.fields
-         .
-            .:x:@strings.concat
-   set-value:x:@.fields
-      strings.join:x:@.fields/*
-         .:" || "
-   remove-nodes:x:@.fields/*
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
 
-   // 2) Keyword density calculation
-   .no:int:0
-   for-each:x:@.words/*
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
 
-      // Adding SQL parameter.
-      set-name:x:+/+/*/*
-         strings.concat
-            .:@p
-            get-value:x:@.no
-      unwrap:x:+/*/*
-      add:x:@data.connect/*/data.select
-         .
-            .:x:@.dp/#
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-      // Modifying our SQL.
-      if
-         eq:x:@.no
-            .:int:0
-         .lambda
-
-            // First keyword => no leading plus
-            set-value:x:@.sql
-               strings.concat:x:@.sql
-                  get-value:x:@.sql
-                  .:" (length("
-                  get-value:x:@.fields
-                  .:) - length(replace(lower(
-                  get-value:x:@.fields
-                  .:), @p
-                  get-value:x:@.no
-                  .:", ''))) / length(@p"
-                  get-value:x:@.no
-                  .:)
-      else
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" + (length("
-               get-value:x:@.fields
-               .:) - length(replace(lower(
-               get-value:x:@.fields
-               .:), @p
-               get-value:x:@.no
-               .:", ''))) / length(@p"
-               get-value:x:@.no
-               .:)
-      math.increment:x:@.no
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:) * 1.0 / length(
-         get-value:x:@.fields
-         .:) as keyword_density, (
-
-   // 3) Distinct keyword count => For each keyword, 1 if present, 0 if not.
-   .no:int:0
-   for-each:x:@.words/*
-      if
-         eq:x:@.no
-            .:int:0
-         .lambda
-
-            // First keyword => no leading plus
-            set-value:x:@.sql
-               strings.concat:x:@.sql
-                  get-value:x:@.sql
-                  .:" CASE WHEN ((length("
-                  get-value:x:@.fields
-                  .:) - length(replace(lower(
-                  get-value:x:@.fields
-                  .:), @p
-                  get-value:x:@.no
-                  .:", ''))) / length(@p"
-                  get-value:x:@.no
-                  .:)) > 0 THEN 1 ELSE 0 END
-      else
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" + CASE WHEN ((length("
-               get-value:x:@.fields
-               .:) - length(replace(lower(
-               get-value:x:@.fields
-               .:), @p
-               get-value:x:@.no
-               .:", ''))) / length(@p"
-               get-value:x:@.no
-               .:)) > 0 THEN 1 ELSE 0 END
-      math.increment:x:@.no
-
-   // Finalize "keyword_count".
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:) as keyword_count
-
-   // 4) Finish SELECT + WHERE
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:" from "
-         .:comments
-         .:" where keyword_count > 0"
-
-   // 5) Order by distinct keyword_count (higher means more distinct keywords), then keyword_density.
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:" order by keyword_count desc, keyword_density desc limit "
-         get-value:x:@.arguments/*/limit
-
-   // (Optional) offset => pagination
-   if
-      exists:x:@.arguments/*/offset
-      .lambda
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" offset "
-               get-value:x:@.arguments/*/offset
-
-   // Execute the SQL
-   data.select:x:@.sql
+   // Reading data from database.
+   data.read
       database-type:sqlite
+      table:address
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
 
-   // Remove helper fields if you don't want them in your final JSON
-   remove-nodes:x:@data.select/*/*/keyword_density
-   remove-nodes:x:@data.select/*/*/keyword_count
-
-   // Return the final result set
-   return-nodes:x:@data.select/*
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

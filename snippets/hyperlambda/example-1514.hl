@@ -1,50 +1,35 @@
 
-// Hyperlambda endpoint that exports all leads from training requests and returns them as a CSV file, ensuring the user is authorized.
+// Read or list records from your pages table in your cms database
 .arguments
-   type:string
+   pages.id.eq:long
+   pages.title.like:string
+   pages.title.eq:string
+   pages.content.like:string
+   pages.content.eq:string
+   pages.created_at.eq:date
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+auth.ticket.verify:guest
 
 // Opening up our database connection.
-data.connect:[generic|magic]
+data.connect:[generic|cms]
+   database-type:sqlite
 
    // Parametrising our read invocation with filtering arguments.
-   if
-      exists:x:@.arguments/*/type
-      .lambda
-         unwrap:x:+/*/*
-         add:x:@data.connect/*/data.read/*/where/*/and
-            .
-               type.eq:x:@.arguments/*/type
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
 
-   // Invoking our read slot.
+   // Reading data from database.
    data.read
-      table:ml_requests
+      database-type:sqlite
+      table:pages
       columns
-         prompt
-            as:lead
+         pages.id
+         pages.title
+         pages.content
+         pages.created_at
       where
          and
-            finish_reason.eq:lead
-      limit:-1
 
-   // Verifying records exists.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         response.status.set:404
-         return
-            result:No records found
-
-   // Converting result to CSV.
-   lambda2csv:x:@data.read/*
-
-   // Applying correct HTTP header.
-   response.headers.set
-      Content-Type:text/csv
-      Access-Control-Expose-Headers:Content-Disposition
-      Content-Disposition:"attachment; filename=\"leads.csv\""
-
-   // Returning content to caller.
-   return:x:@lambda2csv
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

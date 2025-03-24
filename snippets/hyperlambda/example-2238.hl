@@ -1,28 +1,23 @@
 
-// CRUD Hyperlambda file that deletes one record from your menus table in your cms database
+// Returns objects of the specified type to caller
 .arguments
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+   // Type of objects you want to retrieve. Mandatory.
+   type:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-validators.mandatory:x:@.arguments/*/id
+   // Optional maximum number of objects to return. Defaults to 10 if not specified.
+   limit:long
 
-// Opening up our database connection with default database type (SQLite).
-data.connect:[generic|cms]
+   // Optional offset of where to start retrieving objects.
+   from:long
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
 
-   // Deleting item from database using default database type being SQLite.
-   data.delete
-      table:menus
-      where
-         and
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-get-records.hl
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returning result to caller.
+return-nodes:x:@execute-file/*

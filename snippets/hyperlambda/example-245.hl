@@ -1,24 +1,41 @@
-// Search through a log file and extract all IPv4 addresses from it
 
-// A temporary place to hold the extracted IP addresses
-.ip-addresses
+// Hyperlambda script for a CRUD update endpoint that updates an existing item in the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   name:string
+   description:string
 
-// Making sure exceptions don't propagate
-try
+// Verifying user is authorized to access endpoint.
+validators.mandatory:x:@.arguments/*/name
+auth.ticket.verify:root
 
-   // Reading file's content as text.
-   io.file.load:/var/logs/server.log
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-   // Extracting IP addresses using regex
-   strings.matches:x:@io.file.load
-      .:"\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
 
-   // Loop through the matches and add them to the list
-   for-each:x:@strings.matches/*/match
-      unwrap:x:+/*/*
-      add:x:@.ip-addresses
-         .
-            .:x:@.dp/#
+   // Invoking our update slot.
+   data.update
+      table:roles
+      values
+      where
+         and
 
-.catch
-   log.error:Log file not found
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning success to caller.
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

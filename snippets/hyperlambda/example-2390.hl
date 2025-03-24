@@ -1,68 +1,35 @@
 
-// Write a Hyperlambda script for a Twilio webhook callback to handle notifications when your Twilio account receives messages.
+// Creates one record in your MediaType table in your chinook database.
+.arguments
 
-// Retrieving actual message.
-.body
-set-value:x:@.body
-   get-value:x:@.arguments/*/Body
+   // MediaTypeId column value
+   MediaTypeId:long
 
-// Retrieving from value.
-.from
-set-value:x:@.from
-   get-value:x:@.arguments/*/From
+   // Name column value
+   Name:string
 
-// Retrieving to value.
-.to
-set-value:x:@.to
-   get-value:x:@.arguments/*/To
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
 
-// Basic logging.
-log.info:Webhook invoked from Twilio
-   body:x:@.body
-   from:x:@.from
-   to:x:@.to
+// Opening up database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-// Lambda object to execute with callback.
-.exe
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-   // Signaling configured slot.
-   signal:foo
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:MediaType
+      return-id:bool:false
+      values
 
-   // Returning whatever callback returned as result of webhook invocation
-   return:x:-
+   // Returning the correct status code.
+   response.status.set:201
 
-/*
- * Dynamically creating our lambda [.exe] callback by parametrising with [.arguments]
- * given to endpoint by Twilio. This makes sure we're using the dynamically configured
- * slot the backend has been configured to use as your webhook is being invoked.
- */
-set-value:x:@.exe/*/signal
-   config.get:"magic:twilio:callback"
-
-/*
- * Sanity checking configuration.
- * 
- * This will throw an exception if you have not specified a callback
- * slot in your configuration.
- */
-validators.mandatory:x:@.exe/*/signal
-
-// Further parametrising slot invocation with arguments given by Twilio.
-unwrap:x:+/*/*
-add:x:@.exe/0
-   .
-      body:x:@.body
-      from:x:@.from
-      to:x:@.to
-      twilio_account_id:x:@.arguments/*/AccountSid
-
-// Executing callback.
-invoke:x:@.exe
-
-// Returning result of invocation to caller, if caller provided a return value.
-if
-   not-null:x:@invoke
-   .lambda
-
-      // Returning result of invocation to Twilio.
-      return:x:@invoke
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      result:success

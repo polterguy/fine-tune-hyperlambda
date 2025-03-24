@@ -1,32 +1,92 @@
 
-// Delete endpoint deleting one record from your items table in your shopping-cart-demo database.
-.arguments
+// Dynamic slot that executes a single workflow action, ensuring the user is authorized.
+slots.create:magic.workflows.actions.execute
 
-   // Primary key of record to delete
-   item_id:long
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/name
+   validators.mandatory:x:@.arguments/*/filename
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+   /*
+    * Checking if we're authenticated as root user, and if so,
+    * publishing a socket message as "debug info" back to caller.
+    */
+   .time
+   if
+      auth.ticket.in-role:root
+      .lambda
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/item_id
+         // Publishing socket debug message to client.
+         add:x:./*/sockets.signal/*/args/*/input
+            get-nodes:x:@.arguments/*/arguments/*
+         unwrap:x:+/**
+         sockets.signal:magic.workflows.action
+            roles:root
+            args
+               type:action
+               name:x:@.arguments/*/name
+               input
+         set-value:x:@.time
+            date.now
 
-// Opening up our database connection.
-data.connect:[generic|shopping-cart-demo]
-   database-type:sqlite
+   // Making sure we're able to catch exceptions.
+   try
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+      // Parametrising [execute-file].
+      add:x:./*/execute-file
+         get-nodes:x:@.arguments/*/arguments/*
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:items
-      where
-         and
+      // Executing action.
+      execute-file:x:@.arguments/*/filename
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+      /*
+       * Checking if we're authenticated as root user, and if so,
+       * publishing a socket message as "debug info" back to caller.
+       */
+      if
+         auth.ticket.in-role:root
+         .lambda
+
+            // Publishing socket debug message to client.
+            add:x:./*/sockets.signal/*/args/*/output
+               get-nodes:x:@execute-file/*
+            math.subtract
+               date.now
+               get-value:x:@.time
+            unwrap:x:+/**
+            sockets.signal:magic.workflows.action
+               roles:root
+               args
+                  type:result
+                  time:x:@math.subtract
+                  output
+
+      // Decorating [result] node.
+      set-value:x:./*/return
+         get-value:x:@.arguments/*/name
+      add:x:./*/return
+         get-nodes:x:@execute-file/*
+
+      // Returning result of invocation to caller.
+      return
+   .catch
+
+      /*
+       * Checking if we're authenticated as root user, and if so,
+       * publishing a socket message as "debug info" back to caller.
+       */
+      if
+         auth.ticket.in-role:root
+         .lambda
+
+            // Publishing socket debug message to client.
+            unwrap:x:+/**
+            sockets.signal:magic.workflows.action
+               roles:root
+               args
+                  type:error
+                  message:x:@.arguments/*/message
+
+      // Rethrowing exception
+      throw:x:@.arguments/*/message
+         status:x:@.arguments/*/status
+         public:x:@.arguments/*/public

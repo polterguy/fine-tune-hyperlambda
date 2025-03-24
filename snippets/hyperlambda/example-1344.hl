@@ -1,69 +1,140 @@
 
-// Search for news using Google with a mandatory query parameter.
+// Returns minimum, maximum, average or sum from your address table in your sakila database without authorization
 .arguments
 
-   // Mandatory query to search for.
-   query:string
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   // Filtering
+   address.address_id.mt:long
+   address.address_id.lt:long
+   address.address_id.mteq:long
+   address.address_id.lteq:long
+   address.address_id.neq:long
+   address.address_id.eq:long
+   address.address.like:string
+   address.address.mt:string
+   address.address.lt:string
+   address.address.mteq:string
+   address.address.lteq:string
+   address.address.neq:string
+   address.address.eq:string
+   address.address2.like:string
+   address.address2.mt:string
+   address.address2.lt:string
+   address.address2.mteq:string
+   address.address2.lteq:string
+   address.address2.neq:string
+   address.address2.eq:string
+   address.district.like:string
+   address.district.mt:string
+   address.district.lt:string
+   address.district.mteq:string
+   address.district.lteq:string
+   address.district.neq:string
+   address.district.eq:string
+   address.city_id.mt:long
+   address.city_id.lt:long
+   address.city_id.mteq:long
+   address.city_id.lteq:long
+   address.city_id.neq:long
+   address.city_id.eq:long
+   address.postal_code.like:string
+   address.postal_code.mt:string
+   address.postal_code.lt:string
+   address.postal_code.mteq:string
+   address.postal_code.lteq:string
+   address.postal_code.neq:string
+   address.postal_code.eq:string
+   address.phone.like:string
+   address.phone.mt:string
+   address.phone.lt:string
+   address.phone.mteq:string
+   address.phone.lteq:string
+   address.phone.neq:string
+   address.phone.eq:string
+   address.last_update.mt:date
+   address.last_update.lt:date
+   address.last_update.mteq:date
+   address.last_update.lteq:date
+   address.last_update.neq:date
+   address.last_update.eq:date
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:address.address_id
+   .:address.address
+   .:address.address2
+   .:address.district
+   .:address.city_id
+   .:address.postal_code
+   .:address.phone
+   .:address.last_update
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/query
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
 
-// Retrieving SERP API's API key and making sure we've got one.
-.api-key
-set-value:x:@.api-key
-   config.get:"magic:serp-api:api_key"
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
 if
-   or
-      null:x:@.api-key
-      eq:x:@.api-key
-         .:
+   exists:x:@.arguments/*/operator
    .lambda
 
-      // Oops ...!!
-      throw:Could not find a SERP API key to use for fetching hotels.
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
 
-// Creating our URL.
-.url
-set-value:x:@.url
-   strings.concat
-      .:"https://serpapi.com/search.json?tbm=nws&api_key="
-      get-value:x:@.api-key
-      .:&q=
-      strings.url-encode:x:@.arguments/*/query
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
 
-// Retrieving result.
-http.get:x:@.url
-   convert:true
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
 
-// Sanity checking result of above invocation.
-if
-   not
-      and
-         mte:x:@http.get
-            .:int:200
-         lt:x:@http.get
-            .:int:300
-   .lambda
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
 
-      // Oops ...!!
-      lambda2hyper:x:../*
-      log.info:x:-
-      throw:Something went wrong while invoking SERP API
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-// Iterating through result, making sure we return the result to caller.
-for-each:x:@http.get/*/content/*/news_results/*
-   unwrap:x:+/*/*/*
-   add:x:../*/return-nodes/*/result
-      .
-         .
-            title:x:@.dp/#/*/title
-            link:x:@.dp/#/*/link
-            snippet:x:@.dp/#/*/snippet
-            thumbnail:x:@.dp/#/*/thumbnail
-            date:x:@.dp/#/*/date
-            source:x:@.dp/#/*/source
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:address
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
 
-// Returning result to caller.
-unwrap:x:+/*
-return-nodes
-   result
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

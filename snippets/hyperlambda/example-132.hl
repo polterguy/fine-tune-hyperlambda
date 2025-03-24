@@ -1,13 +1,30 @@
 
-// Create a Hyperlambda snippet that fetches the company name of a user from an API.
+// Hyperlambda endpoint for a CRUD delete endpoint that deletes one record from the questions table in the magic database with a question_id matching the argument, ensuring authentication and authorization for root roles.
+.arguments
+   question_id:long
 
-// Fetches the company name of a user.
-http.get:"https://jsonplaceholder.typicode.com/users/2"
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Converts JSON response.
-   convert:true
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/question_id
 
-// Sets [.company_name] to the user's company name
-.company_name
-set-value:x:@.company_name
-   get-value:x:@http.get/*/content/*/company/*/name
+// Opening up our database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:questions
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

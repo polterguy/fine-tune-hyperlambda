@@ -1,10 +1,30 @@
-// Executing the Hyperlambda changes the node hierarchy
 
-// This Hyperlambda
-strings.concat
-   .:foo
-   .:-
-   .:bar
+// CRUD Hyperlambda file that deletes one record from your menu_items table in your cms database
+.arguments
 
-// Creates this result
-strings.concat:foo-bar
+   // Primary key of record to delete, mandatory argument
+   id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:menu_items
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

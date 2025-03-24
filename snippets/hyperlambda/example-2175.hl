@@ -1,63 +1,93 @@
 
-// Endpoint to upload, unzip, and overwrite a specified folder.
+// Create a Hyperlambda script that returns the Hyperlambda required to execute an action or snippet, ensuring the user is authorized.
 .arguments
-   file:*
-   folder:string
+   filename:string
+   args:*
 
-// Endpoint can accept form-data
-.accept:multipart/form-data
-
-// Ensures user is authorized to access endpoint.
+// Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/file
-validators.mandatory:x:@.arguments/*/file/*/name
-validators.mandatory:x:@.arguments/*/file/*/stream
-validators.mandatory:x:@.arguments/*/folder
+// Loading action/snippet Hyperlambda file and transforming to lambda object.
+load-file:x:@.arguments/*/filename
 
-// Making sure specified file is a ZIP file.
-strings.split:x:@.arguments/*/file/*/name
-   .:.
+// Checking if this is a action template.
 if
-   not
-      eq
-         get-value:x:@strings.split/0/-
-         .:zip
+   strings.contains:x:@.arguments/*/filename
+      .:/workflows/actions/
    .lambda
 
-      // Oops, not a ZIP file ...
-      throw:You can only upload ZIP files
-         public:true
-         status:415
+      /*
+       * This is an action template type of snippet.
+       * Parametrizing accordingly.
+       */
+      .action
+      add:x:@.action
+         hyper2lambda:x:@load-file
+            comments:true
 
-// Emptying folder.
-io.folder.list:x:@.arguments/*/folder
-   display-hidden:true
-for-each:x:-/*
-   io.folder.delete:x:@.dp/#
-io.file.list:x:@.arguments/*/folder
-   display-hidden:true
-for-each:x:-/*
-   io.file.delete:x:@.dp/#
+      // Creating our action invocation.
+      .invocation
+         execute:magic.workflows.actions.execute
+            name
+            filename
+            arguments
+      set-value:x:@.invocation/*/execute/*/name
+         get-value:x:@.arguments/*/args/*/action_name
+      remove-nodes:x:@.arguments/*/args/*/action_name
+      set-value:x:@.invocation/*/execute/*/filename
+         get-value:x:@.arguments/*/filename
 
-// Figuring out full path of ZIP file as it should be saved.
-.filename
-set-value:x:@.filename
-   strings.concat
-      get-value:x:@.arguments/*/folder
-      get-value:x:@.arguments/*/file/*/name
+      // Creating our action comment.
+      if
+         eq
+            get-name:x:@.action/0
+            .:..
+         .lambda
+            unwrap:x:+/*/*
+            insert-before:x:@.invocation/0
+               .
+                  ..:x:@.action/0
 
-// Saving stream to file.
-io.stream.save-file:x:@.filename
-   get-value:x:@.arguments/*/file/*/stream
+      // Making sure we correctly convert arguments according to type declaration.
+      for-each:x:@.arguments/*/args/**
+         if
+            strings.starts-with:x:@.dp/#
+               .:":x:"
+            .lambda
+               strings.substring:x:@.dp/#
+                  .:int:3
+               set-x:x:@.dp/#
+                  convert:x:@strings.substring
+                     type:x
+         else
+            get-name:x:@.dp/#
+            switch:x:@.action/*/.arguments/*/{@get-name}/*/type
+               case:long
+               case:decimal
+               case:int
+               case:float
+               case:double
+                  set-value:x:@.dp/#
+                     convert:x:@.dp/#
+                        type:x:@.action/*/.arguments/*/{@get-name}/*/type
+               case:hyperlambda
+                  add:x:@.dp/#
+                     hyper2lambda:x:@.dp/#
+                        comments:true
+                  set-value:x:@.dp/#
 
-// Unzipping file.
-io.file.unzip:x:@.filename
+      // Decorating action arguments according to [.arguments]/[args].
+      add:x:@.invocation/*/execute/*/arguments
+         get-nodes:x:@.arguments/*/args/*
 
-// Deleting ZIP file.
-io.file.delete:x:@.filename
+      // Returning result to caller as Hyperlambda.
+      lambda2hyper:x:@.invocation/*
+         comments:true
+      yield
+         result:x:@lambda2hyper
+else
 
-// Returning success to caller.
-return-nodes
-   result:Success
+   // This is a template snippet, returning as is.
+   unwrap:x:+/*
+   return
+      result:x:@load-file

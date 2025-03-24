@@ -1,48 +1,30 @@
 
-// A Hyperlambda endpoint for a CRUD update endpoint that updates one record in the ml_requests table in the magic database, filtering which item to update with ID and updating type, prompt, completion, and finish_reason fields, ensuring authentication and authorization for root roles.
-.arguments
-   id:long
-   type:string
-   prompt:string
-   completion:string
-   finish_reason:string
-   cached:int
+// Hyperlambda script to get an access token for NetSuite using a private key, account ID, certificate ID, and consumer key.
+.key
+set-value:x:@.key
+   io.file.load:/etc/netsuite/private-key.txt
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
+// Account id
+.account-id
+set-value:x:@.account-id
+   config.get:"magic:netsuite:account-id"
+validators.mandatory:x:@.account-id
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Certificate id
+.certificate-id
+set-value:x:@.certificate-id
+   config.get:"magic:netsuite:certificate-id"
+validators.mandatory:x:@.certificate-id
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+// Consumer key
+.consumer-key
+set-value:x:@.consumer-key
+   config.get:"magic:netsuite:consumer-key"
+validators.mandatory:x:@.consumer-key
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      table:ml_requests
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   yield
-      affected:x:@data.update
+// Invoking slot doing the heavy lifting.
+netsuite.get-access-token
+   private-key:x:@.key
+   account-id:x:@.account-id
+   certificate-id:x:@.certificate-id
+   consumer-key:x:@.consumer-key

@@ -1,27 +1,32 @@
 
-// Hyperlambda action that returns specified HTTP headers from a request. Use 'headers' as an input array to determine which headers to return.
-.arguments
-   headers
-      type:array
-      mandatory:bool:true
-.icon:http
-
-// Retrieving HTTP headers from request.
-request.headers.list
+// Global exception handler in Hyperlambda that logs error messages, URLs, and stack traces. It checks if the 'public' argument exists and is true or if the user belongs to the 'root' role to decide whether to propagate the exception message to the client. If not, return a generic error message.
+log.error:x:@.arguments/*/message
+   url:x:@.arguments/*/path
+   exception:x:@.arguments/*/stack
 
 /*
- * Iterating through each header from above invocation and checking if caller is interested in it,
- * and if caller wants this particular header, we make sure we return it below.
+ * Notice, unless the [public] argument exists, and is true,
+ * we return a "generic" error to caller to make sure we don't
+ * disclose any security information originating from exceptions.
  */
-for-each:x:@request.headers.list/*
-   get-name:x:@.dp/#
-   if
-      exists:x:@.arguments/*/headers/*/={@get-name}
-      .lambda
+if
+   or
+      auth.ticket.in-role:root
+      and
+         exists:x:@.arguments/*/public
+         or
+            get-value:x:@.arguments/*/public
+            convert:x:@.arguments/*/public
+               type:bool
+   .lambda
 
-         // Caller wants currently iterated HTTP header.
-         add:x:../*/return-nodes
-            get-nodes:x:@.dp/#
+      // Exception message is supposed to propagate to client.
+      set-value:x:../*/return/*/message
+         get-value:x:@.arguments/*/message
 
-// Returning result to caller.
-return-nodes
+// Parametrizing return invocation.
+add:x:+
+   get-nodes:x:@.arguments/*/status
+   get-nodes:x:@.arguments/*/field
+return
+   message:Guru meditation, come back when Universe is in order!

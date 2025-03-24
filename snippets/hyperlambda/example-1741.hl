@@ -1,28 +1,22 @@
 /*
- * Sends a multipart email with both HTML and plain text parts, where the 'to',
- * 'subject', and 'body' are dynamically retrieved from other nodes. An attachment
- * is also included, with the file path specified dynamically.
+ * Hyperlambda authenticate endpoint based upon Hyperlambda workflow action file
  */
+.arguments
+   username:string
+   password:string
 
-.recipient-email:john.doe@example.com
-.email-subject:Dynamic Multipart Email
-.plain-text-body:This is the plain text version.
-.html-body:<html><body><p>This is the HTML version.</p></body></html>
-.attachment-path:/path/to/attachment.pdf
+/*
+ * Authenticates the user with the specified [username] and [password].
+ *
+ * Returns a JWT Bearer token that can be used for consecutive requests authorizing user according
+ * to his or her roles.
+ */
+execute:magic.workflows.actions.execute
+   name:authenticate
+   filename:/modules/auth/workflows/actions/authenticate.hl
+   arguments
+      username:x:@.arguments/*/username
+      password:x:@.arguments/*/password
 
-// [mail.smtp.send] requires us to use [unwrap].
-unwrap:x:+/**
-mail.smtp.send
-   message
-      to
-         // Alternative was of declaring both name and email in one node.
-         John Doe:x:@.recipient-email
-      subject:x:@.email-subject
-      entity:multipart/mixed
-         entity:multipart/alternative
-            entity:text/plain
-               content:x:@.plain-text-body
-            entity:text/html
-               content:x:@.html-body
-         entity:application/pdf
-            file-path:x:@.attachment-path
+// Returns the result of your last action.
+return-nodes:x:@execute/*

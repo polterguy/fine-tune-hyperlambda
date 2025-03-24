@@ -1,36 +1,50 @@
 
-// Delete one record from your menu_items table in your cms database
+// Hyperlambda script for a CRUD read endpoint with paging, sorting, and filtering that selects records from the questionnaires table in the magic database, returning name and filtering on name, ensuring authentication and authorization for root and admin roles.
 .arguments
-
-   // Primary key of record to delete, mandatory argument
-   id:long
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   questionnaires.name.like:string
+   questionnaires.name.eq:string
+   questionnaires.type.like:string
+   questionnaires.type.eq:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-validators.mandatory:x:@.arguments/*/id
+auth.ticket.verify:root
 
 // Opening up our database connection.
-data.connect:[generic|cms]
+data.connect:[generic|magic]
    database-type:sqlite
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
       get-nodes:x:@.arguments/*
 
-   // Deleting item from database.
-   data.delete
+   // Reading data from database.
+   data.read
       database-type:sqlite
-      table:menu_items
+      table:questionnaires
+      columns
+         questionnaires.name
+         questionnaires.type
+         questionnaires.action
       where
          and
 
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.menu_items.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

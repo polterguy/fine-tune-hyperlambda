@@ -1,49 +1,87 @@
 
-// Returns a grouped chart image to caller. Values is a mandatory comma separated list of values.
-.arguments:*
+// Hyperlambda script for a CRUD read endpoint that returns items from the users table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+.arguments
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/legend
+   // Paging
+   limit:long
+   offset:long
 
-// Creating our individual bars.
-.bars
-for-each:x:@.arguments/*
-   get-name:x:@.dp/#
-   if
-      not
-         strings.starts-with:x:@get-name
-            .:legend
-      .lambda
+   // Sorting result
+   order:string
+   direction:string
 
-         // Adding primary node for bar.
-         set-name:x:+/*/*
-            get-value:x:@get-name
-         add:x:@.bars
+   // Filtering (optional)
+   username.eq:string
+   username.like:string
+   created.mt:date
+   created.lt:date
+   created.mteq:date
+   created.lteq:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our read invocation.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      table:users
+      columns
+         users.username
+         users.created
+      where
+         and
+
+   // Mixing in roles.
+   include:x:@data.read/*
+      data.read
+         table:users_roles
+         columns
+            role
+         where
+            and
+               user.eq:x:@.dp/#/*/username
+      for-each:x:@data.read/*
+         unwrap:x:+/*/*
+         add:x:././*/return/*/roles
+            .
+               .:x:@.dp/#/*/role
+      return
+         roles
+
+   // Mixing in users extra fields.
+   include:x:@data.read/*
+      data.read
+         table:users_extra
+         columns
+            type
+            value
+         where
+            and
+               user.eq:x:@.dp/#/*/username
+      for-each:x:@data.read/*
+         unwrap:x:+/*/*/*
+         add:x:././*/return/*/extra
             .
                .
+                  type:x:@.dp/#/*/type
+                  value:x:@.dp/#/*/value
+      return
+         extra
 
-         // Adding values for individual cells.
-         add:x:@.bars/0/-
-            strings.split:x:@.dp/#
-               .:,
-
-// Creating our legend.
-add:x:../*/image.chart/*/legend
-   strings.split:x:@.arguments/*/legend
-      .:,
-
-// Parametrizing [image.chart] invocation.
-add:x:../*/image.chart/*/bars
-   get-nodes:x:@.bars/*
-image.chart:grouped
-   width:800
-   height:500
-   bars
-   legend
-
-// Applying correct HTTP header.
-response.headers.set
-   Content-Type:image/png
-
-// Returning chart to caller.
-return:x:@image.chart
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

@@ -1,11 +1,33 @@
 
-// Hyperlambda script to demonstrate a nested expression example.
-.arg1:.data
-.arg2:foo2
-.result
-.data
-   foo1:john
-   foo2:thomas
-   foo3:peter
-set-value:x:@.result
-   get-value:x:../*/{@.arg1}/*/{@.arg2}
+// Create a Hyperlambda script for a CRUD create endpoint that inserts one record into the questions table in the magic database, taking question and questionnaire, ensuring authentication and authorization for root and admin roles.
+.arguments
+   question:string
+   questionnaire:string
+   type:string
+   name:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:questions
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

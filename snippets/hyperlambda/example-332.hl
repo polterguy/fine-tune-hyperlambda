@@ -1,5 +1,42 @@
-// Not equals checking value of [.src]
-.src:int:5
-neq
-   get-value:x:@.src
-   .:int:5
+// Build the dynamic JSON payload
+.payload
+   username:admin
+   password:supersecret123
+   client_id:web-client
+
+// Create headers for content-type and custom request ID
+.headers
+   Content-Type:application/json
+   X-Request-ID:xyz-123-abc
+
+// Make the HTTP POST request
+add:x:./*/http.post/*/headers
+   get-value:x:@.headers/*
+add:x:./*/http.post/*/payload
+   get-value:x:@.payload/*
+http.post:"https://api.example.com/auth/login"
+   headers
+   payload
+
+   // This automatically converts result to lambda object
+   convert:true
+
+// Verify above POST was a success.
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+
+      // Store response status and body
+      .name
+      set-value:x:@.name
+         get-value:x:@http.post/*/content/*/name
+
+      .user-id
+      set-value:x:@.user-id
+         get-value:x:@http.post/*/content/*/user-id
+else
+   throw:Something went wrong when invoking HTTP POST

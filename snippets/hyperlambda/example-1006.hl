@@ -1,53 +1,27 @@
 
-// Script to return all available themes from the backend.
-.arguments
+// Generate a Hyperlambda snippet that evaluates specified [.lambda] if any condition evaluates to true.
 
-// Making sure user has access to invoked endpoint.
-auth.ticket.verify:root
-
-// Checking if custom CSS file exists.
+// Evaluates specified [.lambda] if any condition evaluates to true.
 .result
-
-// Listing custom files.
+.value1:int:3
+.value2:int:10
 if
-   io.folder.exists:/etc/system/openai/css/chat/
-   .lambda
-      io.file.list:/etc/system/openai/css/chat/
-      for-each:x:@io.file.list/*
-         if
-            strings.ends-with:x:@.dp/#
-               .:css
-            .lambda
-               strings.split:x:@.dp/#
-                  .:/
-               strings.split:x:@strings.split/0/-
-                  .:.
-               unwrap:x:+/*/*
-               add:x:@.result
-                  .
-                     .:x:@strings.split/0
+   or
 
-// Listing system files.
-if
-   io.folder.exists:/system/openai/front.files/chat/
-   .lambda
-      io.file.list:/system/openai/front.files/chat/
-      for-each:x:@io.file.list/*
-         if
-            strings.ends-with:x:@.dp/#
-               .:css
-            .lambda
-               strings.split:x:@.dp/#
-                  .:/
-               strings.split:x:@strings.split/0/-
-                  .:.
-               if
-                  not-exists:x:"@.result/*/\"={@strings.split/0}\""
-                  .lambda
-                     unwrap:x:+/*/*
-                     add:x:@.result
-                        .
-                           .:x:@strings.split/0
+      // [lt] implies "less than"
+      lt:x:@.value1
+         .:int:4
 
-// Returning result to caller.
-return-nodes:x:@.result/*
+      // [mt] implies "more than"
+      mt:x:@.value2
+         .:int:9
+   .lambda
+
+      // Changing the value of [.result] to true
+      set-value:x:@.result
+         .:bool:true
+else
+
+   // Changing the value of [.result] to false
+   set-value:x:@.result
+      .:bool:false

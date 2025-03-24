@@ -1,16 +1,32 @@
-// Tries to fetch a random cat fact, with error handling if the request fails
-.cat-fact
-http.get:"https://meowfacts.herokuapp.com/"
-   convert:true
-if
-   and
-      mte:x:@http.get
-         .:int:200
-      lt:x:@http.get
-         .:int:300
-   .lambda
-      set-value:x:@.cat-fact
-         get-value:x:@http.get/*/content/*/data/0
-else
-   set-value:x:@.cat-fact
-      .:Failed to fetch cat fact
+
+// Delete one record from your CustomerCustomerDemo table in your northwind database
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   CustomerID:string
+
+   // Primary key of record to delete, mandatory argument
+   CustomerTypeID:string
+
+validators.mandatory:x:@.arguments/*/CustomerID
+validators.mandatory:x:@.arguments/*/CustomerTypeID
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:CustomerCustomerDemo
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

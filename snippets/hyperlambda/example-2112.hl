@@ -1,89 +1,23 @@
-
-// Returns minimum, maximum, average or sum from your Customers table in your northwind database
+/*
+ * Hyperlambda action that returns artists and count of records per artist, sorted by artist having the most albums.
+ */
 .arguments
 
-   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
-   aggregate_function:string
+   // Notice, action syntax
+   filter
+      type:string
+      mandatory:bool:true
 
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
-   aggregate_column:string
+// This becomes the icon used to show the activity in your toolbox
+.icon:home
 
-   // Optional filtering
-   Customers.CustomerID.like:string
-   Customers.CustomerID.eq:string
-   Customers.CompanyName.like:string
-   Customers.CompanyName.eq:string
-   Customers.ContactName.like:string
-   Customers.ContactName.eq:string
-   Customers.ContactTitle.like:string
-   Customers.ContactTitle.eq:string
-   Customers.Address.like:string
-   Customers.Address.eq:string
-   Customers.City.like:string
-   Customers.City.eq:string
-   Customers.Region.like:string
-   Customers.Region.eq:string
-   Customers.PostalCode.like:string
-   Customers.PostalCode.eq:string
-   Customers.Country.like:string
-   Customers.Country.eq:string
-   Customers.Phone.like:string
-   Customers.Phone.eq:string
-   Customers.Fax.like:string
-   Customers.Fax.eq:string
-
-// Sanity checking mandatory arguments.
-validators.mandatory:x:@.arguments/*/aggregate_function
-validators.mandatory:x:@.arguments/*/aggregate_column
-
-// Sanity checking name of aggregate function.
-validators.enum:x:@.arguments/*/aggregate_function
-   .:min
-   .:max
-   .:sum
-   .:avg
-
-// Sanity checking agggregate column name.
-validators.enum:x:@.arguments/*/aggregate_column
-   .:Customers.CustomerID
-   .:Customers.CompanyName
-   .:Customers.ContactName
-   .:Customers.ContactTitle
-   .:Customers.Address
-   .:Customers.City
-   .:Customers.Region
-   .:Customers.PostalCode
-   .:Customers.Country
-   .:Customers.Phone
-   .:Customers.Fax
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Making sure we're using correct aggregate function.
-   set-name:x:./*/data.read/*/columns/*/aggregate_functor
-      strings.concat
-         get-value:x:@.arguments/*/aggregate_function
-         .:(
-         get-value:x:@.arguments/*/aggregate_column
-         .:)
-
-   // Removing aggregate arguments to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/[0,2]
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Customers
-      columns
-         aggregate_functor
-            as:result
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+data.connect:chinook
+   data.select:@"
+select ar.Name, count(*) as count
+   from Album al, Artist ar where al.ArtistId = ar.ArtistId
+   and ar.Name like @filter
+   group by al.ArtistId
+   order by count desc
+   limit 25"
+      @filter:x:@.arguments/*/filter
+   return:x:-/*

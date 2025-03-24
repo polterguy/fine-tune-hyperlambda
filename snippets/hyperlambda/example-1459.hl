@@ -1,14 +1,36 @@
 
-// Hyperlambda endpoint that loads the appsettings.json file and returns its content to the caller, ensuring the user is authorized.
-
-// An empty [.arguments] node such as this, prevents users from passing in arguments to the endpoint.
+// Delete one record from your posts table in your cms database
 .arguments
 
-// Ensuring user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-// Loading the 'appsettings.json' file.
-config.load
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
 
-// Returning file to caller.
-return-value:x:@config.load
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:posts
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.posts.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

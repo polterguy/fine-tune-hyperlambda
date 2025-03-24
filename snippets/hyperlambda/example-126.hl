@@ -1,38 +1,17 @@
+// Retrieve orders that are either pending OR processing
+data.connect:shopDB
 
-// Create one record in your Album table in your chinook database
-.arguments
+   // Using CRUD slot called [data.read]
+   data.read
 
-   // AlbumId column value
-   AlbumId:long
+      // Table we're selecting items from
+      table:orders
 
-   // Title column value
-   Title:string
+      // Return absolutely all items (be careful with your memory)
+      limit:-1
+      where
 
-   // ArtistId column value
-   ArtistId:long
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:Album
-      return-id:bool:false
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      result:success
+         // Either status equals "pending" OR "processing"
+         or
+            status.eq:"pending"
+            status.eq:"processing"

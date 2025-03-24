@@ -1,18 +1,26 @@
 
-// Hyperlambda snippet that evaluates specified [.lambda] if condition does not evaluate to Hello Universe.
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one item from the roles table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   name:string
 
-// Evaluates specified [.lambda] if condition does not evaluate to Hello Universe.
-.foo:Hello Universe
-if
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/name
 
-   // [neq] implies "not equals".
-   neq:x:@.foo
-      .:Hello Universe
-   .lambda
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-      // Lambda evaluates if condition is true.
-      log.info:[.foo] is NOT Hello Universe
-else
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-   // Lambda evaluated if condition is NOT true.
-   log.info:[.foo] is Hello Universe
+   // Deleting item from database.
+   data.delete
+      table:roles
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

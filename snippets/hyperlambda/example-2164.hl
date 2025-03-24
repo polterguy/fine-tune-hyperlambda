@@ -1,42 +1,88 @@
-// Build the dynamic JSON payload
-.payload
-   username:admin
-   password:supersecret123
-   client_id:web-client
 
-// Create headers for content-type and custom request ID
-.headers
-   Content-Type:application/json
-   X-Request-ID:xyz-123-abc
+/*
+ * Lists customers
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
+.arguments
 
-// Make the HTTP POST request
-add:x:./*/http.post/*/headers
-   get-value:x:@.headers/*
-add:x:./*/http.post/*/payload
-   get-value:x:@.payload/*
-http.post:"https://api.example.com/auth/login"
-   headers
-   payload
+   // Optional filtering argument allowing to filter items on name, no, address, phone, email, etc.
+   filter:string
 
-   // This automatically converts result to lambda object
-   convert:true
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
 
-// Verify above POST was a success.
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
+   // Optional offset into records of where to start returning items.
+   offset:long
 
-      // Store response status and body
-      .name
-      set-value:x:@.name
-         get-value:x:@http.post/*/content/*/name
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
 
-      .user-id
-      set-value:x:@.user-id
-         get-value:x:@http.post/*/content/*/user-id
-else
-   throw:Something went wrong when invoking HTTP POST
+// Getting limit value, defaulting to 10
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:10
+
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:No_
+            .:Name
+            .:Address
+            .:"Address 2"
+            .:City
+            .:Post Code
+            .:County
+            .:Contact
+            .:"Phone No_"
+            .:Mobile Phone No_
+            .:Customer Posting Group
+            .:Customer Price Group
+            .:"Salesperson Code"
+            .:Customer Disc_ Group
+            .:E-Mail
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Reading records.
+   mssql.read
+      table:addv_Clientes
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         or
+   
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.read/*

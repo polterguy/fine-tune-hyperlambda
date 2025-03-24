@@ -1,112 +1,18 @@
 
-// Sends a payment link to the specified email address using Hyperlambda workflow actions
-.arguments
-   size:string
-   name:string
-   email:string
+// Create a Hyperlambda switch/case condition that checks an 'input-value'. Log a message if the value is 'foo', another message if the value is 'bar', and a default message if the value is neither.
+switch:x:@.arguments/*/input-value
 
-// Notice, this Hyperlambda file assumes you've got the stripe, auth and hub module installed
+   case:foo
 
-/*
- * Ensures the specified [arg] was given.
- *
- * This action will throw an exception with a descriptive text explaining if the argument is missing.
- */
-execute:magic.workflows.actions.execute
-   name:validators-enum
-   filename:/misc/workflows/actions/auth/validators-enum.hl
-   arguments
-      values
-         .:small
-         .:large
-      value:x:@.arguments/*/size
+      // [input-value] was equal to "foo".
+      log.info:Value was foo
 
-/*
- * Ensures user is authorized to access endpoint.
- *
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/auth/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+   case:bar
 
-// Returns a single plan
-execute:magic.workflows.actions.execute
-   name:hub-setup_price-get
-   filename:/modules/hub/workflows/actions/hub-setup_price-get.hl
-   arguments
-      size:x:@.arguments/*/size
+      // [input-value] was equal to "bar".
+      log.info:Value was bar
 
-/*
- * Creates a Stripe payment link from the specified [price_reference], being
- * a Stripe payment ID, for [quantity] amount of items, returning the user to
- * [success_url] after payment has been successfully finished.
- *
- * Will use your Stripe API token found from your settings as it's interacting
- * with the Stripe API.
- */
-execute:magic.workflows.actions.execute
-   name:stripe-payment-link-create
-   filename:/modules/stripe/workflows/actions/stripe-payment-link-create.hl
-   arguments
-      price_reference:x:--/execute/=hub-setup_price-get/*/price_reference
-      quantity:int:1
-      success_url:"https://ainiro.io"
+   default
 
-// Loads the specified [file] and returns to caller as [content].
-execute:magic.workflows.actions.execute
-   name:file-load
-   filename:/misc/workflows/actions/file/file-load.hl
-   arguments
-      file:/modules/hub/magic.startup/templates/payment-link.html
-
-/*
- * Replaces the specified [source] string's [what] occurencies with [with].
- *
- * Returns the result as [result].
- */
-execute:magic.workflows.actions.execute
-   name:strings-replace-1
-   filename:/misc/workflows/actions/strings/strings-replace.hl
-   arguments
-      source:x:--/execute/=file-load/*/content
-      what:{{name}}
-      with:x:@.arguments/*/name
-
-/*
- * Replaces the specified [source] string's [what] occurencies with [with].
- *
- * Returns the result as [result].
- */
-execute:magic.workflows.actions.execute
-   name:strings-replace-2
-   filename:/misc/workflows/actions/strings/strings-replace.hl
-   arguments
-      source:x:--/execute/=strings-replace-1/*/result
-      what:{{url}}
-      with:x:--/execute/=stripe-payment-link-create/*/purchase_link
-
-/*
- * Sends an email to the specified [name]/[email] recipient, with the specified [subject] and [body].
- *
- * Optionally supply [from] and [from-email] as name/email sender. If you don't supply from, this action
- * will use the default sender settings from your configuration.
- */
-execute:magic.workflows.actions.execute
-   name:email
-   filename:/misc/workflows/actions/misc/email.hl
-   arguments
-      name:x:@.arguments/*/name
-      email:x:@.arguments/*/email
-      html:bool:true
-      subject:Your AINIRO.IO Setup Payment link
-      body:x:--/execute/=strings-replace-2/*/result
-
-// Returning success to caller.
-return
-   result:success
+      // [input-value] was neither foo nor bar.
+      log.info:Value was neither foo nor bar

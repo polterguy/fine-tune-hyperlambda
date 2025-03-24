@@ -1,35 +1,28 @@
 
-// Creates one record in your MediaType table in your chinook database.
+// Create a Hyperlambda endpoint for a CRUD delete endpoint that deletes one record from the ml_requests table in the magic database with an ID matching the argument, ensuring authentication and authorization for root roles.
 .arguments
-
-   // MediaTypeId column value
-   MediaTypeId:long
-
-   // Name column value
-   Name:string
+   id:long
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+auth.ticket.verify:root
 
-// Opening up database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/id
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
       get-nodes:x:@.arguments/*
 
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:MediaType
-      return-id:bool:false
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
+   // Deleting item from database.
+   data.delete
+      table:ml_requests
+      where
+         and
 
    // Returning result of above invocation to caller.
    unwrap:x:+/*
    return
-      result:success
+      affected:x:@data.delete

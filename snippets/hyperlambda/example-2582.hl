@@ -1,2 +1,121 @@
-// This snippet defines a node with a double (floating-point) value.
-.ratio:double:0.000123
+
+// Dynamic Hyperlambda slot returning VSS search results for a specified machine learning type, given threshold, prompt, max, and vector_model arguments.
+slots.create:magic.ai.search
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/prompt
+   validators.mandatory:x:@.arguments/*/threshold
+   validators.mandatory:x:@.arguments/*/max
+   validators.mandatory:x:@.arguments/*/vector_model
+   validators.string:x:@.arguments/*/prompt
+      min:1
+
+   // Converting threshold in case we're given the wrong type.
+   set-value:x:@.arguments/*/threshold
+      convert:x:@.arguments/*/threshold
+         type:double
+
+   // Retrieving OpenAI token required to invoke ChatGPT.
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+
+   // Retrieving embedding for prompt.
+   http.post:"https://api.openai.com/v1/embeddings"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         input:x:@.arguments/*/prompt
+         model:x:@.arguments/*/vector_model
+      convert:true
+
+   // Sanity checking above invocation.
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+
+         // Oops, error - Logging error and returning OpenAI's HTTP status code to caller.
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            error:x:@lambda2hyper
+         throw:x:@http.post/*/content/*/error/*/message
+            public:bool:true
+            status:x:@http.post
+
+   // Connects to database to retrieve matching snippets
+   data.connect:[generic|magic]
+
+      // Checking if we've got a prefix-url argument, defaulting to NOT NULL.
+      .prefix-url:"ts.uri is not null and "
+      if
+         and
+            exists:x:@.arguments/*/prefix-url
+            not-null:x:@.arguments/*/prefix-url
+            neq:x:@.arguments/*/prefix-url
+               .:
+         .lambda
+
+            // Restricting search according to [prefix-url] argument.
+            set-value:x:@.prefix-url
+               .:"ts.uri like @prefix and "
+            add:x:@data.connect/*/data.select
+               .
+                  @prefix:x:@.arguments/*/prefix-url
+
+      // Fetching relevant snippets, making sure we profile the time it takes.
+      .begin
+      set-value:x:@.begin
+         date.now
+
+      // Converting embeddings to a byte array of floats, since this is how we store embeddings in SQLite.
+      floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+      math.subtract
+         .:float:1
+         get-value:x:@.arguments/*/threshold
+      strings.concat
+         .:"\nselect vss.distance, ts.prompt, ts.uri\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and "
+         get-value:x:@.prefix-url
+         .:"vss_search(vss.embedding_vss, @embedding) and\n       vss.distance < @threshold\ngroup by ts.uri\norder by vss.distance\nlimit @limit"
+      data.select:x:@strings.concat
+         @embedding:x:@floatArray2bytes
+         @type:x:@.arguments/*/type
+         @threshold:x:@math.subtract
+         @limit:x:@.arguments/*/max
+
+      // Measuring how much time we spent looping through snippets.
+      .end
+      set-value:x:@.end
+         date.now
+      .time
+      set-value:x:@.time
+         math.subtract
+            get-value:x:@.end
+            get-value:x:@.begin
+      set-value:x:@.time
+         time.format:x:@.time
+            format:"ss\\.fff"
+
+      // Making sure we don't return [snippets] unless we actually have snippets.
+      if
+         not-exists:x:@data.select/*
+         .lambda
+            remove-nodes:x:../*/return/*/snippets
+      else
+         add:x:@data.connect/*/return/*/snippets
+            get-nodes:x:@data.select/*
+
+      // Returning result to caller.
+      unwrap:x:./*/return/*
+      return
+         db_time:x:@.time
+         snippets

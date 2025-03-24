@@ -1,20 +1,22 @@
 /*
- * This script counts the number of Hyperlambda files, in addition to the combined
- * number of nodes, within the specified folder.
+ * FILE: /modules/api/sql/multiple-results.get.hl
+ *
+ * DESCRIPTION:
+ * Demonstrates how to use [data.select] with multiple SQL statements.
+ * Returns multiple result sets as arrays.
+ *
+ * HOW TO CREATE THIS ENDPOINT:
+ * Save the file as `/modules/api/sql/multiple-results.get.hl`.
+ * Becomes accessible at:
+ *     GET /modules/api/sql/multiple-results
+ *
+ * NOTES:
+ * - Be cautious when using raw SQL; it must be sanitized or parameterized in production use.
  */
-.folder:/
-.loc:int:0
-.files:int:0
-unwrap:x:+/*
-signal:magic.io.file.load-recursively
-   .:x:@.folder
-for-each:x:@signal/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-         hyper2lambda:x:@.dp/#/0
-         math.increment:x:@.loc
-            get-count:x:@hyper2lambda/**
-         math.increment:x:@.files
-remove-nodes:x:@signal/*
+
+data.connect:sakila
+   data.select:"SELECT * FROM actor LIMIT 2; SELECT * FROM film LIMIT 2;"
+      multiple-result-sets:bool:true
+
+   yield
+      results:x:@data.select/*

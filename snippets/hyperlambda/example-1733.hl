@@ -1,11 +1,27 @@
-// Processing each item in a collection
-.items
-   .:int:5
-   .:int:10
-   .:int:15
-.sum:int:0
-for-each:x:@.items/*
-   math.add:x:@.sum
-      get-value:x:@.dp/#
-   set-value:x:@.sum
-      get-value:x:@math.add
+
+// Create a Hyperlambda script for a CRUD create endpoint that creates an item in the users_roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   role:string
+   user:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:users_roles
+      return-id:bool:false
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      result:success

@@ -1,8 +1,27 @@
-// Creates a task, then schedules it
-tasks.create:task-id-qwqw
+/*
+ * This example checks if a temporary folder "/temp/uploads/" exists.
+ * If it exists and contains files, it deletes them.
+ * If it exists but is empty, it logs a message.
+ * If it does not exist, it creates the folder.
+ */
+.result
+if
+   io.folder.exists:/temp/uploads/
    .lambda
+      io.folder.list:/temp/uploads/
+      if
+         gt
+            get-count:x:@io.folder.list/*
+            .:int:0
+         .lambda
+            for-each:x:@io.folder.list/*
+               io.file.delete:x:@.dp/#
 
-      log.info:Executing repeating task
+      else
+         set-value:x:@.result
+            .:Folder exists but is empty.
 
-tasks.schedule:task-id-qwqw
-   repeats:50.seconds
+else
+   io.folder.create:/temp/uploads/
+   set-value:x:@.result
+      .:Folder did not exist, so it was created.

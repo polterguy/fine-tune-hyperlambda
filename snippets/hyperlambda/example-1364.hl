@@ -1,17 +1,34 @@
 
-// Returns Swagger and OpenAPI specifications for the specified type
+// Create a Hyperlambda endpoint for a CRUD create endpoint that creates an item in the users table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
 .arguments
+   username:string
+   password:string
 
-   // Mandatory argument declaring the type of object to retrieve OpenAPI specification for.
-   type:string
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Ensuring user is authorized to invoking endpoint.
-auth.ticket.verify:netsuite
+// Sanity checking invocation
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
+eval:x:+
+signal:transformers.hash-password
+   reference:x:@.arguments/*/password
 
-// Forwarding heavy lifting to workflow file.
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/modules/netsuite/workflows/workflows/netsuite-openapi-spec.hl
+// Opening up database connection.
+data.connect:[generic|magic]
 
-// Returning result to caller.
-return-nodes:x:@execute-file/*
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:users
+      return-id:bool:false
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      result:success

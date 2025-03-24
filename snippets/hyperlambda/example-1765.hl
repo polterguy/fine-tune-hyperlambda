@@ -1,8 +1,32 @@
-// Requests an XML response format by setting the Accept header
-http.get:"https://api.weather.gov/gridpoints/MPX/107,71/forecast"
-   headers
-      Accept:application/xml
-   convert:true
+/*
+ * This Hyperlambda snippet accepts a file path and a target word as arguments.
+ * It reads the content of the file, splits the content into words,
+ * counts how many words are NOT equal to the specified word, and returns the count.
+ */
 
-// Transforming XML to a lambda object such that we can traverse it
-xml2lambda:x:-/*/content
+.arguments
+   file-path:string
+   word:string
+
+// Load the text file's content
+io.file.load:x:@.arguments/*/file-path
+
+// Split the content into words based on spaces
+strings.split:x:@io.file.load
+   .:' '
+
+// Initialize counter
+.counter:int:0
+
+// Iterate through each word and compare to target
+for-each:x:@strings.split/*
+   if
+      not
+         eq:x:@.dp/#
+            .:x:@.arguments/*/word
+      .lambda
+         math.increment:x:@.counter
+
+// Return the result
+yield
+   word-count:x:@.counter

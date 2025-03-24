@@ -1,82 +1,120 @@
 
-// Counts unique and distinct items from your city table in your sakila database without authorization but with reCAPTCHA
+// Workflow action invoking OpenAI's chat API with the specified [model], [max_tokens], [context], [instruction] and [query].
 .arguments
+   model
+      type:string
+      mandatory:bool:true
+      default:gpt-4-1106-preview
+      values
+         .:gpt-4o
+         .:gpt-4o-mini
+         .:gpt-4o-2024-05-13
+         .:gpt-3.5-turbo
+         .:gpt-3.5-turbo-16k
+         .:gpt-3.5-turbo-1106
+         .:gpt-3.5-turbo-0125
+         .:gpt-4
+         .:gpt-4-1106-preview
+         .:03-mini
+         .:gpt-4.5-preview
+   max_tokens
+      type:int
+      mandatory:bool:true
+      default:int:1500
+   context
+      type:textarea
+      mandatory:bool:false
+   instruction
+      type:textarea
+      mandatory:bool:false
+   query
+      type:textarea
+      mandatory:bool:true
+.icon:chat_bubble
 
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
-   recaptcha:string
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/model
+validators.mandatory:x:@.arguments/*/query
+validators.mandatory:x:@.arguments/*/max_tokens
 
-   // Filter conditions (optional)
-   city.city_id.eq:long
-   city.city.like:string
-   city.city.eq:string
-   city.country_id.eq:long
-   city.last_update.eq:date
+// Retrieving OpenAI API token from configuration settings.
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:openai:key"
 
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:city.city_id
-   .:city.city
-   .:city.country_id
-   .:city.last_update
-
-// Adding Cache-Control HTTP header.
-response.headers.set
-   Cache-Control:private, max-age=500
-
-// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
-config.get:"magic:auth:recaptcha:key"
-config.get:"magic:auth:recaptcha:secret"
+// Checking if caller provided a [context].
 if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-      neq:x:@config.get/@config.get
-         .
-      neq:x:@config.get/@config.get
-         .:
+   exists:x:@.arguments/*/context
    .lambda
 
-      // reCAPTCHA configuration settings found.
-      validators.mandatory:x:@.arguments/*/recaptcha
-      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-         min:decimal:0.3
+      // Adding [context].
+      insert-before:x:../*/http.post/*/payload/*/messages/0
+         .
+            .
+               role:user
+               content:x:@.arguments/*/context
 
-// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
-remove-nodes:x:@.arguments/*/recaptcha/[0,1]
+// Checking if caller provided an [instruction].
+if
+   exists:x:@.arguments/*/instruction
+   .lambda
 
-// Opening up our database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
+      // Adding [instruction].
+      insert-before:x:../*/http.post/*/payload/*/messages/0
+         .
+            .
+               role:system
+               content:x:@.arguments/*/instruction
 
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
-      strings.concat
-         .:"count(distinct "
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+// Checking if model is o3 something, at which point we'll have to change [max_tokens] to [max_completion_tokens]
+if
+   strings.starts-with:x:@.arguments/*/model
+      .:o3-
+   .lambda
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+      // Changing name of argument.
+      set-name:x:../*/http.post/*/payload/*/max_tokens
+         .:max_completion_tokens
+      remove-nodes:x:../*/http.post/*/payload/*/temperature
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:city
-      columns
-         distinct_functor
-            as:count
-      where
-         and
+// Invokes OpenAI.
+http.post:"https://api.openai.com/v1/chat/completions"
+   convert:bool:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json
+   payload
+      model:x:@.arguments/*/model
+      max_tokens:x:@.arguments/*/max_tokens
+      temperature:decimal:0.3
+      messages
+         .
+            role:user
+            content:x:@.arguments/*/query
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+
+      // Oops, error - Logging error and returning status 500 to caller.
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      throw:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+
+// Returning answer to caller.
+yield
+   answer:x:@http.post/*/content/*/choices/0/*/message/*/content

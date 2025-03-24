@@ -1,76 +1,58 @@
 
-// Create a function to cancel a user's active subscriptions using Stripe. The function should retrieve the username, search for all subscriptions linked to the user, and cancel each one using the Stripe API. It should handle any errors during the cancellation process by logging them. Additionally, the function should update the user's roles in the database, excluding 'root' and 'guest', and retrieve extra user information like name and email. Finally, it should authenticate the user again to create a new JWT token reflecting the updated roles and return this token along with the extra information.
-.extra
+// Create one record in your Customers table in your northwind database
+.arguments
 
-// Retrieving username.
-auth.ticket.get
+   // CustomerID column value
+   CustomerID:string
 
-/*
- * Searches for subscriptions belonging to user.
- * 
- * Returns all subscriptions belonging to the specified user.
- */
-execute:magic.workflows.actions.execute
-   name:stripe-subscription-search
-   filename:/modules/stripe/workflows/actions/stripe-subscription-search.hl
-   arguments
-      username:x:@auth.ticket.get
+   // CompanyName column value
+   CompanyName:string
 
-// Looping through all subscriptions belonging to user and canceling these.
-for-each:x:@execute/*
+   // ContactName column value
+   ContactName:string
 
-   /*
-    * Deletes the existing Stripe subscription for the given [subscription_id].
-    * 
-    * Will use your Stripe API token found from your settings as it's interacting
-    * with the Stripe API.
-    */
-   try
-      execute:magic.workflows.actions.execute
-         name:stripe-subscription-delete
-         filename:/modules/stripe/workflows/actions/stripe-subscription-delete.hl
-         arguments
-            subscription_id:x:@.dp/#/*/id
-   .catch
-      log.error:x:@.arguments/*/message
+   // ContactTitle column value
+   ContactTitle:string
+
+   // Address column value
+   Address:string
+
+   // City column value
+   City:string
+
+   // Region column value
+   Region:string
+
+   // PostalCode column value
+   PostalCode:string
+
+   // Country column value
+   Country:string
+
+   // Phone column value
+   Phone:string
+
+   // Fax column value
+   Fax:string
 
 // Opening up database connection.
-data.connect:magic
+data.connect:[generic|northwind]
+   database-type:sqlite
 
-   // Deleting all roles user belongs to except root and guest.
-   data.delete
-      table:users_roles
-      where
-         and
-            user.eq:x:@auth.ticket.get
-            role.neq:guest
-            role.neq:root
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-   // Retrieving extra information.
-   data.connect:magic
-      data.read
-         table:users_extra
-         where
-            and
-               user.eq:x:@auth.ticket.get
-               or
-                  type.eq:name
-                  type.eq:email
-      for-each:x:@data.read/*
-         set-name:x:./*/add/*/*
-            get-value:x:@.dp/#/*/type
-         set-value:x:./*/add/*/*
-            get-value:x:@.dp/#/*/value
-         add:x:@.extra
-            .
-               .
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Customers
+      return-id:bool:false
+      values
 
-// Authenticating user again creating a new JWT token since roles have been updated.
-execute:magic.auth.authenticate
-   username:x:@auth.ticket.get
-   password-check:bool:false
+   // Returning the correct status code.
+   response.status.set:201
 
-// Returning token and extra information to caller.
-yield
-   ticket:x:@execute/*/ticket
-   extra:x:@.extra/*
+   // Returning result of above invocation to caller.
+   return
+      result:success

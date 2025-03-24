@@ -1,18 +1,26 @@
-// Compares role and returns whether user is an admin
-slots.create:is.admin
-   if
-      eq:x:@.arguments/*/role
-         .:admin
-      .lambda
-         return
-            isAdmin:bool:true
-   return
-      isAdmin:bool:false
+/*
+ * Sends an email using SMTP settings from other nodes,
+ * making it flexible for dynamically injected configuration values.
+ */
 
-// Returns true
-execute:is.admin
-   role:admin
+.smtp-host:smtp.example.com
+.smtp-port:int:587
+.smtp-user:your-username
+.smtp-pass:your-password
+.smtp-ssl:bool:true
 
-// Returns false
-execute:is.admin
-   role:guest
+// The [mail.smtp.send] requires us to invoke [unwrap]
+unwrap:x:../*/mail.smtp.send/**
+mail.smtp.send
+   smtp
+      host:x:@.smtp-host
+      port:x:@.smtp-port
+      username:x:@.smtp-user
+      password:x:@.smtp-pass
+      enableSsl:x:@.smtp-ssl
+   message
+      to
+         recipient:john.doe@example.com
+      subject:SMTP Settings via Expressions
+      entity:text/plain
+         content:This email uses SMTP settings from external nodes.

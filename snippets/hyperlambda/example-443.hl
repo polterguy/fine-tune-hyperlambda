@@ -1,11 +1,27 @@
+
+// Hyperlambda file and endpoint that changes the password of the currently authenticated user, ensuring the user is authorized.
+.arguments
+   password:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/password
+
+// Making sure password is at least 12 characters in length
+validators.string:x:@.arguments/*/password
+   min:12
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify
+
 /*
- * Notice, the whole idea with this Hyperlambda,
- * is to demonstrate how the log invocation inside of
- * the [fork] is being executed after the outer log
- * invocation, due to the sleep invocation, and the
- * fact that it runs on a different thread.
+ * Invokes the slot that does the heavy lifting, and updates the user's current password.
+ * 
+ * This slot will change the password of the currently logged in user.
  */
-fork
-   sleep:1000
-   log.info:INSIDE
-log.info:OUTSIDE
+unwrap:x:+/*
+signal:magic.auth.change-password
+   password:x:@.arguments/*/password
+
+// Returns success to caller.
+return-nodes
+   result:success

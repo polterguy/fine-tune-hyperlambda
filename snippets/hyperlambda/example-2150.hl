@@ -1,85 +1,213 @@
 
-// Hyperlambda script to create a task that periodically crawls all models to add new pages, with error handling.
-tasks.list:ainiro-crawl-machine-learning-models
-if
-   exists:x:@tasks.list/*
-   .lambda
-      tasks.delete:ainiro-crawl-machine-learning-models
+// Slot ingesting the products for the specified Woocommerce account into ml_training_data.
+slots.create:woocommerce.products.ingest
 
-// Creating task that crawls all models periodically.
-tasks.create:ainiro-crawl-machine-learning-models
-   description:Periodically crawls all models once every day to add new pages to model
-   repeats:24.hours
-   .lambda
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/base-url
+   validators.mandatory:x:@.arguments/*/username
+   validators.mandatory:x:@.arguments/*/secret
+   validators.default:x:@.arguments
+      quantity:bool:true
+      vectorize:bool:true
+      max_tokens:int:1000
 
-      // Basic logging.
-      log.info:Task to periodically crawl models about to be executed
+   // Basic logging.
+   log.info:Deleting products to prepare for import using WooCommerce API
+      type:x:@.arguments/*/type
+      shop:x:@.arguments/*/base-url
 
-      // Connecting to database.
+   // Normalizing URL.
+   set-value:x:@.arguments/*/base-url
+      strings.trim-end:x:@.arguments/*/base-url
+         .:/
+
+   // Making sure we trap exceptions and logs errors.
+   try
+
+      // Deleting existing WooCommerce imported ml_training_snippets for model.
       data.connect:[generic|magic]
-
-         // Finding all types with a [base_url].
-         data.read
-            table:ml_types
-            columns
-               type
-               base_url
+         data.execute:"delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type and meta = 'woocommerce-import')"
+            @type:x:@.arguments/*/type
+         data.delete
+            table:ml_training_snippets
             where
                and
-                  base_url.neq
-                  base_url.neq:
+                  type.eq:x:@.arguments/*/type
+                  meta.eq:woocommerce-import
 
-         // Looping through all types returned above.
-         for-each:x:@data.read/*
+      // Basic logging.
+      log.info:Importing products using WooCommerce API
+         type:x:@.arguments/*/type
+         shop:x:@.arguments/*/base-url
 
-            // Verifying URL is not null and not empty.
-            if
-               and
-                  not-null:x:@.dp/#/*/base_url
-                  neq:x:@.dp/#/*/base_url
-                     .:
-               .lambda
+      // Buffer for all products.
+      .products
 
-                  // Making sure exceptions never leave thread.
-                  try
+      // Buffer for Basic AUTH key.
+      .auth
 
-                     // Verifying user can create more snippets.
-                     add:x:+
-                        get-nodes:x:@.dp/#/*/type
-                     try-signal:magic.ai.can-create-snippet
+      // Creating Basic AUTH token.
+      set-value:x:@.auth
+         strings.concat
+            get-value:x:@.arguments/*/username
+            .:":"
+            get-value:x:@.arguments/*/secret
+      set-value:x:@.auth
+         convert:x:@.auth
+            type:bytes
+      set-value:x:@.auth
+         strings.concat
+            .:"Basic "
+            convert:x:@.auth
+               type:base64
 
-                     // Doing some logging.
-                     log.info:Crawling website
-                        url:x:@.dp/#/*/base_url
-                        type:x:@.dp/#/*/type
+      // What page of items we're retrieving.
+      .page:int:0
 
-                     // Invoking slot doing the heavy lifting.
-                     unwrap:x:./*/signal/*
-                     unwrap:x:./*/signal/*/.onafter/**/type
-                     unwrap:x:./*/signal/*/.onafter/**/.type
-                     signal:magic.ai.crawl-site
-                        delay:int:2000
-                        threshold:int:150
-                        max:int:1250
-                        summarize:bool:true
-                        url:x:@.dp/#/*/base_url
-                        type:x:@.dp/#/*/type
-                        feedback-channel:non-existing
-                        .onafter
-                           signal:magic.ai.vectorise
-                              feedback-channel:non-existing
-                              type:x:@.dp/#/*/type
-                              .onafter
+      // Continue while loop as long as true.
+      .continue:bool:true
 
-                                 // Basic logging.
-                                 .type:x:@.dp/#/*/type
+      // Looping as long as we've got more products from WooCommerce.
+      while:x:@.continue
+         .base-url:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10"
+         if
+            mt:x:@.page
+               .:int:0
+            .lambda
+               set-value:x:@.base-url
+                  strings.concat
+                     .:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10&page="
+                     get-value:x:@.page
+
+         // Getting next batch of products.
+         http.get:x:@.base-url
+            headers
+               Authorization:x:@.auth
+            convert:bool:true
+
+         // Insert products into above buffer node.
+         add:x:@.products
+            get-nodes:x:@http.get/*/content/*
+
+         // Checking if we're done.
+         if
+            lt
+               get-count:x:@http.get/*/content/*
+               .:int:10
+            .lambda
+               set-value:x:@.continue
+                  .:bool:false
+
+         // Incrementing page.
+         math.increment:x:@.page
+            .:int:10
+
+         /*
+          * Opening up our database connection, such that we can
+          * insert training snippets into database.
+          */
+         data.connect:[generic|magic]
+
+            // Looping through all products we fetched above.
+            for-each:x:@http.get/*/content/*
+
+               // Verifying product is in stock.
+               if
+                  and
+                     eq:x:@.dp/#/*/stock_status
+                        .:instock
+                     not-null:x:@.dp/#/*/description
+                     neq:x:@.dp/#/*/description
+                        .:
+                  .lambda
+
+                     // Building the product ml_training_snippet.
+                     .prompt
+                     .completion
+
+                     // Extracting properties of product
+                     set-value:x:@.prompt
+                        strings.concat
+                           html2markdown:x:@.dp/#/*/description
+                     set-value:x:@.completion
+                        strings.concat
+                           .:"Price: "
+                           get-value:x:@.dp/#/*/price
+                           .:"\n\n"
+                           .:"URL: "
+                           get-value:x:@.dp/#/*/permalink
+                     if
+                        and
+                           not-null:x:@.dp/#/*/short_description
+                           neq:x:@.dp/#/*/short_description
+                              .:
+                        .lambda
+                           set-value:x:@.completion
+                              strings.concat
+                                 get-value:x:@.completion
+                                 .:"\n\n"
+                                 .:"Short description: "
+                                 html2markdown:x:@.dp/#/*/short_description
+
+                     // Extracting images if there are any.
+                     if
+                        exists:x:@.dp/#/*/images/*
+                        .lambda
+                           set-value:x:@.completion
+                              strings.concat
+                                 get-value:x:@.completion
+                                 .:"\n\nImages of product:"
+                           for-each:x:@.dp/#/*/images/*
+
+                              // Appending currently iterated image.
+                              set-value:x:@.completion
                                  strings.concat
-                                    get-value:x:@.type
-                                    .:" successfully crawled"
-                                 log.info:x:-
-                  .catch
+                                    get-value:x:@.completion
+                                    .:"\n\n"
+                                    .:![
+                                    get-value:x:@.dp/#/*/name
+                                    .:](
+                                    get-value:x:@.dp/#/*/src
+                                    .:)
 
-                     // Logging.
-                     log.error:Could not crawl site
-                        error:x:@.arguments/*/message
-                        site:x:@.dp/#/*/base_url
+                     // Inserting product into database.
+                     data.create
+                        table:ml_training_snippets
+                        values
+                           type:x:@.arguments/*/type
+                           prompt:x:@.prompt
+                           completion:x:@.completion
+                           uri:x:@.uri
+                           meta:woocommerce-import
+
+      // Checking if we should vectorize model or not.
+      if:x:@.arguments/*/vectorize
+
+         // Basic logging.
+         log.info:Started vectorizing model after WooCommerce import
+            type:x:@.arguments/*/type
+            shop:x:@.arguments/*/base-url
+
+         // Vectorizing model.
+         unwrap:x:+/*
+         signal:magic.ai.vectorise
+            feedback-channel:non-existing
+            type:x:@.arguments/*/type
+
+         // Basic logging.
+         log.info:Done vectorizing model after WooCommerce import
+            type:x:@.arguments/*/type
+            shop:x:@.arguments/*/base-url
+
+      // Logging the fact that we're done.
+      log.info:Done with WooCommerce import
+         type:x:@.arguments/*/type
+         shop:x:@.arguments/*/base-url
+   .catch
+
+      // Oops ...!!
+      log.error:Something went wrong as we tried to import products from WooCommerce
+         error:x:@.arguments/*/message
+         type:x:@.arguments/*/type
+         shop:x:@.arguments/*/base-url

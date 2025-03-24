@@ -1,44 +1,69 @@
 
-// Creates training data and inserts into fine-tuning database such that it can be exported later.
+// Executes the specified SuiteQL query towards your NetSuite account
 .arguments
 
-   // Mandatory argument being file number to generate training data for. When listing Hyperlambda files, this will generate training data for the nth file listed, allowing us to loop for as long as have have additional files, incrementing the file-no argument for each iteration.
-   file-no:int
+   // Mandatory argument being your NetSuite query to execute.
+   q:string
 
-// Listing files recursively.
-io.file.list-recursively:/
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/q
 
-// Pruning out everything but Hyperlambda files.
-.file
-for-each:x:@io.file.list-recursively/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-         unwrap:x:+/*/*
-         add:x:@.file
-            .
-               .:x:@.dp/#
+/*
+ * Returns an access token for NetSuite.
+ * 
+ * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
+ * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
+ * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
+ */
+execute:magic.workflows.actions.execute
+   name:netsuite-get-access-token
+   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
+   arguments
 
-// Checking if we've dealt with all files.
+// Creating our idempotency key to prevent replay attacks.
+guid.new
+
+// Creating invocation URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://"
+      config.get:"magic:netsuite:account-id"
+      .:.suitetalk.api.netsuite.com/services/rest/query/v1/suiteql
+
+// Parametrizing our payload.
+add:x:./*/http.post/*/payload
+   get-nodes:x:@.arguments/*/q
+
+// Invoking our HTTP GET endpoint, now correctly parametrised.
+http.post:x:@.url
+   token:x:--/execute/=netsuite-get-access-token/*/access-token
+   headers
+      Prefer:transient
+      X-NetSuite-Idempotency-Key:x:@guid.new
+   payload
+
+// Converts the result to a lambda object.
+json2lambda:x:@http.post/*/content
+
+// Sanity checking above invocation.
 if
-   mt
-      get-value:x:@.arguments/*/file-no
-      get-count:x:@.file/*
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
    .lambda
-      return
-         result:There are no more files, you have handled all files.
 
-// Loading nth file.
-.hyperlambda
-strings.concat
-   .:@.file/
-   get-value:x:@.arguments/*/file-no
-set-x:x:+
-   convert:x:@strings.concat
-      type:x
-io.file.load
+      // Oops, error ...!!
+      lambda2hyper:x:@json2lambda
+      log.error:x:@lambda2hyper
+      throw:Could not create entity in NetSuite, check your log for details.
 
-// Returning Hyperlambda file to caller.
+// Cleaning up redundant stuff.
+remove-nodes:x:@json2lambda/*/items/*/*/links
+
+// Returning entities to caller.
 yield
-   hyperlambda:x:@io.file.load
+   items:x:@json2lambda/*/items/*

@@ -1,58 +1,55 @@
 
-// Counts items from your city table in your sakila database
-.arguments
-   recaptcha:string
-   city.city_id.eq:long
-   city.city.like:string
-   city.city.eq:string
-   city.country_id.eq:long
-   city.last_update.eq:date
+// Lists all foreign keys in the specified SQLite table.
+slots.create:magic.db.sqlite.foreign_keys
 
-// Adding Cache-Control HTTP header.
-response.headers.set
-   Cache-Control:private, max-age=500
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
 
-// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
-config.get:"magic:auth:recaptcha:key"
-config.get:"magic:auth:recaptcha:secret"
-if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-      neq:x:@config.get/@config.get
-         .
-      neq:x:@config.get/@config.get
-         .:
-   .lambda
+   // Opens up our connection
+   .connection:
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   sqlite.connect:x:@.connection
+      strings.concat
+         .:"pragma foreign_key_list('"
+         get-value:x:@.arguments/*/table
+         .:"')"
+      sqlite.select:x:@strings.concat
 
-      // reCAPTCHA configuration settings found.
-      validators.mandatory:x:@.arguments/*/recaptcha
-      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-         min:decimal:0.3
-
-// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
-remove-nodes:x:@.arguments/*/recaptcha/[0,1]
-
-// Opening up our database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:city
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+      /*
+       * Creating our return value, by projecting it into
+       * a generic form, that does not rely upon SQLite's syntactic
+       * details.
+       */
+      for-each:x:@sqlite.select/*
+         unwrap:x:+/*/*/*
+         add:x:../*/return-nodes
+            .
+               .
+                  column:x:@.dp/#/*/from
+                  foreign_table:x:@.dp/#/*/table
+                  foreign_column:x:@.dp/#/*/to
+   return-nodes

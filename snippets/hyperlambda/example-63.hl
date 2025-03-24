@@ -1,46 +1,20 @@
 
-// Workflow action returning true if the specified username is available.
+// Generate a Hyperlambda snippet that updates an employee record in the 'hr_db' database within the 'employees' table.
+
+// Updates an employee record in the "hr_db" database within the "employees" table.
 .arguments
-   username
-      type:string
-      mandatory:bool:true
-   throw
-      type:bool
-      mandatory:bool:false
-.icon:supervisor_account
+   employee_id:int
+data.connect:hr_db
+   database-type:mysql
 
-// Applying defaults.
-validators.default:x:@.arguments
-   throw:bool:false
-
-// Opens up database connection.
-data.connect:[generic|magic]
-
-   // Selecting user from database such that we can check if it exists or not.
-   data.read
-      table:users
-      columns
-         username
+   // Updating the employee's department and salary.
+   data.update
+      database-type:mysql
+      table:employees
+      values
+         department:Finance
+         salary:decimal:75000.00
       where
          and
-            username.eq:x:@.arguments/*/username
-
-   // Checks if above invocation returned anything.
-   if
-      exists:x:@data.read/*
-      .lambda
-
-         // Checking if we should throw an exception instead of returning false.
-         if:x:@.arguments/*/throw
-            throw:User already exists
-               status:int:400
-               public:bool:true
-
-         // User exists, returning false to caller.
-         return
-            available:bool:false
-   else
-
-      // User does not exist, returning true to caller.
-      return
-         available:bool:true
+            employee_id.eq:x:@.arguments/*/employee_id
+   return:x:@data.update

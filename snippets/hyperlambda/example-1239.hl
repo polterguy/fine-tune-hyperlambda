@@ -1,23 +1,22 @@
 
-// Hyperlambda script that deletes one record from a specified table in a database with optional filtering arguments.
-.arguments
+// Generate a Hyperlambda snippet that compiles a C# file 'math.cs' into a library and loads it dynamically.
 
-// Opening up our database connection.
-data.connect:{database}
-   database-type:{database-type}
+/*
+ * Compiles a C# file "math.cs" into a library and loads it dynamically.
+ * This assumes "math.cs" exists in "/etc/" and contains a slot named [calculate].
+ */
+io.file.load:/etc/math.cs
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Math
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.node.extensions
+      .:magic.signals.contracts
+   code:x:@io.file.load
+   assembly-name:math.dll
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:{database-type}
-      table:{table}
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Loading the compiled assembly.
+system.plugin.load:x:@system.compile

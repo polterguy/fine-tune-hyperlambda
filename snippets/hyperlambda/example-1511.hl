@@ -1,213 +1,25 @@
 
-// Slot ingesting the products for the specified Woocommerce account into ml_training_data.
-slots.create:woocommerce.products.ingest
+// Returns [max_urls] matching specified query by searching DuckDuckGo.
+.arguments
+   query:string
+   max_urls:int
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/type
-   validators.mandatory:x:@.arguments/*/base-url
-   validators.mandatory:x:@.arguments/*/username
-   validators.mandatory:x:@.arguments/*/secret
-   validators.default:x:@.arguments
-      quantity:bool:true
-      vectorize:bool:true
-      max_tokens:int:1000
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
 
-   // Basic logging.
-   log.info:Deleting products to prepare for import using WooCommerce API
-      type:x:@.arguments/*/type
-      shop:x:@.arguments/*/base-url
+// Applying default values for optional arguments.
+validators.default:x:@.arguments
+   max_urls:int:10
 
-   // Normalizing URL.
-   set-value:x:@.arguments/*/base-url
-      strings.trim-end:x:@.arguments/*/base-url
-         .:/
+// Converting to integer to make sure we've got the right type.
+set-value:x:@.arguments/*/max_urls
+   convert:x:@.arguments/*/max_urls
+      type:int
 
-   // Making sure we trap exceptions and logs errors.
-   try
+// Retrieving context.
+execute:magic.http.duckduckgo-search
+   query:x:@.arguments/*/query
+   max:x:@.arguments/*/max_urls
 
-      // Deleting existing WooCommerce imported ml_training_snippets for model.
-      data.connect:[generic|magic]
-         data.execute:"delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type and meta = 'woocommerce-import')"
-            @type:x:@.arguments/*/type
-         data.delete
-            table:ml_training_snippets
-            where
-               and
-                  type.eq:x:@.arguments/*/type
-                  meta.eq:woocommerce-import
-
-      // Basic logging.
-      log.info:Importing products using WooCommerce API
-         type:x:@.arguments/*/type
-         shop:x:@.arguments/*/base-url
-
-      // Buffer for all products.
-      .products
-
-      // Buffer for Basic AUTH key.
-      .auth
-
-      // Creating Basic AUTH token.
-      set-value:x:@.auth
-         strings.concat
-            get-value:x:@.arguments/*/username
-            .:":"
-            get-value:x:@.arguments/*/secret
-      set-value:x:@.auth
-         convert:x:@.auth
-            type:bytes
-      set-value:x:@.auth
-         strings.concat
-            .:"Basic "
-            convert:x:@.auth
-               type:base64
-
-      // What page of items we're retrieving.
-      .page:int:0
-
-      // Continue while loop as long as true.
-      .continue:bool:true
-
-      // Looping as long as we've got more products from WooCommerce.
-      while:x:@.continue
-         .base-url:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10"
-         if
-            mt:x:@.page
-               .:int:0
-            .lambda
-               set-value:x:@.base-url
-                  strings.concat
-                     .:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10&page="
-                     get-value:x:@.page
-
-         // Getting next batch of products.
-         http.get:x:@.base-url
-            headers
-               Authorization:x:@.auth
-            convert:bool:true
-
-         // Insert products into above buffer node.
-         add:x:@.products
-            get-nodes:x:@http.get/*/content/*
-
-         // Checking if we're done.
-         if
-            lt
-               get-count:x:@http.get/*/content/*
-               .:int:10
-            .lambda
-               set-value:x:@.continue
-                  .:bool:false
-
-         // Incrementing page.
-         math.increment:x:@.page
-            .:int:10
-
-         /*
-          * Opening up our database connection, such that we can
-          * insert training snippets into database.
-          */
-         data.connect:[generic|magic]
-
-            // Looping through all products we fetched above.
-            for-each:x:@http.get/*/content/*
-
-               // Verifying product is in stock.
-               if
-                  and
-                     eq:x:@.dp/#/*/stock_status
-                        .:instock
-                     not-null:x:@.dp/#/*/description
-                     neq:x:@.dp/#/*/description
-                        .:
-                  .lambda
-
-                     // Building the product ml_training_snippet.
-                     .prompt
-                     .completion
-
-                     // Extracting properties of product
-                     set-value:x:@.prompt
-                        strings.concat
-                           html2markdown:x:@.dp/#/*/description
-                     set-value:x:@.completion
-                        strings.concat
-                           .:"Price: "
-                           get-value:x:@.dp/#/*/price
-                           .:"\n\n"
-                           .:"URL: "
-                           get-value:x:@.dp/#/*/permalink
-                     if
-                        and
-                           not-null:x:@.dp/#/*/short_description
-                           neq:x:@.dp/#/*/short_description
-                              .:
-                        .lambda
-                           set-value:x:@.completion
-                              strings.concat
-                                 get-value:x:@.completion
-                                 .:"\n\n"
-                                 .:"Short description: "
-                                 html2markdown:x:@.dp/#/*/short_description
-
-                     // Extracting images if there are any.
-                     if
-                        exists:x:@.dp/#/*/images/*
-                        .lambda
-                           set-value:x:@.completion
-                              strings.concat
-                                 get-value:x:@.completion
-                                 .:"\n\nImages of product:"
-                           for-each:x:@.dp/#/*/images/*
-
-                              // Appending currently iterated image.
-                              set-value:x:@.completion
-                                 strings.concat
-                                    get-value:x:@.completion
-                                    .:"\n\n"
-                                    .:![
-                                    get-value:x:@.dp/#/*/name
-                                    .:](
-                                    get-value:x:@.dp/#/*/src
-                                    .:)
-
-                     // Inserting product into database.
-                     data.create
-                        table:ml_training_snippets
-                        values
-                           type:x:@.arguments/*/type
-                           prompt:x:@.prompt
-                           completion:x:@.completion
-                           uri:x:@.uri
-                           meta:woocommerce-import
-
-      // Checking if we should vectorize model or not.
-      if:x:@.arguments/*/vectorize
-
-         // Basic logging.
-         log.info:Started vectorizing model after WooCommerce import
-            type:x:@.arguments/*/type
-            shop:x:@.arguments/*/base-url
-
-         // Vectorizing model.
-         unwrap:x:+/*
-         signal:magic.ai.vectorise
-            feedback-channel:non-existing
-            type:x:@.arguments/*/type
-
-         // Basic logging.
-         log.info:Done vectorizing model after WooCommerce import
-            type:x:@.arguments/*/type
-            shop:x:@.arguments/*/base-url
-
-      // Logging the fact that we're done.
-      log.info:Done with WooCommerce import
-         type:x:@.arguments/*/type
-         shop:x:@.arguments/*/base-url
-   .catch
-
-      // Oops ...!!
-      log.error:Something went wrong as we tried to import products from WooCommerce
-         error:x:@.arguments/*/message
-         type:x:@.arguments/*/type
-         shop:x:@.arguments/*/base-url
+// Returning result to caller.
+return-nodes:x:@execute/*

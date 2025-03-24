@@ -1,41 +1,31 @@
 
-// Hyperlambda script to return the Magic CAPTCHA JavaScript library, substituting the public key dynamically.
-.arguments
-   v:string
+// Compiles C# code files required to wire up module correctly
 
-// Getting server auth secret.
-config.get:"magic:auth:secret"
+// Assumes this file exists and is valid C# code (for .Net Core)
+io.file.load:/modules/netsuite/magic.startup/csharp/GenerateToken.cs.raw
 
-// Double hashing auth secret using SHA256 to avoid predictable hash values.
-crypto.hash.sha256:x:@config.get
-crypto.hash.sha256:x:-
+// Compiling file into an assembly.
+system.compile
+   references
+      .:netstandard
+      .:System.Linq
+      .:System.Runtime
+      .:System.Net.Http
+      .:System.Private.Uri
+      .:System.ComponentModel
+      .:System.Private.CoreLib
+      .:System.Linq.Expressions
+      .:System.Security.Cryptography
+      .:Microsoft.IdentityModel.Tokens
+      .:System.IdentityModel.Tokens.Jwt
+      .:Microsoft.IdentityModel.Abstractions
+      .:Newtonsoft.Json
+      .:magic.node
+      .:magic.node.extensions
+      .:magic.signals.contracts
+      .:System.Net.Primitives
+   code:x:@io.file.load
+   assembly-name:dynamic.magic.lambda.netsuite.dll
 
-// Loading JavaScript file.
-.file
-if
-   io.file.exists:/system/misc/magic-captcha.min.js
-   .lambda
-
-      // We have a minified file.
-      set-value:x:@.file
-         load-file:/system/misc/magic-captcha.min.js
-else
-
-   // We don't have a minified file.
-   set-value:x:@.file
-      load-file:/system/misc/magic-captcha.js
-
-/*
- * Dynamically substituting public key in file with public key that was generated
- * specifically for current server.
- */
-strings.replace:x:@.file
-   .:[[public-key]]
-   get-value:x:@crypto.hash.sha256
-
-// Applying correct HTTP headers.
-response.headers.set
-   Content-Type:text/javascript
-
-// Returning result to caller.
-return:x:@strings.replace
+// Loading assembly as plugin now that we've created it.
+system.plugin.load:x:@system.compile

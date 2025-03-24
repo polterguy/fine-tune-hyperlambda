@@ -1,78 +1,76 @@
 
-// Special implementation for MySQL.
-auth.ticket.get
+/*
+ * Lists sales
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
+.arguments
 
-// Used to store commision percent for affiliate.
-.percent
+   // Optional filtering argument allowing to filter items on No_ and Description
+   filter:string
 
-// Ensuring user is an affiliate
-data.connect:[generic|magic]
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
 
-   /*
-    * Retrieving affiliate percent for user.
-    * Notice, if user doesn't have an affiliate percent, user ir
-    * not an affiliate.
-    */
-   data.read
-      table:users_extra
-      columns
-         value
-      where
-         and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
+   // Optional offset into records of where to start returning items.
+   offset:long
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Getting limit value, defaulting to 10
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:10
+
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items.
    if
-      not-exists:x:@data.read/*/*/value
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
       .lambda
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:No_
+            .:Description
+            .:Source No_
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
 
-   // Retrieving transactions from database.
-   data.select:"\nselect date_format(u.created, '%Y-%m-%d') as date, count(*) as users\n   from users u\n      inner join users_extra ue on u.username = ue.user and ue.type = 'affiliate'\n      where u.created > now() - interval 6 week and ue.value = @affiliate\n   group by date\n   order by date asc"
-      @affiliate:x:@auth.ticket.get
-
-   // Looping through all days the last 6 weeks.
-   .buffer
-   .cur
-   set-value:x:@.cur
-      math.subtract
-         date.now
-         time
-            days:42
-   while
-      lt:x:@.cur
-         date.now
-      .lambda
-         date.format:x:@.cur
-            format:yyyy-MM-dd
-         if
-            exists:x:@data.select/*/*/date/={@date.format}
-            .lambda
-               get-nodes:x:@data.select/*/*/date/={@date.format}/.
-               add:x:@.buffer
-                  get-nodes:x:@data.select/*/*/date/={@date.format}/.
-         else
-            unwrap:x:+/*/*/*
-            add:x:@.buffer
-               .
-                  .
-                     date:x:@date.format
-                     users:int:0
-
-         // Decrementing current day.
-         set-value:x:@.cur
-            math.add:x:@.cur
-               time
-                  days:1
-
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:private, max-age=3600
-
-   // Returning result to caller.
-   return-nodes:x:@.buffer/*
+   // Reading records.
+   mssql.read
+      table:avwVentasDet
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         or
+   
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.read/*

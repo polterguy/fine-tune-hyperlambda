@@ -1,55 +1,53 @@
+// How does CRUD slots in Hyperlambda
 
-// Withdraw endpoint allowing affiliates to request withdrawals of funds.
-.arguments
-   amount:decimal
-   bank_name:string
-   account_name:string
-   iban:string
-   swift:string
-   bank_address:string
-   affiliate_address:string
+/*
+ * Hyperlambda has 4 basic CRUD slots, you can examples of these below.
+ */
 
-// Verifying user has access to endpoint.
-auth.ticket.verify:root, admin, guest
+// [data.create]
+data.create
+   table:table1
+   values
+      column1:value1
+      column2:value2
+      column3:value3
 
-// Retrieving currently authenticated user to parametrise invocation towards database.
-auth.ticket.get
+// Read
+data.read
+   table:table1
 
-// Verifying user is an affiliate
-data.connect:[generic|magic]
-   data.read
-      table:users_extra
-      columns
-         value
-      where
-         and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
+   // Optional
+   limit:5
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
+   // Optional
+   offset:5
 
-// Creating an email and sending to admin of system with data.
-unwrap:x:+/*/*
-add:x:@.arguments
-   .
-      username:x:@auth.ticket.get
-lambda2hyper:x:@.arguments/*
+   // Optional
+   order
+      column1
+      column2
 
-// Sending email with withdrawal request to team@ainiro.io
-unwrap:x:+/**
-signal:magic.emails.send
-   subject:Affiliate withdrawal request
-   template-file:/modules/hub/magic.startup/templates/affiliate-withdrawal.txt
-   substitutes
-      content:x:@lambda2hyper
-   mime-type:text/plain
-   email:team@ainiro.io
-   name:Thomas Hansen
+   // Optional
+   direction:desc
+
+   // Conditions we're filtering on
+   where
+
+      // Use either [or] or [and] here
+      and
+
+// Update
+data.update
+   table:table1
+   values
+      column1:new-value
+   where
+      and
+         id.eq:PRIMARY-KEY-OF-RECORD-TO-UPDATE
+
+// Delete
+data.delete
+   table:table1
+   where
+      and
+         id.eq:PRIMARY-KEY-OF-RECORD-TO-UPDATE

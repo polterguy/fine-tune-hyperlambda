@@ -1,13 +1,20 @@
 
-// Provide a Hyperlambda example where error codes are iterated and logged.
+// Deletes a single object of the specified type in NetSuite
+.arguments
 
-// Iterates through error codes and logs them.
-.errors
-   error1:404 Not Found
-   error2:500 Internal Server Error
-   error3:403 Forbidden
+   // Mandatory argument declaring what type of object you want to delete.
+   type:string
 
-for-each:x:@.errors/*
+   // Mandatory argument being the id of the object you want to delete.
+   id:long
 
-   // Logging each error message.
-   log.info:x:@.dp/#
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
+
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-delete-record.hl
+
+// Returning result to caller.
+return-nodes:x:@execute-file/*

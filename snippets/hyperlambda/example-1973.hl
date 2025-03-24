@@ -1,17 +1,29 @@
-// Select specific columns from the employees table and sort by department ascending
-data.connect:hrDB
-   data.read
-      table:employees
 
-      // Columns we're interested in
-      columns
-         id
-         name
-         department
+// Write a Hyperlambda script to delete a specified connection string.
+.arguments
+   databaseType:string
+   name:string
 
-      // Sort results by department in ascending order
-      order:department
-      direction:asc
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-      // Limit to 10 results
-      limit:10
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/databaseType
+validators.mandatory:x:@.arguments/*/name
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:pgsql
+   .:mssql
+
+// Loading config file such that we can delete connection string from current configuration.
+config.load
+json2lambda:x:-
+
+// Deleting actual connection string from section.
+remove-nodes:x:"@json2lambda/*/magic/*/databases/*/\"{@.arguments/*/databaseType}\"/*/\"{@.arguments/*/name}\""
+lambda2json:x:@json2lambda/*
+config.save:x:-
+
+// Success, connetion string deleted.
+return
+   result:success

@@ -1,57 +1,27 @@
 
-// Create a Hyperlambda action to execute a workflow file if a condition is true. The condition uses 'lhs', 'rhs', and 'comparison' (e.g., eq, neq, mt, mte, lt, lte). Include 'workflow' and optional 'arguments'. Validate and set comparison operator.
+// Hyperlambda action that returns specified HTTP headers from a request. Use 'headers' as an input array to determine which headers to return.
 .arguments
-
-   // Notice, this is action syntax
-   lhs
-      type:string
+   headers
+      type:array
       mandatory:bool:true
-   comparison
-      type:enum
-      mandatory:bool:true
-      values
-         .:eq
-         .:neq
-         .:mt
-         .:mte
-         .:lt
-         .:lte
-   rhs
-      type:string
-      mandatory:bool:true
-   workflow
-      type:workflow
-      mandatory:bool:true
-   arguments
-      type:key-value
-      mandatory:bool:false
-.icon:settings
+.icon:http
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/workflow
-validators.mandatory:x:@.arguments/*/comparison
+// Retrieving HTTP headers from request.
+request.headers.list
 
-// Making sure we use correct comparison operator.
-set-name:x:./*/if/*/comparison
-   get-value:x:@.arguments/*/comparison
+/*
+ * Iterating through each header from above invocation and checking if caller is interested in it,
+ * and if caller wants this particular header, we make sure we return it below.
+ */
+for-each:x:@request.headers.list/*
+   get-name:x:@.dp/#
+   if
+      exists:x:@.arguments/*/headers/*/={@get-name}
+      .lambda
 
-// Checking if [comparison] yields true.
-if
-   comparison
-      get-value:x:@.arguments/*/lhs
-      get-value:x:@.arguments/*/rhs
-   .lambda
+         // Caller wants currently iterated HTTP header.
+         add:x:../*/return-nodes
+            get-nodes:x:@.dp/#
 
-      // Parametrising [execute-file].
-      add:x:./*/execute-file
-         get-nodes:x:@.arguments/*/arguments/*
-
-      // Executing file.
-      execute-file:x:@.arguments/*/workflow
-
-      // Parametrising [return] invocation.
-      add:x:./*/return
-         get-nodes:x:@execute-file/*
-
-      // Returning result of execution to caller.
-      return
+// Returning result to caller.
+return-nodes

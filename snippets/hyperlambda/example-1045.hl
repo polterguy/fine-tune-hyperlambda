@@ -1,17 +1,36 @@
 
-// Hyperlambda snippet focusing on different string formats, including multi-line and escaped characters.
+// Write a Hyperlambda script to import a specified CSV file into a specified database.
+.arguments
+   databaseType:string
+   connectionString:string
+   databaseName:string
+   tableName:string
 
-// Regular string without quotes
-.paramA:default
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/databaseType
+validators.mandatory:x:@.arguments/*/connectionString
+validators.mandatory:x:@.arguments/*/databaseName
+validators.mandatory:x:@.arguments/*/tableName
 
-// String requiring quotes due to special character
-.paramB:"id:number"
-
-// Multi-line string using @
-.paramC:"first\nsecond"
-
-// Single-quoted text
-.paramD:example-quoted
-
-// Escaped newline
-.paramE:"split\ntext"
+// Opening up our database connection.
+strings.concat
+   .:[
+   get-value:x:@.arguments/*/connectionString
+   .:|
+   get-value:x:@.arguments/*/databaseName
+   .:]
+data.connect:x:@strings.concat
+   type:x:@.arguments/*/databaseType
+   data.read
+      table:x:@.arguments/*/tableName
+      limit:-1
+   lambda2csv:x:-/*
+   strings.concat
+      .:"attachment; filename=\""
+      get-value:x:@.arguments/*/tableName
+      .:".csv\""
+   response.headers.set
+      Content-Type:application/csv
+      Content-Disposition:x:@strings.concat
+      Access-Control-Expose-Headers:Content-Disposition
+   return:x:@lambda2csv

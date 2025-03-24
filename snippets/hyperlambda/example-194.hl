@@ -1,28 +1,49 @@
 
-// Create a Hyperlambda action to throw an exception with a mandatory 'message'. Optionally include 'status' and 'public' to control HTTP propagation and status code. Validate and apply defaults.
-.arguments
-
-   // Notice, this is action syntax
-   message
-      type:string
-      mandatory:bool:true
-   status
-      type:int
-      mandatory:bool:false
-   public
-      type:bool
-      mandatory:bool:false
-.icon:warning
+// Returns a stacked chart image to caller. Values is a mandatory comma separated list of values.
+.arguments:*
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/message
+validators.mandatory:x:@.arguments/*/legend
 
-// Applying defaults.
-validators.default:x:@.arguments
-   status:int:500
-   public:bool:false
+// Creating our individual bars.
+.bars
+for-each:x:@.arguments/*
+   get-name:x:@.dp/#
+   if
+      not
+         strings.starts-with:x:@get-name
+            .:legend
+      .lambda
 
-// Throwing exception.
-throw:x:@.arguments/*/message
-   public:x:@.arguments/*/public
-   status:x:@.arguments/*/status
+         // Adding primary node for bar.
+         set-name:x:+/*/*
+            get-value:x:@get-name
+         add:x:@.bars
+            .
+               .
+
+         // Adding values for individual cells.
+         add:x:@.bars/0/-
+            strings.split:x:@.dp/#
+               .:,
+
+// Creating our legend.
+add:x:../*/image.chart/*/legend
+   strings.split:x:@.arguments/*/legend
+      .:,
+
+// Parametrizing [image.chart] invocation.
+add:x:../*/image.chart/*/bars
+   get-nodes:x:@.bars/*
+image.chart:stacked
+   width:800
+   height:500
+   bars
+   legend
+
+// Applying correct HTTP header.
+response.headers.set
+   Content-Type:image/png
+
+// Returning chart to caller.
+return:x:@image.chart

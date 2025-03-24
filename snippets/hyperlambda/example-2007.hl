@@ -1,30 +1,30 @@
 
-// Hyperlambda script that creates a scheduled task that resets no_requests at the first day of the month, with conditions for SQLite.
-if
-   eq
-      config.get:"magic:databases:default"
-      .:sqlite
-   .lambda
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the questionnaires table in the magic database with a name matching the argument, ensuring authentication and authorization for root and admin roles.
+.arguments
+   name:string
 
-      // Wrapping in try/catch in case task already exists.
-      try
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-         // Deleting old task if existing.
-         tasks.list:reset-no_requests
-         if
-            exists:x:@tasks.list/*
-            .lambda
-               tasks.delete:x:@tasks.list/0/*/id
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/name
 
-         // Creating task that periodically deletes old historical requests.
-         tasks.create:reset-no_requests
-            description:Resets no_requests at the first day of the month
-            repeats:**.01.01.01.01
-            .lambda
-               sqlite.connect:magic
-                  sqlite.execute:update ml_types set no_requests = 0
-               log.info:All machine learning models had their no_requests values reset
-      .catch
+// Opening up our database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
 
-         // Task already exists.
-         console.log:Task to reset no_requests already exists
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:questionnaires
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,26 +1,54 @@
 
-// Returns IDs of the specified type to caller
+// Create one record in your address table in your sakila database without authorization. Log invocation
 .arguments
 
-   // Type of objects you want to retrieve. Mandatory.
-   type:string
+   // address column value
+   address:string
 
-   // Optional query for retrieval.
-   q:string
+   // address2 column value
+   address2:string
 
-   // Optional maximum number of objects to return.
-   limit:long
+   // district column value
+   district:string
 
-   // Optional offset of where to start retrieving objects.
-   offset:long
+   // city_id column value
+   city_id:long
 
-// Ensuring user is authorized to invoking endpoint.
-auth.ticket.verify:netsuite
+   // postal_code column value
+   postal_code:string
 
-// Forwarding heavy lifting to workflow file.
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/modules/netsuite/workflows/workflows/netsuite-list-records.hl
+   // phone column value
+   phone:string
 
-// Returning result to caller.
-return-nodes:x:@execute-file/*
+   // last_update column value
+   last_update:date
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.address entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:address
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

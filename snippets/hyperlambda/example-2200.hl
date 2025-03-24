@@ -1,25 +1,120 @@
-/*
- * Replaces placeholders {{name}} and {{confirmation_link}} in a registration email template.
- * Prepares a fully rendered message ready to be sent as email.
- */
-.template:@"
-Hello {{name}},
 
-Thank you for registering at our site!
+// Hyperlambda action for workflows that executes a SQL CRUD Read operation with specified 'database-type', 'connection-string', 'database', 'table', and optional filters like 'and', 'or', 'limit', 'offset', 'order', 'direction'. Validate mandatory fields and enums.
+.arguments
+   database-type
+      type:enum
+      mandatory:bool:true
+      values
+         .:sqlite
+         .:mssql
+         .:mysql
+         .:pgsql
+   connection-string
+      type:string
+      mandatory:bool:true
+   database
+      type:string
+      mandatory:bool:true
+   table
+      type:string
+      mandatory:bool:true
+   columns
+      type:array
+      mandatory:bool:false
+   and
+      type:key-value
+      mandatory:bool:false
+   or
+      type:key-value
+      mandatory:bool:false
+   limit
+      type:int
+      mandatory:bool:false
+   offset
+      type:int
+      mandatory:bool:false
+   order
+      type:string
+      mandatory:bool:false
+   direction
+      type:enum
+      mandatory:bool:false
+      values
+         .:asc
+         .:desc
+.icon:cloud_download
 
-Click the link below to confirm your email:
-{{confirmation_link}}
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/table
+validators.enum:x:@.arguments/*/database-type
+   .:sqlite
+   .:mssql
+   .:mysql
+   .:pgsql
 
-Regards,
-The Team"
+// Applying defaults.
+validators.default:x:@.arguments
+   connection-string:generic
+   database-type:sqlite
+   database:magic
 
-.final-message
-set-value:x:-
-   strings.replace:x:@.template
-      .:{{name}}
-      .:Sarah
+// Ensuring user provided either [or] or [and] and not both.
+if
+   and
+      exists:x:@.arguments/*/or/*
+      exists:x:@.arguments/*/and/*
+   .lambda
+      throw:Provide either [or] or [and] to sql-read action, and not both
+         public:bool:true
+         status:500
 
-set-value:x:@.final-message
-   strings.replace:x:@.final-message
-      .:{{confirmation_link}}
-      .:"https://example.com/confirm?id=123"
+// Connection string to actually use as we connect.
+.connection-string
+
+// Caller supplied an explicit [connection-string] argument.
+set-value:x:@.connection-string
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connection-string
+      .:|
+      get-value:x:@.arguments/*/database
+      .:]
+
+// Connecting to database.
+data.connect:x:@.connection-string
+   database-type:x:@.arguments/*/database-type
+
+   // Checking if caller provided explicit [columns].
+   if
+      exists:x:@.arguments/*/columns/*
+      .lambda
+
+         // Adding explicit columns declaration
+         add:x:@data.connect/*/data.read
+            .
+               columns
+         for-each:x:@.arguments/*/columns/*
+            set-name:x:./0/-/*/*
+               get-value:x:@.dp/#
+            add:x:@data.connect/*/data.read/*/columns
+               .
+                  name
+
+   // Adding [limit], [offset], [order] and [direction] arguments.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+
+   // Adding [or] or [and] arguments.
+   add:x:@data.connect/*/data.read/*/where
+      get-nodes:x:@.arguments/*/or
+      get-nodes:x:@.arguments/*/and
+
+   // Executing SQL.
+   data.read
+      database-type:x:@.arguments/*/database-type
+      table:x:@.arguments/*/table
+      where
+   return-nodes:x:@data.read/*

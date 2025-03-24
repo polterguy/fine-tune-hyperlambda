@@ -1,3 +1,79 @@
-// How do you declare a 32-bit integer in Hyperlambda?
 
-.page-views:int:1048576
+// Hyperlambda workflow action that creates a customer object in Stripe using a name, email, and optionally an IP address. The function should validate the name and email, ensuring the email is correctly formatted. If an IP address is provided, use it as the default tax location. Include any metadata in the payload. Retrieve the Stripe API token and make a POST request to create the customer. Handle any errors by logging and throwing exceptions. Return the customer ID to the caller upon successful creation.
+.arguments
+   name
+      type:string
+      mandatory:bool:true
+   email
+      type:email
+      mandatory:bool:true
+   ip_address
+      type:string
+      mandatory:bool:false
+   metadata
+      type:key-value
+.icon:payment
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/name
+validators.mandatory:x:@.arguments/*/email
+validators.email:x:@.arguments/*/email
+
+// Checking if IP address was supplied, and if so, adding it to invocation.
+if
+   exists:x:@.arguments/*/ip_address
+   .lambda
+
+      // Adding [ip_address] to payload as tax location.
+      add:x:../*/http.post/*/payload
+         .
+            tax[ip_address]:x:@.arguments/*/ip_address
+
+// Adding metadata
+for-each:x:@.arguments/*/metadata/*
+   set-name:x:./0/-/*/*
+      strings.concat
+         .:metadata[
+         get-name:x:@.dp/#
+         .:]
+   unwrap:x:./0/-/*/*
+   add:x:../*/http.post/*/payload
+      .
+         name:x:@.dp/#
+
+// Retrieving token to use for invocations towards Stripe.
+.token
+set-value:x:-
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
+
+// Invoking Stripe REST API.
+http.post:"https://api.stripe.com/v1/customers"
+   headers
+      Content-Type:application/x-www-form-urlencoded
+      Authorization:x:@.token
+   payload
+      email:x:@.arguments/*/email
+      name:x:@.arguments/*/name
+   convert:true
+
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.post
+      .:int:400
+   .lambda
+
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe, could not create customer
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe, could not create customer
+         public:true
+         status:500
+
+// Returning customer ID to caller.
+yield
+   customer_id:x:@http.post/*/content/*/id

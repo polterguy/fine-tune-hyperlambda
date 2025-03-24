@@ -1,27 +1,69 @@
+/*
+ * This script generates training data from Hyperlambda files.
+ */
 
-// Hyperlambda example where [.lambda] runs when all conditions evaluate to true.
+// Loads all files recursively from the specified folder
+execute:magic.io.file.load-recursively
+   .:/etc/hyperlambda-training-material/hyperlambda/
+for-each:x:@execute/*
 
-// Runs [.lambda] if all conditions evaluate to true.
-.state
-.check1:int:2
-.check2:int:8
-if
-   and
+   // Making sure we catch exceptions such that we can see which file fails.
+   try
 
-      // First condition: Less than
-      lt:x:@.check1
-         .:int:3
+      // Verifying we're dealing with a Hyperlambda file.
+      if
+         strings.ends-with:x:@.dp/#
+            .:.hl
+         .lambda
 
-      // Second condition: More than
-      mt:x:@.check2
-         .:int:7
-   .lambda
+            // Transforming file to lambda object.
+            hyper2lambda:x:@.dp/#/0
+               comments:true
+            remove-nodes:x:-/*/.description
+            if
+               eq
+                  get-name:x:@hyper2lambda/0
+                  .:..
+               .lambda
 
-      // Updating [.state] to true
-      set-value:x:@.state
-         .:bool:true
-else
+                  .prompt
+                  set-value:x:-
+                     get-value:x:@hyper2lambda/0
+                  remove-nodes:x:@hyper2lambda/0
 
-   // Updating [.state] to false
-   set-value:x:@.state
-      .:bool:false
+                  // Creating our code segment
+                  lambda2hyper:x:@hyper2lambda/*
+                     comments:true
+                  if
+                     lt
+                        openai.tokenize:x:@lambda2hyper
+                        .:int:5000
+                     .lambda
+
+                        // Saving above code snippet.
+                        data.connect:fine-tune
+                        
+                           // Making sure we avoid double inserts.
+                           data.read
+                              table:hyperlambda
+                              where
+                                 and
+                                    code.eq:x:@lambda2hyper
+                                    prompt.eq:x:@.prompt
+
+                           // Making sure we avoid double inserts of the same snippets
+                           if
+                              not-exists:x:@data.read/*
+                              .lambda
+                                 data.create
+                                    table:hyperlambda
+                                    values
+                                       code:x:@lambda2hyper
+                                       prompt:x:@.prompt
+   .catch
+   
+      // This throws an exception being the name of the currently processed filename
+      throw:x:@.dp/#
+
+// House cleanups.
+remove-nodes:x:@execute/*

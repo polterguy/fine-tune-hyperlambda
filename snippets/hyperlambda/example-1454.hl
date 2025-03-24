@@ -1,100 +1,14 @@
-
-/*
- * Lists total discounts applied for individual quotes
- * 
- * Optionally apply limit and offset as you see fit
- */
-.arguments
-
-   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
-   min_date:string
-
-   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
-   max_date:string
-
-   // Optional maximum number of records to return. Defaults to 10 if not specified.
-   limit:long
-
-   // Optional offset into records of where to start returning items.
-   offset:long
-
-// Making sure user is authorised to access the workflow.
-auth.ticket.verify:mnhc-admin
-
-// Getting limit value, defaulting to 10
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:10
-
-// Making sure limit is never more than 10
-if
-   or
-      eq:x:@.limit
-         .:long:-1
-      mt:x:@.limit
-         .:long:10
-   .lambda
-      set-value:x:@.limit
-         .:long:10
-      add:x:../*/mssql.connect/*/yield
-         .
-            notice:"There might be more records but the system can only retrieve a maximum of 10 records at the time. Please inform the user that you can show him the next set of records if required."
-
-// Getting offset value, defaulting to 0
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
-
-// Opening up database connection.
-mssql.connect:[production|MNDG_LSC18-1]
-
-   // Checking if we're filtering items on [min_date].
-   if
-      and
-         exists:x:@.arguments/*/min_date
-         not-null:x:@.arguments/*/min_date
-      .lambda
-         convert:x:@.arguments/*/min_date
-            type:date
-         unwrap:x:+/*/*
-         add:x:@mssql.connect/*/mssql.read/*/where/*/and
-            .
-               Document Date.mt:x:@convert
-
-   // Checking if we're filtering items on [max_date].
-   if
-      and
-         exists:x:@.arguments/*/max_date
-         not-null:x:@.arguments/*/max_date
-      .lambda
-         convert:x:@.arguments/*/max_date
-            type:date
-         unwrap:x:+/*/*
-         add:x:@mssql.connect/*/mssql.read/*/where/*/and
-            .
-               Document Date.lt:x:@convert
-
-   // Reading records.
-   mssql.read
-      table:addv_Cotizaciones
-      columns
-         No_
-            as:QuoteNumber
-         sum((Quantity * [Unit Price]) - Amount)
-            as:TotalDiscountForQuote
-      where
-         and
-      group
-         No_
-      limit:x:@.limit
-      offset:x:@.offset
-      order:TotalDiscountForQuote
-      direction:desc
-   
-   // Returning result of above invocation to caller.
+// A slot that adds three values: a + b + c
+slots.create:math.add-three
+   math.add
+      get-value:x:@.arguments/*/a
+      get-value:x:@.arguments/*/b
+      get-value:x:@.arguments/*/c
    yield
-      result:x:@mssql.read/*
+      result:x:@math.add
+
+// Invoke the slot with a=3, b=4, and c=5
+signal:math.add-three
+   a:int:3
+   b:int:4
+   c:int:5

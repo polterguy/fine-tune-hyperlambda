@@ -1,4 +1,93 @@
-// Demonstrates how [unwrap] works
-.src:Hello World
-unwrap:x:+
-.dest:x:@.src
+
+// Hyperlambda script for a CRUD delete endpoint that deletes multiple records from the ml_training_snippets table in the magic database, matching a filter and ensuring authentication and authorization for root roles.
+.arguments
+   ml_training_snippets.prompt.like:string
+   ml_training_snippets.completion.like:string
+   ml_training_snippets.uri.like:string
+   ml_training_snippets.type.eq:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our delete and read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*/*/or
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   add:x:./*/data.delete/*/where/*/*/or
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   add:x:./*/data.delete/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Removing [or] parts unless we've got something to actually or.
+   if
+      not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
+         remove-nodes:x:@data.connect/*/data.delete/*/where/*/and/*/or
+
+   // Reading items from database such that we can delete files associated with items.
+   data.read
+      table:ml_training_snippets
+      columns
+         filename
+      where
+         and
+            filename.neq
+            or
+      limit:-1
+   for-each:x:@data.read/*
+      if
+         and
+            not-null:x:@.dp/#/*/filename
+            io.file.exists:x:@.dp/#/*/filename
+         .lambda
+            io.file.delete:x:@.dp/#/*/filename
+
+   /*
+    * Generating select statement for records we're deleting since we need
+    * to use it as input to deletion from vss shadow table.
+    */
+   data.read
+      generate:true
+      table:ml_training_snippets
+      columns
+         id
+            as:rowid
+      where
+         and
+            or
+      limit:-1
+   .sql
+
+   // Deleting records from vss shadow table.
+   set-value:x:@.sql
+      strings.concat
+         .:delete from vss_ml_training_snippets where rowid in(
+         get-value:x:@data.read
+         .:)
+   add:x:./*/data.execute
+      get-nodes:x:@data.read/*
+   data.execute:x:@.sql
+
+   // Finally, deleting ml_training_snippets item from database.
+   data.delete
+      table:ml_training_snippets
+      where
+         and
+            or
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

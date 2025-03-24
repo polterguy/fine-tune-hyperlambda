@@ -1,41 +1,28 @@
 
-// CRUD / Create Hyperlambda that creates one record in your media table in your cms database
+// CRUD Hyperlambda file that deletes one record from your menus table in your cms database
 .arguments
 
-   // post_id column value
-   post_id:long
-
-   // file_path column value
-   file_path:string
-
-   // file_type column value
-   file_type:string
-
-   // created_at column value
-   created_at:date
+   // Primary key of record to delete, mandatory argument
+   id:long
 
 // Verifying user is authorized to access endpoint.
 auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
 
-// Opening up database connection.
+// Opening up our database connection with default database type (SQLite).
 data.connect:[generic|cms]
-   database-type:sqlite
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
       get-nodes:x:@.arguments/*
 
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:media
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
+   // Deleting item from database using default database type being SQLite.
+   data.delete
+      table:menus
+      where
+         and
 
    // Returning result of above invocation to caller.
    unwrap:x:+/*
    return
-      id:x:@data.create
+      affected:x:@data.delete

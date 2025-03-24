@@ -1,102 +1,36 @@
 
-// Hyperlambda script for a CRUD update endpoint that updates one record in the ml_types table in the magic database, filtering which item to update with type and updating model, max_tokens, and temperature fields, ensuring authentication and authorization for root roles.
+// Read or list records from your plugins table in your cms database
 .arguments
-   type:string
-   model:string
-   max_tokens:long
-   max_context_tokens:long
-   max_request_tokens:long
-   temperature:double
-   recaptcha:decimal
-   auth:string
-   supervised:int
-   cached:int
-   prefix:string
-   use_embeddings:int
-   threshold:decimal
-   vector_model:string
-   greeting:string
-   base_url:string
-   contact_us:string
-   lead_email:string
-   api_key:string
-   twilio_account_id:string
-   twilio_account_sid:string
-   webhook_incoming:string
-   webhook_outgoing:string
-   webhook_incoming_url:string
-   webhook_outgoing_url:string
-   system_message:string
-   conversation_starters:string
-   initial_questionnaire:string
-   no_requests:int
-   max_requests:int
-   search_postfix:string
-   max_function_invocations:int
-   max_session_items:int
-   completion_slot:string
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/type
-
-// Sanity checking invocation.
-validators.integer:x:@.arguments/*/max_context_tokens
-   min:500
-   max:40000
-validators.integer:x:@.arguments/*/max_request_tokens
-   min:100
-   max:25000
-validators.integer:x:@.arguments/*/max_tokens
-   min:500
-   max:4000
+   plugins.id.eq:long
+   plugins.name.like:string
+   plugins.name.eq:string
+   plugins.description.like:string
+   plugins.description.eq:string
+   plugins.is_active.eq:long
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+auth.ticket.verify:guest
 
 // Opening up our database connection.
-data.connect:[generic|magic]
+data.connect:[generic|cms]
+   database-type:sqlite
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
 
-   // Making sure we default twilio_account_id token to model name unless explicitly specified.
-   if
-      or
-         not-exists:x:@.arguments/*/twilio_account_id
-         null:x:@.arguments/*/twilio_account_id
-         eq:x:@.arguments/*/twilio_account_id
-            .:
-      .lambda
-         remove-nodes:x:@data.connect/*/data.create/*/values/*/twilio_account_id
-         unwrap:x:+/*/*
-         add:x:@data.connect/*/data.update/*/values
-            .
-               twilio_account_id:x:@.arguments/*/type
-
-   // Invoking our update slot.
-   data.update
-      table:ml_types
-      values
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:plugins
+      columns
+         plugins.id
+         plugins.name
+         plugins.description
+         plugins.is_active
       where
          and
 
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

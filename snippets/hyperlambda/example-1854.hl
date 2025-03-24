@@ -1,45 +1,29 @@
 
-// Counts items from your Customers table in your northwind database
+// Scrapes the specified [url] and returns as context data to caller.
 .arguments
-   Customers.CustomerID.like:string
-   Customers.CustomerID.eq:string
-   Customers.CompanyName.like:string
-   Customers.CompanyName.eq:string
-   Customers.ContactName.like:string
-   Customers.ContactName.eq:string
-   Customers.ContactTitle.like:string
-   Customers.ContactTitle.eq:string
-   Customers.Address.like:string
-   Customers.Address.eq:string
-   Customers.City.like:string
-   Customers.City.eq:string
-   Customers.Region.like:string
-   Customers.Region.eq:string
-   Customers.PostalCode.like:string
-   Customers.PostalCode.eq:string
-   Customers.Country.like:string
-   Customers.Country.eq:string
-   Customers.Phone.like:string
-   Customers.Phone.eq:string
-   Customers.Fax.like:string
-   Customers.Fax.eq:string
+   url:string
 
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/modules/auth/workflows/actions/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Customers
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
+// Returns [max_tokens] context from the specified [url].
+execute:magic.workflows.actions.execute
+   name:openai-context-from-url
+   filename:/modules/openai/workflows/actions/openai-context-from-url.hl
+   arguments
+      url:x:@.arguments/*/url
+      max_tokens:int:2000
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+// Returns the result of your last action.
+return-nodes:x:@execute/*

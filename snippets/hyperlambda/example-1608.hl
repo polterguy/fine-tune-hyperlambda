@@ -1,32 +1,18 @@
 /*
- * Sends a welcome message to students who recently joined the learning portal.
+ * Save this file as `/modules/settings/endpoints/set-theme.hl`
+ * This exposes an HTTP POST endpoint at `/settings/set-theme`
+ *
+ * Requires `theme` to be one of "light", "dark", or "auto".
  */
 
-data.connect:[pgsql|learning_hub]
-   database-type:pgsql
+.arguments
+   theme
 
-   data.select:@"
-select name, email
-   from students
-   where created_at >= current_date - interval '1 day'"
-      database-type:pgsql
+validators.mandatory:x:@.arguments/*/theme
+validators.enum:x:@.arguments/*/theme
+   .:light
+   .:dark
+   .:auto
 
-   for-each:x:@data.select/*
-      strings.concat
-         .:"Welcome aboard, "
-         get-value:x:@.dp/#/*/name
-         .:"! Your learning journey starts today 🚀"
-      unwrap:x:+/**
-      mail.smtp.send
-         message
-            to
-               .
-                  name:x:@.dp/#/*/name
-                  email:x:@.dp/#/*/email
-            from
-               .
-                  name:Learning Hub
-                  email:support@learnhub.com
-            subject:Get Started with Learning Hub!
-            entity:text/plain
-               content:x:@strings.concat
+yield
+   result:Theme set

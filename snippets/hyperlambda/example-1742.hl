@@ -1,56 +1,43 @@
 
-// Resizes the specified image.
-if
-   not
-      strings.starts-with:x:@.arguments/*/img
-         .:/assets/images/
-   .lambda
-      throw:Not an image
+// Write a Hyperlambda script to delete a specified folder on the server, including uninstalling a module if necessary.
+.arguments
+   folder:string
 
-// Figuring out path of image.
-.path
-set-value:x:@.path
-   strings.concat
-      .:/etc/www
-      get-value:x:@.arguments/*/img
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Returning correct MIME type.
-response.headers.set
-   Content-Type:image/webp
-   Cache-Control:public, max-age=31536000
-
-// Checking if image is cached on disc.
-.cache-file-name
-lambda2hyper:x:@.arguments
-crypto.hash.sha1:x:@lambda2hyper
-set-value:x:@.cache-file-name
-   strings.concat
-      .:/etc/hub/image-cache/
-      get-value:x:@crypto.hash.sha1
-if
-   io.file.exists:x:@.cache-file-name
-   .lambda
-      io.stream.open-file:x:@.cache-file-name
-      return:x:-
-
-// Checking if user did not provide any [width] or [height] arguments, at which point we simply convert it to webp.
+/*
+ * Checking if this is a module folder, and if so, we uninstall module before actually
+ * deleting it.
+ */
+strings.split:x:@.arguments/*/folder
+   .:/
 if
    and
-      not-exists:x:@.arguments/*/width
-      not-exists:x:@.arguments/*/height
+      eq
+         get-count:x:@strings.split/*
+         .:int:2
+      eq
+         get-value:x:@strings.split/0
+         .:modules
    .lambda
-      add:x:+
-         get-nodes:x:@.arguments/*/type
-      image.convert:x:@.path
-      return:x:-
 
-// Loading image
-add:x:./*/image.resize
-   get-nodes:x:@.arguments/*/width
-   get-nodes:x:@.arguments/*/height
-   get-nodes:x:@.arguments/*/type
-image.resize:x:@.path
-io.stream.save-file:x:@.cache-file-name
-   get-value:x:@image.resize
-io.stream.open-file:x:@.cache-file-name
-return:x:-
+      // 'modules' folder, checking if it's got an uninstall file, and if so, executing it.
+      strings.concat
+         get-value:x:@.arguments/*/folder
+         .:uninstall.hl
+      if
+         io.file.exists:x:@strings.concat
+         .lambda
+
+            // Uninstall file exists
+            log.info:Uninstalling module
+               module:x:@strings.concat
+            io.file.execute:x:@strings.concat
+
+// Deletes the specified folder.
+io.folder.delete:x:@.arguments/*/folder
+
+// Returning success to caller.
+return
+   result:success

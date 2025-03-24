@@ -1,21 +1,112 @@
 
-// Ensures user is authorized to access endpoint.
+// Search for jobs using SERP API with a mandatory query parameter.
 .arguments
-   roles:*
 
-/*
- * Checking if we've got a [roles] argument,
- * and if so, joining all roles into a comma separated string of roles.
- */
-.roles
+   // Mandatory parameter being the search query to use.
+   q:string
+
+   // Optional parameter for what city or location you want to filter your results by.
+   location:string
+
+   // Optional parameter being search radius in kilometers.
+   lrad:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/q
+
+// Retrieving SERP API's API key and making sure we've got one.
+.api-key
+set-value:x:@.api-key
+   config.get:"magic:serp-api:api_key"
 if
-   exists:x:@.arguments/*/roles/*
+   or
+      null:x:@.api-key
+      eq:x:@.api-key
+         .:
    .lambda
 
-      // Creating comma separated list of roles.
-      set-value:x:@.roles
-         strings.join:x:@.arguments/*/roles/*
-            .:,
+      // Oops ...!!
+      throw:Could not find a SERP API key to use for fetching jobs.
 
-// Making sure user is authenticated, and optionally authorised.
-auth.ticket.verify:x:@.roles
+// Creating our URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://serpapi.com/search.json?engine=google_jobs&api_key="
+      get-value:x:@.api-key
+      .:&q=
+      strings.url-decode:x:@.arguments/*/q
+
+// Checking if we've got a location argument.
+if
+   and
+      exists:x:@.arguments/*/location
+      not-null:x:@.arguments/*/location
+      neq:x:@.arguments/*/location
+         .:
+   .lambda
+
+      // Concatenating location to URL.
+      set-value:x:@.url
+         strings.concat
+            get-value:x:@.url
+            .:&location=
+            get-value:x:@.arguments/*/location
+
+// Retrieving result.
+http.get:x:@.url
+   convert:true
+
+// Sanity checking result of above invocation.
+if
+   not
+      and
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+   .lambda
+
+      // Oops ...!!
+      lambda2hyper:x:../*
+      log.info:x:-
+      throw:Something went wrong while invoking SERP API
+
+// Iterating through result, making sure we return it to caller.
+for-each:x:@http.get/*/content/*/jobs_results/*/[0,5]
+
+   // Returning primary job info to caller.
+   unwrap:x:+/*/*/*
+   add:x:../*/return-nodes/*/jobs
+      .
+         .
+            title:x:@.dp/#/*/title
+            company_name:x:@.dp/#/*/company_name
+            location:x:@.dp/#/*/location
+            highlights
+            apply_options
+
+   // Returning job highlights to caller.
+   for-each:x:@.dp/#/*/job_highlights/*/[0,5]
+      add:x:+/+/*/*/*/items
+         get-nodes:x:@.dp/#/*/items/*
+      unwrap:x:+/*/*/*/title
+      add:x:../*/return-nodes/*/jobs/0/-/*/highlights
+         .
+            .
+               title:x:@.dp/#/*/title
+               items
+
+   // Returning apply options to caller.
+   for-each:x:@.dp/#/*/apply_options/*/[0,2]
+      unwrap:x:+/*/*/*
+      add:x:../*/return-nodes/*/jobs/0/-/*/apply_options
+         .
+            .
+               title:x:@.dp/#/*/title
+               link:x:@.dp/#/*/link
+
+// Returning result to caller.
+unwrap:x:+/*
+return-nodes
+   jobs

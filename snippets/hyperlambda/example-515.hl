@@ -1,117 +1,14 @@
 
-// Returns minimum, maximum, average, sum or count from your CustomerDemographics table in your northwind database grouped by a column
+// Hyperlambda endpoint taking arguments. The SQL query retrieves distinct customer details who have purchased tracks from the "Rock" genre.
 .arguments
 
-   // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME
-   group_column:string
-
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
-
-   // Offset into the dataset of where to start retrieving records
-   offset:long
-
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum, avg or count
-   aggregate_function:string
-
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
-   aggregate_column:string
-
-   // Filter conditions
-   CustomerDemographics.CustomerTypeID.like:string
-   CustomerDemographics.CustomerTypeID.eq:string
-   CustomerDemographics.CustomerDesc.like:string
-   CustomerDemographics.CustomerDesc.eq:string
-
-// Sanity checking mandatory arguments.
-validators.mandatory:x:@.arguments/*/group_column
-validators.mandatory:x:@.arguments/*/aggregate_function
-validators.mandatory:x:@.arguments/*/aggregate_column
-
-// Sanity checking name of aggregate function.
-validators.enum:x:@.arguments/*/aggregate_function
-   .:min
-   .:max
-   .:sum
-   .:avg
-   .:count
-
-// Sanity checking group column.
-validators.enum:x:@.arguments/*/group_column
-   .:CustomerDemographics.CustomerTypeID
-   .:CustomerDemographics.CustomerDesc
-
-// Sanity checking agggregate column name.
-validators.enum:x:@.arguments/*/aggregate_column
-   .:CustomerDemographics.CustomerTypeID
-   .:CustomerDemographics.CustomerDesc
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
+// Connecting to database.
+data.connect:chinook
    database-type:sqlite
 
-   // Making sure we're using the correct group column
-   set-name:x:@data.connect/*/data.read/*/group/*/group_column
-      get-value:x:@.arguments/*/group_column
-
-   // Making sure we return group column as a part of the result
-   set-name:x:+/*/*
-      get-value:x:@.arguments/*/group_column
-   insert-before:x:@data.connect/*/data.read/*/columns/0
-      .
-         group_column
-
-   // Changing name of aggregate column returned to caller.
-   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
-      get-value:x:@.arguments/*/aggregate_function
-
-   // Removing group column to simplify adding other arguments
-   remove-nodes:x:@.arguments/*/group_column
-
-   // Adding paging arguments
-   add:x:@data.connect/*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-
-   // Parametrising our read invocation with ordering arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-
-   // Making sure we're using correct aggregate function.
-   set-name:x:./*/data.read/*/columns/*/aggregate_functor
-      strings.concat
-         get-value:x:@.arguments/*/aggregate_function
-         .:(
-         get-value:x:@.arguments/*/aggregate_column
-         .:)
-
-   // Removing aggregate arguments to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/[0,2]
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
+   // Executing [data.select] slot with our SQL.
+   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name = \"Rock\"\n  order by c.Email\n"
       database-type:sqlite
-      table:CustomerDemographics
-      columns
-         aggregate_functor
-            as:result
-      where
-         and
-      group
-         group_column
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

@@ -1,40 +1,51 @@
 
-// Lists all tables in your MySQL instance.
-slots.create:magic.db.pgsql.tables
+// Update one record in your Artist table in your chinook database
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/database
+   // ArtistId column value being primary key of record to update, mandatory argument
+   ArtistId:long
 
-   // Opens up our connection
-   .connection:[postgres]
+   // Name column's new value
+   Name:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/ArtistId
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Artist
+      values
+      where
+         and
+
+   // Verifying record exists.
    if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
+      eq
+         get-value:x:@data.update
+         .:int:0
       .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               get-value:x:@.arguments/*/database
-               .:]
-   else
-      set-value:x:@.connection
-         strings.concat
-            .:[generic|
-            get-value:x:@.arguments/*/database
-            .:]
-   pgsql.connect:x:@.connection
+         response.status.set:404
+         return
+            result:Record not found
 
-      // Runs our query
-      pgsql.select:"select tablename from pg_catalog.pg_tables where schemaname != 'pg_catalog' and schemaname != 'information_schema'"
-      set-name:x:@pgsql.select/*/*
-         .:table
-      return-nodes:x:@pgsql.select/*
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

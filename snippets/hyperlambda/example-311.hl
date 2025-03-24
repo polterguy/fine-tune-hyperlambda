@@ -1,46 +1,26 @@
-/*
- * Slot that returns summarized sales orders for a given region.
- */
 
-slots.create:sales.orders.by-region
+// Callback slot for Stripe, throws exception if cloudlet has child cloudlets.
+slots.create:payments.subscriptions.can-delete.cloudlet-not-parent
 
-   .limit
-   set-value:x:@.limit
-      get-first-value
-         get-value:x:@.arguments/*/limit
-         .:long:20
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/meta
+   validators.mandatory:x:@.arguments/*/username
 
-   .offset
-   set-value:x:@.offset
-      get-first-value
-         get-value:x:@.arguments/*/offset
-         .:long:0
-
-   mssql.connect:[production|ORDSYS_MAIN]
-
-      mssql.read
-         table:SalesOrders
-            as:o
-            join:Customers
-               as:c
-               type:left
-               on
-                  and
-                     o.CustomerId.eq:c.Id
+   // Verifying cloudlet is not a parent cloudlet.
+   data.connect:[generic|hub]
+      data.read
+         table:cloudlets
          columns
-            c.Region
-            c.CompanyName
-            sum(o.TotalAmount)
-               as:TotalSales
-            count(*)
-               as:OrdersCount
-         limit:x:@.limit
-         offset:x:@.offset
+            id
          where
             and
-               c.Region.eq:x:@.arguments/*/filter
-         group
-            c.Region
-            c.CompanyName
+               source_cloudlet.eq:x:@.arguments/*/meta
+               user.eq:x:@.arguments/*/username
+      if
+         exists:x:@data.read/*/*
+         .lambda
 
-      return-nodes:x:@mssql.read/*
+            // Oops ...!!
+            throw:Subscription cannot be cancelled since cloudlet associated with subscription is a source cloudlet for another cloudlet. Delete primary cloudlet first!
+               status:412
+               public:true

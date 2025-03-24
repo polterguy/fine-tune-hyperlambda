@@ -1,14 +1,32 @@
 
-// Retrieve all pending orders of amount 100 (using AND conditions in where clause)
-data.connect:shopDB
-   data.read
-      table:orders
+// Hyperlambda script for a CRUD create endpoint that inserts one record into the ml_requests table in the magic database, taking type, prompt, completion, and finish_reason, ensuring authentication and authorization for root roles.
+.arguments
+   type:string
+   prompt:string
+   completion:string
+   finish_reason:string
+   cached:int
 
-      // No limit on results (-1 means no limit)
-      limit:long:-1
-      where
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-         // Both conditions must be true (AND)
-         and
-            status.eq:pending
-            amount.eq:long:100
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:ml_requests
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

@@ -1,23 +1,31 @@
+/*
+ * This Hyperlambda snippet accepts a file path and a target word as arguments.
+ * It reads the content of the file, splits the content into words,
+ * counts how many times the specified word appears, and returns the count.
+ */
 
-// Updates an existing object of the specified type with the specified fields
 .arguments
+   file-path:string
+   word:string
 
-   // Type of object to update. Mandatory.
-   type:string
+// Load the text file's content
+io.file.load:x:@.arguments/*/file-path
 
-   // Id of object to update. Mandatory.
-   id:long
+// Split the content into words based on spaces
+strings.split:x:@io.file.load
+   .:' '
 
-   // Key/value list of fields to update in object. Mandatory.
-   object:*
+// Initialize counter
+.counter:int:0
 
-// Ensuring user is authorized to invoking endpoint.
-auth.ticket.verify:netsuite
+// Iterate through each word and compare to target
+for-each:x:@strings.split/*
+   if
+      eq:x:@.dp/#
+         .:x:@.arguments/*/word
+      .lambda
+         math.increment:x:@.counter
 
-// Forwarding heavy lifting to workflow file.
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/modules/netsuite/workflows/workflows/netsuite-update-record.hl
-
-// Returning result to caller.
-return-nodes:x:@execute-file/*
+// Return the result
+yield
+   word-count:x:@.counter

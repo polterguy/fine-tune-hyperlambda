@@ -1,36 +1,66 @@
 
-// Delete one record from your menus table in your cms database
+// Returns items from your clusters table in your [generic|hub] database according to the specified arguments.
 .arguments
-
-   // Primary key of record to delete, mandatory argument
-   id:long
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   operator:string
+   clusters.id.like:string
+   clusters.id.eq:string
+   clusters.country.like:string
+   clusters.country.eq:string
+   clusters.name.like:string
+   clusters.name.eq:string
+   clusters.enabled.eq:bool
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-validators.mandatory:x:@.arguments/*/id
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/*
+         get-value:x:@.arguments/*/operator
 
 // Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+data.connect:[generic|hub]
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
+   // Parametrising our read invocation.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/operator
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read/*/where/*
       get-nodes:x:@.arguments/*
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:menus
+   // Reading data from database.
+   data.read
+      table:clusters
+      columns
+         clusters.id
+         clusters.country
+         clusters.name
+         clusters.enabled
       where
          and
 
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.menus.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

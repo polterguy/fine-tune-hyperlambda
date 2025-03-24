@@ -1,36 +1,25 @@
 
-// Delete one record from your roles table in your cms database
+// Hyperlambda script that deletes all existing vectors for a specified model.
 .arguments
+   type:string
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-validators.mandatory:x:@.arguments/*/id
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+// Connecting to database.
+data.connect:[generic|magic]
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+   // Deleting VSS data.
+   data.execute:delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type)
+      @type:x:@.arguments/*/type
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:roles
-      where
-         and
+   // Deleting embeddings.
+   data.execute:update ml_training_snippets set embedding = null where type = @type
+      @type:x:@.arguments/*/type
 
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.roles.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returning success to caller.
+return
+   result:success

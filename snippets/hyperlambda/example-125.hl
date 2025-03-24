@@ -1,8 +1,78 @@
-/*
- * This example tries to resize an image without specifying width or height.
- * This should trigger an error.
- */
-image.resize
-   file:/input.jpg
 
-// Throws an exception!!
+// Updates an existing object in NetSuite of the specified type
+.arguments
+
+   // Mandatory argument declaring the type of entity we want to create.
+   type:string
+
+   // Mandatory argument declaring the ID of the entity we should update.
+   id:long
+
+   // Mandatory argument declaring the actual content of the new entity we want to create.
+   object:*
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/object
+validators.mandatory:x:@.arguments/*/object/0
+
+/*
+ * Returns an access token for NetSuite.
+ * 
+ * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
+ * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
+ * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
+ */
+execute:magic.workflows.actions.execute
+   name:netsuite-get-access-token
+   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
+   arguments
+
+// Creating our idempotency key to prevent replay attacks.
+guid.new
+
+// Creating invocation URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://"
+      config.get:"magic:netsuite:account-id"
+      .:.suitetalk.api.netsuite.com/services/rest/record/v1
+      .:/
+      get-value:x:@.arguments/*/type
+      .:/
+      get-value:x:@.arguments/*/id
+
+// Parametrizing our payload.
+add:x:./*/http.patch/*/payload
+   get-nodes:x:@.arguments/*/object/*
+
+// Invoking our HTTP GET endpoint, now correctly parametrised.
+http.patch:x:@.url
+   token:x:--/execute/=netsuite-get-access-token/*/access-token
+   headers
+      X-NetSuite-Idempotency-Key:x:@guid.new
+      Content-Type:application/json; charset=UTF-8
+   payload
+
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.patch
+            .:int:200
+         lt:x:@http.patch
+            .:int:300
+   .lambda
+
+      // Oops, error ...!!
+      convert:x:@http.patch/*/content
+         type:string
+      log.error:Could not delete entity in NetSuite
+         response:x:@convert
+      throw:Could not delete entity in NetSuite, check your log for details.
+
+// Returning success to caller.
+return
+   result:success

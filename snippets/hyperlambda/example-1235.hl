@@ -1,55 +1,9 @@
-
-// Lists all foreign keys in the specified SQLite table.
-slots.create:magic.db.sqlite.foreign_keys
-
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/database
-   validators.mandatory:x:@.arguments/*/table
-
-   // Opens up our connection
-   .connection:
-   if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
-      .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               get-value:x:@.arguments/*/database
-               .:]
-   else
-      set-value:x:@.connection
-         strings.concat
-            .:[generic|
-            get-value:x:@.arguments/*/database
-            .:]
-   sqlite.connect:x:@.connection
-      strings.concat
-         .:"pragma foreign_key_list('"
-         get-value:x:@.arguments/*/table
-         .:"')"
-      sqlite.select:x:@strings.concat
-
-      /*
-       * Creating our return value, by projecting it into
-       * a generic form, that does not rely upon SQLite's syntactic
-       * details.
-       */
-      for-each:x:@sqlite.select/*
-         unwrap:x:+/*/*/*
-         add:x:../*/return-nodes
-            .
-               .
-                  column:x:@.dp/#/*/from
-                  foreign_table:x:@.dp/#/*/table
-                  foreign_column:x:@.dp/#/*/to
-   return-nodes
+// This code connects to the 'school' database and updates the grade of a student in the 'students' table.
+pgsql.connect:school
+   pgsql.update
+      table:students
+      values
+         grade:A
+      where
+         and
+            student_id:int:101

@@ -1,13 +1,24 @@
-// This example connects to the 'ocean' database and reads records from the 'creatures' table.
-sqlite.connect:ocean
-   sqlite.read
-      table:creatures
-      columns
-         species
-         habitat
-      where
-         and
-            habitat:Coral Reef
-      order:species
-      direction:asc
-      limit:int:10
+/*
+ * Returns companies and sectors where a director is involved
+ */
+.arguments
+   director_id:long
+   limit:long
+   offset:long
+
+data.connect:[mysql|industry_insight]
+   database-type:mysql
+
+   data.select:@"
+select b.company_name, b.sector, d.role_name
+   from directors d
+      inner join basic b on b.org_number = d.org_number
+   where d.director_id = @id
+   limit @limit offset @offset"
+      database-type:mysql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   yield
+      company_roles:x:@data.select/*

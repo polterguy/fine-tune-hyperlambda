@@ -1,64 +1,48 @@
 
-// Lists all foreign keys in the specified SQLite table.
-slots.create:magic.db.sqlite.indexes
+// Write a Hyperlambda script to speak the specified content using OpenAI TTS.
+.arguments
+   content:string
+   session:string
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/database
-   validators.mandatory:x:@.arguments/*/table
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/content
+validators.mandatory:x:@.arguments/*/session
 
-   // Opens up our connection
-   .connection:
-   if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
-      .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               get-value:x:@.arguments/*/database
-               .:]
-   else
-      set-value:x:@.connection
-         strings.concat
-            .:[generic|
-            get-value:x:@.arguments/*/database
-            .:]
-   sqlite.connect:x:@.connection
+// Creating a new thread to return before timeout.
+insert-before:x:../*/fork/0
+   get-nodes:x:@.arguments
+fork
+
+   // Retrieving token used to invoke OpenAI.
+   .token
+   config.get:"magic:openai:key"
+   set-value:x:@.token
       strings.concat
-         .:"select * from sqlite_master where type = 'index' and tbl_name='"
-         get-value:x:@.arguments/*/table
-         .:"'"
-      sqlite.select:x:@strings.concat
+         .:"Bearer "
+         get-first-value
+            get-value:x:@.arguments/*/api_key
+            config.get:"magic:openai:key"
 
-      /*
-       * Creating our return value, by projecting it into
-       * a generic form, that does not rely upon MySQL's syntactic
-       * details.
-       */
-      for-each:x:@sqlite.select/*
-         unwrap:x:+/*/*/*
-         add:x:../*/return-nodes
-            .
-               .
-                  name:x:@.dp/#/*/name
-                  columns
-         strings.concat
-            .:"pragma index_info('"
-            get-value:x:@.dp/#/*/name
-            .:"')"
-         sqlite.select:x:@strings.concat
-         for-each:x:@sqlite.select/*
-            unwrap:x:+/*/*
-            add:x:../*/return-nodes/0/-/*/columns
-               .
-                  .:x:@.dp/#/*/name
-   return-nodes
+   // Invoking OpenAI's API.
+   http.post:"https://api.openai.com/v1/audio/speech"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+         Accept:text/event-stream
+      payload
+         model:tts-1
+         input:x:@.arguments/*/content
+         voice:alloy
+         response_format:mp3
+         speed:decimal:1.0
+
+   // Sending speech to client.
+   convert:x:@http.post/*/content
+      type:base64
+   unwrap:x:+/*/*
+   sockets.signal:x:@.arguments/*/session
+      args
+         audio:x:@http.post/*/content
+yield
+   result:success

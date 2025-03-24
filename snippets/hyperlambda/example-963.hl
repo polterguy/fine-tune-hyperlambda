@@ -1,50 +1,45 @@
+/*
+ * Slot that returns employees grouped by department name.
+ */
 
-// Hyperlambda script for a CRUD update endpoint that updates one record in the questions table in the magic database, filtering which item to update with question_id and updating question and questionnaire fields, ensuring authentication and authorization for root and admin roles.
-.arguments
-   question_id:long
-   question:string
-   questionnaire:string
-   type:string
-   name:string
+slots.create:hr.employees.by-department
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/question_id
+   .limit
+   set-value:x:@.limit
+      get-first-value
+         get-value:x:@.arguments/*/limit
+         .:long:50
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   .offset
+   set-value:x:@.offset
+      get-first-value
+         get-value:x:@.arguments/*/offset
+         .:long:0
 
-// Opening up our database connection.
-data.connect:[generic|magic]
-   database-type:sqlite
+   mssql.connect:[hr|PEOPLE_DB]
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
+      mssql.read
+         table:Employees
+            as:e
+            join:Departments
+               as:d
+               type:left
+               on
+                  and
+                     e.DepartmentId.eq:d.Id
+         columns
+            d.Name
+               as:Department
+            count(*)
+               as:EmployeeCount
+            avg(e.Salary)
+               as:AvgSalary
+         limit:x:@.limit
+         offset:x:@.offset
+         where
+            and
+               d.Name.eq:x:@.arguments/*/filter
+         group
+            d.Name
 
-   // Invoking our update slot.
-   data.update
-      database-type:sqlite
-      table:questions
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+      return-nodes:x:@mssql.read/*

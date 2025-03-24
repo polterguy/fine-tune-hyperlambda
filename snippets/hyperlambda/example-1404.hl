@@ -1,75 +1,112 @@
 
-// Returns balance information for affiliate.
-auth.ticket.get
+// Count unique and distinct items from your media table in your cms database
+.arguments
 
-// Affiliate percent calculated below.
-.percent
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
 
-// Ensuring user is an affiliate
-data.connect:[generic|magic]
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
 
-   /*
-    * Retrieving affiliate percent for user.
-    * Notice, if user doesn't have an affiliate percent, user is
-    * not an affiliate.
-    */
+   // All of these arguments are optional and becomes filtering conditions if supplied
+   media.id.mt:long
+   media.id.lt:long
+   media.id.mteq:long
+   media.id.lteq:long
+   media.id.neq:long
+   media.id.eq:long
+   media.post_id.mt:long
+   media.post_id.lt:long
+   media.post_id.mteq:long
+   media.post_id.lteq:long
+   media.post_id.neq:long
+   media.post_id.eq:long
+   media.file_path.like:string
+   media.file_path.mt:string
+   media.file_path.lt:string
+   media.file_path.mteq:string
+   media.file_path.lteq:string
+   media.file_path.neq:string
+   media.file_path.eq:string
+   media.file_type.like:string
+   media.file_type.mt:string
+   media.file_type.lt:string
+   media.file_type.mteq:string
+   media.file_type.lteq:string
+   media.file_type.neq:string
+   media.file_type.eq:string
+   media.created_at.mt:date
+   media.created_at.lt:date
+   media.created_at.mteq:date
+   media.created_at.lteq:date
+   media.created_at.neq:date
+   media.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:media.id
+   .:media.post_id
+   .:media.file_path
+   .:media.file_type
+   .:media.created_at
+   .:post_id.title
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
    data.read
-      table:users_extra
+      database-type:sqlite
+      table:media
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  media.post_id:post_id.id
       columns
-         value
+         distinct_functor
+            as:count
       where
          and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
-
-   // Calculating ratio and storing.
-   convert:x:@data.read/*/*/value
-      type:decimal
-   set-value:x:@.percent
-      math.divide:x:@convert
-         .:decimal:100
-
-// Connecting to database.
-data.connect:[generic|stripe]
-
-   // Buffer to hold return values.
-   .balance
-      received
-      accepted
-      withdrawals
-
-   // Retrieving all received amounts from database.
-   set-value:x:@.balance/*/received
-      math.multiply
-         data.scalar:"select coalesce(sum(amount), 0) as sum from transactions\n   where affiliate = @affiliate and\n      type = 'charge.succeeded'"
-            @affiliate:x:@auth.ticket.get
-         get-value:x:@.percent
-
-   // Retrieving all accepted amounts from database.
-   set-value:x:@.balance/*/accepted
-      math.multiply
-         data.scalar:"select coalesce(sum(amount), 0) as sum from transactions t\n   where affiliate = @affiliate and\n      created <= curdate() - interval 1 month and\n      type = 'charge.succeeded' and not exists(\n         select * from transactions t2\n            where t2.type = 'charge.refunded' and\n               t2.invoice = t.invoice and t2.invoice is not null)"
-            @affiliate:x:@auth.ticket.get
-         get-value:x:@.percent
-
-   // Retrieving all withdrawals from database.
-   set-value:x:@.balance/*/withdrawals
-      data.scalar:"select coalesce(sum(amount), 0) as sum from transactions t\n   where affiliate = @affiliate and type = 'withdrawal'"
-         @affiliate:x:@auth.ticket.get
-
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:private, max-age=3600
-
-   // Returning result to caller.
-   return-nodes:x:@.balance/*
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

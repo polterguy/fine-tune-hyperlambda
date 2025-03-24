@@ -1,50 +1,13 @@
+// Executing the following Hyperlambda results in the following
 
-// Returns all roles [username] belongs to.
-.arguments
-   username
-      type:string
-      mandatory:bool:true
-.icon:supervisor_account
+// When executing the following Hyperlambda
+cache.set:foo
+   value:some cache value
+cache.get:foo
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
+// We end up with this result
+cache.set:foo
+   value:some cache value
+cache.get:some cache value
 
-// Connecting to database.
-data.connect:[generic|magic]
-
-   // Verifying user exists.
-   data.read
-      table:users
-      columns
-         username
-      where
-         and
-            username.eq:x:@.arguments/*/username
-
-   // Verifying above invocation returned something.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-
-         // Oops ...!!
-         throw:No such user
-            username:x:@.arguments/*/username
-
-   // Selecting all roles user belongs to.
-   data.read
-      table:users_roles
-      columns
-         role
-      where
-         and
-            user.eq:x:@.arguments/*/username
-
-   // Parametrizing [return] invocation below.
-   for-each:x:@data.read/*
-      unwrap:x:+/*/*
-      add:x:../*/return
-         .
-            .:x:@.dp/#/*/role
-
-// Returning roles to user.
-return
+// Notice how the cached value is returned

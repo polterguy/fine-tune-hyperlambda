@@ -1,71 +1,35 @@
+// Attempts to register a user, throws on 500, fallback message on other errors, and return success to caller if the invocation was a success
 
-// Hyperlambda script to return all available system messages from the backend.
 .arguments
 
-// Making sure user has access to invoked endpoint.
-auth.ticket.verify:root
+// Status to return
+.register.status
 
-// Contains list of system messages we find.
-.result
-
-// Listing custom files.
+// Invoking GET
+http.post:"https://api.example.com/users/register"
+   convert:true
+   payload
+      username:alice
+      email:alice@example.com
+      password:Secure123!
 if
-   io.folder.exists:/etc/system/openai/system-messages/
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
    .lambda
-      io.file.list:/etc/system/openai/system-messages/
-      for-each:x:@io.file.list/*
-         if
-            strings.ends-with:x:@.dp/#
-               .:hl
-            .lambda
-               io.file.load:x:@.dp/#
-               hyper2lambda:x:@io.file.load
-               add:x:+/*/*
-                  get-nodes:x:@hyper2lambda/*
-               add:x:@.result
-                  .
-                     .
-
-// Listing system files.
-if
-   io.folder.exists:/system/openai/system-messages/
+      set-value:x:@.register.status
+         .:Registration successful
+else-if
+   eq:x:@http.post
+      .:int:500
    .lambda
-      io.file.list:/system/openai/system-messages/
-      for-each:x:@io.file.list/*
-         if
-            strings.ends-with:x:@.dp/#
-               .:hl
-            .lambda
-               io.file.load:x:@.dp/#
-               hyper2lambda:x:@io.file.load
-               add:x:+/*/*
-                  get-nodes:x:@hyper2lambda/*
-               add:x:@.result
-                  .
-                     .
+      throw
+         .:Internal server error during registration (500)
+else
+   set-value:x:@.register.status
+      .:Registration failed
 
-// Listing module specific system messages.
-io.folder.list:/modules/
-for-each:x:@io.folder.list/*
-   strings.concat
-      get-value:x:@.dp/#
-      .:system-messages/
-   if
-      io.folder.exists:x:@strings.concat
-      .lambda
-         io.file.list:x:@strings.concat
-         for-each:x:@io.file.list/*
-            if
-               strings.ends-with:x:@.dp/#
-                  .:hl
-               .lambda
-                  io.file.load:x:@.dp/#
-                  hyper2lambda:x:@io.file.load
-                  add:x:+/*/*
-                     get-nodes:x:@hyper2lambda/*
-                  add:x:@.result
-                     .
-                        .
-
-// Returning result to caller.
-return-nodes:x:@.result/*
+yield
+   result:x:@.register.status

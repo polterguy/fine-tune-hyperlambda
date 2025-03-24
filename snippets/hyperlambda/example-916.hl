@@ -1,29 +1,42 @@
 
-// Counts items from your menus table in your cms database
+// Delete one record from your post_tags table in your cms database
 .arguments
-   menus.id.eq:long
-   menus.name.like:string
-   menus.name.eq:string
+
+   // Primary key of record to delete, mandatory argument
+   post_id:long
+
+   // Primary key of record to delete, mandatory argument
+   tag_id:long
 
 // Verifying user is authorized to access endpoint.
 auth.ticket.verify:guest
 
+// Making sure both arguments was supplied
+validators.mandatory:x:@.arguments/*/post_id
+validators.mandatory:x:@.arguments/*/tag_id
+
 // Opening up our database connection.
 data.connect:[generic|cms]
    database-type:sqlite
-   add:x:+/*/where/*
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
       get-nodes:x:@.arguments/*
 
-   // Reading data from database.
-   data.read
+   // Deleting item from database.
+   data.delete
       database-type:sqlite
-      table:menus
-      columns
-         count(*)
-            as:count
+      table:post_tags
       where
          and
-      limit:long:1
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.post_tags.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

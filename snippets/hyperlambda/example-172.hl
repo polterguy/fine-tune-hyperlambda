@@ -1,58 +1,54 @@
 
-// Returns a payment link.
+// Delete one record from your city table in your sakila database
 .arguments
-   plan:string
 
-/*
- * Ensures the specified [arg] was given.
- *
- * This action will throw an exception with a descriptive text explaining if the argument is missing.
- */
-execute:magic.workflows.actions.execute
-   name:validators-enum
-   filename:/misc/workflows/actions/security/validators-enum.hl
-   arguments
-      values
-         .:professional
-         .:enterprise
-      value:x:@.arguments/*/plan
+   // Primary key of record to delete, mandatory argument
+   recaptcha:string
 
-/*
- * Ensures user is authorized to access endpoint.
- *
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+   // Primary key of record to delete, mandatory argument
+   city_id:long
 
-// Returns a single plan
-execute:magic.workflows.actions.execute
-   name:hub-plan-get
-   filename:/modules/hub/workflows/actions/hub-plan-get.hl
-   arguments
-      plan:x:@.arguments/*/plan
+// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
+config.get:"magic:auth:recaptcha:key"
+config.get:"magic:auth:recaptcha:secret"
+if
+   and
+      neq:x:@config.get
+         .
+      neq:x:@config.get
+         .:
+      neq:x:@config.get/@config.get
+         .
+      neq:x:@config.get/@config.get
+         .:
+   .lambda
 
-/*
- * Creates a Stripe payment link from the specified [price_reference], being
- * a Stripe payment ID, for [quantity] amount of items, returning the user to
- * [success_url] after payment has been successfully finished.
- *
- * Will use your Stripe API token found from your settings as it's interacting
- * with the Stripe API.
- */
-execute:magic.workflows.actions.execute
-   name:stripe-payment-link-create
-   filename:/modules/stripe/workflows/actions/stripe-payment-link-create.hl
-   arguments
-      price_reference:x:--/execute/=hub-plan-get/*/price_reference
-      quantity:int:1
-      success_url:"https://ainiro.io"
+      // reCAPTCHA configuration settings found.
+      validators.mandatory:x:@.arguments/*/recaptcha
+      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
+         min:decimal:0.3
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
+remove-nodes:x:@.arguments/*/recaptcha/[0,1]
+validators.mandatory:x:@.arguments/*/city_id
+
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:city
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   yield
+      affected:x:@data.delete

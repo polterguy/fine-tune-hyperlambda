@@ -1,63 +1,61 @@
 
-// Search for jobs using SERP API with a mandatory query parameter.
+// Returns a list of IDs from NetSuite to caller according to arguments
 .arguments
 
-   // Mandatory parameter being the search query to use.
+   // Mandatory argument declaring the type of entities we want to list.
+   type:string
+
+   // Optional filtering for contacts to search for.
    q:string
 
-   // Optional parameter for what city or location you want to filter your results by.
-   location:string
+   // Optional limit for how many records to select. Defaults to 1000 if not specified.
+   limit:long
 
-   // Optional parameter being search radius in kilometers.
-   lrad:string
+   // Optional offset of where to start returning records. Defaults to 0 if not specified.
+   offset:long
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/q
+validators.mandatory:x:@.arguments/*/type
 
-// Retrieving SERP API's API key and making sure we've got one.
-.api-key
-set-value:x:@.api-key
-   config.get:"magic:serp-api:api_key"
-if
-   or
-      null:x:@.api-key
-      eq:x:@.api-key
-         .:
-   .lambda
+/*
+ * Returns an access token for NetSuite.
+ * 
+ * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
+ * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
+ * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
+ */
+execute:magic.workflows.actions.execute
+   name:netsuite-get-access-token
+   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
+   arguments
 
-      // Oops ...!!
-      throw:Could not find a SERP API key to use for fetching jobs.
+// Creating our idempotency key to prevent replay attacks.
+guid.new
 
-// Creating our URL.
+// Creating invocation URL.
 .url
 set-value:x:@.url
    strings.concat
-      .:"https://serpapi.com/search.json?engine=google_jobs&api_key="
-      get-value:x:@.api-key
-      .:&q=
-      strings.url-decode:x:@.arguments/*/q
+      .:"https://"
+      config.get:"magic:netsuite:account-id"
+      .:.suitetalk.api.netsuite.com/services/rest/record/v1
+      .:/
+      get-value:x:@.arguments/*/type
 
-// Checking if we've got a location argument.
-if
-   and
-      exists:x:@.arguments/*/location
-      not-null:x:@.arguments/*/location
-      neq:x:@.arguments/*/location
-         .:
-   .lambda
+// Removing type to avoid unsupported query parameter.
+remove-nodes:x:@.arguments/*/type
 
-      // Concatenating location to URL.
-      set-value:x:@.url
-         strings.concat
-            get-value:x:@.url
-            .:&location=
-            get-value:x:@.arguments/*/location
-
-// Retrieving result.
+// Invoking our HTTP GET endpoint, now correctly parametrised.
 http.get:x:@.url
-   convert:true
+   token:x:--/execute/=netsuite-get-access-token/*/access-token
+   headers
+      X-NetSuite-Idempotency-Key:x:@guid.new
+   query:x:@.arguments/*
 
-// Sanity checking result of above invocation.
+// Converts the result to a lambda object.
+json2lambda:x:@http.get/*/content
+
+// Sanity checking above invocation.
 if
    not
       and
@@ -67,46 +65,15 @@ if
             .:int:300
    .lambda
 
-      // Oops ...!!
-      lambda2hyper:x:../*
-      log.info:x:-
-      throw:Something went wrong while invoking SERP API
+      // Oops, error ...!!
+      lambda2hyper:x:@json2lambda
+      log.error:x:@lambda2hyper
+      throw:Could not list entities from NetSuite, check your log for details.
 
-// Iterating through result, making sure we return it to caller.
-for-each:x:@http.get/*/content/*/jobs_results/*/[0,5]
+// Cleaning up redundant stuff.
+remove-nodes:x:@json2lambda/*/items/*/*/links
 
-   // Returning primary job info to caller.
-   unwrap:x:+/*/*/*
-   add:x:../*/return-nodes/*/jobs
-      .
-         .
-            title:x:@.dp/#/*/title
-            company_name:x:@.dp/#/*/company_name
-            location:x:@.dp/#/*/location
-            highlights
-            apply_options
-
-   // Returning job highlights to caller.
-   for-each:x:@.dp/#/*/job_highlights/*/[0,5]
-      add:x:+/+/*/*/*/items
-         get-nodes:x:@.dp/#/*/items/*
-      unwrap:x:+/*/*/*/title
-      add:x:../*/return-nodes/*/jobs/0/-/*/highlights
-         .
-            .
-               title:x:@.dp/#/*/title
-               items
-
-   // Returning apply options to caller.
-   for-each:x:@.dp/#/*/apply_options/*/[0,2]
-      unwrap:x:+/*/*/*
-      add:x:../*/return-nodes/*/jobs/0/-/*/apply_options
-         .
-            .
-               title:x:@.dp/#/*/title
-               link:x:@.dp/#/*/link
-
-// Returning result to caller.
-unwrap:x:+/*
-return-nodes
-   jobs
+// Returning entities to caller.
+yield
+   items:x:@json2lambda/*/items/*
+   totalResults:x:@json2lambda/*/totalResults

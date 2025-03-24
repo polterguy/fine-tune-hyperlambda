@@ -1,43 +1,55 @@
 
-// Deletes one record from the SubscriptionPlan table in the saas database using the primary key.
-.arguments
+// a Hyperlambda file that returns all cloudlets belonging to the currently authenticated user.
 
-   // Primary key of record to delete, mandatory argument
-   PlanId:long
+// Ensuring user is authorised to invoke endpoint.
+auth.ticket.verify:root, guest, impersonated
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Logging invocation.
+/*
+ * Retrieving currently authenticated user to prevent a user
+ * from retrieving cloudlets not belonging to him/her.
+ */
 auth.ticket.get
-lambda2hyper:x:@.arguments/*
-log.info:saas.SubscriptionPlan entry deleted
-   username:x:@auth.ticket.get
-   arguments:x:@lambda2hyper
-validators.mandatory:x:@.arguments/*/PlanId
 
 // Opening up our database connection.
-data.connect:[generic|saas]
-   database-type:sqlite
+data.connect:[generic|hub]
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:SubscriptionPlan
+   // Reading data from database.
+   data.read
+      table:cloudlets
+         join:plans
+            type:inner
+            on
+               and
+                  cloudlets.plan.eq:plans.name
+         join:clusters
+            type:inner
+            on
+               and
+                  cloudlets.cluster.eq:clusters.id
+      columns
+         cloudlets.id
+         cloudlets.created
+         cloudlets.name
+         cloudlets.plan
+         cloudlets.cluster
+         cloudlets.destruction_date
+         cloudlets.enabled
+         cloudlets.source_cloudlet
+         plans.price
+         plans.storage
+         plans.cpu
+         plans.memory
+         plans.frontend
+         plans.max_upload
+         plans.bandwidth
+         plans.max_timeout
+         clusters.country
+         clusters.name
+            as:node_name
+         plans.description
       where
          and
+            user.eq:x:@auth.ticket.get
 
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:saas.SubscriptionPlan.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

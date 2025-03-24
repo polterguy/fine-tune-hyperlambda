@@ -1,38 +1,31 @@
 
-// Create one record in your menus table in your cms database
+// Write a Hyperlambda script to upload a specified backup file.
 .arguments
+   file:*
 
-   // name column value
-   name:string
+// Allowing endpoint to handle multipart/form-data MIME content
+.accept:multipart/form-data
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Opening up database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+validators.regex:x:@.arguments/*/file/*/name
+   regex:"\\.db$"
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
+// Saves the file to the specified folder.
+.full-path
+set-value:x:@.full-path
+   strings.concat
+      .:/data/
+      get-value:x:@.arguments/*/file/*/name
+io.stream.save-file:x:@.full-path
+   get-value:x:@.arguments/*/file/*/stream
 
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:menus
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.menus.post
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+// Flushing SQLite, and returning success to caller.
+sqlite.connections.flush
+return
+   result:success

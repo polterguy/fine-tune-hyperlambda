@@ -1,17 +1,17 @@
+/*
+ * FILE: /modules/api/products/available.get.hl
+ *
+ * DESCRIPTION:
+ * Lists available products in stock using raw SQL.
+ * Demonstrates basic filtering logic using SQL inside [data.select].
+ *
+ * HOW TO CREATE THIS ENDPOINT:
+ * Save to `/modules/products/available.get.hl`, and it becomes available at:
+ *     GET /magic/modules/products/available
+ */
 
-// Executes the specified SuiteQL towards your NetSuite account
-.arguments
+data.connect:shop
+   data.select:SELECT name, quantity FROM products WHERE quantity > 0
 
-   // Mandatory SuiteQL query you want to execute.
-   q:string
-
-// Ensuring user is authorized to invoking endpoint.
-auth.ticket.verify:netsuite
-
-// Forwarding heavy lifting to workflow file.
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/modules/netsuite/workflows/workflows/netsuite-query.hl
-
-// Returning result to caller.
-return-nodes:x:@execute-file/*
+   yield
+      result:x:@data.select/*

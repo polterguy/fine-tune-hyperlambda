@@ -1,11 +1,28 @@
-// Adds a 2-hour offset to a given timestamp and yields the updated date
-slots.create:offset.timestamp
-   math.add
-      get-value:x:@.arguments/*/timestamp
-      time
-         hours:int:2
-   yield
-      updated:x:@math.add
 
-execute:offset.timestamp
-   timestamp:date:"2025-03-22T10:00:00Z"
+// Deletes one item from your clusters table in your [generic|hub] database matching the specified argument(s).
+.arguments
+   id:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|hub]
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:clusters
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

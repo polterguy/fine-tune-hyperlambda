@@ -1,7 +1,33 @@
-// Storing a message in the cache with a 10-second expiration time.
 
-cache.set:session.message
-   expiration:10
-   value:Welcome back, user!
+// Write a Hyperlambda script to return the conversation starters for a specified type.
+.arguments
+   type:string
 
-// This will store "Welcome back, user!" in cache under "session.message".
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Retrieving all questions from database.
+   data.select:"\nselect conversation_starters\n\tfrom ml_types\n\twhere type = @type"
+      type:x:@.arguments/*/type
+
+   // Transforming to markdown and splitting into individual questions, but only if we have conversation starters.
+   if
+      and
+         not-null:x:@data.select/*/*/conversation_starters
+         neq:x:@data.select/*/*/conversation_starters
+            .:
+      .lambda
+         markdown2html:x:@data.select/*/*/conversation_starters
+         html2lambda:x:@markdown2html
+         for-each:x:"@html2lambda/**/li/**/\\#text"
+            unwrap:x:+/*/*
+            add:x:../*/return/*/questions
+               .
+                  .:x:@.dp/#
+
+// Returning result to caller.
+return
+   questions

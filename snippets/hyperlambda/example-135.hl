@@ -1,31 +1,49 @@
 
-// Delete one record from your Album table in your chinook database
-.arguments
+// Returns a grouped chart image to caller. Values is a mandatory comma separated list of values.
+.arguments:*
 
-   // Primary key of record to delete, mandatory argument
-   AlbumId:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/legend
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+// Creating our individual bars.
+.bars
+for-each:x:@.arguments/*
+   get-name:x:@.dp/#
+   if
+      not
+         strings.starts-with:x:@get-name
+            .:legend
+      .lambda
 
-validators.mandatory:x:@.arguments/*/AlbumId
+         // Adding primary node for bar.
+         set-name:x:+/*/*
+            get-value:x:@get-name
+         add:x:@.bars
+            .
+               .
 
-// Opening up our database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
+         // Adding values for individual cells.
+         add:x:@.bars/0/-
+            strings.split:x:@.dp/#
+               .:,
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+// Creating our legend.
+add:x:../*/image.chart/*/legend
+   strings.split:x:@.arguments/*/legend
+      .:,
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:Album
-      where
-         and
+// Parametrizing [image.chart] invocation.
+add:x:../*/image.chart/*/bars
+   get-nodes:x:@.bars/*
+image.chart:grouped
+   width:800
+   height:500
+   bars
+   legend
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Applying correct HTTP header.
+response.headers.set
+   Content-Type:image/png
+
+// Returning chart to caller.
+return:x:@image.chart

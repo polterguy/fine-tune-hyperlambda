@@ -1,24 +1,20 @@
-/*
- * Returns all companies where the director is no longer active
- */
-.arguments
-   director_id:long
-   limit:long
-   offset:long
+// Traverse node hierarchy and look for nodes with a name starting with 'n'. Then change their values to 'visited'.
+.result
+.data
+   n1:howdy
+      n2:nope!
+   some-node-1
+      n3:" world"
+         is-not-considered
 
-data.connect:[mssql|legacy_data]
-   database-type:mssql
-
-   data.select:@"
-select b.company_name, d.role_name, d.end_date
-   from directors d
-      join basic b on d.org_number = b.org_number
-   where d.director_id = @id and d.active = 0
-   limit @limit offset @offset"
-      database-type:mssql
-      @id:x:@.arguments/*/director_id
-      @limit:x:@.arguments/*/limit
-      @offset:x:@.arguments/*/offset
-
-   yield
-      inactive_roles:x:@data.select/*
+            // Considered since it starts with 'n' character
+            nanna:". "
+            n4:old-value
+for-each:x:@.data/**
+   get-name:x:@.dp/#
+   if
+      strings.starts-with:x:@get-name
+         .:n
+      .lambda
+         set-value:x:@.dp/#
+            .:visited

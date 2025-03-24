@@ -1,47 +1,22 @@
+/*
+ * This Hyperlambda snippet accepts a file path as input, reads the content of the file,
+ * splits the text into words using space as the delimiter, counts the number of resulting words,
+ * and returns this count to the caller.
+ */
 
-// Read or list records from your media table in your cms database
 .arguments
-   media.id.eq:long
-   media.post_id.eq:long
-   media.file_path.like:string
-   media.file_path.eq:string
-   media.file_type.like:string
-   media.file_type.eq:string
-   media.created_at.eq:date
-   post_id.title.eq:string
-   post_id.title.like:string
+   file-path:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
+// Load the text file's content
+io.file.load:x:@.arguments/*/file-path
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+// Split the content into words based on spaces
+strings.split:x:@io.file.load
+   .:' '
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
+// Count the number of words found
+get-count:x:@strings.split/*
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:media
-         join:posts
-            as:post_id
-            type:left
-            on
-               and
-                  media.post_id:post_id.id
-      columns
-         media.id
-         media.post_id
-         media.file_path
-         media.file_type
-         media.created_at
-         post_id.title
-            as:post_id.title
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+// Return the word count to the caller
+yield
+   word-count:x:@get-count

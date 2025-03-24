@@ -1,30 +1,41 @@
 
-// Ensures our system messages are updated during deployments
-io.file.list:/modules/finovo/system-messages/
+// Lists all tables in your MySQL instance.
+slots.create:magic.db.mysql.tables
 
-// Opening up database connection.
-data.connect:magic
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
 
-   // Looping through each system message and updating our machine learning type accordingly.
-   for-each:x:@io.file.list/*
+   // Opens up our connection
+   .connection:[information_schema]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mysql.connect:x:@.connection
 
-      // Loading file.
-      io.file.load:x:@.dp/#
-
-      // Finding type name
-      .type
-      strings.split:x:@.dp/#
-         .:/
-      strings.split:x:-/0/-
-         .:.
-      set-value:x:@.type
-         get-value:x:@strings.split/0
-
-      // Updating type name's system message.
-      data.update
-         table:ml_types
-         values
-            system_message:x:@io.file.load
-         where
-            and
-               type.eq:x:@.type
+      // Runs our query
+      mysql.select:"show full tables where Table_Type = 'BASE TABLE'"
+      remove-nodes:x:@mysql.select/*/*/Table_type
+      set-name:x:@mysql.select/*/*
+         .:table
+      return-nodes:x:@mysql.select/*

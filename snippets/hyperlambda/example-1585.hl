@@ -1,36 +1,12 @@
-
-// Deletes one record from your pages table in your cms database
-.arguments
-
-   // Primary key of record to delete, mandatory argument
-   id:long
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-validators.mandatory:x:@.arguments/*/id
-
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:pages
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.pages.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Combines data from two services into a unified result node
+.data
+   result
+.service1
+   itemA:int:100
+   itemB:int:200
+.service2
+   itemC:int:300
+   itemD:int:400
+add:x:@.data/*/result
+   get-nodes:x:@.service1/*
+   get-nodes:x:@.service2/*

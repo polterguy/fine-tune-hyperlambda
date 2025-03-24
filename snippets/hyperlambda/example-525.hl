@@ -1,49 +1,13 @@
+// Use else-if to check multiple conditions in sequence
 
-// Verifies user is allowed to create a demo account.
-slots.create:hub.user.can-create-demo-account
-
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/username
-   validators.mandatory:x:@.arguments/*/plan
-
-   // Verifying user belongs to one of the roles that are allowed to create demo clodlets.
-   try
-      auth.ticket.verify:root, admin, partner
-   .catch
-
-      // Letting user know that he is not allowed to create demo cloudlets.
-      sockets.signal:hub.cloudlets.create
-         users:x:@auth.ticket.get
-         args
-            status:Only partners can create demo cloudlets. To test AINIRO send en email to team@ainiro.io
-            finished:bool:false
-            error:bool:true
-      log.error:User tried to create demo cloudlets when not allowed
-         user:x:@.arguments/*/username
-         plan:x:@.arguments/*/plan
-      throw:Only partners can create demo cloudlets
-         public:true
-         status:403
-
-   // Checking if user alread have a demo cloudlet.
-   data.scalar:select count(*) from cloudlets where user = @user and plan = @plan
-      user:x:@.arguments/*/username
-      plan:x:@.arguments/*/plan
-   if
-      neq:x:@data.scalar
-         .:long:0
-      .lambda
-
-         // Letting user know that he already has a demo account of specified type.
-         sockets.signal:hub.cloudlets.create
-            users:x:@auth.ticket.get
-            args
-               status:You already have one demo account of the specified type
-               finished:bool:false
-               error:bool:true
-         log.error:User tried to create multiple demo cloudlets
-            user:x:@.arguments/*/username
-            plan:x:@.arguments/*/plan
-         throw:We only allow one demo cloudlet of each type for each user
-            public:true
-            status:403
+.result
+if
+   .:bool:false
+   .lambda
+      set-value:x:../*/.result
+         .:failure
+else-if
+   .:bool:true
+   .lambda
+      set-value:x:../*/.result
+         .:OK

@@ -1,2 +1,24 @@
-// Dynamically load a plugin/assembly
-system.plugin.load:/etc/foo.dll
+
+// Write a Hyperlambda script to list all connection strings in your installation for a specified database type.
+.arguments
+   databaseType:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:pgsql
+   .:mssql
+   .:sqlite
+
+// Retrieves all connection strings according to database type specified.
+strings.concat
+   .:"magic:databases:"
+   get-value:x:@.arguments/*/databaseType
+config.section:x:-
+add:x:+
+   get-nodes:x:@config.section/*
+return

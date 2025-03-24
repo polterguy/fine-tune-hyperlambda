@@ -1,26 +1,27 @@
-/*
- * This Hyperlambda snippet tests multiple conditions in one execution.
- *
- * 1. `.data` contains `foo1` (empty), `foo2:bar2` (with value), and `foo3` (empty).
- * 2. The `null` slot checks if `foo1` and `foo3` are null.
- * 3. The `not-null` slot checks if `foo2` is not null.
- */
 
-.data
-   foo1
-   foo2:bar2
-   foo3
-null:x:@.data/*/foo1
-not-null:x:@.data/*/foo2
-null:x:@.data/*/foo3
+// Counts items from your CustomerCustomerDemo table in your northwind database
+.arguments
+   CustomerCustomerDemo.CustomerID.like:string
+   CustomerCustomerDemo.CustomerID.eq:string
+   CustomerCustomerDemo.CustomerTypeID.like:string
+   CustomerCustomerDemo.CustomerTypeID.eq:string
 
-/* Expected result is
- .data
-   foo1
-   foo2:bar2
-   foo3
-null:bool:true
-not-null:bool:true
-null:bool:true
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
- */
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:CustomerCustomerDemo
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

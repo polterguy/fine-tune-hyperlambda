@@ -1,28 +1,40 @@
 
-// Deletes one item from your clusters table in your [generic|hub] database matching the specified argument(s).
-.arguments
-   id:string
+// Lists all tables in your MySQL instance.
+slots.create:magic.db.pgsql.tables
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/id
+   // Opens up our connection
+   .connection:[postgres]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   pgsql.connect:x:@.connection
 
-// Opening up our database connection.
-data.connect:[generic|hub]
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      table:clusters
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+      // Runs our query
+      pgsql.select:"select tablename from pg_catalog.pg_tables where schemaname != 'pg_catalog' and schemaname != 'information_schema'"
+      set-name:x:@pgsql.select/*/*
+         .:table
+      return-nodes:x:@pgsql.select/*

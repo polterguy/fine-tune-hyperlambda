@@ -1,54 +1,16 @@
 
-// Update endpoint updating one record in your items table in your shopping-cart-demo database.
-.arguments
+// Hyperlambda example where a new order is inserted into the 'ecommerce_db' database and its 'orders' table. Use Microsoft SQL Server
 
-   // item_id column value being primary key of record to update
-   item_id:long
+// Inserts a new order into the "ecommerce_db" database and its "orders" table.
+data.connect:ecommerce_db
+   database-type:mssql
 
-   // product_id column's new value
-   product_id:long
-
-   // session_id column's new value
-   session_id:string
-
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/item_id
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up our database connection.
-data.connect:[generic|shopping-cart-demo]
-   database-type:sqlite
-
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      database-type:sqlite
-      table:items
+   // Storing order details.
+   data.create
+      database-type:mssql
+      table:orders
       values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+         order_id:int:12345
+         user_id:int:1001
+         total:decimal:199.99
+         order_date:date:"2025-04-01T00:00:00.000"

@@ -1,72 +1,84 @@
 
-// Hyperlambda script for an upsert endpoint that upserts questions for a questionnaire, assuming questions are in Markdown with list items, ensuring the user is authorized.
+// Read endpoint with paging, sorting on fully qualified table name (TABLE_NAME.COLUMN_NAME), filtering selecting records from your items table in your shopping-cart-demo database.
 .arguments
-   name:string
-   questions:string
+
+   // Number of records to return
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // What column to order by
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // items table item_id column equality exact match filtering
+   items.item_id.eq:long
+
+   // items table product_id column equality exact match filtering
+   items.product_id.eq:long
+
+   // items table quantity column equality exact match filtering
+   items.quantity.eq:long
+
+   // items table session_id column wildcard filtering with SQL like '%' comparison
+   items.session_id.like:string
+
+   // items table session_id column equality exact match filtering
+   items.session_id.eq:string
+
+   // products table name column equality exact match filtering
+   product_id.name.eq:string
+
+   // products table name column wildcard filtering with SQL like '%' comparison
+   product_id.name.like:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+auth.ticket.verify:root,admin
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/name
-validators.mandatory:x:@.arguments/*/questions
+// Opening up our database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
 
-// Connecting to database.
-data.connect:[generic|magic]
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
 
-   // Deleting all old questions.
-   data.delete
-      table:questions
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:items
+         join:products
+            as:product_id
+            type:left
+            on
+               and
+                  items.product_id:product_id.product_id
+      columns
+         items.item_id
+         items.product_id
+         items.quantity
+         items.session_id
+         product_id.name
+            as:product_id.name
       where
          and
-            questionnaire.eq:x:@.arguments/*/name
 
-   /*
-    * Turning questions string into individual questions by transforming
-    * to HTML and then semantically traversing.
-    */
-   markdown2html:x:@.arguments/*/questions
-   html2lambda:x:-
-
-   // Iterating all li elements in HTML.
-   for-each:x:@html2lambda/**/li
-
-      // Semantically parsing question.
-      strings.split:x:"@.dp/#/*/\\#text"
-         .:=>
-      .question
-      set-value:x:@.question
-         strings.trim:x:@strings.split/0
-
-      // Checking if question contains meta information.
-      if
-         mt
-            get-count:x:@strings.split/*
-            .:int:1
-         .lambda
-
-            // Question contain meta information.
-            strings.trim:x:@strings.split/1
-            strings.split:x:-
-               .:,
-            for-each:x:@strings.split/*
-               strings.split:x:@.dp/#
-                  .:=
-               set-value:x:./*/add/*/*/name
-                  strings.trim:x:@strings.split/1
-               set-name:x:./*/add/*/*/name
-                  strings.trim:x:@strings.split/0
-               add:x:@for-each/@for-each/*/data.create/*/values
-                  .
-                     name:value
-
-      // Inserting currently iterated question and associating it with specified questionnaire.
-      data.create
-         table:questions
-         values
-            questionnaire:x:@.arguments/*/name
-            question:x:@.question
-
-   // Returning success to caller.
-   return
-      result:success
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

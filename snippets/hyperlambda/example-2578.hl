@@ -1,14 +1,33 @@
-// How to auto-reject if insurance claim is incomplete?
-.hasPolicy:bool:true
-.hasDocs:bool:false
-.claimResult
+
+// Write a Hyperlambda script to rename a specified file or folder.
+.arguments
+   oldName:string
+   newName:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Basic logging.
+log.info:Renaming file object
+   old_name:x:@.arguments/*/oldName
+   new_name:x:@.arguments/*/newName
+
+// Checking if specified object is a file or a folder.
 if
-   and
-      get-value:x:@.hasPolicy
-      get-value:x:@.hasDocs
+   io.folder.exists:x:@.arguments/*/oldName
    .lambda
-      set-value:x:@.claimResult
-         .:Approved
+
+      // File object is a folder, renaming it.
+      io.folder.move:x:@.arguments/*/oldName
+         get-value:x:@.arguments/*/newName
 else
-   set-value:x:@.claimResult
-      .:Rejected
+
+   // File object is a file, renaming it.
+   io.file.move:x:@.arguments/*/oldName
+      strings.concat
+         io.path.get-folder:x:@.arguments/*/oldName
+         get-value:x:@.arguments/*/newName
+
+// Returning result to caller.
+return-nodes
+   result:success

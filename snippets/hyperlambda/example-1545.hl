@@ -1,75 +1,22 @@
 
-// Creates an engagement for a contact in HubSpot
-.arguments
-   id:long
-   note:string
+// Provide a Hyperlambda example where a boolean status is evaluated using a switch case with a default option.
 
-// Sanity checking invoation.
-validators.mandatory:x:@.arguments/*/id
-validators.mandatory:x:@.arguments/*/note
+// Switch case comparison for boolean values.
+.status:bool:true
+.result
+switch:x:@.status
+   case:bool:true
 
-// Retrieving token from configuration and verifying it exists.
-config.get:"magic:hubspot:token"
-if
-   or
-      eq:x:@config.get
-         .:
-      null:x:@config.get
-   .lambda
+      // If status is true.
+      set-value:x:@.result
+         .:Status is active
+   case:bool:false
 
-      // Oops ...!!
-      throw:No authorization token found in your configuration
-         public:bool:true
-         status:int:500
-.token
-set-value:x:@.token
-   strings.concat
-      .:"Bearer "
-      get-value:x:@config.get
+      // If status is false.
+      set-value:x:@.result
+         .:Status is inactive
+   default
 
-// Getting current timestamp.
-date.now
-
-// Getting owner ID.
-.owner
-config.get:"magic:hubspot:owner"
-set-value:x:@.owner
-   convert:x:@config.get
-      type:long
-
-// Creating our contact in HubSpot.
-http.post:"https://api.hubapi.com/crm/v3/objects/notes"
-   headers
-      Authorization:x:@.token
-      Content-Type:application/json; charset=utf8
-   payload
-      properties
-         hs_note_body:x:@.arguments/*/note
-         hs_timestamp:x:@date.now
-         hubspot_owner_id:x:@.owner
-      associations
-         .
-            to
-               id:x:@.arguments/*/id
-            types
-               .
-                  associationCategory:HUBSPOT_DEFINED
-                  associationTypeId:int:202
-
-// Verifying above invocation was a success.
-if
-   neq:x:@http.post
-      .:int:201
-   .lambda
-
-      // Oops ...!!
-      lambda2hyper:x:@http.post
-      log.error:Could not create contact in HubSpot
-         message:x:@lambda2hyper
-      throw:Something went wrong as we tried to post a contact to HubSpot, check your log for details.
-         status:int:500
-         public:bool:true
-
-// Returning success to caller.
-return
-   result:success
+      // If the value does not match true/false.
+      set-value:x:@.result
+         .:Invalid status

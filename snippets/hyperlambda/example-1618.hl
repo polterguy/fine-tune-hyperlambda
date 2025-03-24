@@ -1,25 +1,16 @@
 
-// Hyperlambda script that deletes all existing vectors for a specified model.
-.arguments
-   type:string
+// Hyperlambda snippet that loops while [.progress] is not equal to 100.
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Loops while [.progress] is not equal to 100.
+.progress:int:0
+while
+   neq
+      get-value:x:@.progress
+      .:int:100
+   .lambda
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
+      // Logging progress.
+      log.info:Processing...
 
-// Connecting to database.
-data.connect:[generic|magic]
-
-   // Deleting VSS data.
-   data.execute:delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type)
-      @type:x:@.arguments/*/type
-
-   // Deleting embeddings.
-   data.execute:update ml_training_snippets set embedding = null where type = @type
-      @type:x:@.arguments/*/type
-
-// Returning success to caller.
-return
-   result:success
+      // Increasing progress.
+      math.increment:x:@.progress

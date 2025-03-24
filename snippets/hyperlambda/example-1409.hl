@@ -1,113 +1,92 @@
 
-// Hyperlambda workflow action to retrieve charges from Stripe using the Stripe API token. The function should accept optional arguments for limit, starting_after, and customer_id, applying a default limit of 10 if not specified. It should construct the appropriate URL for the Stripe API, handle the customer_id argument, and make a GET request. If the request fails, it should log an error and throw an exception. The function should process only paid charges, converting amounts to decimals and Unix timestamps to UTC dates, and return the results to the caller.
+// Create a Hyperlambda script that applies specified arguments and a file comment description to the specified Hyperlambda, ensuring the user is authorized.
 .arguments
-   limit
-      type:int
-      mandatory:bool:false
-   starting_after
-      type:string
-      mandatory:bool:false
-   customer_id
-      type:string
-      mandatory:bool:false
-.icon:payment
+   hyperlambda:string
+   description:string
+   args:*
 
-// Applying defaults.
-validators.default:x:@.arguments
-   limit:int:10
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Retrieving token to use for invocations towards Stripe.
-.token
-set-value:x:-
-   strings.concat
-      .:"Bearer "
-      config.get:"magic:stripe:token"
+// Converting input Hyperlambda to lambda object.
+hyper2lambda:x:@.arguments/*/hyperlambda
+   comments:true
 
-// Changing [customer_id] to [customer] if existing.
+// Removing old file comment description.
+remove-nodes:x:"@hyper2lambda/0/\\.."
+
+// Removing old [.arguments] collection.
+remove-nodes:x:@hyper2lambda/0/.arguments
+
+// Creating supporting node at the end of lambda object.
+add:x:@hyper2lambda
+   .
+      .support
+
+// Checking if caller provided an [.arguments] collection for Hyperlambda.
 if
-   exists:x:@.arguments/*/customer_id
-   .lambda
-      set-name:x:@.arguments/*/customer_id
-         .:customer
-
-// Creating URL.
-.url
-for-each:x:@.arguments/*
-   if
-      not-null:x:@.dp/#
-      .lambda
-         if
-            null:x:@.url
-            .lambda
-               set-value:x:@.url
-                  .:"https://api.stripe.com/v1/charges?"
-         else
-            set-value:x:@.url
-               strings.concat
-                  get-value:x:@.url
-                  .:&
-         set-value:x:@.url
-            strings.concat
-               get-value:x:@.url
-               get-name:x:@.dp/#
-               .:=
-               get-value:x:@.dp/#
-
-// Invoking Stripe REST API.
-http.get:x:@.url
-   convert:true
-   headers
-      Authorization:x:@.token
-
-// Sanity checking above invocation.
-if
-   mte
-      get-value:x:@http.get
-      .:int:400
+   exists:x:@.arguments/*/args
    .lambda
 
-      // Oops, something went wrong ...!!
-      lambda2hyper:x:@http.post
-      log.error:Something went wrong while invoking Stripe, could not retrieve charges
-         result:x:@lambda2hyper
-         provider:Stripe
-      throw:Something went wrong while invoking Stripe, could not retrieves charges
-         public:true
-         status:500
-
-// Parametrising our [return] invocation.
-for-each:x:@http.get/*/content/*/data/*
-
-   // Only handling paid charges.
-   if:x:@.dp/#/*/paid
-
-      // Buffer for currently iterated item.
-      .tmp
+      // Inserting arguments at top of lambda object.
+      add:x:+/*/*
+         get-nodes:x:@.arguments/*/args/*
+      insert-before:x:@hyper2lambda/0
          .
-            id:x:@.dp/#/*/id
-            amount:x:@.dp/#/*/amount
-            currency:x:@.dp/#/*/currency
-            customer:x:@.dp/#/*/customer
-            metadata:x:@.dp/#/*/metadata/*
-            receipt_url:x:@.dp/#/*/receipt_url
-            created:x:@.dp/#/*/created
+            .arguments
+else
 
-      // Forward evaluating all above expressions.
-      unwrap:x:@.tmp/*/*
-         apply-lists:true
+   // Checking if we've got a file level comment.
+   if
+      eq
+         get-name:x:@hyper2lambda/0
+         .:..
+      .lambda
 
-      // Converting amount to decimal and dividing by 100.
-      set-value:x:@.tmp/*/*/amount
-         math.divide
-            convert:x:@.tmp/*/*/amount
-               type:decimal
-            .:int:100
+         // We have a file level comment, hence applying [.arguments] node after it.
+         insert-after:x:@hyper2lambda/0
+            .
+               .arguments
+   else
 
-      // Converting Unix time to UTC date.
-      set-value:x:@.tmp/*/*/created
-         date.from-unix:x:@.tmp/*/*/created
-      add:x:../*/return
-         get-nodes:x:@.tmp/*
+      // We don't have a file level comment, applying [.arguments] as the first node in the file.
+      insert-before:x:@hyper2lambda/0
+         .
+            .arguments
 
-// Returning result of above invocation to caller.
-return
+// Defaulting file [.type] to public.
+insert-after:x:@hyper2lambda/*/.arguments
+   .
+      .type:public
+
+// Checking if caller provided a [description] for Hyperlambda.
+if
+   and
+      exists:x:@.arguments/*/description
+      not-null:x:@.arguments/*/description
+   .lambda
+
+      // Normalising [description] CR/LF characters.
+      strings.replace:x:@.arguments/*/description
+         .:"\n"
+         .:"\n"
+      strings.replace:x:@strings.replace
+         .:"\n"
+         .:"\n"
+
+      // Inserting file comment / description at top of lambda object.
+      unwrap:x:+/*/*
+      insert-before:x:@hyper2lambda/0
+         .
+            ..:x:@strings.replace
+
+// Removing supporting node.
+remove-nodes:x:@hyper2lambda/0/-/.support
+
+// Converting lambda to Hyperlambda again.
+lambda2hyper:x:@hyper2lambda/*
+   comments:true
+
+// Returning updated Hyperlambda to caller.
+yield
+   result:x:@lambda2hyper

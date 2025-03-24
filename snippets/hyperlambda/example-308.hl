@@ -1,47 +1,24 @@
 /*
- * Retrieves invoice summaries filtered by customer type
+ * Posts an order ID to the order system to fetch order details.
+ * If the request is successful (2xx), the full response content is returned.
  */
+
 .arguments
-   filter:string
-   limit:long
-   offset:long
+   id:int
 
-auth.ticket.verify:billing-admin
+http.post:"https://orders.api.example.com/get-order"
+   convert:true
+   payload
+      order_id:x:@.arguments/*/id
 
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:30
-
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
-
-mssql.connect:[finance|INV_DB]
-
-   mssql.read
-      table:Invoices
-         as:i
-         join:CustomerTypes
-            as:ct
-            type:left
-            on
-               and
-                  i.CustomerTypeId.eq:ct.Id
-      columns
-         ct.TypeName
-         count(*)
-            as:InvoiceCount
-         sum(i.Total)
-            as:TotalInvoiced
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         and
-            ct.TypeName.eq:x:@.arguments/*/filter
-      group
-         ct.TypeName
-   return-nodes:x:@mssql.read/*
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         result:x:@http.post/*/content/*
+else
+   throw:Failed to fetch order

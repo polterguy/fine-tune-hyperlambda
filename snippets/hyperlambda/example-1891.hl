@@ -1,42 +1,21 @@
 
-// Returns all cloudlets in the system using Hyperlambda workflow actions.
-.arguments
-   name:string
-   limit:int
-   offset:int
+// Lists all SQLite database in your default data folder.
+slots.create:magic.db.sqlite.databases
 
-/*
- * Ensures user is authorized to access endpoint.
- * 
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
-
-/*
- * Returns the username of the currently authenticated user,
- * or null if user isn't authenticated.
- */
-execute:magic.workflows.actions.execute
-   name:username-get
-   filename:/misc/workflows/actions/security/username-get.hl
-   arguments
-
-// Returns all cloudlets in the system.
-execute:magic.workflows.actions.execute
-   name:hub-cloudlets-get
-   filename:/modules/hub/workflows/actions/hub-cloudlets-get.hl
-   arguments
-      username:x:--/execute/=username-get/*/username
-      name:x:@.arguments/*/name
-      limit:x:@.arguments/*/limit
-      offset:x:@.arguments/*/offset
-
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+   // Listing files in data folder and returning to caller.
+   io.file.list:/data/
+   for-each:x:-/*
+      if
+         strings.ends-with:x:@.dp/#
+            .:.db
+         .lambda
+            strings.split:x:@.dp/#
+               .:/
+            strings.split:x:-/0/-
+               .:.
+            unwrap:x:+/*/*/*
+            add:x:../*/return-nodes
+               .
+                  .
+                     db:x:@strings.split/0
+   return-nodes

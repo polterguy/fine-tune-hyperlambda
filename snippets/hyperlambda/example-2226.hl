@@ -1,99 +1,162 @@
 
-// Returns unique and distinct values from your Customers table in your northwind database
+/*
+ * Lists quotations
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
 .arguments
 
-   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+   // Optional filtering argument allowing to filter items on No_, Description, etc.
+   filter:string
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
    limit:long
 
-   // Offset into the dataset of where to start retrieving records
+   // Optional offset into records of where to start returning items.
    offset:long
 
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
+   min_date:string
+
+   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
+   max_date:string
+
+   // Optional column to order records.
    order:string
 
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   // Optional sort direction, can be either 'ASC' or 'DESC'. Defaults to 'ASC' unless specified.
    direction:string
 
-   // Filtering args
-   Customers.CustomerID.like:string
-   Customers.CustomerID.eq:string
-   Customers.CompanyName.like:string
-   Customers.CompanyName.eq:string
-   Customers.ContactName.like:string
-   Customers.ContactName.eq:string
-   Customers.ContactTitle.like:string
-   Customers.ContactTitle.eq:string
-   Customers.Address.like:string
-   Customers.Address.eq:string
-   Customers.City.like:string
-   Customers.City.eq:string
-   Customers.Region.like:string
-   Customers.Region.eq:string
-   Customers.PostalCode.like:string
-   Customers.PostalCode.eq:string
-   Customers.Country.like:string
-   Customers.Country.eq:string
-   Customers.Phone.like:string
-   Customers.Phone.eq:string
-   Customers.Fax.like:string
-   Customers.Fax.eq:string
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
 
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
+// Applying default value to sorting.
+validators.default:x:@.arguments
+   order:Document Date
+   direction:DESC
 
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:Customers.CustomerID
-   .:Customers.CompanyName
-   .:Customers.ContactName
-   .:Customers.ContactTitle
-   .:Customers.Address
-   .:Customers.City
-   .:Customers.Region
-   .:Customers.PostalCode
-   .:Customers.Country
-   .:Customers.Phone
-   .:Customers.Fax
+// Getting limit value, defaulting to 300
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:300
 
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
+// Making sure limit is never more than 10
+if
+   or
+      eq:x:@.limit
+         .:long:-1
+      mt:x:@.limit
+         .:long:10
+   .lambda
+      set-value:x:@.limit
+         .:long:10
 
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
-      strings.concat
-         .:distinct(
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
 
-   // Adding [limit] and [offset] arguments
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Customers
-      columns
-         distinct_functor
-            as:.
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:"No_"
+            .:"Location Code"
+            .:"Sell-to Customer No_"
+            .:"Bill-to Customer No_"
+            .:"Bill-to Name"
+            .:"Bill-to Address"
+            .:"Bill-to Address 2"
+            .:"Bill-to City"
+            .:"Bill-to Contact"
+            .:"Sell-to E-Mail"
+            .:"Document Date"
+            .:"Payment Terms Code"
+            .:"Salesperson Code"
+            .:"Assigned User ID"
+            .:"Item Category Code"
+            .:"Item_No"
+            .:"Description"
+            .:"Unit of Measure"
+            .:"Quantity"
+            .:"Unit Price"
+            .:"Amount"
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Checking if we're filtering items on [min_date].
+   if
+      and
+         exists:x:@.arguments/*/min_date
+         not-null:x:@.arguments/*/min_date
+      .lambda
+         convert:x:@.arguments/*/min_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.mt:x:@convert
+
+   // Checking if we're filtering items on [max_date].
+   if
+      and
+         exists:x:@.arguments/*/max_date
+         not-null:x:@.arguments/*/max_date
+      .lambda
+         convert:x:@.arguments/*/max_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.lt:x:@convert
+
+   // Reading records.
+   mssql.read
+      table:addv_Cotizaciones
+      limit:x:@.limit
+      offset:x:@.offset
       where
+         or
          and
+      order:x:@.arguments/*/order
+      direction:x:@.arguments/*/direction
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Making sure we warn LLM in case there are more than max items returned.
+   if
+      eq
+         get-count:x:@mssql.read/*
+         get-value:x:@.arguments/*/limit
+      .lambda
+         add:x:../*/mssql.connect/*/yield
+            .
+               notice:"There might be more records but the system can only retrieve a maximum of 10 records at the time. Please inform the user that you can show him the next set of records if required."
+   
+   // Returning result of above invocation to caller.
+   yield
+      result:x:@mssql.read/*

@@ -1,44 +1,24 @@
 
-/*
- * Returns subsidiary companies from specified org number.
- * 
- * Returns all companies the specified org number company owns, either partially or completely.
- */
+// Generate an endpoint returning line_items from financial database. Add optional paging support and optional filtering on name
 .arguments
-   org_number:string
+   limit:long
+   offset:long
+   comments.name.eq:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/org_number
-set-value:x:@.arguments/*/org_number
-   strings.replace-not-of:x:@.arguments/*/org_number
-      .:0123456789
-      .:
+// Opening up our database connection.
+data.connect:financial
 
-// Connecting to database.
-data.connect:[finovo|finovo]
-   database-type:pgsql
-
-   // Retrieving items.
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/comments.name.eq
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
    data.read
-      database-type:pgsql
-      table:group_structure
-      columns
-         org_number
-         company_name
-         company_country_name
-         owned_percent
+      table:line_items
       where
          and
-            group_mother_orgnumber.eq:x:@.arguments/*/org_number
-            org_number.neq:x:@.arguments/*/org_number
-      limit:-1
 
-   // Verifying the company has subsidiaries.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         return
-            result:"This company doesn't have any subsidiaries"
-
-   // Returning result to caller.
-   return-nodes:x:@data.read/*
+   // Returning result of above read invocation to caller.
+   yield
+      result:x:@data.read/*

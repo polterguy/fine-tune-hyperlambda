@@ -1,48 +1,14 @@
-/*
- * Returns employees belonging to a specified department
- */
-.arguments
-   filter:string
-   limit:long
-   offset:long
+// Executes any Hyperlambda segments found in string, passing in arguments, and substitutes Hyperlambda segment with result of execution
+.mixin:@"The sum of your arguments is {{
+math.add
+   get-value:x:@.arguments/*/arg1
+   get-value:x:@.arguments/*/arg2
 
-auth.ticket.verify:hr-admin
+// Whatever we return here substitutes the mixin in the result
+return:x:-
+}}"
+strings.mixin:x:-
+   arg1:int:2
+   arg2:int:3
 
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:50
-
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
-
-mssql.connect:[hr|PEOPLE_DB]
-
-   mssql.read
-      table:Employees
-         as:e
-         join:Departments
-            as:d
-            type:left
-            on
-               and
-                  e.DepartmentId.eq:d.Id
-      columns
-         d.Name
-            as:Department
-         count(*)
-            as:EmployeeCount
-         avg(e.Salary)
-            as:AvgSalary
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         and
-            d.Name.eq:x:@.arguments/*/filter
-      group
-         d.Name
-   return-nodes:x:@mssql.read/*
+// Result ==> "The sum of your arguments is 5"

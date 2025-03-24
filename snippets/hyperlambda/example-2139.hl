@@ -1,86 +1,71 @@
 
-// Hyperlambda script to create an HTTP interceptor or gateway that invokes another endpoint, executing lambda objects before and after the invocation.
-.arguments:*
+// Returns items from your cloudlets table in your [generic|hub] database according to the specified arguments.
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   operator:string
+   cloudlets.id.eq:long
+   cloudlets.created.eq:date
+   cloudlets.name.like:string
+   cloudlets.name.eq:string
+   cloudlets.plan.like:string
+   cloudlets.plan.eq:string
+   cloudlets.cluster.like:string
+   cloudlets.cluster.eq:string
+   cloudlets.user.like:string
+   cloudlets.user.eq:string
 
-// Endpoint we're intercepting.
-.endpoint:"https://your-app.com/your-endpoint"
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-/*
- * Retrieving Authorization header to transmit to
- * intercepted endpoint.
- */
-request.headers.get:Authorization
-
-/*
- * Lambda object executed as an "intercepted lambda object"
- * before invocation to HTTP endpoint.
- */
-.before
-
-/*
- * This is where you would parametrise your above [.before] object
- * with for instance arguments given by the client, before the
- * invocation to [eval] below.
- */
-
-// Evaluating [.before] lambda object.
-eval:x:@.before
-
-// Forwarding arguments given to endpoint to intercepted endpoint.
-add:x:../*/http.post/*/payload
-   get-nodes:x:@.arguments/*
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
 
 /*
- * Checking if we've got an Authorization HTTP header,
- * at which point we forward it to the original HTTP endpoint.
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
  */
 if
-   not-null:x:@request.headers.get
+   exists:x:@.arguments/*/operator
    .lambda
-      add:x:../*/http.post/*/headers
-         .
-            Authorization:x:@request.headers.get
 
-// Invoking the intercepted HTTP endpoint.
-http.post:x:@.endpoint
-   headers
-      Content-Type:application/json
-   convert:true
-   payload
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/*
+         get-value:x:@.arguments/*/operator
 
-// Sanity checking invocation to endpoint.
-if
-   not
-      and
-         mte:x:@http.post
-            .:int:200
-         lt:x:@http.post
-            .:int:400
-   .lambda
-      log.error:Something went wrong as we invoked our intercepted HTTP endpoint
-         endpoint:x:@.endpoint
-         status:x:@http.post
-         result:x:@http.post/*/content
-      throw:Intercepted endpoint did not return success
-         public:true
-         status:502
+// Opening up our database connection.
+data.connect:[generic|hub]
 
-/*
- * Lambda object to execute after invocation to
- * intercepted endpoint.
- */
-.after
+   // Parametrising our read invocation.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/operator
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
 
-/*
- * This is where you would parametrise your above [.after] object
- * with for instance arguments given by the client, before the
- * invocation to [eval] below.
- */
+   // Reading data from database.
+   data.read
+      table:cloudlets
+      columns
+         cloudlets.id
+         cloudlets.created
+         cloudlets.name
+         cloudlets.plan
+         cloudlets.cluster
+         cloudlets.user
+      where
+         and
 
-// Evaluating [.before] lambda object.
-eval:x:@.after
-
-// Return result to caller.
-add:x:+
-   get-nodes:x:@http.post/*/content/*
-return
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

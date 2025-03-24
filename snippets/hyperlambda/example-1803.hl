@@ -1,17 +1,36 @@
 
-// Changes the value of all nodes having a name of [foo]
-.data
-   foo
-      bar
-   hello
-      howdy
-         foo
-      some-node
-         some-other-node
-            foo
+// Delete one record from your comments table in your cms database
+.arguments
 
-// ** expression yields ALL descendants
-set-value:x:@.data/**/foo
-   .:touched
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-// After execution, all above nodes having the name of 'foo' will have their values changed
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:comments
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.comments.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

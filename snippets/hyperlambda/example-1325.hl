@@ -1,51 +1,17 @@
 
-// Moves SQL scripts to the correct folder and creates the Chinook database file if it doesn't exist.
+// Create a Hyperlambda script to compile a snippet of C# code into a library, load it as a plugin, and invoke a slot.
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.signals.contracts
+   code:"\n\n// Example C# code creating a Hyperlambda slot.\nusing System;\nusing magic.node;\nusing magic.signals.contracts;\n\n// Our slot class.\n[Slot(Name = \"bar\")]\npublic class Bar : ISlot\n{\n   public void Signal(ISignaler signaler, Node input)\n   {\n      input.Value = \"Hello from C#\";\n   }\n}"
+   assembly-name:bar.dll
 
-// Listing all files in startup folder
-io.file.list:/modules/sqlite-chinook/magic.startup/
+// Loading assembly now that we've created it.
+system.plugin.execute:x:@system.compile
 
-// Looping through the result of above invocation
-for-each:x:-/*
-   strings.split:x:@.dp/#
-      .:/
-
-   // Making sure this is .sql file
-   if
-      strings.ends-with:x:@.dp/#
-         .:.sql
-      .lambda
-         strings.concat
-            .:/etc/sqlite/templates/
-            get-value:x:@strings.split/0/-
-         if
-            not
-               io.file.exists:x:@strings.concat
-            .lambda
-
-               // File doesn't exists, hence moving it.
-               io.file.move:x:@.dp/#
-                  .:/etc/sqlite/templates/
-               log.info:SQL script moved into etc folder
-                  filename:x:@.dp/#
-
-// Creates the chinook database file.
-if
-   not
-      io.file.exists:/data/chinook.db
-   .lambda
-
-      // Creating a default database file to store database in.
-      io.file.save:/data/chinook.db
-         .:
-      log.info:Chinook database file created
-         filename:/data/chinook.db
-
-      // Loads and executes the chinook.sql script.
-      io.file.load:/etc/sqlite/templates/chinook.sql
-      sqlite.connect:chinook
-         sqlite.execute:x:@io.file.load
-      log.info:The chinook database was successfully created
-         filename:/etc/sqlite/templates/chinook.sql
-
-      // Evicting cache item related to SQLite.
-      cache.set:magic.sql.databases.sqlite.generic
+   // Invoking dynamically created C# slot.
+   bar

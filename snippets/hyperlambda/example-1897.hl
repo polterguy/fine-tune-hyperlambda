@@ -1,54 +1,44 @@
 
-// Count unique and distinct items from your Categories table in your northwind database
+// Create one record in your plugins table in your cms database
 .arguments
 
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+   // name column value
+   name:string
 
-   // Apply optional filtering if you wish
-   Categories.CategoryID.eq:long
-   Categories.CategoryName.like:string
-   Categories.CategoryName.eq:string
-   Categories.Description.like:string
-   Categories.Description.eq:string
-   Categories.Picture.like:string
-   Categories.Picture.eq:string
+   // description column value
+   description:string
 
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
+   // is_active column value
+   is_active:long
 
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:Categories.CategoryID
-   .:Categories.CategoryName
-   .:Categories.Description
-   .:Categories.Picture
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
 
-// Opening up our database connection.
-data.connect:[generic|northwind]
+// Opening up database connection.
+data.connect:[generic|cms]
    database-type:sqlite
 
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
-      strings.concat
-         .:"count(distinct "
-         get-value:x:@.arguments/*/distinct_column
-         .:)
-
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
-   add:x:+/*/where/*
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
       get-nodes:x:@.arguments/*
 
-   // Reading data from database.
-   data.read
+   // Creating our record.
+   data.create
       database-type:sqlite
-      table:Categories
-      columns
-         distinct_functor
-            as:count
-      where
-         and
+      table:plugins
+      return-id:bool:true
+      values
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.plugins.post
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

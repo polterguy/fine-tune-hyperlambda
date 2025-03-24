@@ -1,15 +1,31 @@
 
-// A Hyperlambda endpoint to count the number of tasks in the system given an optional filter.
-.arguments
-   filter:string
+// Returns all types of cloudlets the system supports.
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Opening up our database connection.
+data.connect:[generic|hub]
 
-// Retrieves all scheduled tasks in the system.
-tasks.count:x:@.arguments/*/filter
+   // Reading data from database.
+   data.read
+      table:plans
 
-// Returning the results of the evaluation to caller.
-unwrap:x:+/*
-return-nodes
-   count:x:@tasks.count
+      // Making sure we ONLY return the following columns.
+      columns
+         name
+         description
+         cpu
+         memory
+         storage
+         max_timeout
+         max_upload
+         price
+         price_reference
+         yearly_price
+         yearly_price_reference
+         frontend
+         bandwidth
+      where
+         and
+            enabled.eq:bool:true
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

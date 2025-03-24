@@ -1,14 +1,30 @@
-// Checks if a values are similar and updates rank accordingly
-.team
-   captain:Maria
-   score:int:88
-.rank
-if
-   and
-      eq:x:@.team/*/captain
-         .:Maria
-      mt:x:@.team/*/score
-         .:int:50
-   .lambda
-      set-value:x:@.rank
-         .:A
+
+// CRUD Hyperlambda file that deletes one record from your comments table in your cms database
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:comments
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

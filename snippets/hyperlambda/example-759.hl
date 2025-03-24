@@ -1,18 +1,48 @@
-// This code loads a C# source file and replaces outdated method names with modern equivalents.
-// Specifically, it changes "BeginTransaction" to "StartTransaction" and "CommitChanges" to "SaveAll".
-.data
-   .
-      what:BeginTransaction
-      with:StartTransaction
-   .
-      what:CommitChanges
-      with:SaveAll
-.filename:/src/Data/Repository.cs
-.result
-set-value:x:-
-   io.file.load:x:@.filename
-for-each:x:@.data/*
-   set-value:x:@.result
-      strings.replace:x:@.result
-         get-value:x:@.dp/#/*/what
-         get-value:x:@.dp/#/*/with
+
+// Create a Hyperlambda action to hash a specified input using an optional algorithm (default is SHA 256). Validate the algorithm and return the hash result.
+.arguments
+
+   // Notice, this is action syntax
+   input
+      type:string
+      mandatory:bool:true
+   algorithm
+      type:enum
+      mandatory:bool:false
+      values
+         .:sha1
+         .:md5
+         .:sha256
+         .:sha384
+         .:sha512
+.icon:settings
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/algorithm
+   .:sha1
+   .:md5
+   .:sha256
+   .:sha384
+   .:sha512
+
+// Checking if caller wants to override the default hashing algorithm.
+if
+   and
+      exists:x:@.arguments/*/algorithm
+      not-null:x:@.arguments/*/algorithm
+      neq:x:@.arguments/*/algorithm
+         .:
+   .lambda
+
+      // Overriding hashing algorithm by changing name of slot we invoke below.
+      set-name:x:../*/crypto.hash
+         strings.concat
+            .:crypto.hash.
+            get-value:x:@.arguments/*/algorithm
+
+// Hashing string.
+crypto.hash:x:@.arguments/*/input
+
+// Returning result to caller.
+yield
+   result:x:./-

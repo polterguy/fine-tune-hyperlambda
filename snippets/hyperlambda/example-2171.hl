@@ -1,40 +1,62 @@
 
-// Hyperlambda script for an OpenAI AI search endpoint returning only references to matching training snippets.
-.arguments
-   prompt:string
-   type:string
-   recaptcha_response:string
-   max:int
+// Hyperlambda script that creates a user and inserts it into the magic database with specified username, password, and roles, ensuring password is securely hashed.
+slots.create:magic.auth.create-user
 
-// Invoking slot containing commonalities for all endpoints.
-insert-before:x:../*/signal/*/.callback
-   get-nodes:x:@.arguments/*
-signal:magic.ai.endpoint-common
-   .callback
+   // Hashing password if we should.
+   .password
+   if
+      get-value:x:@.arguments/*/is_hashed
+      .lambda
 
-      // Invoking slot responsible for returning URLs to us.
-      add:x:+
-         get-nodes:x:@.arguments/*
-      signal:magic.ai.search
+         // Password is already hashed.
+         set-value:x:@.password
+            get-value:x:@.arguments/*/password
+   else
 
-      // Returning results of above invocation to caller.
-      add:x:./*/return-nodes/*/snippets
-         get-nodes:x:@signal/*/snippets/*
-      add:x:./*/return-nodes
-         get-nodes:x:@signal/*/db_time
-      return-nodes
-         snippets
+      // Password is not hashed, hashing it.
+      set-value:x:@.password
+         crypto.password.hash:x:@.arguments/*/password
 
-/*
- * Applying some HTTP caching to avoid invoking OpenAI again with
- * the same question before some minimum amount of time has passed.
- * 
- * Notice, we can apply more "aggressive" caching here than in our
- * chat endpoints, since the same query will mostly always return
- * the same result, since there is no room for "creativity" here.
- */
-response.headers.set
-   Cache-Control:max-age=300
+   // Opening up a database connection to magic.
+   data.connect:magic
 
-// Returning result of worker slot to caller.
-return-nodes:x:@signal/*
+      // Inserting user.
+      data.create
+         table:users
+         values
+            username:x:@.arguments/*/username
+            password:x:@.password
+
+      // Inserting all roles.
+      for-each:x:@.arguments/*/roles/*
+
+         // Then inserting into users_roles an association between user and role.
+         data.create
+            table:users_roles
+            values
+               role:x:@.dp/#
+               user:x:@.arguments/*/username
+
+      // Inserting optionally supplied extra information.
+      if
+         exists:x:@.arguments/*/extra/*
+         .lambda
+
+            // Looping through each extra child specified.
+            for-each:x:@.arguments/*/extra/*
+
+               // Temporary variables.
+               .type
+               .value
+               set-value:x:@.type
+                  get-name:x:@.dp/#
+               set-value:x:@.value
+                  get-value:x:@.dp/#
+
+               // Then inserting into users_extra an association between user and extra value.
+               data.create
+                  table:users_extra
+                  values
+                     user:x:@.arguments/*/username
+                     type:x:@.type
+                     value:x:@.value

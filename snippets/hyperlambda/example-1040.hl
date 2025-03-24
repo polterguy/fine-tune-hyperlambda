@@ -1,14 +1,25 @@
+// Hyperlambda file that takes a lambda objects as an argument, and exceutes the lambda object from within the file, once for each role that exists in the system.
+.arguments
+   .execute:*
+
+// Retrieving roles from magic database
+data.connect:magic
+   data.read
+      table:roles
+
+   // Iterating through each role, executing [.execute] lambda object once for each role.
+   for-each:x:@data.read/*
+      unwrap:x:+/*
+      invoke:x:@.arguments/*/.execute
+         role:x:@.dp/#/*/name
+
 /*
- * Loads the file and counts the number of lines by splitting on `\n`.
- */
+To execute the file, you can use something such as follows:
 
-io.file.load:/README.md
-strings.split:x:@io.file.load
+io.file.execute:/modules/slett/foo.get.hl
+   .execute
 
-   // We must ALWAYS use double quotes if we're adding special characters, or escaped characters, such as for instance \n
-   .:"\n"
+      // You will be getting the role in as an argument from the above Hyperlambda file here.
+      log.info:x:@.arguments/*/role
 
-// This node will have its value becoming the number of lines from the file
-.number-of-lines-in-file
-set-value:x:-
-   get-count:x:@strings.split/*
+*/

@@ -1,75 +1,41 @@
 
-// HTTP endpoint that evaluates the given SQL for a specified database and return the result to the caller.
+// CRUD / Create Hyperlambda that creates one record in your comments table in your cms database
 .arguments
-   databaseType:string
-   database:string
-   sql:string
-   safeMode:bool
-   batch:bool
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // post_id column value
+   post_id:long
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:pgsql
-   .:mssql
-   .:sqlite
+   // user_id column value
+   user_id:long
 
-// Creating our database connection.
-data.connect:x:@.arguments/*/database
-   database-type:x:@.arguments/*/databaseType
+   // content column value
+   content:string
 
-   /*
-    * Checking if we're supposed to execute SQL in safe mode, only
-    * returning the first 200 records.
-    */
-   if
-      and
-         get-value:x:@.arguments/*/safeMode
-         not
-            get-value:x:@.arguments/*/batch
-      .lambda
-         add:x:@data.connect/**/data.select
-            .
-               max:200
+   // created_at column value
+   created_at:date
 
-   /*
-    * Checking if we're supposed to execute SQL as an MS SQL 'batch' operation,
-    * which implies respecting 'go' keywords, splitting SQL by each 'go' keyword.
-    */
-   if
-      and
-         eq
-            get-value:x:@.arguments/*/databaseType
-            .:mssql
-         get-value:x:@.arguments/*/batch
-      .lambda
-         set-name:x:@data.connect/**/data.select
-            .:mssql.execute-batch
-   else
-      add:x:@data.connect/**/data.select
-         .
-            database-type:x:@.arguments/*/databaseType
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
 
-   /*
-    * Executing SQL and returning results to caller, making sure we're
-    * able to return exceptions to caller.
-    */
-   try
-      data.select:x:@.arguments/*/sql
-         multiple-result-sets:true
+// Opening up database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
 
-      // Returning result of invocation to caller.
-      if
-         exists:x:@data.select/*/*
-         .lambda
-            return-nodes:x:@data.select/*
-   .catch
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-      // Notice, throwing exceptions as public now.
-      throw:x:@.arguments/*/message
-         public:bool:true
-         status:int:401
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:comments
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

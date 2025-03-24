@@ -1,12 +1,27 @@
-// Copies config default values into the matching runtime placeholders
-.config
-   settings
-      retry:int:3
-      timeout:int:30
-.runtime
-   retry
-   timeout
-for-each:x:@.config/*/settings/*
+// Creating new nodes based on conditions in [for-each]
+.car-parts
+   engine:available
+   wheel:out-of-stock
+   door:available
+
+.results
+
+for-each:x:@.car-parts/*
    get-name:x:@.dp/#
-   set-value:x:@.runtime/*/{@get-name}
-      get-value:x:@.dp/#
+   if
+      eq:x:@.dp/#
+         .:available
+      .lambda
+         unwrap:x:+/*/*/*/name
+         add:x:@.results
+            .
+               .
+                  name:x:@get-name
+                  status:checked
+   else
+      unwrap:x:+/*/*/*/name
+      add:x:@.results
+         .
+            .
+               name:x:@get-name
+               status:needs restocking

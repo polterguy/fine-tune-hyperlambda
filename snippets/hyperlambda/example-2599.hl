@@ -1,46 +1,21 @@
+// An HTTP PUT endpoint to update an existing contact's name and email address.
 
-// Updates an existing item in your types table in your [generic|onboarding] database according to the specified arguments.
+/*
+ * Save as for instance: /modules/contacts/update.put.hl
+ */
+
 .arguments
+   id:int
    name:string
-   description:string
-   max_upload:int
-   max_timeout:int
-   enabled:bool
-   price_reference:string
-   bandwidth:string
+   email:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/name
-
-// Opening up our database connection.
-data.connect:[generic|hub]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-
-   // Invoking our update slot.
+data.connect:[generic|crm]
    data.update
-      table:plans
+      table:contacts
       values
+         name:x:@.arguments/*/name
+         email:x:@.arguments/*/email
       where
          and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning success to caller.
-   response.status.set:202
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+            id:x:@.arguments/*/id
+   return-nodes:x:@data.update/*

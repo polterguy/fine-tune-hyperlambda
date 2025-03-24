@@ -1,10 +1,58 @@
-// How can I check if the current user is in the 'admin' role?
-.result
-if
-   auth.ticket.in-role:admin
-   .lambda
-      set-value:x:@.result
-         .:Welcome, admin!
-else
-   set-value:x:@.result
-      .:Access denied
+
+// Returns a payment link.
+.arguments
+   plan:string
+
+/*
+ * Ensures the specified [arg] was given.
+ *
+ * This action will throw an exception with a descriptive text explaining if the argument is missing.
+ */
+execute:magic.workflows.actions.execute
+   name:validators-enum
+   filename:/misc/workflows/actions/security/validators-enum.hl
+   arguments
+      values
+         .:professional
+         .:enterprise
+      value:x:@.arguments/*/plan
+
+/*
+ * Ensures user is authorized to access endpoint.
+ *
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
+
+// Returns a single plan
+execute:magic.workflows.actions.execute
+   name:hub-plan-get
+   filename:/modules/hub/workflows/actions/hub-plan-get.hl
+   arguments
+      plan:x:@.arguments/*/plan
+
+/*
+ * Creates a Stripe payment link from the specified [price_reference], being
+ * a Stripe payment ID, for [quantity] amount of items, returning the user to
+ * [success_url] after payment has been successfully finished.
+ *
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-payment-link-create
+   filename:/modules/stripe/workflows/actions/stripe-payment-link-create.hl
+   arguments
+      price_reference:x:--/execute/=hub-plan-get/*/price_reference
+      quantity:int:1
+      success_url:"https://ainiro.io"
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

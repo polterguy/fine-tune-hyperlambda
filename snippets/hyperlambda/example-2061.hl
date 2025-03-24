@@ -1,45 +1,72 @@
 
-// Create a dynamic slot that ensures the specified role exists, creating it if not, ensuring the user is authorized.
-slots.create:magic.auth.ensure-role
+// Search for products on Ebay using SERP API with a mandatory query parameter.
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/role
-   validators.mandatory:x:@.arguments/*/description
+   // Mandatory query to search for.
+   query:string
 
-   /*
-    * Ensures the [role] role exists.
-    * 
-    * Notice, in case system hasn't been setup yet, we'll need to silently
-    * catch all exceptions.
-    */
-   try
+   // Optional parameter filtering result by country. If specified must be a two letter country code such as US or NO.
+   gl:string
 
-      // Connecting to Magic database.
-      data.connect:[generic|magic]
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
 
-         // Checking to see if [role] role exists.
-         data.read
-            table:roles
-            where
-               and
-                  name.eq:x:@.arguments/*/role
+// Retrieving SERP API's API key and making sure we've got one.
+.api-key
+set-value:x:@.api-key
+   config.get:"magic:serp-api:api_key"
+if
+   or
+      null:x:@.api-key
+      eq:x:@.api-key
+         .:
+   .lambda
 
-         // Checking result of above invocation.
-         if
-            not
-               exists:x:@data.read/*/*
-            .lambda
+      // Oops ...!!
+      throw:Could not find a SERP API key to use for fetching hotels.
 
-               // We need to insert [role] role into Magic database.
-               data.create
-                  table:roles
-                  values
-                     name:x:@.arguments/*/role
-                     description:x:@.arguments/*/description
-   .catch
+// Creating our URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://serpapi.com/search.json?engine=ebay&api_key="
+      get-value:x:@.api-key
+      .:&_nkw=
+      strings.url-encode:x:@.arguments/*/query
 
-      /*
-       * Silently catching here, to avoid application crash
-       * if system hasn't been setup yet.
-       */
-      .silent
+// Retrieving result.
+http.get:x:@.url
+   convert:true
+
+// Sanity checking result of above invocation.
+if
+   not
+      and
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+   .lambda
+
+      // Oops ...!!
+      lambda2hyper:x:../*
+      log.info:x:-
+      throw:Something went wrong while invoking SERP API
+
+// Iterating through result, making sure we return the result to caller.
+for-each:x:@http.get/*/content/*/organic_results/*/[0,5]
+   unwrap:x:+/*/*/*
+   add:x:../*/return-nodes/*/result
+      .
+         .
+            title:x:@.dp/#/*/title
+            link:x:@.dp/#/*/link
+            condition:x:@.dp/#/*/condition
+            price:x:@.dp/#/*/price/*/raw
+            thumbnail:x:@.dp/#/*/thumbnail
+
+// Returning result to caller.
+unwrap:x:+/*
+return-nodes
+   result
+   total_matches:x:@http.get/*/content/*/search_information/*/total_results

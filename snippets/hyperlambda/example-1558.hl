@@ -1,19 +1,32 @@
 
-// Provide a Hyperlambda example where numbers are summed while the sum remains below 100.
+// Hyperlambda script to schedule a task with a specified ID for execution according to specified parameters.
+.arguments
+   id:string
+   due:date
+   repeats:string
 
-// Summing numbers while sum remains below 100
-.no:int:0
-.sum:int:0
-while
-   lt
-      get-value:x:@.sum
-      .:int:100
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+/*
+ * Adds either a [repeats] or [due] argument to invocation below,
+ * depending upon what argument was supplied by caller.
+ */
+if
+   not
+      eq
+         get-value:x:@.arguments/*/repeats
+         .
    .lambda
+      add:x:../*/tasks.schedule
+         get-nodes:x:@.arguments/*/repeats
+else
+   add:x:../*/tasks.schedule
+      get-nodes:x:@.arguments/*/due
 
-      // Adding to sum.
-      set-value:x:@.sum
-         math.add:x:@.sum
-            get-value:x:@.no
+// Performs actual scheduling of task.
+tasks.schedule:x:@.arguments/*/id
 
-      // Incrementing counter.
-      math.increment:x:@.no
+// Returns success to caller.
+return-nodes
+   result:success

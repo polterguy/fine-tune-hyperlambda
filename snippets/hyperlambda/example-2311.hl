@@ -1,14 +1,78 @@
 
-// Hyperlambda endpoint taking arguments. The SQL query retrieves distinct customer details who have purchased tracks from the "Rock" genre.
-.arguments
+// Special implementation for SQLite.
+auth.ticket.get
 
-// Connecting to database.
-data.connect:chinook
-   database-type:sqlite
+// Used to store commision percent for affiliate.
+.percent
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name = \"Rock\"\n  order by c.Email\n"
-      database-type:sqlite
+// Ensuring user is an affiliate
+data.connect:[generic|magic]
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+   /*
+    * Retrieving affiliate percent for user.
+    * Notice, if user doesn't have an affiliate percent, user ir
+    * not an affiliate.
+    */
+   data.read
+      table:users_extra
+      columns
+         value
+      where
+         and
+            type.eq:affiliate_percent
+            user.eq:x:@auth.ticket.get
+   if
+      not-exists:x:@data.read/*/*/value
+      .lambda
+
+         // Oops ...!!
+         log.error:User is not affiliate
+            username:x:@auth.ticket.get
+         throw:You are not an affiliate
+            public:true
+            status:400
+
+   // Retrieving transactions from database.
+   data.select:"\nselect strftime('%Y-%m-%d', datetime(u.created)) as date, count(*) as users\n   from users u\n      inner join users_extra ue on u.username = ue.user and ue.type = 'affiliate'\n      where date(u.created, '+42 day') > CURRENT_TIMESTAMP and ue.value = @affiliate\n   group by date\n   order by date asc"
+      @affiliate:x:@auth.ticket.get
+
+   // Looping through all days the last 6 weeks.
+   .buffer
+   .cur
+   set-value:x:@.cur
+      math.subtract
+         date.now
+         time
+            days:42
+   while
+      lt:x:@.cur
+         date.now
+      .lambda
+         date.format:x:@.cur
+            format:yyyy-MM-dd
+         if
+            exists:x:@data.select/*/*/date/={@date.format}
+            .lambda
+               get-nodes:x:@data.select/*/*/date/={@date.format}/.
+               add:x:@.buffer
+                  get-nodes:x:@data.select/*/*/date/={@date.format}/.
+         else
+            unwrap:x:+/*/*/*
+            add:x:@.buffer
+               .
+                  .
+                     date:x:@date.format
+                     users:int:0
+
+         // Decrementing current day.
+         set-value:x:@.cur
+            math.add:x:@.cur
+               time
+                  days:1
+
+   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
+   response.headers.set
+      Cache-Control:private, max-age=3600
+
+   // Returning result to caller.
+   return-nodes:x:@.buffer/*

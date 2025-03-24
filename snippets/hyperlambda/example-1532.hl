@@ -1,93 +1,170 @@
 
-// Create a Hyperlambda script that returns the Hyperlambda required to execute an action or snippet, ensuring the user is authorized.
-.arguments
-   filename:string
-   args:*
+// Write a Hyperlambda script to dynamically execute a Hyperlambda file with a specified format, extracting the file name and JSON payload.
+slots.create:magic.ai.functions.invoke
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/invocation
 
-// Loading action/snippet Hyperlambda file and transforming to lambda object.
-load-file:x:@.arguments/*/filename
+   // Trimming [invocation] since it might start and end with special characters.
+   set-value:x:@.arguments/*/invocation
+      strings.trim:x:@.arguments/*/invocation
 
-// Checking if this is a action template.
-if
-   strings.contains:x:@.arguments/*/filename
-      .:/workflows/actions/
-   .lambda
+   // Making sure [invocation] starts with FUNCTION_INVOCATION
+   if
+      not
+         strings.starts-with:x:@.arguments/*/invocation
+            .:FUNCTION_INVOCATION
+      .lambda
 
-      /*
-       * This is an action template type of snippet.
-       * Parametrizing accordingly.
-       */
-      .action
-      add:x:@.action
-         hyper2lambda:x:@load-file
-            comments:true
+         // Oops ...!
+         throw:Malformatted function invocation
+            status:int:400
+            public:bool:true
 
-      // Creating our action invocation.
-      .invocation
-         execute:magic.workflows.actions.execute
-            name
-            filename
-            arguments
-      set-value:x:@.invocation/*/execute/*/name
-         get-value:x:@.arguments/*/args/*/action_name
-      remove-nodes:x:@.arguments/*/args/*/action_name
-      set-value:x:@.invocation/*/execute/*/filename
-         get-value:x:@.arguments/*/filename
+   // Extracting file name.
+   .file
+   strings.split:x:@.arguments/*/invocation
+      .:[
+   strings.split:x:@strings.split/1
+      .:]
+   set-value:x:@.file
+      get-value:x:@strings.split/0
 
-      // Creating our action comment.
+   // Ensuring function file exists in type to avoid "function invocation injection attacks".
+   data.connect:[generic|magic]
+      strings.concat
+         :%FUNCTION_INVOCATION[
+         get-value:x:@.file
+         .:]%
+      strings.concat
+         :"FUNCTION_INVOCATION ==> "
+         get-value:x:@.file
+      data.scalar:select count(*) from ml_training_snippets where type = @type and (meta = @meta or completion like @completion)
+         @type:x:@.arguments/*/type
+         @meta:x:@strings.concat
+         @completion:x:@strings.concat/@strings.concat
+
+      // If we couldn't find a training snippet with function invocation declaration, we look in system message.
       if
-         eq
-            get-name:x:@.action/0
-            .:..
+         eq:x:@data.scalar
+            .:long:0
          .lambda
-            unwrap:x:+/*/*
-            insert-before:x:@.invocation/0
-               .
-                  ..:x:@.action/0
 
-      // Making sure we correctly convert arguments according to type declaration.
-      for-each:x:@.arguments/*/args/**
+            // Now checking if function invocation exists on system message.
+            data.scalar:select count(*) from ml_types where type = @type and system_message like @func
+               @type:x:@.arguments/*/type
+               @func:x:@strings.concat/@strings.concat
+            if
+               eq:x:@data.scalar
+                  .:long:0
+               .lambda
+
+                  // Oops ...!!
+                  throw:"That function doesn't exist on type"
+                     public:bool:true
+                     status:int:400
+
+   // Checking if we have a JSON payload.
+   .json
+   if
+      strings.contains:x:@.arguments/*/invocation
+         .:":"
+      .lambda
+
+         // Extracting JSON payload.
+         strings.split:x:@.arguments/*/invocation
+            .:":"
+         remove-nodes:x:@strings.split/0
+         set-value:x:@.json
+            strings.join:x:@strings.split/*
+               .:":"
+
+         // Parametrising invocation.
          if
-            strings.starts-with:x:@.dp/#
-               .:":x:"
+            neq:x:@.json
+               .:
             .lambda
-               strings.substring:x:@.dp/#
-                  .:int:3
-               set-x:x:@.dp/#
-                  convert:x:@strings.substring
-                     type:x
-         else
-            get-name:x:@.dp/#
-            switch:x:@.action/*/.arguments/*/{@get-name}/*/type
-               case:long
-               case:decimal
-               case:int
-               case:float
-               case:double
-                  set-value:x:@.dp/#
-                     convert:x:@.dp/#
-                        type:x:@.action/*/.arguments/*/{@get-name}/*/type
-               case:hyperlambda
-                  add:x:@.dp/#
-                     hyper2lambda:x:@.dp/#
-                        comments:true
-                  set-value:x:@.dp/#
 
-      // Decorating action arguments according to [.arguments]/[args].
-      add:x:@.invocation/*/execute/*/arguments
-         get-nodes:x:@.arguments/*/args/*
+               // We actually have some JSON.
+               json2lambda:x:@.json
 
-      // Returning result to caller as Hyperlambda.
-      lambda2hyper:x:@.invocation/*
-         comments:true
-      yield
-         result:x:@lambda2hyper
-else
+               /*
+                * Removing [session] and [user-id] from JSON arguments, to avoid applying these twice,
+                * in case user didn't correctly prompt engineer the AI function.
+                */
+               remove-nodes:x:@json2lambda/*/_session
+               remove-nodes:x:@json2lambda/*/_user-id
+               remove-nodes:x:@json2lambda/*/_type
 
-   // This is a template snippet, returning as is.
-   unwrap:x:+/*
-   return
-      result:x:@load-file
+               // Adding arguments to [execute-file].
+               add:x:../*/execute-file
+                  get-nodes:x:@json2lambda/*
+
+   /*
+    * Loading file and transforming to lambda to see if the file requires a [_session], [_user-id] or [_type] arguments,
+    * at which point we add the current [_session] value, the current [_user-id] value and the current [_type] value to its invocation.
+    */
+   load-file:x:@.file
+   hyper2lambda:x:@load-file
+   if
+      exists:x:@hyper2lambda/*/.arguments/*/_session/=string
+      .lambda
+
+         /*
+          * File requires a [_session] and it is of type string, making sure we pass
+          * in [_session] argument given to invocation.
+          */
+         unwrap:x:+/*/*
+         add:x:../*/execute-file
+            .
+               _session:x:@.arguments/*/session
+   if
+      exists:x:@hyper2lambda/*/.arguments/*/_user-id/=string
+      .lambda
+
+         /*
+          * File requires a [_user-id] and it is of type string, making sure we pass
+          * in [_user-id] argument given to invocation.
+          */
+         unwrap:x:+/*/*
+         add:x:../*/execute-file
+            .
+               _user-id:x:@.arguments/*/user-id
+   if
+      exists:x:@hyper2lambda/*/.arguments/*/_type/=string
+      .lambda
+
+         /*
+          * File requires a [_type] and it is of type string, making sure we pass
+          * in [_type] argument given to invocation.
+          */
+         unwrap:x:+/*/*
+         add:x:../*/execute-file
+            .
+               _type:x:@.arguments/*/type
+
+   // Executing file.
+   execute-file:x:@.file
+
+   // Doing some basic logging.
+   log.info:Function invocation succeeded
+      type:x:@.arguments/*/type
+      function-file:x:@.file
+
+   // Figuring out name of function such that we can return it to the caller.
+   strings.split:x:@.file
+      .:/
+   strings.split:x:@strings.split/0/-
+      .:.
+   remove-nodes:x:@strings.split/0/-
+   strings.join:x:@strings.split/*
+      .:.
+
+   // Returning result of invocation to caller.
+   add:x:./*/yield/*/result
+      get-nodes:x:@execute-file/*
+   yield
+      json:x:@.json
+      workflow:x:@strings.join
+      result

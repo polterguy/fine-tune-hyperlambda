@@ -1,32 +1,42 @@
 
-// Hyperlambda script for a CRUD create endpoint that inserts one record into the ml_requests table in the magic database, taking type, prompt, completion, and finish_reason, ensuring authentication and authorization for root roles.
+// Searches through your training snippets using RAG / VSS search for the specified query
 .arguments
-   type:string
-   prompt:string
-   completion:string
-   finish_reason:string
-   cached:int
+   _type:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Mandatory argument and the actual query to use when finding data from your RAG database.
+   query:string
 
-// Opening up database connection.
-data.connect:[generic|magic]
+   // Optional argument and the number of tokens to return. The default value of not spcified is 4000.
+   max_tokens:int
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
+   // Optional argument being similarity distance between query and RAG records matched during search. Will default to 0.3 if not specified.
+   threshold:decimal
 
-   // Creating our record.
-   data.create
-      table:ml_requests
-      return-id:bool:true
-      values
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/_type
+validators.mandatory:x:@.arguments/*/query
 
-   // Returning the correct status code.
-   response.status.set:201
+// Applying defaults.
+validators.default:x:@.arguments
+   max_tokens:int:4000
+   threshold:decimal:0.3
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+/*
+ * Returns context for the specified [query] from the specified [_type],
+ * and returns to caller.
+ * 
+ * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
+ * tokens to return. [_type] is a machine learning type from your ml_types database table in
+ * your magic database.
+ */
+execute:magic.workflows.actions.execute
+   name:openai-context-from-database
+   filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+   arguments
+      type:x:@.arguments/*/_type
+      query:x:@.arguments/*/query
+      max_tokens:x:@.arguments/*/max_tokens
+      threshold:x:@.arguments/*/threshold
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

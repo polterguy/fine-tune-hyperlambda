@@ -1,30 +1,14 @@
+/*
+ * Invalid: Uses `*` without a proper node context on the left-hand side.
+ * `*` expects an enumerable set of nodes to iterate over.
+ */
 
-// Creates an item in your cloudlets table in your [generic|hub] database according to the specified arguments.
-.arguments
-   created:date
-   name:string
-   plan:string
-   cluster:string
-   user:string
+set-value:x:*
+   .:oops
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Opening up database connection.
-data.connect:[generic|hub]
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      table:cloudlets
-      return-id:bool:true
-      values
-
-   // Returning result of above invoction to caller.
-   response.status.set:201
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+/*
+ * The above will not throw an exception, but also not update any nodes.
+ * This is because the `*` iterator is used directly on the identity node,
+ * resulting in that it returns all children of [set-value] which would
+ * be considered a logical error.
+ */

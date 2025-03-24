@@ -1,43 +1,32 @@
 
-// Updates an existing item in your clusters table in your [generic|hub] database according to the specified arguments.
+// CRUD / Create Hyperlambda that creates one record in your menus table in your cms database
 .arguments
-   id:string
-   country:string
-   name:string
-   enabled:bool
 
-// Only root users can execute endpoint
-auth.ticket.verify:root
+   // name column value
+   name:string
 
 // Verifying user is authorized to access endpoint.
-validators.mandatory:x:@.arguments/*/id
+auth.ticket.verify:root,admin
 
-// Opening up our database connection.
-data.connect:[generic|hub]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
+// Opening up database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
 
-   // Invoking our update slot.
-   data.update
-      table:clusters
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:menus
+      return-id:bool:true
       values
-      where
-         and
 
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
+   // Returning the correct status code.
+   response.status.set:201
 
-   // Returning success to caller.
-   response.status.set:202
+   // Returning result of above invocation to caller.
    unwrap:x:+/*
    return
-      affected:x:@data.update
+      id:x:@data.create

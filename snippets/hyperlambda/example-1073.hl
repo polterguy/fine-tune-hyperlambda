@@ -1,62 +1,75 @@
 
-// Returns the schema specification for the specified type from NetSuite
+// Count unique and distinct items from your comments table in your cms database
 .arguments
 
-   // Type of object the caller wants the schema spec for.
-   type:string
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
+   // Optional arguments for filtering
+   comments.id.eq:long
+   comments.post_id.eq:long
+   comments.user_id.eq:long
+   comments.content.like:string
+   comments.content.eq:string
+   comments.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
+   user_id.username.eq:string
+   user_id.username.like:string
 
-/*
- * Returns an access token for NetSuite.
- * 
- * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
- * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
- * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
- */
-execute:magic.workflows.actions.execute
-   name:netsuite-get-access-token
-   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
-   arguments
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
 
-// Creating our idempotency key to prevent replay attacks.
-guid.new
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:comments.id
+   .:comments.post_id
+   .:comments.user_id
+   .:comments.content
+   .:comments.created_at
+   .:post_id.title
+   .:user_id.username
 
-// Creating invocation URL.
-.url
-set-value:x:@.url
-   strings.concat
-      .:"https://"
-      config.get:"magic:netsuite:account-id"
-      .:.suitetalk.api.netsuite.com/services/rest/record/v1/metadata-catalog
-      .:/
-      get-value:x:@.arguments/*/type
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
 
-// Invoking our HTTP GET endpoint, now correctly parametrised.
-http.get:x:@.url
-   token:x:--/execute/=netsuite-get-access-token/*/access-token
-   headers
-      Accept:application/schema+json
-      X-NetSuite-Idempotency-Key:x:@guid.new
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
 
-// Converts the result to a lambda object.
-json2lambda:x:@http.get/*/content
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
 
-// Sanity checking above invocation.
-if
-   not
-      and
-         mte:x:@http.get
-            .:int:200
-         lt:x:@http.get
-            .:int:300
-   .lambda
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-      // Oops, error ...!!
-      lambda2hyper:x:@json2lambda
-      log.error:x:@lambda2hyper
-      throw:Could not get entity from NetSuite, check your log for details.
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:comments
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  comments.post_id:post_id.id
+         join:users
+            as:user_id
+            type:left
+            on
+               and
+                  comments.user_id:user_id.id
+      columns
+         distinct_functor
+            as:count
+      where
+         and
 
-// Returning our entity to caller.
-return:x:@json2lambda/*
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

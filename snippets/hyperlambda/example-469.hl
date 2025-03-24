@@ -1,13 +1,41 @@
-// This example connects to the 'kingdom' database and reads records from the 'castles' table.
-sqlite.connect:kingdom
-   sqlite.read
-      table:castles
+
+// Counts items from your crawl_urls table in your scraper database.
+.arguments
+
+   // crawl_urls table crawl_url_id column equality exact match filtering
+   crawl_urls.crawl_url_id.eq:long
+
+   // crawl_urls table url column wildcard filtering with SQL like '%' comparison
+   crawl_urls.url.like:string
+
+   // crawl_urls table url column equality exact match filtering
+   crawl_urls.url.eq:string
+
+   // crawl_urls table type column wildcard filtering with SQL like '%' comparison
+   crawl_urls.type.like:string
+
+   // crawl_urls table type column equality exact match filtering
+   crawl_urls.type.eq:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:crawl_urls
       columns
-         name
-         age
+         count(*)
+            as:count
       where
          and
-            age.mteq:int:500
-      order:age
-      direction:desc
-      limit:int:3
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

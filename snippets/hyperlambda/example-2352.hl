@@ -1,45 +1,17 @@
 
-// Sends the latest log items from the chatbot's history to the specified email address as an attachment in the form of a CSV file
-slots.create:utilities.history.send-email
+// Returns the schema specifications for the specified type
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/email
-   validators.email:x:@.arguments/*/email
+   // Mandatory argument declaring the type of object to retrieve the schema specification for.
+   type:string
 
-   // Basic logging.
-   log.info:Sending chatbot log to cloudlet owner
-      email:x:@.arguments/*/email
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
 
-   // Opening database connection.
-   data.connect:[generic|magic]
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-schema-spec.hl
 
-      // Extracting items from ml_requests
-      data.read
-         table:ml_requests
-         columns
-            prompt
-            completion
-            created
-            type
-            finish_reason
-            user_id
-            session
-
-      // Converting records to CSV
-      lambda2csv:x:@data.read/*
-
-      // Sending CSV file to specified email address.
-      mail.smtp.send
-         message
-            to
-               .
-                  email:x:@.arguments/*/email
-                  name:Chatbot Admin
-            subject:Chatbot history log
-            entity:multipart/mixed
-               entity:text/plain
-                  content:Latest AINIRO.IO Chatbot requests
-               entity:text/csv
-                  headers
-                     Content-Disposition:"attachment; filename=\"log.csv\""
-                  content:x:@lambda2csv
+// Returning result to caller.
+return-nodes:x:@execute-file/*

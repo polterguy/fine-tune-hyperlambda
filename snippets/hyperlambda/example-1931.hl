@@ -1,17 +1,40 @@
 
-// Generate a Hyperlambda snippet that retrieves records from the sales database and its transactions table.
+// Lists all tables in your SQLite instance.
+slots.create:magic.db.sqlite.tables
 
-// Retrieves records from the sales database and its transactions table.
-data.connect:sales_db
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
 
-   // Using MySQL as the database type.
-   database-type:mysql
+   // Opens up our connection
+   .connection:[postgres]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   sqlite.connect:x:@.connection
 
-   // Fetching data from the database.
-   data.read
-      database-type:mysql
-      table:transactions
-      limit:20
-      sort
-         transaction_date
-      direction:asc
+      // Runs our query
+      sqlite.select:"select name from sqlite_master where type = 'table' and name != 'sqlite_sequence'"
+      set-name:x:@sqlite.select/*/*
+         .:table
+      return-nodes:x:@sqlite.select/*

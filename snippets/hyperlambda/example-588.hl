@@ -1,53 +1,11 @@
+// Use an if statement with eq to compare values
 
-// Executes the specified [sql] towards your [type] and returns the result
-.arguments
-
-   // Mandatory and is the SQL statement that will be executed
-   sql:string
-
-   // Optional and will default to 4000 if not specified
-   max_tokens:int
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/sql
-
-// Applying defaults.
-validators.default:x:@.arguments
-   max_tokens:int:4000
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Executing SQL as select statement.
-   data.select:x:@.arguments/*/sql
-
-   // Making sure we return total record count to caller.
-   set-value:x:../*/return/*/count
-      get-count:x:@data.select/*
-
-   // Making sure we do't return more context than what was requested.
-   .cont:bool:true
-   while:x:@.cont
-      lambda2hyper:x:@data.select/*
-      if
-         lt
-            openai.tokenize:x:@lambda2hyper
-            convert:x:@.arguments/*/max_tokens
-               type:int
-         .lambda
-            set-value:x:@.cont
-               .:bool:false
-            set-value:x:../*/return/*/complete_information
-               .:WARNING! We found more records than we could fit into the context!
-      else
-         remove-nodes:x:@data.select/0/-
-
-   // Making sure we return actual records to caller.
-   add:x:../*/return/*/records
-      get-nodes:x:@data.select/*
-
-// Return result to caller.
-return
-   count
-   records
-   complete_information:This was all the records we could find related to your query
+.result
+.src:int:1
+if
+   eq
+      get-value:x:@.src
+      .:int:1
+   .lambda
+      set-value:x:../*/.result
+         .:OK

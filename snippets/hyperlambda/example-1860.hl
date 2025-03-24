@@ -1,33 +1,44 @@
-// Search through a log file and extracting all emails from it
 
-// Making sure current Hyperlambda file and endpoint does NOT take any arguments
+// Write a Hyperlambda script to create a new training snippet with optional URL, prompt, completion, and type.
 .arguments
 
-// Read the log file
-if
-   io.file.exists:/var/logs/server.log
-   .lambda
+   // Optional URL for citations
+   uri:string
 
-      // Reading file's content as text.
-      io.file.load:/var/logs/server.log
+   // Mandatory prompt or short one liner description
+   prompt:string
 
-      // A temporary place to hold the extracted emails
-      .emails
+   // Mandatory completion being the content or body of your snippet
+   completion:string
 
-      // Extracting email addresses using regex
-      strings.matches:x:@io.file.load
-         .:"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z]{2,6}"
+   // Mandatory machine learning to to associate snippet with
+   type:string
 
-      // Loop through the matches and add them to the list
-      for-each:x:@strings.matches/*/match
-         unwrap:x:+/*/*
-         add:x:@.emails
-            .
-               .:x:@.dp/#
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,service
 
-      // Returning the result to caller.
-      yield
-         emails:x:@.emails/*
+// Opening up database connection.
+data.connect:[generic|magic]
 
-else
-   log.error:Log file not found
+   // Verifying user can create more snippets.
+   add:x:+
+      get-nodes:x:@.arguments/*/type
+   try-signal:magic.ai.can-create-snippet
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:ml_training_snippets
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

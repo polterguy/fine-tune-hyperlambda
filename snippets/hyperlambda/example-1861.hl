@@ -1,68 +1,53 @@
 
-// Hyperlambda script that returns all supported OpenID Connect providers the system supports, allowing for dynamic extension with additional providers.
+// Searches for the specified [query] through your training snippets and returns [max_tokens] training snippets to caller.
 .arguments
-   createNonce:bool
+   _type:string
 
-// Finding all slots declaring OpenID Providers.
-slots.vocabulary:magic.openid.providers.
+   // Mandatory argument and become an SQL LIKE condition records must match to be considered.
+   query:string
 
-// Looping through each slot returned above and executing it.
-for-each:x:@slots.vocabulary/*
+   // Optional argument being maximum number of tokens to return. Will default to 4000 if not specified.
+   max_tokens:int
 
-   // Changing slot invocation name.
-   set-value:x:./*/execute
-      get-value:x:@.dp/#
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/_type
+validators.mandatory:x:@.arguments/*/query
 
-   /*
-    * Executing slot to retrieve supported providers.
-    * 
-    * Notice, name of slot (value of node) is dynamically created above.
-    */
-   execute
-      createNonce:x:@.arguments/*/createNonce
+// Applying defaults.
+validators.default:x:@.arguments
+   max_tokens:int:4000
 
-   // Looping through all providers returned above to return them to client.
-   for-each:x:@execute/*
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-      // Sanity checking OpenID provider.
-      if
+   // Creating our filter string
+   .filter
+   set-value:x:@.filter
+      strings.concat
+         .:%
+         get-value:x:@.arguments/*/query
+         .:%
+   data.read
+      table:ml_training_snippets
+      columns
+         id
+         prompt
+         uri
+      where
          or
-            not-exists:x:@.dp/#/*/issuer
-            not-exists:x:@.dp/#/*/name
-         .lambda
-
-            // Oops, bogus provider ...!!
-            throw:Bogus OpenID provider
-               status:int:500
-               public:bool:true
-
-      /*
-       * Checking that this particular provider was not registered
-       * by some other slot invocation perviously.
-       * 
-       * This prevents having two different slots in two different modules
-       * registering the same OpenID Connect provider twice.
-       */
-      .exists:bool:false
-      for-each:x:../*/return/*
-         if
-            eq:x:@.dp/#/*/issuer
-               get-value:x:@for-each/@.dp/#/*/issuer
-            .lambda
-
-               // OpenID provider already exists.
-               set-value:x:@.exists
-                  .:bool:true
-
-      // Adding provider unless it was registered by another slot invoction.
+            prompt.like:x:@.filter
+            completion.like:x:@.filter
+   .cont:bool:true
+   while:x:@.cont
+      lambda2hyper:x:@data.read/*
       if
-         eq:x:@.exists
-            .:bool:false
+         lt
+            openai.tokenize:x:@lambda2hyper
+            convert:x:@.arguments/*/max_tokens
+               type:int
          .lambda
-
-            // Adding currently iterated provider to [return] invocation below.
-            add:x:../*/return
-               get-nodes:x:@.dp/#
-
-// Returning providers to client.
-return
+            set-value:x:@.cont
+               .:bool:false
+      else
+         remove-nodes:x:@data.read/0/-
+   return-nodes:x:@data.read/*

@@ -1,17 +1,653 @@
 
-// Hyperlambda snippet that adds a new employee in 'hr_db' database and its 'employees' table.
+// API endpoint that creates a new cloudlet for the currently authenticated user in the specified cluster with the specified plan.
+.arguments
+   name:string
+   plan:string
+   cluster:string
+   source_cloudlet:string
+   subscription:*
+   recaptcha_response:string
+   pay_yearly:bool
 
-// Adds a new employee in "hr_db" database and its "employees" table.
-data.connect:hr_db
-   database-type:sqlite
+// Ensuring user is authorised to invoke endpoint.
+auth.ticket.verify:root, guest
 
-   // Creating employee record.
-   data.create
-      database-type:sqlite
-      table:employees
-      values
-         employee_id:int:301
-         name:Alice Smith
-         department:Finance
-         salary:decimal:55000.00
-         hire_date:date:"2020-07-15T00:00:00.000"
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/name
+set-value:x:@.arguments/*/name
+   strings.to-lower:x:@.arguments/*/name
+validators.regex:x:@.arguments/*/name
+   regex:^[a-z0-9]{2,20}$
+validators.mandatory:x:@.arguments/*/plan
+
+/*
+ * Checking if backend is configured to use reCAPTCHA, and if so,
+ * making sure we ensure the frontend supplied a [recaptcha_response],
+ * and invoking slot responsible for verifying reCAPTCHA value.
+ */
+config.get:"magic:auth:recaptcha:key"
+if
+   and
+      neq:x:@config.get
+         .
+      neq:x:@config.get
+         .:
+   .lambda
+
+      // [recaptcha_response] is a mandatory field.
+      validators.mandatory:x:@.arguments/*/recaptcha_response
+
+      // Retrieving secret and invoking slot responsible for verifying reCAPTCHA value.
+      config.get:"magic:auth:recaptcha:secret"
+      validators.recaptcha:x:@.arguments/*/recaptcha_response
+         min:decimal:0.3
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
+
+// Removing recaptcha_response to avoid adding it to [data.create] invocation further down.
+remove-nodes:x:@.arguments/*/recaptcha_response
+
+/*
+ * Retrieving currently authenticated user to ensure we're
+ * able to associate the cloudlet with the authenticated user.
+ */
+auth.ticket.get
+
+/*
+ * Ensuring user doesn't create cloudlets too frequently,
+ * or manages to somehow create two cloudlets simultaneously.
+ */
+semaphore:kube-create
+   config.get:"magic:hub:cooldown"
+   strings.concat
+      .:cloudlet-created-by-
+      get-value:x:@auth.ticket.get
+   cache.get:x:-
+   if
+      not-null:x:@cache.get
+      .lambda
+
+         // User is creating cloudlets too often.
+         log.info:User creating cloudlets too often
+            username:x:@auth.ticket.get
+         strings.concat
+            .:"You can only create cloudlets every "
+            get-value:x:@config.get
+            .:" seconds"
+         throw:x:-
+            public:true
+            status:400
+   cache.set:x:@strings.concat
+      value:Yup!
+      expiration:x:@config.get
+
+/*
+ * In case this is the first cloudlet, and it's supposed to be automatically created,
+ * we delete the extra fields that stores the initial backend as extra information.
+ */
+data.connect:[generic|magic]
+
+   // Deleting initial backend and cluster name if existing.
+   data.delete
+      table:users_extra
+      where
+         and
+            user.eq:x:@auth.ticket.get
+            or
+               type.eq:backend
+               type.eq:cluster
+
+// Letting user know we're checking pre-requisites for creating cloudlet.
+sockets.signal:hub.cloudlets.create
+   users:x:@auth.ticket.get
+   args
+      status:Checking that user is allowed to create cloudlet
+      finished:bool:false
+      error:bool:false
+
+// Opening up database connection.
+data.connect:[generic|hub]
+
+   /*
+    * Notice, is [source_cloudlet] is specified, we determine [cluster]
+    * from source cloudlet, and ignore the specified cluster, to avoid trying
+    * to create a frontend from another cluster than the backend was deployed into.
+    */
+   if
+      not-null:x:@.arguments/*/source_cloudlet
+      .lambda
+
+         // Letting user know that we're verifying that source cloudlet exists.
+         sockets.signal:hub.cloudlets.create
+            users:x:@auth.ticket.get
+            args
+               status:Verifying that source cloudlet exists
+               finished:bool:false
+               error:bool:false
+
+         // Better safe than sorry.
+         remove-nodes:x:@.arguments/*/cluster
+
+         // Figuring out [cluster] of [source_cloudlet]
+         data.read
+            table:cloudlets
+            values
+               cluster
+            where
+               and
+                  user.eq:x:@auth.ticket.get
+                  name.eq:x:@.arguments/*/source_cloudlet
+         if
+            not-exists:x:@data.read/*/*
+            .lambda
+
+               // Oops ...!!
+               log.error:Source cloudlet does not exist
+                  source_cloudlet:x:@.arguments/*/source_cloudlet
+                  username:x:@auth.ticket.get
+
+               // Letting user know that source cloudlet doesn't exist.
+               sockets.signal:hub.cloudlets.create
+                  users:x:@auth.ticket.get
+                  args
+                     status:Source cloudlet does not exist
+                     finished:bool:true
+                     error:bool:true
+
+               // Throwing ...
+               throw:No such source cloudlet
+                  status:404
+                  public:true
+
+         // For simplicity adding up [cluster] into [.arguments] collection.
+         unwrap:x:+/*/*
+         add:x:@.arguments
+            .
+               cluster:x:@data.read/*/*/cluster
+   else
+
+      // No [source_cloudlet], hence [cluster] is mandatory.
+      validators.mandatory:x:@.arguments/*/cluster
+
+   /*
+    * Notice, if cloudlet is created from a [source_cloudlet] we
+    * modify its name such that it "inherits" parts of its name
+    * from its [source_cloudlet]. Otherwise name is not changed.
+    */
+   .name-check:x:@.arguments/*/name
+   unwrap:x:-
+   if
+      not-null:x:@.arguments/*/source_cloudlet
+      .lambda
+
+         // Cloudlet's name becomes source_cloudlet + name.
+         set-value:x:@.name-check
+            strings.concat
+               get-value:x:@.arguments/*/name
+               .:-
+               get-value:x:@.arguments/*/source_cloudlet
+
+   // Verifying cloudlet does not exist.
+   data.read
+      table:cloudlets
+      columns
+         id
+      where
+         and
+            user.eq:x:@auth.ticket.get
+            name.eq:x:@.name-check
+   if
+      exists:x:@data.read/*/*
+      .lambda
+
+         // Oops ...!!
+         throw:Cloudlet already exists
+            status:400
+            public:true
+
+   // Used to track if cloudlet is a "demo" cloudlet or not.
+   .demo:bool:false
+
+   // Checking if user is creating a demo cloudlet.
+   strings.to-lower:x:@.arguments/*/plan
+   if
+      strings.starts-with:x:@strings.to-lower
+         .:demo
+      .lambda
+
+         // Cloudlet is demo cloudlet, verifying it's not got a subscription associated with it.
+         if
+            exists:x:@.arguments/*/subscription/*
+            .lambda
+
+               // Oops ...!!
+               log.error:Client tried to create demo cloudlet with subscription attached
+                  user:x:@auth.ticket.get
+                  cloudlet:x:@.arguments/*/name
+                  plan:x:@.arguments/*/plan
+               throw:You cannot associate a subscription with a demo cloudlet
+                  status:400
+                  public:true
+
+         // Tracking the fact that we're creating a "demo" cloudlet.
+         set-value:x:@.demo
+            .:bool:true
+
+         // Invoking slot responsible for verifying user is allowed to create a demo account.
+         unwrap:x:+/*
+         signal:hub.user.can-create-demo-account
+            username:x:@auth.ticket.get
+            plan:x:@.arguments/*/plan
+   else
+
+      // User is not creating a demo cloudlet, ensuring we're given payment info.
+      if
+         not
+            exists:x:@.arguments/*/subscription/*
+         .lambda
+
+            // No payment information supplied which is needed for a professional cloudlet.
+            log.error:User tried to create a professional cloudlet without providing payment information
+               username:x:@auth.ticket.get
+            throw:We need payment information if you want to create a professional cloudlet
+               status:402
+               public:true
+
+   // Verifying that cluster is enabled.
+   data.read
+      table:clusters
+      columns
+         id
+      where
+         and
+            enabled.eq:bool:true
+            id.eq:x:@.arguments/*/cluster
+      limit:1
+   if
+      not
+         exists:x:@data.read/*/*
+      .lambda
+
+         // Oops, cluster is not enabled or doesn't exist.
+         log.error:User tried to create a cloudlet in a cluster that is not enabled or does not exist
+            user:x:@auth.ticket.get
+            cluster:x:@.arguments/*/cluster
+         throw:Cluster does not exist
+            public:true
+            status:404
+
+   // Verifying that plan is enabled.
+   data.read
+      table:plans
+      columns
+         name
+         max_upload
+         max_timeout
+         storage
+         cpu
+         memory
+      where
+         and
+            enabled.eq:bool:true
+            name.eq:x:@.arguments/*/plan
+      limit:1
+   if
+      not
+         exists:x:@data.read/*/*
+      .lambda
+
+         // Oops, plan does not exists or is not enabled.
+         log.error:User tried to create a cloudlet in a plan that is not enabled or does not exist
+            user:x:@auth.ticket.get
+            plan:x:@.arguments/*/plan
+         throw:Plan does not exist
+            public:true
+            status:404
+
+   // Letting user know we've started creating his or her cloudlet.
+   sockets.signal:hub.cloudlets.create
+      users:x:@auth.ticket.get
+      args
+         status:Started cloudlet production
+         finished:bool:false
+         error:bool:false
+
+   /*
+    * Retrieving user's email address and name.
+    * Email and name is needed among other things to send user email warning about
+    * cloudlet destruction, but also for other reasons.
+    */
+   .email
+   .name
+   .exe
+      data.connect:[generic|magic]
+         data.read
+            table:users_extra
+            columns
+               value
+               type
+            where
+               and
+                  user.eq:x:@auth.ticket.get
+                  or
+                     type.eq:email
+                     type.eq:name
+         set-value:x:@.email
+            get-value:x:@data.read/*/*/type/=email/./*/value
+         set-value:x:@.name
+            get-value:x:@data.read/*/*/type/=name/./*/value
+   eval:x:@.exe
+
+   // Ensuring user has provided email and name.
+   if
+      or
+         null:x:@.email
+         null:x:@.name
+      .lambda
+         log.error:User has not provided email or name
+            user:x:@auth.ticket.get
+         throw:You need to provide both email and name before creating a cloudlet
+            public:true
+            status:400
+
+   /*
+    * Figuring out cloudlet's full Kubernetes name.
+    * For cloudlets with a [source_cloudlet] the name becomes "name-source-username".
+    * For cloudlets without a source it becomes "name-username".
+    * This ensures we've got unique names for PODs in Kubernetes.
+    * 
+    * [.cloudlet-name] contains the whole name of cloudlet, including username
+    * [.cloudlet-name-only] contains only the name of the cloudlet, and not the username.
+    */
+   .cloudlet-name
+   .cloudlet-name-only
+   if
+      not-null:x:@.arguments/*/source_cloudlet
+      .lambda
+
+         // Cloudlet is based of a source cloudlet.
+         set-value:x:@.cloudlet-name
+            strings.concat
+               get-value:x:@.arguments/*/name
+               .:-
+               get-value:x:@.arguments/*/source_cloudlet
+               .:-
+               get-value:x:@auth.ticket.get
+         set-value:x:@.cloudlet-name-only
+            strings.concat
+               get-value:x:@.arguments/*/name
+               .:-
+               get-value:x:@.arguments/*/source_cloudlet
+   else
+
+      // Cloudlet does not have a source cloudlet.
+      set-value:x:@.cloudlet-name
+         strings.concat
+            get-value:x:@.arguments/*/name
+            .:-
+            get-value:x:@auth.ticket.get
+      set-value:x:@.cloudlet-name-only
+         strings.concat
+            get-value:x:@.arguments/*/name
+
+   /*
+    * Finding user's password in internal database, and passing
+    * into [hub.cloudlets.create] as pre-hashed.
+    * This ensures the cloudlet has the same root password as the user has in hub by default.
+    */
+   .password
+   data.connect:[generic|magic]
+      set-value:x:@.password
+         data.scalar:select password from users where username = @username
+            username:x:@auth.ticket.get
+
+   /*
+    * Making sure we catch exceptions such that we can do some house cleaning
+    * unless process succeeds completely.
+    * This allows us to delete cloudlets that are partically created to avoid
+    * "hanging" cloudlets.
+    */
+   try
+
+      /*
+       * If [souce_cloudlet] is specified, this is somehow a frontend of some sort,
+       * and we need to inform [hub.cloudlets.create] about that fact.
+       */
+      .is-cloudlet:bool:true
+      .source-cloudlet
+      if
+         not-null:x:@.arguments/*/source_cloudlet
+         .lambda
+
+            // [source_cloudlet] exists.
+            set-value:x:@.is-cloudlet
+               .:bool:false
+            set-value:x:@.source-cloudlet
+               strings.concat
+                  get-value:x:@.arguments/*/source_cloudlet
+                  .:-
+                  get-value:x:@auth.ticket.get
+
+      // Invoking slot responsible for creating cloudlet.
+      unwrap:x:+/*
+      signal:hub.cloudlets.create
+         cloudlet_name:x:@.cloudlet-name
+         cluster:x:@.arguments/*/cluster
+         plan:x:@.arguments/*/plan
+         source_cloudlet:x:@.source-cloudlet
+         username:x:@auth.ticket.get
+         timeout:x:@data.read/*/*/max_timeout
+         upload:x:@data.read/*/*/max_upload
+         storage:x:@data.read/*/*/storage
+         cpu:x:@data.read/*/*/cpu
+         memory:x:@data.read/*/*/memory
+         password:x:@.password
+         name:x:@.name
+         email:x:@.email
+         is-cloudlet:x:@.is-cloudlet
+
+      /*
+       * Appending [source_cloudlet] as the cloudlet's name if specified.
+       * Notice, since we add all [.arguments] to [data.create] we need to
+       * modify the name we're given in [.arguments] before we invoke [data.create]
+       * if we're given a [source_cloudlet].
+       */
+      if
+         not-null:x:@.arguments/*/source_cloudlet
+         .lambda
+            set-value:x:@.arguments/*/name
+               strings.concat
+                  get-value:x:@.arguments/*/name
+                  .:-
+                  get-value:x:@.arguments/*/source_cloudlet
+
+      // Parametrising our create database record invocation.
+      add:x:./*/data.create/*/values
+         get-nodes:x:@.arguments/*/cluster
+         get-nodes:x:@.arguments/*/name
+         get-nodes:x:@.arguments/*/plan
+
+      // Removing [subscription] from [data.create] before invoking slot.
+      remove-nodes:x:./*/data.create/*/values/*/subscription
+
+      // Creating our cloudlet record.
+      data.create
+         table:cloudlets
+         return-id:bool:true
+         values
+            user:x:@auth.ticket.get
+
+      // Doing some basic logging.
+      log.info:Cloudlet successfully created
+         plan:x:@.arguments/*/plan
+         cluster:x:@.arguments/*/cluster
+         user:x:@auth.ticket.get
+         name:x:@.cloudlet-name-only
+
+      // Checking if cloudlet is a "demo" cloudlet.
+      if
+         get-value:x:@.demo
+         .lambda
+
+            // Ensuring destruction of cloudlet after trial period ends.
+            unwrap:x:+/*
+            signal:hub.cloudlet.ensure-demo-destruction
+               cluster:x:@.arguments/*/cluster
+               username:x:@auth.ticket.get
+               cloudlet-id:x:@data.create
+               cloudlet-name:x:@.cloudlet-name
+
+            // Letting user know that we're done creating his or her cloudlet.
+            sockets.signal:hub.cloudlets.create
+               users:x:@auth.ticket.get
+               args
+                  status:Cloudlet was successfully created
+                  finished:bool:true
+                  error:bool:false
+
+            // Sleeping for 2 seconds to allow user to register feedback.
+            sleep:2000
+      else
+
+         /*
+          * Professional account of some sort, making sure we create a subscription for it somehow.
+          * First letting user know that we're creating a subscription for his cloudlet.
+          */
+         sockets.signal:hub.cloudlets.create
+            users:x:@auth.ticket.get
+            args
+               status:Creating a subscription for your cloudlet
+               finished:bool:false
+               error:bool:false
+
+         // Finding price_reference for plan.
+         data.read
+            table:plans
+            values
+               price_reference
+               yearly_price_reference
+            where
+               and
+                  name.eq:x:@.arguments/*/plan
+
+         // Creating a subscription for our cloudlet.
+         remove-nodes:x:@.arguments/*/subscription/*/meta
+         add:x:./*/io.file.execute
+            get-nodes:x:@.arguments/*/subscription/*
+         if
+            get-value:x:@.arguments/*/pay_yearly
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@else/*/io.file.execute
+                  .
+                     price:x:@data.read/*/*/yearly_price_reference
+         else
+            unwrap:x:+/*/*
+            add:x:@else/@else/*/io.file.execute
+               .
+                  price:x:@data.read/*/*/price_reference
+         unwrap:x:+/*
+         io.file.execute:/modules/stripe/subscriptions.post.hl
+            meta:x:@.cloudlet-name-only
+
+         // Letting user know that we're done creating his or her cloudlet.
+         sockets.signal:hub.cloudlets.create
+            users:x:@auth.ticket.get
+            args
+               status:Successfully associated your cloudlet with a payment subscription
+               finished:bool:false
+               error:bool:false
+
+         // Checking that card payment was successful. It might need 3D Secure!
+         if
+            eq:x:@io.file.execute/*/finished
+               .:bool:false
+            .lambda
+
+               // Letting user know that he needs to verify his or her payment using 3D Secure.
+               sockets.signal:hub.cloudlets.create
+                  users:x:@auth.ticket.get
+                  args
+                     status:You need to verify your card payment, please go to invoices and pay your invoice once we are done!
+                     finished:bool:false
+                     payment_authentication_required:bool:true
+                     error:bool:false
+
+         // Letting user know that we're done creating his or her cloudlet.
+         sockets.signal:hub.cloudlets.create
+            users:x:@auth.ticket.get
+            args
+               status:Cloudlet was successfully created
+               finished:bool:true
+               error:bool:false
+
+         // Sleeping for 2 seconds to allow user to register feedback.
+         sleep:2000
+
+         // Checking if we've got a notifications callback, and if so, invoking it.
+         config.get:"magic:hub:notifications"
+         unwrap:x:+/*/username
+         signal:x:@config.get
+            type:cloudlet
+            content:Cloudlet successfully created
+            username:x:@auth.ticket.get
+
+         // Returning subscription ID and cloudlet ID to caller.
+         response.status.set:201
+         unwrap:x:+/*
+         return
+            result:success
+            subscription_created:bool:true
+            subscription_paid:x:@io.file.execute/*/finished
+   .catch
+
+      // Logging error and showing user some feedback.
+      log.error:x:@.arguments/*/message
+      unwrap:x:+/*/*/status
+      sockets.signal:hub.cloudlets.create
+         users:x:@auth.ticket.get
+         args
+            status:x:@.arguments/*/message
+            finished:bool:false
+            error:bool:true
+      sockets.signal:hub.cloudlets.create
+         users:x:@auth.ticket.get
+         args
+            status:Something went wrong when creating cloudlet
+            finished:bool:true
+            error:bool:true
+      sleep:5
+      sockets.signal:hub.cloudlets.create
+         users:x:@auth.ticket.get
+         args
+            status:Cloudlet destruction and cleanup process initiated
+            finished:bool:true
+            error:bool:false
+      log.info:Cloudlet destruction process initiated to cleanup
+         cluster:x:@.arguments/*/cluster
+         name:x:@.cloudlet-name
+
+      // Invoking slot responsible for deleting cloudlet.
+      unwrap:x:+/*
+      signal:hub.cloudlets.hard-delete
+         cluster:x:@.arguments/@.arguments/*/cluster
+         name:x:@.cloudlet-name
+
+      // Deleting cloudlet record.
+      data.delete
+         table:cloudlets
+         where
+            and
+               user.eq:x:@auth.ticket.get
+               name.eq:x:@.cloudlet-name-only
+
+      // Re-throwing messages
+      throw:x:@.arguments/*/message
+         status:x:@.arguments/*/status
+         public:x:@.arguments/*/public
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      result:success

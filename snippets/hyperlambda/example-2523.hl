@@ -1,11 +1,42 @@
-// How can I validate if a user has both email and password using [and]?
-.email:bool:true
-.password:bool:true
-.validation
-if
-   and
-      get-value:x:@.email
-      get-value:x:@.password
-   .lambda
-      set-value:x:@.validation
-         .:User is valid
+
+// Updates an existing item in your cloudlets table in your [generic|hub] database according to the specified arguments.
+.arguments
+   id:long
+   name:string
+   plan:string
+   cluster:string
+   user:string
+
+// Verifying user is authorized to access endpoint.
+validators.mandatory:x:@.arguments/*/id
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|hub]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+
+   // Invoking our update slot.
+   data.update
+      table:cloudlets
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning success to caller.
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

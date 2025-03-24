@@ -1,5 +1,71 @@
-// Convert a value to a short integer (short)
 
-.src:5
-convert:x:-
-   type:short
+// Develop a function to confirm a payment using a session ID. The function should validate the session ID, ensuring it is exactly 25 characters long. It should retrieve and delete the stored session from the database, then find and execute all slots that handle payments with names starting with 'stripe.subscriptions.accepted.'. If any slot returns a result, the function should immediately return that result, indicating the payment was handled. Finally, if no slots return a result, the function should return a success message to the caller.
+.arguments
+   session:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/session
+validators.string:x:@.arguments/*/session
+   min:25
+   max:25
+
+// Retrieving stored session.
+.session
+data.connect:stripe
+   data.read
+      table:checkout_sessions
+      values
+         username
+         price
+      where
+         and
+            session_id.eq:x:@.arguments/*/session
+   add:x:@.session
+      get-nodes:x:@data.read/*/*
+   data.delete
+      table:checkout_sessions
+      where
+         and
+            session_id.eq:x:@.arguments/*/session
+
+/*
+ * Finding all slots that handles payments.
+ * 
+ * This will invoke all slots starting out with [stripe.subscriptions.accepted.] as their names,
+ * and if one of these slots are returning anything, abort the iteration and return whatever
+ * that slots returned from its invocation.
+ */
+slots.vocabulary:stripe.subscriptions.accepted.
+
+// Looping through each slot returned above and executing it.
+for-each:x:@slots.vocabulary/*
+
+   // Changing slot invocation name.
+   set-value:x:./*/execute
+      get-value:x:@.dp/#
+
+   // Parametrising invocation.
+   add:x:./*/execute
+      get-nodes:x:@.session/*
+
+   /*
+    * Executing slot to retrieve supported providers.
+    * 
+    * Notice, name of slot (value of node) is dynamically created above.
+    */
+   execute
+
+   /*
+    * Checking if this slot returned something, at which point we return immediately
+    * since this implies the payment was handled.
+    */
+   if
+      exists:x:@execute/*
+      .lambda
+
+         // Slot handled payment.
+         return-nodes:x:@execute/*
+
+// Returning success to caller.
+return
+   result:success

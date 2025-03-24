@@ -1,32 +1,31 @@
 
-// Create a Hyperlambda script for a CRUD create endpoint that creates an item in the users_extra table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
-.arguments
-   type:string
-   value:string
-   user:string
+// Generate a Hyperlambda snippet that evaluates a user role using a switch case with a default option.
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Switch case comparison for user roles.
+.user_role:admin
+.result
+switch:x:@.user_role
 
-// Sanity checking invocation.
-validators.regex:x:@.arguments/*/type
-   regex:^[a-zA-Z0-9-_]+$
+   case:admin
 
-// Opening up database connection.
-data.connect:[generic|magic]
+      // If user role is "admin".
+      set-value:x:@.result
+         .:Has admin privileges
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
+   case:editor
 
-   // Creating our record.
-   data.create
-      table:users_extra
-      return-id:bool:false
-      values
+      // If user role is "editor".
+      set-value:x:@.result
+         .:Has editor privileges
 
-   // Returning result of above invoction to caller.
-   response.status.set:201
-   unwrap:x:+/*
-   return
-      result:success
+   case:user
+
+      // If user role is "user".
+      set-value:x:@.result
+         .:Has user privileges
+
+   default
+
+      // If none of the above roles match.
+      set-value:x:@.result
+         .:Unknown role

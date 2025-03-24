@@ -1,54 +1,32 @@
 
-// Enables a cloudlet when a subscription payment has gone through.
-slots.create:payments.subscriptions.unsubscribed.cloudlets.destroy
+// Ensures our system messages are updated during deployments.
 
-   // Checking if invocation is for us.
-   if
-      neq:x:@.arguments/*/type
-         .:subscription
-      .lambda
+// Listing all system messages we've got.
+io.file.list:/modules/finovo/system-messages/
 
-         // Not our guy.
-         return:bool:false
+// Opening up database connection.
+data.connect:magic
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/meta
-   validators.mandatory:x:@.arguments/*/username
+   // Looping through each system message and updating our machine learning type accordingly.
+   for-each:x:@io.file.list/*
 
-   // Invoking slot responsible for deleting cloudlet.
-   .name
-   set-value:x:@.name
-      strings.concat
-         get-value:x:@.arguments/*/meta
-         .:-
-         get-value:x:@.arguments/*/username
+      // Loading file.
+      io.file.load:x:@.dp/#
 
-   // Finding cluster for cloudlet.
-   .cluster
-   data.connect:[generic|hub]
-      data.read
-         table:cloudlets
+      // Finding type name
+      .type
+      strings.split:x:@.dp/#
+         .:/
+      strings.split:x:-/0/-
+         .:.
+      set-value:x:@.type
+         get-value:x:@strings.split/0
+
+      // Updating type name's system message.
+      data.update
+         table:ml_types
          values
-            cluster
+            system_message:x:@io.file.load
          where
             and
-               user.eq:x:@.arguments/*/username
-               name.eq:x:@.arguments/*/meta
-      set-value:x:@.cluster
-         get-value:x:@data.read/*/*/cluster
-   unwrap:x:+/*
-   signal:hub.cloudlets.hard-delete
-      cluster:x:@.cluster
-      name:x:@.name
-
-   // Deleting cloudlet from database.
-   data.connect:[generic|hub]
-      data.delete
-         table:cloudlets
-         where
-            and
-               name.eq:x:@.arguments/*/meta
-               user.eq:x:@.arguments/*/username
-
-   // Returning true to indicate we handled the callback.
-   return:bool:true
+               type.eq:x:@.type

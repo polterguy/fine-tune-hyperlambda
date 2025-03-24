@@ -1,63 +1,16 @@
 
-// Reads contacts from HubSpot
-.arguments
-   after:int
+// Write a Hyperlambda snippet that handles file read errors using a try/catch/finally block.
 
-// Retrieving token from configuration and verifying it exists.
-config.get:"magic:hubspot:token"
-if
-   or
-      eq:x:@config.get
-         .:
-      null:x:@config.get
-   .lambda
+// Handles file read errors inside a try/catch/finally block
+try
 
-      // Oops ...!!
-      throw:No authorization token found in your configuration
-         public:bool:true
-         status:int:500
-.token
-set-value:x:@.token
-   strings.concat
-      .:"Bearer "
-      get-value:x:@config.get
+   // Attempting to read a non-existent file
+   file.read:/invalid/path/to/file.txt
+.catch
 
-// Creating our URL.
-.url:"https://api.hubapi.com/crm/v3/objects/contacts"
-if
-   and
-      exists:x:@.arguments/*/after
-      not-null:x:@.arguments/*/after
-      neq:x:@.arguments/*/after
-         .:
-   .lambda
+   // Logging the error
+   log.error:x:@.arguments/*/message
+.finally
 
-      // appending QUERY parameter to URL.
-      set-value:x:@.url
-         strings.concat
-            get-value:x:@.url
-            .:?after=
-            get-value:x:@.arguments/*/after
-
-// Reading contacts from HubSpot.
-http.get:x:@.url
-   convert:true
-   headers
-      Authorization:x:@.token
-
-// Verifying above invocation was a success.
-if
-   neq:x:@http.get
-      .:int:200
-   .lambda
-
-      // Oops ...!!
-      lambda2hyper:x:@http.get
-      log.error:Could not read contacts from HubSpot
-         message:x:@lambda2hyper
-      throw:Something went wrong as we tried to read contacts from HubSpot, check your log for details.
-         status:int:500
-         public:bool:true
-
-// Returning result of invocation to caller.
-return-nodes:x:@http.get/*/content/*/results/*
+   // Logging completion
+   log.info:File read attempt finished

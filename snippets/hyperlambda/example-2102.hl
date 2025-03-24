@@ -1,24 +1,35 @@
+/*
+ * This snippet demonstrates how to perform basic string manipulation by iterating 
+ * through a collection of strings and transforming each one
+ */
+.strings
+   string1:Hello World
+   string2:Hyperlambda is fun
+   string3:Magic Cloud
+   
+// Create a destination node to store our results
+.transformed
 
-// Generate an endpoint returning line_items from financial database. Add optional paging support and optional filtering on name
-.arguments
-   limit:long
-   offset:long
-   comments.name.eq:string
+// Iterate through each string and transform it
+for-each:x:@.strings/*
+   
+   // Get the current string value
+   .current-value:x:@.dp/#
 
-// Opening up our database connection.
-data.connect:financial
+   // Unwrapping above expression.
+   unwrap:x:-
+   
+   // Transform the string (uppercase + add exclamation)
+   strings.to-upper:x:@.current-value
+   strings.concat
+      get-value:x:@strings.to-upper
+      .:!
+   
+   // Add the transformed string to our results
+   unwrap:x:+/*/*
+   add:x:@.transformed
+      .
+         transformed-string:x:@strings.concat
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*/and
-      get-nodes:x:@.arguments/*/comments.name.eq
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   data.read
-      table:line_items
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   yield
-      result:x:@data.read/*
+// Log our results
+log.info:Transformation complete
