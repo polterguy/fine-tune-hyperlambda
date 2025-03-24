@@ -1,50 +1,43 @@
 
-// Returns all roles [username] belongs to.
+// Counts items from your media table in your cms database
 .arguments
-   username
-      type:string
-      mandatory:bool:true
-.icon:supervisor_account
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
+   // Optional filter arguments
+   media.id.eq:long
+   media.post_id.eq:long
+   media.file_path.like:string
+   media.file_path.eq:string
+   media.file_type.like:string
+   media.file_type.eq:string
+   media.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
 
-// Connecting to database.
-data.connect:[generic|magic]
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
 
-   // Verifying user exists.
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
    data.read
-      table:users
+      database-type:sqlite
+      table:media
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  media.post_id:post_id.id
       columns
-         username
+         count(*)
+            as:count
       where
          and
-            username.eq:x:@.arguments/*/username
+      limit:long:1
 
-   // Verifying above invocation returned something.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-
-         // Oops ...!!
-         throw:No such user
-            username:x:@.arguments/*/username
-
-   // Selecting all roles user belongs to.
-   data.read
-      table:users_roles
-      columns
-         role
-      where
-         and
-            user.eq:x:@.arguments/*/username
-
-   // Parametrizing [return] invocation below.
-   for-each:x:@data.read/*
-      unwrap:x:+/*/*
-      add:x:../*/return
-         .
-            .:x:@.dp/#/*/role
-
-// Returning roles to user.
-return
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

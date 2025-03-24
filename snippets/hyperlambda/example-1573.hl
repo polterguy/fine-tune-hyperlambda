@@ -1,88 +1,172 @@
 
-// Hyperlambda script to create a slot that avoids abuse of AI chatbot by limiting the number of chat requests per user per day.
-slots.create:magic.openai.chat-interceptor.avoid-abuse
+// Create a Hyperlambda script that installs the specified Bazar module into the local server, ensuring the user is authorized.
+.arguments
+   url:string
+   name:string
+   type:string
 
-   // Getting original IP address of request.
-   request.headers.get:cf-connecting-ip
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Verifying we've actually got an IP address.
-   if
-      and
-         not-null:x:@request.headers.get
-         neq:x:@request.headers.get
-            .:
-      .lambda
+// Defaulting type to "module".
+validators.default:x:@.arguments
+   type:module
 
-         // Connecting to magic database.
-         data.connect:magic
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/name
 
-            // Checking if IP address has been blocked previously.
-            data.read
-               table:ml_blocked_ips
-               where
-                  and
-                     ip_address.eq:x:@request.headers.get
+// Running actual installation on a different thread.
+insert-before:x:./*/fork/0
+   get-nodes:x:@.arguments
+fork
+
+   // Making sure we catch exceptions such that we can log errors.
+   try
+
+      // Checking what type of plugin this is.
+      switch:x:@.arguments/*/type
+         case:module
+
+            /*
+             * Verifying that folder doesn't already exist, as in that plugin
+             * is already installed - And if plugin is already installed, we
+             * delete the folder first which will uninstall the plugin.
+             */
+            strings.concat
+               .:/modules/
+               get-value:x:@.arguments/*/name
+               .:/uninstall.hl
             if
-               exists:x:@data.read/*
+               io.file.exists:x:@strings.concat
                .lambda
 
-                  // IP address has been blocked.
-                  request.headers.list
-                  add:x:./*/log.info
-                     get-nodes:x:@request.headers.list/*
-                  log.info:Potential abuse, user has been permanently blocked
-                  throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
-                     public:bool:true
-                     status:int:401
+                  // Uninstall file exists
+                  log.info:Uninstalling module
+                     module:x:@strings.concat
+                  io.file.execute:x:@strings.concat
 
-            // True if we should block IP address.
-            .block:bool:false
+            // Downloading zip file as binary content from specified URL.
+            http.get:x:@.arguments/*/url
 
-            // Checking if cloudlet is configured for maximum number of requests per day per user.
-            config.get:"magic:openai:max-daily-requests"
+            /*
+             * Saving file to modules folder using the 'filename' argument specified
+             * by its HTTP Content-Disposition header.
+             */
+            strings.split:x:@http.get/*/headers/*/Content-Disposition
+               .:=
+            strings.trim:x:@strings.split/1
+               .:"\""
+            strings.concat
+               .:/modules/
+               get-value:x:@strings.trim
+            io.file.save.binary:x:@strings.concat
+               get-value:x:@http.get/*/content
+
+            // Unzipping downloaded ZIP file.
+            .folder
+            set-value:x:@.folder
+               strings.concat
+                  .:/modules/
+                  get-value:x:@.arguments/*/name
+                  .:/
+
+            // Checking if folder already exists, at which point we delete it.
             if
-               and
-                  not-null:x:@config.get
-                  neq:x:@config.get
-                     .:
+               io.folder.exists:x:@.folder
+               .lambda
+                  io.folder.delete:x:@.folder
+
+            // Creating folder and unzipping file.
+            io.folder.create:x:@.folder
+            io.file.unzip:x:@strings.concat
+               folder:x:@.folder
+
+            // Deleting ZIP file.
+            io.file.delete:x:@strings.concat
+
+            /*
+             * Checking if the ZIP file resulted in creating the module folder,
+             * otherwise renaming folder accordingly.
+             */
+            .module-folder
+            set-value:x:@.module-folder
+               strings.concat
+                  .:/modules/
+                  get-value:x:@.arguments/*/name
+                  .:/
+            if
+               not
+                  io.folder.exists:x:@.module-folder
                .lambda
 
-                  // Cloudlet is configured to only answer the same user n times per day.
-                  .no
-                  set-value:x:@.no
-                     convert:x:@config.get
-                        type:int
+                  // Renaming the folder to the name specified by caller.
+                  strings.split:x:@strings.concat
+                     .:.zip
+                  io.folder.move:x:@strings.split/0
+                     get-value:x:@.module-folder
 
-                  // Counting questions user has asked today.
-                  data.scalar:"select count(*) from ml_requests where user_id = @user and created >= date('now', '-1 day')"
-                     @user:x:@.arguments/*/user_id
+            // Running through installation process of plugin.
+            strings.split:x:@.module-folder
+               .:/
+            execute:magic.modules.install-module
+               module:x:@strings.split/0/-
 
-                  // Checking if user has exhausted his daily requests.
-                  if
-                     mt
-                        convert:x:@data.scalar
-                           type:int
-                        get-value:x:@.no
-                     .lambda
+            // Notifying client that installation is done.
+            sockets.signal:magic.backend.message
+               roles:root
+               args
+                  message:Plugin was successfully installed
+                  type:success
+         case:frontend
 
-                        // Blocking user.
-                        set-value:x:@.block
-                           .:bool:true
+            // Downloading zip file as binary content from specified URL.
+            strings.concat
+               get-value:x:@.arguments/*/url
+               .:&type=frontend
+            http.get:x:@strings.concat
 
-            // Checking if we should block user.
-            if:x:@.block
+            /*
+             * Saving file to modules folder using the 'filename' argument specified
+             * by its HTTP Content-Disposition header.
+             */
+            strings.split:x:@http.get/*/headers/*/Content-Disposition
+               .:=
+            strings.trim:x:@strings.split/1
+               .:"\""
+            strings.concat
+               .:/modules/
+               get-value:x:@strings.trim
+            io.file.save.binary:x:@strings.concat
+               get-value:x:@http.get/*/content
 
-               // Blocking IP address.
-               data.create
-                  table:ml_blocked_ips
-                  values
-                     ip_address:x:@request.headers.get
-                     user_id:x:@.arguments/*/user_id
+            // Unzipping downloaded ZIP file into www folder.
+            io.file.unzip:x:@strings.concat
+               folder:/etc/www/
+               overwrite:true
 
-               // Writing it into our log.
-               add:x:./*/log.info
-                  request.headers.list
-               log.info:IP address was permanently blocked
-               throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
-                  public:bool:true
-                  status:int:401
+            // Deleting ZIP file.
+            io.file.delete:x:@strings.concat
+
+            // Notifying client that installation is done.
+            sockets.signal:magic.backend.message
+               roles:root
+               args
+                  message:Frontend was successfully installed
+                  type:success
+   .catch
+
+      // Oops ...!!
+      log.error:Could not install plugin
+         message:x:@.arguments/*/message
+
+      // Notifying client that some error occurred.
+      sockets.signal:magic.backend.message
+         roles:root
+         args
+            message:Plugin could not be installed, check your log for details
+            type:error
+
+// Returning success to caller.
+return
+   result:success

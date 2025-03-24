@@ -1,30 +1,80 @@
 
-// Returns a single plan.
+// Count unique and distinct items from your Customers table in your northwind database
 .arguments
-   plan:string
 
-// Returns all plans in the system.
-data.connect:[generic|hub]
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   /*
+    * Filtering columns
+    * - '.eq' implies equals
+    * - '.like' implies like filtering using SQL 'LIKE' where condition
+    */
+   Customers.CustomerID.like:string
+   Customers.CustomerID.eq:string
+   Customers.CompanyName.like:string
+   Customers.CompanyName.eq:string
+   Customers.ContactName.like:string
+   Customers.ContactName.eq:string
+   Customers.ContactTitle.like:string
+   Customers.ContactTitle.eq:string
+   Customers.Address.like:string
+   Customers.Address.eq:string
+   Customers.City.like:string
+   Customers.City.eq:string
+   Customers.Region.like:string
+   Customers.Region.eq:string
+   Customers.PostalCode.like:string
+   Customers.PostalCode.eq:string
+   Customers.Country.like:string
+   Customers.Country.eq:string
+   Customers.Phone.like:string
+   Customers.Phone.eq:string
+   Customers.Fax.like:string
+   Customers.Fax.eq:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Customers.CustomerID
+   .:Customers.CompanyName
+   .:Customers.ContactName
+   .:Customers.ContactTitle
+   .:Customers.Address
+   .:Customers.City
+   .:Customers.Region
+   .:Customers.PostalCode
+   .:Customers.Country
+   .:Customers.Phone
+   .:Customers.Fax
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
    data.read
-      table:plans
+      database-type:sqlite
+      table:Customers
       columns
-         name
-         description
-         cpu
-         memory
-         storage
-         price
-         price_reference
+         distinct_functor
+            as:count
       where
          and
-            name.eq:x:@.arguments/*/plan
 
-   // Returning result of above invocation to caller.
-   yield
-      name:x:@data.read/*/*/name
-      description:x:@data.read/*/*/description
-      cpu:x:@data.read/*/*/cpu
-      memory:x:@data.read/*/*/memory
-      storage:x:@data.read/*/*/storage
-      price:x:@data.read/*/*/price
-      price_reference:x:@data.read/*/*/price_reference
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

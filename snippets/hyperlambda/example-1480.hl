@@ -1,46 +1,48 @@
+/*
+ * Returns enrollment records for a specific course
+ */
 
-// How does CRUD slots in Hyperlambda
+.arguments
+   filter:string
+   limit:long
+   offset:long
 
-// Hyperlambda has 4 basic CRUD slots, you can examples of these below.
+auth.ticket.verify:lms-manager
 
-// Create
-data.create
-   table:table1
-   values
-      column1:value1
-      column2:value2
-      column3:value3
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:15
 
-// Read
-data.read
-   table:table1
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
 
-   // Optional
-   limit:5
+mssql.connect:[training|LMS_Enrollments]
 
-   // Optional
-   offset:5
-
-   // Optional
-   order
-      column1
-      column2
-
-   // Optional
-   direction:desc
-
-// Update
-data.update
-   table:table1
-   values
-      column1:new-value
-   where
-      and
-         id.eq:PRIMARY-KEY-OF-RECORD-TO-UPDATE
-
-// Delete
-data.delete
-   table:table1
-   where
-      and
-         id.eq:PRIMARY-KEY-OF-RECORD-TO-UPDATE
+   mssql.read
+      table:Enrollments
+         as:e
+         join:Courses
+            as:c
+            type:left
+            on
+               and
+                  e.CourseId.eq:c.Id
+      columns
+         c.CourseName
+         count(*)
+            as:EnrollmentCount
+         sum(e.CreditsEarned)
+            as:TotalCredits
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         and
+            c.CourseName.eq:x:@.arguments/*/filter
+      group
+         c.CourseName
+   return-nodes:x:@mssql.read/*

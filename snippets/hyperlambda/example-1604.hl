@@ -1,34 +1,36 @@
-
-// Create a Hyperlambda script that generates a long-lasting JWT token with the specified username and role, expiring on the specified date, ensuring the user is authorized.
-.arguments
-
-   // Mandatory username for token we should generate. Does not need to be an existing user from the database.
-   username:string
-
-   // Mandatory argument being the role the returned JWT token should be associated with.
-   role:string
-
-   // Mandatory expiration date for the token. Can be any future date and time.
-   expires:date
-
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/role
-validators.mandatory:x:@.arguments/*/expires
-
 /*
- * Invokes [auth.ticket.create] to create our JWT token,
- * making sure we return the token to the caller.
+ * Loads every file in specified folder, changes its filename, saves as a new file, and deletes the original file
  */
-auth.ticket.create
-   username:x:@.arguments/*/username
-   expires:x:@.arguments/*/expires
-   roles
-      .:x:@.arguments/*/role
+execute:magic.io.file.load-recursively
+   .:/etc/hyperlambda-training-material/hyperlambda/
 
-// Returns the authentication JWT ticket created above to caller.
-yield
-   ticket:x:@auth.ticket.create
+// Counter
+.no:int:1
+
+// Looping through each file returned above.
+for-each:x:@execute/*
+
+   // Removing existing filename
+   strings.split:x:@.dp/#
+      .:/
+   remove-nodes:x:@strings.split/0/-
+
+   // Creating a new filename based upob the counter
+   strings.concat
+      .:/
+      strings.join:x:@strings.split/*
+         .:/
+      .:/
+      .:example-
+      get-value:x:@.no
+      .:.hl
+
+   // Saving new file
+   io.file.save:x:@strings.concat
+      get-value:x:@.dp/#/*
+
+   // Deleting old file
+   io.file.delete:x:@.dp/#
+
+   // Incrementing counter
+   math.increment:x:@.no

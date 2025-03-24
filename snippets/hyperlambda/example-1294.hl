@@ -1,26 +1,51 @@
+
 /*
- * Posts a dynamic set of arguments to a user info API.
- * Returns full name and contact email on success; error message otherwise.
+ * Creates training data and inserts into fine-tuning database such that it can be exported later.
+ * 
+ * If this function returns nothing, we are done, and we have generated training data for every single Hyperlambda file in your cloudlet.
  */
-
 .arguments
-   id:int
 
-add:x:+/*/payload
-   get-nodes:x:@.arguments/*
-http.post:"https://api.example.com/user/profile"
-   convert:true
-   payload
+   // Mandatory argument being file number to generate training data for. When listing Hyperlambda files, this will generate training data for the nth file listed, allowing us to loop for as long as have have additional files, incrementing the file-no argument for each iteration.
+   file-no:int
 
+// By making the Hyperlambda file public we can use it as an AI function.
+.type:public
+
+// Listing files recursively.
+io.file.list-recursively:/
+
+// Pruning out everything but Hyperlambda files.
+.file
+for-each:x:@io.file.list-recursively/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.file
+            .
+               .:x:@.dp/#
+
+// Checking if we've dealt with all files.
 if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
+   mt
+      get-value:x:@.arguments/*/file-no
+      get-count:x:@.file/*
    .lambda
-      yield
-         full_name:x:@http.post/*/content/*/full_name
-         contact_email:x:@http.post/*/content/*/contact_email
-return
-   error:Unable to retrieve user profile
+      return
+         result:There are no more files, you have handled all files.
+
+// Loading nth file.
+.hyperlambda
+strings.concat
+   .:@.file/
+   get-value:x:@.arguments/*/file-no
+set-x:x:+
+   convert:x:@strings.concat
+      type:x
+io.file.load
+
+// Returning Hyperlambda file to caller.
+yield
+   hyperlambda:x:@io.file.load

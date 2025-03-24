@@ -1,53 +1,21 @@
 
-// Script to return all available themes from the backend.
+// Tracks an order in Shopify.
 .arguments
+   order:string
 
-// Making sure user has access to invoked endpoint.
-auth.ticket.verify:root
+// Retrieving secret and shop.
+.secret
+set-value:x:@.secret
+   config.get:"magic:shopify:secret"
+.shop
+set-value:x:@.shop
+   config.get:"magic:shopify:shop"
 
-// Checking if custom CSS file exists.
-.result
+// Invoking slot to do the heavy work.
+execute:shopify.orders.track
+   secret:x:@.secret
+   shop:x:@.shop
+   order_no:x:@.arguments/*/order
 
-// Listing custom files.
-if
-   io.folder.exists:/etc/system/openai/css/chat/
-   .lambda
-      io.file.list:/etc/system/openai/css/chat/
-      for-each:x:@io.file.list/*
-         if
-            strings.ends-with:x:@.dp/#
-               .:css
-            .lambda
-               strings.split:x:@.dp/#
-                  .:/
-               strings.split:x:@strings.split/0/-
-                  .:.
-               unwrap:x:+/*/*
-               add:x:@.result
-                  .
-                     .:x:@strings.split/0
-
-// Listing system files.
-if
-   io.folder.exists:/system/openai/front.files/chat/
-   .lambda
-      io.file.list:/system/openai/front.files/chat/
-      for-each:x:@io.file.list/*
-         if
-            strings.ends-with:x:@.dp/#
-               .:css
-            .lambda
-               strings.split:x:@.dp/#
-                  .:/
-               strings.split:x:@strings.split/0/-
-                  .:.
-               if
-                  not-exists:x:"@.result/*/\"={@strings.split/0}\""
-                  .lambda
-                     unwrap:x:+/*/*
-                     add:x:@.result
-                        .
-                           .:x:@strings.split/0
-
-// Returning result to caller.
-return-nodes:x:@.result/*
+// Returns the result of your last action.
+return-nodes:x:@execute/*

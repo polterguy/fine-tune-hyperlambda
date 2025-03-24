@@ -1,5 +1,31 @@
-/*
- * Example: Get the length of an empty string.
- */
-// Returns 0
-strings.length:""
+// Search through a log file and extract all URLs from it
+
+// Read the log file
+if
+   io.file.exists:/var/logs/server.log
+   .lambda
+
+      // Reading file's content as text.
+      io.file.load:/var/logs/server.log
+
+      // A temporary place to hold the extracted URLs
+      .urls
+
+      // Extracting URLs using regex
+      strings.matches:x:@io.file.load
+         .:"https?://[\\w\\.-]+(?:\\.[\\w\\.-]+)+(?:[/\\w\\._~:?#[\\]@!$&'()*+,;=-]*)?"
+
+      // Loop through the matches and add them to the list
+      for-each:x:@strings.matches/*/match
+         unwrap:x:+/*/*
+         add:x:@.urls
+            .
+               .:x:@.dp/#
+
+      // Log the summary
+      lambda2hyper:x:@.urls/*
+      log.info:Extracted URLs from file
+         emails:x:@lambda2hyper
+
+else
+   log.error:Log file not found

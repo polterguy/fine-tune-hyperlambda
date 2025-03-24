@@ -1,21 +1,74 @@
 
-// Example of [whitelist] execution, where only two slots are legal
-.result
-whitelist
-   vocabulary
-      set-value
-      return
-   .lambda
+// Slot responsible for hard deletion of an existing cloudlet.
+slots.create:hub.cloudlets.hard-delete
 
-      // Inside of this [.lambda] object, we can only invoke [set-value], and no other slots!
-      set-value:x:@.result
-         .:foo
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/cluster
+   validators.mandatory:x:@.arguments/*/name
 
-      // Notice, the next line will throw an exception if you remove its "." character,
+   // Invoking soft delete first.
+   add:x:+
+      get-nodes:x:@.arguments/*
+   signal:hub.cloudlets.delete
 
-      // because [add] is not whitelisted in our above [vocabulary] declaration!
-      .add:x:@.result
-         .
-            foo:bar
-      return
-         result:success
+   // Figuring out base URL of Kubernetes REST API.
+   .base-url
+   strings.concat
+      .:"magic:hub:"
+      get-value:x:@.arguments/*/cluster
+      .:":manager-url"
+   set-value:x:@.base-url
+      config.get:x:@strings.concat
+
+   // Figuring out Kubernetes namespace cloudlets exists in.
+   .namespace
+   set-value:x:@.namespace
+      config.get:"magic:hub:default-namespace"
+
+   // Retrieving token that's required to invoke Kubernetes REST API.
+   .token
+   strings.concat
+      .:"magic:hub:"
+      get-value:x:@.arguments/*/cluster
+      .:":token"
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:x:@strings.concat/@strings.concat
+
+   // Invoking Web API responsible for deleting volume claim.
+   .url
+   set-value:x:@.url
+      strings.concat
+         get-value:x:@.base-url
+         .:/api/v1/namespaces/
+         get-value:x:@.namespace
+         .:/persistentvolumeclaims/
+         get-value:x:@.arguments/*/name
+   http.delete:x:@.url
+      headers
+         Authorization:x:@.token
+
+   // Sanity checking above invocation
+   if
+      not
+         and
+            mte:x:@http.delete
+               .:int:200
+            lt:x:@http.delete
+               .:int:300
+      .lambda
+
+         // Oops, web API didn't return success
+         log.error:Kubernetes could not delete volume claim
+            status:x:@http.post
+            response:x:@http.post/*/content
+            cluster:x:@.arguments/*/cluster
+            name:x:@.arguments/*/name
+   else
+
+      // Logging the fact that we successfully deleted ingress.
+      log.debug:Kubernetes volume claim successfully deleted
+         cluster:x:@.arguments/*/cluster
+         name:x:@.arguments/*/name
+         response:x:@http.post/*/content

@@ -1,67 +1,42 @@
+// Executing the Hyperlambda changes the node hierarchy
 
-// Update one record in your comments table in your cms database
-.arguments
+// This Hyperlambda
+.source:foo
+.result
 
-   // id column value being primary key of record to update, mandatory argument
-   id:long
+switch:x:@.source
 
-   // post_id column's new value
-   post_id:long
+   case:foo
 
-   // user_id column's new value
-   user_id:long
+      // Lambda object to evaluate if expression's value equals 'foo'.
+      set-value:x:@.result
+         .:Is foo
 
-   // content column's new value
-   content:string
+   case:bar
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
+      // Lambda object to evaluate if expression's value equals 'bar'.
+      set-value:x:@.result
+         .:Is bar
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
+   default
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+      /*
+       * Lambda object to evaluate if expression is not matched to any
+       * of the above values.
+       */
+      set-value:x:@.result
+         .:None of the above
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      database-type:sqlite
-      table:comments
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   add:x:./*/sockets.signal
-      get-nodes:x:@auth.ticket.verify
-   set-name:x:./*/sockets.signal/*/auth.ticket.verify
-      .:roles
-   sockets.signal:cms.comments.put
-      args
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+// Creates this result
+.source:foo
+.result:Is foo
+switch:x:@.source
+   case:foo
+      set-value:x:@.result
+         .:Is foo
+   case:bar
+      set-value:x:@.result
+         .:Is bar
+   default
+      set-value:x:@.result
+         .:None of the above

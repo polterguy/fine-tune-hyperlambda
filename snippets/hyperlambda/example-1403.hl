@@ -1,9 +1,38 @@
 
-// Create a task that executes on two specific dates, in addition to repeating every 3 hours and 5 seconds
-tasks.create:foo-bar-task-3
-   due:date:"2025-01-01T23:59:27.000"
-   repeats:5.seconds
-   repeats:3.hours
-   due:date:"2030-01-01T23:59:27.000"
-   .lambda
-      log.info:Executing foo-bar-task-2
+/*
+ * Gets a company
+ * 
+ * Will return the company with the specified name.
+ */
+.arguments
+   query:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
+
+// Connecting to database.
+data.connect:[finovo|finovo]
+   database-type:pgsql
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:basic
+      columns
+         org_number
+         company_name
+      where
+         and
+            legalgroup_code.eq:AB
+            company_name.ilike:x:@.arguments/*/query
+      limit:1
+
+   // Checking we've got data.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         return
+            result:No results were found
+
+   // Returning result to caller.
+   return-nodes:x:@data.read/*/*

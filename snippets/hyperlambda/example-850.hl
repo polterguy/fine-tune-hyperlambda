@@ -1,0 +1,27 @@
+/*
+ * Invokes HTTP post with dynamic set of arguments and returning error if unsuccessful,
+ * otherwise returns name an email of user
+ */
+
+.arguments
+   id:int
+
+// Adding ALL arguments to payload.
+add:x:+/*/payload
+   get-nodes:x:@.arguments/*
+http.post:"https://logistics.example.org/get-user"
+   convert:true
+   payload
+
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         name:x:@http.post/*/content/*/name
+         email:x:@http.post/*/content/*/email
+return
+   error:Something went wrong

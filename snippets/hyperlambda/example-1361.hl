@@ -1,15 +1,45 @@
-// Checks to see if user exists in magic database
-.arguments
-   username:string
 
-data.connect:magic
-   data.scalar:select count(*) from users where username = @username
-      @username:x:@.arguments/*/username
-   if
-      eq:x:@data.scalar
-         .:long:0
-      .lambda
-         return
-            result:User does not exist
-return
-   result:User exists
+// Create one record in your category table in your sakila database without authorization. Log invocation.
+.arguments
+
+   // name column value
+   name:string
+
+   // last_update column value
+   last_update:date
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.category entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:category
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:sakila.category.post
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

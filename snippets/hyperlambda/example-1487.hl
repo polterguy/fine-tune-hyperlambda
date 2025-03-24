@@ -1,13 +1,46 @@
+/*
+ * Slot that returns summarized sales orders for a given region.
+ */
 
-// Write a Hyperlambda script to ensure the cache folder exists and empty it for JavaScript files.
-if
-   not
-      io.folder.exists:/etc/cache/
-   .lambda
-      io.folder.create:/etc/cache/
-else
+slots.create:sales.orders.by-region
 
-   // Empties cache folder for JavaScript files.
-   io.file.list:/etc/cache/
-   for-each:x:@io.file.list/*
-      io.file.delete:x:@.dp/#
+   .limit
+   set-value:x:@.limit
+      get-first-value
+         get-value:x:@.arguments/*/limit
+         .:long:20
+
+   .offset
+   set-value:x:@.offset
+      get-first-value
+         get-value:x:@.arguments/*/offset
+         .:long:0
+
+   mssql.connect:[production|ORDSYS_MAIN]
+
+      mssql.read
+         table:SalesOrders
+            as:o
+            join:Customers
+               as:c
+               type:left
+               on
+                  and
+                     o.CustomerId.eq:c.Id
+         columns
+            c.Region
+            c.CompanyName
+            sum(o.TotalAmount)
+               as:TotalSales
+            count(*)
+               as:OrdersCount
+         limit:x:@.limit
+         offset:x:@.offset
+         where
+            and
+               c.Region.eq:x:@.arguments/*/filter
+         group
+            c.Region
+            c.CompanyName
+
+      return-nodes:x:@mssql.read/*

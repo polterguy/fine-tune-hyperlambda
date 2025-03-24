@@ -1,25 +1,33 @@
 
-// Returns all cloudlet plans that exists using Hyperlambda workflow actions
+// Write a Hyperlambda script to return the conversation starters for a specified type.
+.arguments
+   type:string
 
-/*
- * Ensures user is authorized to access endpoint.
- * 
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
 
-// Returns all plans in the system.
-execute:magic.workflows.actions.execute
-   name:hub-plans-get
-   filename:/modules/hub/workflows/actions/hub-plans-get.hl
-   arguments
+// Opening up database connection.
+data.connect:[generic|magic]
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+   // Retrieving all questions from database.
+   data.select:"\nselect conversation_starters\n\tfrom ml_types\n\twhere type = @type"
+      type:x:@.arguments/*/type
+
+   // Transforming to markdown and splitting into individual questions, but only if we have conversation starters.
+   if
+      and
+         not-null:x:@data.select/*/*/conversation_starters
+         neq:x:@data.select/*/*/conversation_starters
+            .:
+      .lambda
+         markdown2html:x:@data.select/*/*/conversation_starters
+         html2lambda:x:@markdown2html
+         for-each:x:"@html2lambda/**/li/**/\\#text"
+            unwrap:x:+/*/*
+            add:x:../*/return/*/questions
+               .
+                  .:x:@.dp/#
+
+// Returning result to caller.
+return
+   questions

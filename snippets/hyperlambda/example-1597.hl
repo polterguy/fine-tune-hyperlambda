@@ -1,35 +1,26 @@
 
-// CRUD / Create Hyperlambda that creates one record in your categories table in your cms database with authentication and authorization
+// Hyperlambda script for a CRUD delete endpoint that deletes one item from the users table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
 .arguments
-
-   // Optional name column value
-   name:string
-
-   // Optional description column value
-   description:string
+   username:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/username
 
-// Opening up database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
       get-nodes:x:@.arguments/*
 
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:categories
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
+   // Deleting item from database.
+   data.delete
+      table:users
+      where
+         and
 
    // Returning result of above invocation to caller.
    unwrap:x:+/*
    return
-      id:x:@data.create
+      affected:x:@data.delete

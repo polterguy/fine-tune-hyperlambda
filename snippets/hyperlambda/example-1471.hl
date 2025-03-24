@@ -1,33 +1,63 @@
 
-// Write a Hyperlambda script to return the conversation starters for a specified type.
+// Write a Hyperlambda script to create a system message from specified arguments, including URL, template, and instruction.
 .arguments
-   type:string
+   url:string
+   template:string
+   instruction:string
+   channel:string
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/channel
+validators.mandatory:x:@.arguments/*/template
+validators.mandatory:x:@.arguments/*/instruction
 
-// Opening up database connection.
-data.connect:[generic|magic]
+// Prepending scheme to URL unless explicitly specified.
+if
+   and
+      not
+         strings.starts-with:x:@.arguments/*/url
+            .:"http://"
+      not
+         strings.starts-with:x:@.arguments/*/url
+            .:"https://"
+   .lambda
+      set-value:x:@.arguments/*/url
+         strings.concat
+            .:"https://"
+            get-value:x:@.arguments/*/url
 
-   // Retrieving all questions from database.
-   data.select:"\nselect conversation_starters\n\tfrom ml_types\n\twhere type = @type"
-      type:x:@.arguments/*/type
+// Sanity checking URL.
+validators.url:x:@.arguments/*/url
 
-   // Transforming to markdown and splitting into individual questions, but only if we have conversation starters.
-   if
-      and
-         not-null:x:@data.select/*/*/conversation_starters
-         neq:x:@data.select/*/*/conversation_starters
-            .:
-      .lambda
-         markdown2html:x:@data.select/*/*/conversation_starters
-         html2lambda:x:@markdown2html
-         for-each:x:"@html2lambda/**/li/**/\\#text"
-            unwrap:x:+/*/*
-            add:x:../*/return/*/questions
-               .
-                  .:x:@.dp/#
+// Doing heavy lifting on a background thread to avoid 60 second timeouts.
+insert-before:x:./*/fork/0
+   get-nodes:x:@.arguments
+fork
+   try
 
-// Returning result to caller.
-return
-   questions
+      // Creating our system message.
+      execute:magic.ai.create-system-message
+         url:x:@.arguments/*/url
+         template:x:@.arguments/*/template
+         instruction:x:@.arguments/*/instruction
+
+      // Invoking frontend with message.
+      unwrap:x:+/*/*/message
+      sockets.signal:x:@.arguments/*/channel
+         roles:root
+         args
+            message:x:@execute
+   .catch
+
+      // Oops, signaling frontend that we experienced an error.
+      unwrap:x:+/*/*
+      sockets.signal:x:@.arguments/@.arguments/*/channel
+         roles:root
+         args
+            message:ERROR
+            extra:x:@.arguments/*/message
+
+// Returning result of invocation to caller.
+yield
+   result:success

@@ -1,5 +1,31 @@
+/*
+ * This example checks user role permissions before allowing access.
+ * If the user is an "admin", they get full access.
+ * If the user is a "moderator" but the feature is disabled, access is denied.
+ * Otherwise, they get limited access.
+ */
+.user
+   role:moderator
+   feature-enabled:bool:false
 
-// Create a Hyperlambda script to scrape a specified web page and include semantics.
-signal:magic.http.scrape-url
-   url:"https://www.cnn.com/2023/06/18/golf/wyndham-clark-2023-us-open-winner-spt-intl/index.html"
-   semantics:bool:true
+.access
+if
+   eq:x:@.user/*/role
+      .:admin
+   .lambda
+      set-value:x:@.access
+         .:Full Access Granted
+
+else-if
+   and
+      eq:x:@.user/*/role
+         .:moderator
+      eq:x:@.user/feature-enabled
+         .:bool:true
+   .lambda
+      set-value:x:@.access
+         .:Limited Access Granted
+
+else
+   set-value:x:@.access
+      .:Access Denied

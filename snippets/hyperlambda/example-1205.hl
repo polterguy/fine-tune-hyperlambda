@@ -1,13 +1,17 @@
-// [eq] returns false if values are not equal or types differ
-.a:5
-.b:int:5
-eq
-   get-value:x:@.a
-   get-value:x:@.b
 
-// Result after execution
-.a:5
-.b:int:5
-eq:bool:false
-   get-value:5
-   get-value:int:5
+// Hyperlambda endpoint taking arguments. This SQL query retrieves and returns the names of artists and the titles of their albums from the Chinook database, ordering the results by artist name and limiting the output to 50 records.
+.arguments
+
+// Making sure user is authorized to invoke endpoint.
+auth.ticket.verify:enterprise
+
+// Connecting to database.
+data.connect:chinook
+   database-type:sqlite
+
+   // Executing [data.select] slot with our SQL.
+   data.select:"\n/*\n * Script to join artists to albums in your Chinook database.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect ar.Name, al.Title\n  from Album al\n    inner join Artist ar on al.ArtistId = ar.ArtistId\n  order by ar.Name\n  limit 50\n"
+      database-type:sqlite
+
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

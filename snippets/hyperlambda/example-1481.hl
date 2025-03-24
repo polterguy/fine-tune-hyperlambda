@@ -1,8 +1,38 @@
-// This example connects to the 'hospital' database and inserts a new patient record into the 'patients' table.
-sqlite.connect:hospital
-   sqlite.create
-      table:patients
+
+// Create endpoint inserting one record into your items table in your shopping-cart-demo database.
+.arguments
+
+   // product_id column value
+   product_id:long
+
+   // quantity column value
+   quantity:long
+
+   // session_id column value
+   session_id:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:items
+      return-id:bool:true
       values
-         patient_id:int:11223
-         name:Robert Brown
-         diagnosis:Cold
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

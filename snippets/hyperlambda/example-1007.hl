@@ -1,11 +1,16 @@
 
-// Hyperlambda snippet that queries 'messaging_db' for recent chat logs.
+// Hyperlambda script to return a specified log item based on its ID.
+.arguments
+   id:string
 
-// Queries "messaging_db" for recent chat logs.
-.result
-data.connect:messaging_db
-   database-type:sqlite
-   data.select:select * from chat_logs order by timestamp desc limit 100
-      database-type:sqlite
-   add:x:@.result
-      get-nodes:x:@data.select/*
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+
+// Invoking slot responsible for returning item.
+log.get:x:@.arguments/*/id
+
+// Returning result of above invocation to caller.
+return-nodes:x:-/*

@@ -1,17 +1,27 @@
 
-// Hyperlambda file that sets specified HTTP headers in a response. Use 'headers' as a key-value input to determine which headers to set.
-.arguments
-   headers:*
+// Create a function to return all existing payment subscription plans in the system. The function should find and execute all slots that declare subscription plans, each returning a name, description, price, currency, period (month or year), and Stripe price ID. The function should loop through these slots, execute them to retrieve the subscription plans, and return the plans to the caller. This setup allows the system to handle Stripe subscriptions effectively.
+slots.vocabulary:stripe.subscriptions.plans.
 
-/*
- * Iterating through each header from above invocation and checking if caller is interested in it,
- * and if caller wants this particular header, we make sure we return it below.
- */
-for-each:x:@.arguments/*/headers/*
+// Looping through each slot returned above and executing it.
+for-each:x:@slots.vocabulary/*
 
-   // Adding currently iterated HTTP header.
-   add:x:../*/response.headers.set
-      get-nodes:x:@.dp/#
+   // Changing slot invocation name.
+   set-value:x:./*/execute
+      get-value:x:@.dp/#
 
-// Invoking slot responsible for setting response HTTP headers.
-response.headers.set
+   /*
+    * Executing slot to retrieve supported providers.
+    * 
+    * Notice, name of slot (value of node) is dynamically created above.
+    */
+   execute
+
+   // Looping through all providers returned above to return them to client.
+   for-each:x:@execute/*
+
+      // Returning subscription plan to caller.
+      add:x:../*/return
+         get-nodes:x:@.dp/#
+
+// Returning subscription plans to caller.
+return

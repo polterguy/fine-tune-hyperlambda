@@ -1,3 +1,26 @@
-// Verifies if the authenticated user has any of the roles: admin, editor, or user.
 
-auth.ticket.verify:admin,editor,user
+// Retrieves all URLs from sitemap on specified website.
+.url:"https://ainiro.io"
+
+// will contain all URLs from website
+.urls
+
+// Retrieving main sitemap.
+strings.concat
+   get-value:x:@.url
+   .:"/sitemap.xml"
+http.get:x:@strings.concat
+xml2lambda:x:@http.get/*/content
+
+// Iterating through each URL referenced in main sitemap.
+for-each:x:@xml2lambda/*/sitemapindex/*/sitemap/*/loc/*/\#text
+
+   // Getting XML from currently iterated sitemap subset.
+   unwrap:x:+/*/*
+   http.get:x:@.dp/#
+   xml2lambda:x:@http.get/*/content
+   for-each:x:@xml2lambda/*/urlset/*/url/*/loc/*/\#text
+      unwrap:x:+/*/*
+      add:x:@.urls
+         .
+            .:x:@.dp/#

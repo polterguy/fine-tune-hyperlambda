@@ -1,177 +1,91 @@
 
-// Slot that imports products from Shopify.
-slots.create:shopify.products.import
+// Returns number of registrations for the last 14 days grouped by day.
+auth.ticket.get
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/secret
-   validators.mandatory:x:@.arguments/*/shop
+// Storing commission for later.
+.percent
 
-   // Basic logging.
-   log.info:Starting import from Shopify
-      shop:x:@.arguments/*/shop
+// Ensuring user is an affiliate
+data.connect:[generic|magic]
 
-   // Making sure we catch exceptions.
-   try
+   /*
+    * Retrieving affiliate percent for user.
+    * Notice, if user doesn't have an affiliate percent, user ir
+    * not an affiliate.
+    */
+   data.read
+      table:users_extra
+      columns
+         value
+      where
+         and
+            type.eq:affiliate_percent
+            user.eq:x:@auth.ticket.get
+   if
+      not-exists:x:@data.read/*/*/value
+      .lambda
 
-      // Deleting old products.
-      data.connect:[generic|shopify]
-         database-type:sqlite
-         data.execute:delete from products
+         // Oops ...!!
+         log.error:User is not affiliate
+            username:x:@auth.ticket.get
+         throw:You are not an affiliate
+            public:true
+            status:400
 
-      // Retrieving 20 products at the time.
-      .continue:bool:true
-      .page-info
-      while:x:@.continue
+   // Storing percentage for later.
+   convert:x:@data.read/*/*/value
+      type:decimal
+   set-value:x:@.percent
+      math.divide:x:@convert
+         .:decimal:100
 
-         // Creating our URL.
-         .url
+// Connecting to Stripe database.
+data.connect:[generic|stripe]
+
+   // Retrieving transactions from database.
+   data.select:"\nselect strftime('%Y-%m-%d', datetime(t.created)) as date, sum(amount) as amount\n   from transactions t\n      where date(t.created, '+42 day') > CURRENT_TIMESTAMP and\n         t.affiliate = @affiliate and\n         t.type = 'charge.succeeded'\n   group by date\n   order by date asc"
+      @affiliate:x:@auth.ticket.get
+
+   // Looping through all days the last 6 weeks.
+   .buffer
+   .cur
+   set-value:x:@.cur
+      math.subtract
+         date.now
+         time
+            days:42
+   while
+      lt:x:@.cur
+         date.now
+      .lambda
+         date.format:x:@.cur
+            format:yyyy-MM-dd
          if
-            not-null:x:@.page-info
+            exists:x:@data.select/*/*/date/={@date.format}
             .lambda
-
-               // Paging next result set.
-               set-value:x:@.url
-                  get-value:x:@.page-info
+               set-value:x:@data.select/*/*/date/={@date.format}/./*/amount
+                  math.multiply:x:@data.select/*/*/date/={@date.format}/./*/amount
+                     get-value:x:@.percent
+               get-nodes:x:@data.select/*/*/date/={@date.format}/.
+               add:x:@.buffer
+                  get-nodes:x:@data.select/*/*/date/={@date.format}/.
          else
+            unwrap:x:+/*/*/*
+            add:x:@.buffer
+               .
+                  .
+                     date:x:@date.format
+                     amount:int:0
 
-            // Retrieving first result set.
-            set-value:x:@.url
-               strings.concat
-                  .:"https://"
-                  get-value:x:@.arguments/*/shop
-                  .:.myshopify.com/admin/api/2023-07/products.json?limit=20&published_status=published&status=active
+         // Decrementing current day.
+         set-value:x:@.cur
+            math.add:x:@.cur
+               time
+                  days:1
 
-         // Invoking Shopify.
-         http.get:x:@.url
-            headers
-               X-Shopify-Access-Token:x:@.arguments/*/secret
-            convert:true
+   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
+   response.headers.set
+      Cache-Control:public, max-age=3600
 
-         // Sanity checking HTTP request.
-         if
-            not
-               and
-                  mte:x:@http.get
-                     .:int:200
-                  lt:x:@http.get
-                     .:int:300
-            .lambda
-
-               // Oops ...!!
-               lambda2hyper:x:@http.get
-               log.error:Something went wrong while invoking Shopify
-                  result:x:@lambda2hyper
-               throw:Something went wrong while invoking Shopify, check your log for details.
-
-         // Making sure we've got more products, and if not, aborting while.
-         if
-            not-exists:x:@http.get/*/content/*/products/*
-            .lambda
-
-               // No more products.
-               set-value:x:@.continue
-                  .:bool:false
-         else
-
-            /*
-             * We have more products, first figuring out [.page-info]
-             * such that we can offset next iteration.
-             */
-            strings.matches:x:@http.get/*/headers/*/Link
-               .:"<[^;]+\\/(\\w+\\.json[^;]+)>;\\srel=\"next\""
-            if
-               exists:x:@strings.matches/0
-               .lambda
-
-                  // We have a valid next page.
-                  strings.matches:x:@strings.matches/0
-                     .:[^<>]+
-                  if
-                     exists:x:@strings.matches/0
-                     .lambda
-
-                        // Valid next link.
-                        set-value:x:@.page-info
-                           get-value:x:@strings.matches/0
-                  else
-
-                     // No more pages.
-                     set-value:x:@.continue
-                        .:bool:false
-            else
-
-               // No more pages.
-               set-value:x:@.continue
-                  .:bool:false
-
-            /*
-             * Opening up our database connection, such that we can
-             * import products into our database.
-             */
-            data.connect:[generic|shopify]
-               database-type:sqlite
-
-               // Looping through each result from above invocation.
-               for-each:x:@http.get/*/content/*/products/*
-
-                  // Extracting the important parts to insert into our own database.
-                  .tmp
-                  set-value:x:@.tmp
-                     strings.concat
-                        .:<div>
-                        get-value:x:@.dp/#/*/body_html
-                        .:</div>
-                  html2markdown:x:@.tmp
-                  .data
-                     title:x:@.dp/#/*/title
-                     body_html:x:@html2markdown
-                     vendor:x:@.dp/#/*/vendor
-                     product_type:x:@.dp/#/*/product_type
-                     published_at:x:@.dp/#/*/published_at
-                     handle:x:@.dp/#/*/handle
-                     tags:x:@.dp/#/*/tags
-                  unwrap:x:@.data/*
-
-                  // Inserting product into database.
-                  data.create
-                     database-type:sqlite
-                     table:products
-                     values
-                        title:x:@.data/*/title
-                        body_html:x:@.data/*/body_html
-                        vendor:x:@.data/*/vendor
-                        product_type:x:@.data/*/product_type
-                        published_at:x:@.data/*/published_at
-                        handle:x:@.data/*/handle
-                        tags:x:@.data/*/tags
-
-                  // Inserting variants into database.
-                  for-each:x:@.dp/#/*/variants/*
-                     data.create
-                        database-type:sqlite
-                        table:variants
-                        values
-                           product_id:x:@for-each/@data.create
-                           price:x:@.dp/#/*/price
-                           title:x:@.dp/#/*/title
-
-                  // Inserting images into database.
-                  for-each:x:@.dp/#/*/images/*
-                     data.create
-                        database-type:sqlite
-                        table:images
-                        values
-                           product_id:x:@for-each/@data.create
-                           alt:x:@.dp/#/*/alt
-                           width:x:@.dp/#/*/width
-                           height:x:@.dp/#/*/height
-                           src:x:@.dp/#/*/src
-
-      // Basic logging.
-      log.info:Done importing products from Shopify
-         shop:x:@.arguments/*/shop
-   .catch
-
-      // Oops ...!!
-      log.error:Something went wrong during Shopify import
-         info:x:@.arguments/*/message
+   // Returning result to caller.
+   return-nodes:x:@.buffer/*

@@ -1,39 +1,68 @@
 
-// Removes the specified [roles] from the specified [username], where [roles] is supplied as a list of strings.
-.arguments
-   username:string
-   roles:*
+// Write a Hyperlambda script for a Twilio webhook callback to handle notifications when your Twilio account receives messages.
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/roles
+// Retrieving actual message.
+.body
+set-value:x:@.body
+   get-value:x:@.arguments/*/Body
 
-// Connecting to database.
-data.connect:[generic|magic]
+// Retrieving from value.
+.from
+set-value:x:@.from
+   get-value:x:@.arguments/*/From
 
-   // Verifying user exists.
-   data.read
-      table:users
-      columns
-         username
-      where
-         and
-            username.eq:x:@.arguments/*/username
+// Retrieving to value.
+.to
+set-value:x:@.to
+   get-value:x:@.arguments/*/To
 
-   // Verifying above invocation returned something.
-   if
-      not-exists:x:@data.read/*
-      .lambda
+// Basic logging.
+log.info:Webhook invoked from Twilio
+   body:x:@.body
+   from:x:@.from
+   to:x:@.to
 
-         // Oops ...!!
-         throw:No such user
-            username:x:@.arguments/*/username
+// Lambda object to execute with callback.
+.exe
 
-   // Removing [roles] from [username]
-   for-each:x:@.arguments/*/roles/*
-      data.delete
-         table:users_roles
-         where
-            and
-               user.eq:x:@.arguments/*/username
-               role.eq:x:@.dp/#
+   // Signaling configured slot.
+   signal:foo
+
+   // Returning whatever callback returned as result of webhook invocation
+   return:x:-
+
+/*
+ * Dynamically creating our lambda [.exe] callback by parametrising with [.arguments]
+ * given to endpoint by Twilio. This makes sure we're using the dynamically configured
+ * slot the backend has been configured to use as your webhook is being invoked.
+ */
+set-value:x:@.exe/*/signal
+   config.get:"magic:twilio:callback"
+
+/*
+ * Sanity checking configuration.
+ * 
+ * This will throw an exception if you have not specified a callback
+ * slot in your configuration.
+ */
+validators.mandatory:x:@.exe/*/signal
+
+// Further parametrising slot invocation with arguments given by Twilio.
+unwrap:x:+/*/*
+add:x:@.exe/0
+   .
+      body:x:@.body
+      from:x:@.from
+      to:x:@.to
+      twilio_account_id:x:@.arguments/*/AccountSid
+
+// Executing callback.
+invoke:x:@.exe
+
+// Returning result of invocation to caller, if caller provided a return value.
+if
+   not-null:x:@invoke
+   .lambda
+
+      // Returning result of invocation to Twilio.
+      return:x:@invoke

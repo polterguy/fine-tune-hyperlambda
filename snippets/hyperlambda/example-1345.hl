@@ -1,33 +1,44 @@
 /*
- * Hyperlambda file that can be executed with arguments.
- * Prepares a password reset email by replacing the {{user}} and {{reset_link}} placeholders.
+ * Compiles a snippet of C# code down to a library,
+ * for then to dynamically load it as a plugin.
+ *
+ * This particular code creates a slot, but you can create any
+ * code you wish, and it doesn't have to be Hyperlambda related.
  */
-.arguments
-   user:string
-   reset_link:string
-.email-template:@"
-Hi {{user}},
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.signals.contracts
+   code:@"
 
-We received a request to reset your password.
+// Example C# code creating a Hyperlambda slot.
+using System;
+using magic.node;
+using magic.signals.contracts;
 
-Click the link below to proceed:
-{{reset_link}}
+// Our slot class.
+[Slot(Name = ""bar"")]
+public class Bar : ISlot
+{
+   public void Signal(ISignaler signaler, Node input)
+   {
+      input.Value = ""Hello from C#"";
+   }
+}"
+   assembly-name:bar.dll
 
-If you didn't request this, please ignore this message.
+// Loading assembly now that we've created it.
+system.plugin.execute:x:@system.compile
 
-Thanks,
-Support Team"
+   // Invoking dynamically created C# slot.
+   bar
 
-.reset-email
-set-value:x:@.reset-email
-   strings.replace:x:@.email-template
-      .:{{user}}
-      get-value:x:@.arguments/*/user
-
-set-value:x:@.reset-email
-   strings.replace:x:@.reset-email
-      .:{{reset_link}}
-      get-value:x:@.arguments/*/reset_link
-
-yield
-   email:x:@.reset-email
+/*
+ * Now the [bar] slot is no longer available
+ * since the assembly has been unloaded due to
+ * having gone out of scope.
+ */
+system.plugin.list

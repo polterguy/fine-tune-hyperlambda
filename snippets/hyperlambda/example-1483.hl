@@ -1,2 +1,47 @@
-// This snippet defines a node with a string value (default type).
-.message:string:Hello, World!
+/*
+ * Retrieves invoice summaries filtered by customer type
+ */
+.arguments
+   filter:string
+   limit:long
+   offset:long
+
+auth.ticket.verify:billing-admin
+
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:30
+
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+mssql.connect:[finance|INV_DB]
+
+   mssql.read
+      table:Invoices
+         as:i
+         join:CustomerTypes
+            as:ct
+            type:left
+            on
+               and
+                  i.CustomerTypeId.eq:ct.Id
+      columns
+         ct.TypeName
+         count(*)
+            as:InvoiceCount
+         sum(i.Total)
+            as:TotalInvoiced
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         and
+            ct.TypeName.eq:x:@.arguments/*/filter
+      group
+         ct.TypeName
+   return-nodes:x:@mssql.read/*

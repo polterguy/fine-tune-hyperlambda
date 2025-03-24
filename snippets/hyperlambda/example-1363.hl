@@ -1,45 +1,91 @@
 
-// Moves SQL scripts to the correct folder and creates the Northwind database file if it doesn't exist.
-io.file.list:/modules/sqlite-northwind/magic.startup/
-for-each:x:-/*
-   strings.split:x:@.dp/#
-      .:/
+// Returns number of registrations for the last 14 days grouped by day.
+auth.ticket.get
+
+// Storing commission for later.
+.percent
+
+// Ensuring user is an affiliate
+data.connect:[generic|magic]
+
+   /*
+    * Retrieving affiliate percent for user.
+    * Notice, if user doesn't have an affiliate percent, user ir
+    * not an affiliate.
+    */
+   data.read
+      table:users_extra
+      columns
+         value
+      where
+         and
+            type.eq:affiliate_percent
+            user.eq:x:@auth.ticket.get
    if
-      strings.ends-with:x:@.dp/#
-         .:.sql
+      not-exists:x:@data.read/*/*/value
       .lambda
-         strings.concat
-            .:/etc/sqlite/templates/
-            get-value:x:@strings.split/0/-
+
+         // Oops ...!!
+         log.error:User is not affiliate
+            username:x:@auth.ticket.get
+         throw:You are not an affiliate
+            public:true
+            status:400
+
+   // Storing percentage for later.
+   convert:x:@data.read/*/*/value
+      type:decimal
+   set-value:x:@.percent
+      math.divide:x:@convert
+         .:decimal:100
+
+// Connecting to Stripe database.
+data.connect:[generic|stripe]
+
+   // Retrieving transactions from database.
+   data.select:"\nselect date_format(t.created, '%Y-%m-%d') as date, sum(amount) as amount\n   from transactions t\n      where t.created > now() - interval 6 week and\n         t.affiliate = @affiliate and\n         t.type = 'charge.succeeded'\n   group by date\n   order by date asc"
+      @affiliate:x:@auth.ticket.get
+
+   // Looping through all days the last 6 weeks.
+   .buffer
+   .cur
+   set-value:x:@.cur
+      math.subtract
+         date.now
+         time
+            days:42
+   while
+      lt:x:@.cur
+         date.now
+      .lambda
+         date.format:x:@.cur
+            format:yyyy-MM-dd
          if
-            not
-               io.file.exists:x:@strings.concat
+            exists:x:@data.select/*/*/date/={@date.format}
             .lambda
+               set-value:x:@data.select/*/*/date/={@date.format}/./*/amount
+                  math.multiply:x:@data.select/*/*/date/={@date.format}/./*/amount
+                     get-value:x:@.percent
+               get-nodes:x:@data.select/*/*/date/={@date.format}/.
+               add:x:@.buffer
+                  get-nodes:x:@data.select/*/*/date/={@date.format}/.
+         else
+            unwrap:x:+/*/*/*
+            add:x:@.buffer
+               .
+                  .
+                     date:x:@date.format
+                     amount:int:0
 
-               // File doesn't exists, hence moving it.
-               io.file.move:x:@.dp/#
-                  .:/etc/sqlite/templates/
-               log.info:SQL script moved into etc folder
-                  filename:x:@.dp/#
+         // Decrementing current day.
+         set-value:x:@.cur
+            math.add:x:@.cur
+               time
+                  days:1
 
-// Creates the Northwind database file.
-if
-   not
-      io.file.exists:/data/northwind.db
-   .lambda
+   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
+   response.headers.set
+      Cache-Control:public, max-age=3600
 
-      // Creating a default database file to store database in.
-      io.file.save:/data/northwind.db
-         .:
-      log.info:Northwind database file created
-         filename:/data/northwind.db
-
-      // Loads and executes the northwind.sql script.
-      io.file.load:/etc/sqlite/templates/northwind.sql
-      sqlite.connect:northwind
-         sqlite.execute:x:@io.file.load
-      log.info:The northwind database was successfully created
-         filename:/etc/sqlite/templates/northwind.sql
-
-      // Evicting cache item related to SQLite.
-      cache.set:magic.sql.databases.sqlite.generic
+   // Returning result to caller.
+   return-nodes:x:@.buffer/*

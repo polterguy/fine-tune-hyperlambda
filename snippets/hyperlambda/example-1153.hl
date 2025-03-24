@@ -1,21 +1,54 @@
 
-// Hyperlambda snippet that updates a user's email in the 'auth_db' database within the 'users' table.
-
-// Updates a user's email in the "auth_db" database within the "users" table.
+// Workflow action that refunds a specified charge using its payment ID in Stripe. The function should validate the payment ID, retrieve the Stripe API token, and make a POST request to the Stripe API to process the refund. Handle any errors by logging and throwing exceptions. Ensure the function is robust and capable of handling metadata if provided.
 .arguments
-   user_id:int
+   payment_id
+      type:string
+      mandatory:bool:true
+.icon:payment
 
-data.connect:auth_db
-   database-type:pgsql
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/payment_id
 
-   // Updating the user's email and status.
-   data.update
-      database-type:pgsql
-      table:users
-      values
-         email:newuser@example.com
-         status:active
-      where
-         and
-            user_id.eq:x:@.arguments/*/user_id
-   return:x:@data.update
+// Adding metadata.
+for-each:x:@.arguments/*/metadata/*
+   set-name:x:./0/-/*/*
+      strings.concat
+         .:metadata[
+         get-name:x:@.dp/#
+         .:]
+   unwrap:x:./0/-/*/*
+   add:x:../*/http.post/*/payload
+      .
+         name:x:@.dp/#
+
+// Retrieving token to use for invocations towards Stripe.
+.token
+set-value:x:-
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
+
+// Invoking Stripe REST API.
+http.post:"https://api.stripe.com/v1/refunds"
+   headers
+      Authorization:x:@.token
+      Content-Type:application/x-www-form-urlencoded
+   convert:true
+   payload
+      payment_intent:x:@.arguments/*/payment_id
+
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.delete
+      .:int:400
+   .lambda
+
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe API to delete subscription
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe API to delete subscription
+         public:true
+         status:500

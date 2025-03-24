@@ -1,99 +1,145 @@
 
-// Returns unique and distinct values from your Customers table in your northwind database
-.arguments
+// Enables a cloudlet when a subscription payment has gone through.
+slots.create:payments.subscriptions.subscribed.cloudlets.enable
 
-   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+   // Checking if invocation is for us.
+   if
+      neq:x:@.arguments/*/type
+         .:subscription
+      .lambda
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
+         // Not our guy.
+         return:bool:false
 
-   // Offset into the dataset of where to start retrieving records
-   offset:long
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/meta
+   validators.mandatory:x:@.arguments/*/username
+   validators.mandatory:x:@.arguments/*/price
 
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
+   // Cloudlet name.
+   .cloudlet:x:@.arguments/*/meta
+   unwrap:x:-
 
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
+   // Connecting to hub database to retrieve cluster and plan.
+   .cluster
+   .plan
+   data.connect:[generic|hub]
 
-   // Filtering args
-   Customers.CustomerID.like:string
-   Customers.CustomerID.eq:string
-   Customers.CompanyName.like:string
-   Customers.CompanyName.eq:string
-   Customers.ContactName.like:string
-   Customers.ContactName.eq:string
-   Customers.ContactTitle.like:string
-   Customers.ContactTitle.eq:string
-   Customers.Address.like:string
-   Customers.Address.eq:string
-   Customers.City.like:string
-   Customers.City.eq:string
-   Customers.Region.like:string
-   Customers.Region.eq:string
-   Customers.PostalCode.like:string
-   Customers.PostalCode.eq:string
-   Customers.Country.like:string
-   Customers.Country.eq:string
-   Customers.Phone.like:string
-   Customers.Phone.eq:string
-   Customers.Fax.like:string
-   Customers.Fax.eq:string
+      // Figuring out cluster from cloudlet+username.
+      data.read
+         table:cloudlets
+         values
+            cluster
+         where
+            and
+               user.eq:x:@.arguments/*/username
+               name.eq:x:@.cloudlet
+      if
+         not-exists:x:@data.read/*/*
+         .lambda
 
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
+            // Oops ...!!
+            log.error:No such cloudlet
+            throw:Cloudlet not found
+               public:true
+               status:400
 
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:Customers.CustomerID
-   .:Customers.CompanyName
-   .:Customers.ContactName
-   .:Customers.ContactTitle
-   .:Customers.Address
-   .:Customers.City
-   .:Customers.Region
-   .:Customers.PostalCode
-   .:Customers.Country
-   .:Customers.Phone
-   .:Customers.Fax
+      // Updating cluster.
+      set-value:x:@.cluster
+         get-value:x:@data.read/*/*/cluster
 
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
+      // Figuring out plan from specified [price].
+      data.read
+         datbase-type:mysql
+         table:plans
+         values
+            name
+         where
+            or
+               price_reference.eq:x:@.arguments/*/price
+               yearly_price_reference.eq:x:@.arguments/*/price
 
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      // Updating plan.
+      set-value:x:@.plan
+         get-value:x:@data.read/*/*/name
+
+      /*
+       * Removing scheduled tasks that soft deletes cloudlet once trial period
+       * is over if existing.
+       */
       strings.concat
-         .:distinct(
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+         .:cloudlet-
+         get-value:x:@.cloudlet
+         .:-
+         get-value:x:@.arguments/*/username
+         .:-delete
+      tasks.list:x:-
+      if
+         exists:x:@tasks.list/0/*/id
+         .lambda
+            tasks.delete:x:@tasks.list/0/*/id
+            log.info:Task to automatically soft delete cloudlet was deleted
+               task-name:x:@strings.concat
+               cloudlet:x:@.cloudlet
+               username:x:@.arguments/*/username
+               cluster:x:@.cluster
+      else
+         log.error:Could not find task to delete
+            task-name:x:@strings.concat
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.cloudlet
+         .:-
+         get-value:x:@.arguments/*/username
+         .:-hard-delete
+      tasks.list:x:-
+      if
+         exists:x:@tasks.list/0/*/id
+         .lambda
+            tasks.delete:x:@tasks.list/0/*/id
+            log.info:Task to automatically hard delete cloudlet was deleted
+               task-name:x:@strings.concat
+               cloudlet:x:@.cloudlet
+               username:x:@.arguments/*/username
+               cluster:x:@.cluster
+      else
+         log.error:Could not find task to delete
+            task-name:x:@strings.concat
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.cloudlet
+         .:-
+         get-value:x:@.arguments/*/username
+         .:-warn-about-destruction
+      tasks.list:x:-
+      if
+         exists:x:@tasks.list/0/*/id
+         .lambda
+            tasks.delete:x:@tasks.list/0/*/id
+            log.info:Task to automatically warn user was deleted
+               task-name:x:@strings.concat
+               cloudlet:x:@.cloudlet
+               username:x:@.arguments/*/username
+               cluster:x:@.cluster
+      else
+         log.error:Could not find task to delete
+            task-name:x:@strings.concat
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
+      /*
+       * Updating the cloudlet type to correct type, such that the
+       * user can see in his dashboard that the cloudlet is no longer a trial cloudlet.
+       */
+      data.update
+         table:cloudlets
+         values
+            plan:x:@.plan
+            enabled:bool:true
+            destruction_date
+         where
+            and
+               name.eq:x:@.cloudlet
+               cluster.eq:x:@.cluster
+               user.eq:x:@.arguments/*/username
 
-   // Adding [limit] and [offset] arguments
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Customers
-      columns
-         distinct_functor
-            as:.
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Returning true to indicate we handled the callback.
+   return:bool:true

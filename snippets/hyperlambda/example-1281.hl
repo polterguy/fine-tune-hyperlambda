@@ -1,85 +1,27 @@
 
-// Hyperlambda script to create a task that periodically crawls all models to add new pages, with error handling.
-tasks.list:ainiro-crawl-machine-learning-models
-if
-   exists:x:@tasks.list/*
-   .lambda
-      tasks.delete:ainiro-crawl-machine-learning-models
+// Write a Hyperlambda script to load a specified file and return it as 'application/octet-stream' with appropriate headers.
+.arguments
+   file:string
 
-// Creating task that crawls all models periodically.
-tasks.create:ainiro-crawl-machine-learning-models
-   description:Periodically crawls all models once every day to add new pages to model
-   repeats:24.hours
-   .lambda
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-      // Basic logging.
-      log.info:Task to periodically crawl models about to be executed
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
 
-      // Connecting to database.
-      data.connect:[generic|magic]
-
-         // Finding all types with a [base_url].
-         data.read
-            table:ml_types
-            columns
-               type
-               base_url
-            where
-               and
-                  base_url.neq
-                  base_url.neq:
-
-         // Looping through all types returned above.
-         for-each:x:@data.read/*
-
-            // Verifying URL is not null and not empty.
-            if
-               and
-                  not-null:x:@.dp/#/*/base_url
-                  neq:x:@.dp/#/*/base_url
-                     .:
-               .lambda
-
-                  // Making sure exceptions never leave thread.
-                  try
-
-                     // Verifying user can create more snippets.
-                     add:x:+
-                        get-nodes:x:@.dp/#/*/type
-                     try-signal:magic.ai.can-create-snippet
-
-                     // Doing some logging.
-                     log.info:Crawling website
-                        url:x:@.dp/#/*/base_url
-                        type:x:@.dp/#/*/type
-
-                     // Invoking slot doing the heavy lifting.
-                     unwrap:x:./*/signal/*
-                     unwrap:x:./*/signal/*/.onafter/**/type
-                     unwrap:x:./*/signal/*/.onafter/**/.type
-                     signal:magic.ai.crawl-site
-                        delay:int:2000
-                        threshold:int:150
-                        max:int:1250
-                        summarize:bool:true
-                        url:x:@.dp/#/*/base_url
-                        type:x:@.dp/#/*/type
-                        feedback-channel:non-existing
-                        .onafter
-                           signal:magic.ai.vectorise
-                              feedback-channel:non-existing
-                              type:x:@.dp/#/*/type
-                              .onafter
-
-                                 // Basic logging.
-                                 .type:x:@.dp/#/*/type
-                                 strings.concat
-                                    get-value:x:@.type
-                                    .:" successfully crawled"
-                                 log.info:x:-
-                  .catch
-
-                     // Logging.
-                     log.error:Could not crawl site
-                        error:x:@.arguments/*/message
-                        site:x:@.dp/#/*/base_url
+/*
+ * Loading file and returning it, as text content to caller, making
+ * sure we return the correct Content-Type in the process.
+ */
+strings.split:x:@.arguments/*/file
+   .:/
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@strings.split/0/-
+   .:"\""
+response.headers.set
+   Content-Type:application/octet-stream
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
+io.stream.open-file:x:@.arguments/*/file
+return:x:-

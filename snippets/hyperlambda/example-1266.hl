@@ -1,20 +1,25 @@
 
-// Provide a Hyperlambda example where an order status is updated in the 'ecommerce_db' database within the 'orders' table.
+// Returns all cloudlet plans that exists using Hyperlambda workflow actions
 
-// Updates an order status in the "ecommerce_db" database within the "orders" table.
-.arguments
-   order_id:int
-data.connect:ecommerce_db
-   database-type:mssql
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
 
-   // Updating the order status.
-   data.update
-      database-type:mssql
-      table:orders
-      values
-         order_status:shipped
-         shipped_date:date:"2025-04-01T00:00:00.000"
-      where
-         and
-            order_id.eq:x:@.arguments/*/order_id
-   return:x:@data.update
+// Returns all plans in the system.
+execute:magic.workflows.actions.execute
+   name:hub-plans-get
+   filename:/modules/hub/workflows/actions/hub-plans-get.hl
+   arguments
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

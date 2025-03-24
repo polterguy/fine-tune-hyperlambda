@@ -1,77 +1,44 @@
 
-// Update one record in your city table in your sakila database
+/*
+ * Returns subsidiary companies from specified org number.
+ * 
+ * Returns all companies the specified org number company owns, either partially or completely.
+ */
 .arguments
-   recaptcha:string
+   org_number:string
 
-   // city_id column value being primary key of record to update, mandatory argument
-   city_id:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/org_number
+set-value:x:@.arguments/*/org_number
+   strings.replace-not-of:x:@.arguments/*/org_number
+      .:0123456789
+      .:
 
-   // city column's new value
-   city:string
+// Connecting to database.
+data.connect:[finovo|finovo]
+   database-type:pgsql
 
-   // country_id column's new value
-   country_id:long
-
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/city_id
-
-// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
-config.get:"magic:auth:recaptcha:key"
-config.get:"magic:auth:recaptcha:secret"
-if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-      neq:x:@config.get/@config.get
-         .
-      neq:x:@config.get/@config.get
-         .:
-   .lambda
-
-      // reCAPTCHA configuration settings found.
-      validators.mandatory:x:@.arguments/*/recaptcha
-      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-         min:decimal:0.3
-
-// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
-remove-nodes:x:@.arguments/*/recaptcha/[0,1]
-
-// Opening up our database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
-
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      database-type:sqlite
-      table:city
-      values
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:group_structure
+      columns
+         org_number
+         company_name
+         company_country_name
+         owned_percent
       where
          and
+            group_mother_orgnumber.eq:x:@.arguments/*/org_number
+            org_number.neq:x:@.arguments/*/org_number
+      limit:-1
 
-   // Verifying record exists.
+   // Verifying the company has subsidiaries.
    if
-      eq
-         get-value:x:@data.update
-         .:int:0
+      not-exists:x:@data.read/*
       .lambda
-         response.status.set:404
          return
-            result:Record not found
+            result:"This company doesn't have any subsidiaries"
 
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+   // Returning result to caller.
+   return-nodes:x:@data.read/*

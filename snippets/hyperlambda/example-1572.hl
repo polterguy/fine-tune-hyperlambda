@@ -1,20 +1,23 @@
-// Connects to sakila with database transactions
-data.connect:sakila
-   data.transaction.create
-      data.execute:delete from film_actor
 
-      /*
-       * If you uncomment the line below the
-       * transaction will be committed, resulting
-       * in that everything from your film_actor
-       * table will be deleted.
-       */
-      //data.transaction.commit
+// Creates a contact in HubSpot by executing helper Hyperlambda file
+.arguments
+   email:string
+   first_name:string
+   last_name:string
+   phone:string
+   company:string
+   website:string
+   lifecyclestage:string
 
-data.connect:sakila
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/email
 
-   /*
-    * Notice, this still returns 5462 items, since
-    * transaction was implicitly rolled back above.
-    */
-   data.scalar:select count(*) from film_actor
+// Forwarding request to our HTTP POST Hyperlambda file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/hubspot/contacts.post.hl
+
+// Returning whatever above invocation returned.
+add:x:./*/return
+   get-nodes:x:@execute-file/*
+return

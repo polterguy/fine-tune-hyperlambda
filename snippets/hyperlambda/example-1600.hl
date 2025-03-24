@@ -1,9 +1,97 @@
 
-// Hyperlambda snippet that inserts a 'milestone0' node before 'milestone1' inside '.project'.
+// Workflow action that initiates a new Stripe subscription for a specified customer using a payment method and price ID. The function should validate all mandatory arguments, retrieve the Stripe API token, and make a POST request to create the subscription. It should handle metadata and check if the charge was successful. If not, return a message indicating the subscription is incomplete and encourage the user to pay the invoice. Handle any errors by logging and throwing exceptions, and return the subscription and product IDs to the caller.
+.arguments
+   customer_id
+      type:string
+      mandatory:bool:true
+   payment_method_id
+      type:int
+      mandatory:bool:true
+   price_id
+      type:string
+      mandatory:bool:true
+   automatic_tax
+      type:bool
+      default:bool:false
+   metadata
+      type:key-value
+.icon:payment
 
-// Inserts a "milestone0" node before "milestone1" inside ".project".
-.project
-   milestone1
-insert-before:x:@.project/*/milestone1
-   .
-      milestone0:Project initiation milestone
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/customer_id
+validators.mandatory:x:@.arguments/*/payment_method_id
+validators.mandatory:x:@.arguments/*/price_id
+validators.default:x:@.arguments
+   automatic_tax:bool:false
+
+// Adding metadata
+for-each:x:@.arguments/*/metadata/*
+   set-name:x:./0/-/*/*
+      strings.concat
+         .:metadata[
+         get-name:x:@.dp/#
+         .:]
+   unwrap:x:./0/-/*/*
+   add:x:../*/http.post/*/payload
+      .
+         name:x:@.dp/#
+
+// Retrieving token to use for invocations towards Stripe.
+.token
+set-value:x:-
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
+
+// Invoking Stripe REST API.
+http.post:"https://api.stripe.com/v1/subscriptions"
+   headers
+      Content-Type:application/x-www-form-urlencoded
+      Authorization:x:@.token
+   payload
+      customer:x:@.arguments/*/customer_id
+      items[0][price]:x:@.arguments/*/price_id
+      default_payment_method:x:@.arguments/*/payment_method_id
+      automatic_tax[enabled]:x:@.arguments/*/automatic_tax
+   convert:true
+
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.post
+      .:int:400
+   .lambda
+
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe API to create subscription
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe API to create subscription
+         public:true
+         status:500
+
+/*
+ * Checking if charge was successful.
+ * 
+ * Notice, Stripe does NOT return an "authentication URL" for subscriptions,
+ * for reasons I don't know, so the best we can do here, is to return finished
+ * equaling false, and just encourage user to pay the invoice he have been
+ * given on email.
+ */
+if
+   eq:x:@http.post/*/content/*/status
+      .:incomplete
+   .lambda
+
+      // Charge was NOT successful, and probably needs 3D secure
+      yield
+         finished:bool:false
+         subscription_id:x:@http.post/*/content/*/id
+         product_id:x:@http.post/*/content/*/items/*/data/0/*/price/*/product
+
+// Returning customer ID to caller.
+yield
+   finished:bool:true
+   subscription_id:x:@http.post/*/content/*/id
+   product_id:x:@http.post/*/content/*/items/*/data/0/*/price/*/product

@@ -1,30 +1,39 @@
 
-// Hyperlambda script that creates a scheduled task that resets no_requests at the first day of the month, with conditions for SQLite.
+/*
+ * Default global exception handler, invoked if no other overrides exists
+ * at the module level.
+ *
+ * If you want to create a custom exception handler
+ * for a specific module, you can do so by creating a file called "exceptions.hl"
+ * inside a folder in your module.
+ */
+log.error:x:@.arguments/*/message
+   url:x:@.arguments/*/path
+   exception:x:@.arguments/*/stack
+
+/*
+ * Notice, unless the [public] argument exists, and is true,
+ * we return a "generic" error to caller to make sure we don't
+ * disclose any security information originating from exceptions.
+ */
 if
-   eq
-      config.get:"magic:databases:default"
-      .:sqlite
+   or
+      auth.ticket.in-role:root
+      and
+         exists:x:@.arguments/*/public
+         or
+            get-value:x:@.arguments/*/public
+            convert:x:@.arguments/*/public
+               type:bool
    .lambda
 
-      // Wrapping in try/catch in case task already exists.
-      try
+      // Exception message is supposed to propagate to client.
+      set-value:x:../*/return/*/message
+         get-value:x:@.arguments/*/message
 
-         // Deleting old task if existing.
-         tasks.list:reset-no_requests
-         if
-            exists:x:@tasks.list/*
-            .lambda
-               tasks.delete:x:@tasks.list/0/*/id
-
-         // Creating task that periodically deletes old historical requests.
-         tasks.create:reset-no_requests
-            description:Resets no_requests at the first day of the month
-            repeats:**.01.01.01.01
-            .lambda
-               sqlite.connect:magic
-                  sqlite.execute:update ml_types set no_requests = 0
-               log.info:All machine learning models had their no_requests values reset
-      .catch
-
-         // Task already exists.
-         console.log:Task to reset no_requests already exists
+// Parametrizing return invocation.
+add:x:+
+   get-nodes:x:@.arguments/*/status
+   get-nodes:x:@.arguments/*/field
+return
+   message:Guru meditation, come back when Universe is in order!

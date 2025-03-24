@@ -1,49 +1,20 @@
+// Connects to sakila with database transactions
+data.connect:sakila
+   data.transaction.create
+      data.execute:delete from film_actor
 
-// Returns a stacked chart image to caller. Values is a mandatory comma separated list of values.
-.arguments:*
+      /*
+       * If you uncomment the line below the
+       * transaction will be committed, resulting
+       * in that everything from your film_actor
+       * table will be deleted.
+       */
+      //data.transaction.commit
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/legend
+data.connect:sakila
 
-// Creating our individual bars.
-.bars
-for-each:x:@.arguments/*
-   get-name:x:@.dp/#
-   if
-      not
-         strings.starts-with:x:@get-name
-            .:legend
-      .lambda
-
-         // Adding primary node for bar.
-         set-name:x:+/*/*
-            get-value:x:@get-name
-         add:x:@.bars
-            .
-               .
-
-         // Adding values for individual cells.
-         add:x:@.bars/0/-
-            strings.split:x:@.dp/#
-               .:,
-
-// Creating our legend.
-add:x:../*/image.chart/*/legend
-   strings.split:x:@.arguments/*/legend
-      .:,
-
-// Parametrizing [image.chart] invocation.
-add:x:../*/image.chart/*/bars
-   get-nodes:x:@.bars/*
-image.chart:stacked
-   width:800
-   height:500
-   bars
-   legend
-
-// Applying correct HTTP header.
-response.headers.set
-   Content-Type:image/png
-
-// Returning chart to caller.
-return:x:@image.chart
+   /*
+    * Notice, this still returns 5462 items, since
+    * transaction was implicitly rolled back above.
+    */
+   data.scalar:select count(*) from film_actor

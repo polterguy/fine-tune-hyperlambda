@@ -1,12 +1,48 @@
 /*
- * Retrieves temperature readings from multiple sensors and finds the lowest one.
+ * Returns all support tickets for a specific category
  */
-.sensors
-   t1:int:23
-   t2:int:18
-   t3:int:27
-.lowest
-math.min
-   get-value:x:@.sensors/*/t1
-   get-value:x:@.sensors/*/t2
-   get-value:x:@.sensors/*/t3
+.arguments
+   filter:string
+   limit:long
+   offset:long
+
+auth.ticket.verify:support-agent
+
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:25
+
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+mssql.connect:[support|TICKETS_DB]
+
+   mssql.read
+      table:Tickets
+         as:t
+         join:Categories
+            as:cat
+            type:left
+            on
+               and
+                  t.CategoryId.eq:cat.Id
+      columns
+         cat.Name
+            as:Category
+         count(*)
+            as:TicketCount
+         max(t.CreatedAt)
+            as:LatestTicket
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         and
+            cat.Name.eq:x:@.arguments/*/filter
+      group
+         cat.Name
+   return-nodes:x:@mssql.read/*

@@ -1,31 +1,17 @@
-
-// Counts items from your roles table in your cms database
+// create a hyperlambda endpoint taking name and age, returning a personalised greeting
 .arguments
+   name:string
+   age:int
 
-   // Optional filtering arguments
-   roles.id.eq:long
-   roles.name.like:string
-   roles.name.eq:string
+.result
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+set-value:x:@.result
+   strings.concat
+      .:"Hello "
+      get-value:x:@.arguments/*/name
+      .:", you are "
+      get-value:x:@.arguments/*/age
+      .:" years old."
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:roles
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+yield
+   result:x:@.result

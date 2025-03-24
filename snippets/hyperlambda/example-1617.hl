@@ -1,15 +1,31 @@
 
-// Create a Hyperlambda snippet that counts tickets in the 'support_db' database from the 'tickets' table.
+// Create a Hyperlambda script for a CRUD create endpoint that creates an item in the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   name:string
+   description:string
 
-// Counts tickets in the "support_db" database from the "tickets" table.
-data.connect:support_db
-   database-type:pgsql
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Counting total support tickets.
-   data.read
-      database-type:pgsql
-      table:tickets
-      columns
-         count(*)
-            as:count
-      limit:long:1
+// Sanity checking invocation
+validators.regex:x:@.arguments/*/name
+   regex:"^[A-Za-z0-9\\-_]*$"
+
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:roles
+      return-id:bool:false
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      result:success

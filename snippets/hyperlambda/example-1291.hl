@@ -1,14 +1,48 @@
 
-// Create a Hyperlambda script to evaluate a lambda if a condition is true using an 'or' condition, with an else clause for when the condition is not true.
+// Create a Hyperlambda action to hash a specified input using an optional algorithm (default is SHA 256). Validate the algorithm and return the hash result.
+.arguments
+
+   // Notice, this is action syntax
+   input
+      type:string
+      mandatory:bool:true
+   algorithm
+      type:enum
+      mandatory:bool:false
+      values
+         .:sha1
+         .:md5
+         .:sha256
+         .:sha384
+         .:sha512
+.icon:settings
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/algorithm
+   .:sha1
+   .:md5
+   .:sha256
+   .:sha384
+   .:sha512
+
+// Checking if caller wants to override the default hashing algorithm.
 if
-   or
-      eq:x:@SOME_EXPRESSION
-         .:SOME_VALUE
-      eq:x:@SOME_OTHER_EXPRESSION
-         .:SOME_OTHER_VALUE
+   and
+      exists:x:@.arguments/*/algorithm
+      not-null:x:@.arguments/*/algorithm
+      neq:x:@.arguments/*/algorithm
+         .:
    .lambda
 
-      // Lambda evaluates if condition is true.
-else
+      // Overriding hashing algorithm by changing name of slot we invoke below.
+      set-name:x:../*/crypto.hash
+         strings.concat
+            .:crypto.hash.
+            get-value:x:@.arguments/*/algorithm
 
-   // Lambda evaluated if condition is NOT true.
+// Hashing string.
+crypto.hash:x:@.arguments/*/input
+
+// Returning result to caller.
+yield
+   result:x:./-

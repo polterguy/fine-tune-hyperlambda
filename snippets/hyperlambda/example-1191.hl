@@ -1,43 +1,36 @@
 
-// Read or list records from your categories table in your cms database
+// Create a Hyperlambda action to validate a reCAPTCHA token with an optional 'threshold'. Only validate if the user is not in the 'root' role. Default 'threshold' to 0.3.
 .arguments
+   recaptcha_token:string
+   threshold:decimal
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+/*
+ * Checking if backend is configured to use reCAPTCHA, and if so, making sure we ensure the frontend supplied
+ * a [recaptcha_token], and invoking slot responsible for verifying reCAPTCHA value.
+ * 
+ * Notice, we do not enforce reCAPTCHA logic if user is authenticated as root.
+ * This makes it easier to debug our endpoint, completely bypassing the reCAPTCHA logic if user is root.
+ */
+auth.ticket.get
+config.get:"magic:auth:recaptcha:key"
+if
+   and
+      not-null:x:@config.get
+      neq:x:@config.get
+         .:
+      not-exists:x:@auth.ticket.get/*/roles/*/=root
+   .lambda
 
-   // Offset into the dataset of where to start retrieving records
+      // [recaptcha_token] is a mandatory field.
+      validators.mandatory:x:@.arguments/*/recaptcha_token
 
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+      // Defaulting [threshold] if not given to 0.3.
+      validators.default:x:@.arguments
+         threshold:decimal:0.3
 
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   categories.id.eq:long
-
-   // Filtering
-   categories.name.like:string
-   categories.name.eq:string
-   categories.description.like:string
-   categories.description.eq:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:categories
-      columns
-         categories.id
-         categories.name
-         categories.description
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+      // Retrieving secret and invoking slot responsible for verifying reCAPTCHA value.
+      config.get:"magic:auth:recaptcha:secret"
+      validators.recaptcha:x:@.arguments/*/recaptcha_token
+         min:x:@.arguments/*/threshold
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get

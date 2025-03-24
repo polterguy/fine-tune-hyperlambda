@@ -1,24 +1,21 @@
+/*
+ * Sends a plain text email where 'to', 'subject', and 'body' are dynamically
+ * retrieved from other nodes using expressions.
+ */
 
-// Generate an endpoint returning line_items from financial database. Add optional paging support and optional filtering on name
-.arguments
-   limit:long
-   offset:long
-   comments.name.eq:string
+.recipient-email:john.doe@example.com
+.email-subject:Greetings
+.email-body:Hello John, this is a dynamically generated email.
 
-// Opening up our database connection.
-data.connect:financial
+// Unwrapping all descendant nodes of [mail.smtp.send]
+unwrap:x:+/**
+mail.smtp.send
+   message
+      to
+         .
+            email:x:@.recipient-email
+      subject:x:@.email-subject
+      entity:text/plain
+         content:x:@.email-body
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*/and
-      get-nodes:x:@.arguments/*/comments.name.eq
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   data.read
-      table:line_items
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   yield
-      result:x:@data.read/*
+// Notice, when using [mail.smtp.send] with expressions we HAVE to invoke [unwrap] to evaluate these BEFORE we execute the slot.

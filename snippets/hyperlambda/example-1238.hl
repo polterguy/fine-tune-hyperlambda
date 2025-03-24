@@ -1,19 +1,111 @@
 
 /*
- * Endpoint that takes any arguments, converts all arguments to integers, adds all together, and returns result
+ * Returns the count and sum of quotations
  * 
- * Pass in whatever arguments you wish.
+ * Optionally apply filtering or a date range as you see fit
  */
-.arguments:*
+.arguments
 
-// Adding all arguments
-.result:int:0
-for-each:x:@.arguments/*
-   set-value:x:@.result
-      math.add:x:@.result
-         convert:x:@.dp/#
-            type:int
+   // Optional filtering argument allowing to filter items on No_, Description, etc.
+   filter:string
 
-// Returning result (notice, [yield] unwraps all its arguments)
-yield
-   result:x:@.result
+   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
+   min_date:string
+
+   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
+   max_date:string
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:"No_"
+            .:"Location Code"
+            .:"Sell-to Customer No_"
+            .:"Bill-to Customer No_"
+            .:"Bill-to Name"
+            .:"Bill-to Address"
+            .:"Bill-to Address 2"
+            .:"Bill-to City"
+            .:"Bill-to Contact"
+            .:"Sell-to E-Mail"
+            .:"Document Date"
+            .:"Payment Terms Code"
+            .:"Salesperson Code"
+            .:"Assigned User ID"
+            .:"Item Category Code"
+            .:"Item_No"
+            .:"Description"
+            .:"Unit of Measure"
+            .:"Quantity"
+            .:"Unit Price"
+            .:"Amount"
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Checking if we're filtering items on [min_date].
+   if
+      and
+         exists:x:@.arguments/*/min_date
+         not-null:x:@.arguments/*/min_date
+      .lambda
+         convert:x:@.arguments/*/min_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.mt:x:@convert
+
+   // Checking if we're filtering items on [max_date].
+   if
+      and
+         exists:x:@.arguments/*/max_date
+         not-null:x:@.arguments/*/max_date
+      .lambda
+         convert:x:@.arguments/*/max_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.lt:x:@convert
+
+   // Reading records.
+   mssql.read
+      table:addv_Cotizaciones
+      columns
+         count(distinct No_)
+            as:count
+         sum(Amount)
+            as:sum
+      where
+         or
+         and
+   
+   // Returning result of above invocation to caller.
+   yield
+      result:x:@mssql.read/*

@@ -1,24 +1,43 @@
-/*
- * Sends a POST request to an internal user service with a user ID.
- * Verifies that the status code is 2xx and yields the full response content.
- */
 
+// Develop a function to delete an existing Stripe subscription using a specified subscription ID. The function should validate the subscription ID, retrieve the Stripe API token, and construct the appropriate REST URL. It should make a DELETE request to the Stripe API to remove the subscription. Handle any errors by logging and throwing exceptions to ensure robust error management.
 .arguments
-   id:int
+   subscription_id:string
 
-http.post:"https://internal.api.example.com/users/lookup"
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/subscription_id
+
+// Retrieving token to use for invocations towards Stripe.
+.token
+set-value:x:-
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
+
+// Creating our REST URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://api.stripe.com/v1/subscriptions/"
+      get-value:x:@.arguments/*/subscription_id
+
+// Invoking Stripe REST API.
+http.delete:x:@.url
+   headers
+      Authorization:x:@.token
    convert:true
-   payload
-      userId:x:@.arguments/*/id
 
+// Sanity checking above invocation.
 if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
+   mte
+      get-value:x:@http.delete
+      .:int:400
    .lambda
-      yield
-         result:x:@http.post/*/content/*
-else
-   throw:User lookup failed
+
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe API to delete subscription
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe API to delete subscription
+         public:true
+         status:500

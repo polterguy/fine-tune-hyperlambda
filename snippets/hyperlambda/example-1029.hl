@@ -1,27 +1,37 @@
 
-// Create a Hyperlambda script to generate a stacked chart image with specified dimensions, bar values, ticks, and legend.
-image.chart:stacked
-   filename:/chart.png
-   width:600
-   height:300
-   bars
-      Spring
-         .:int:2
-         .:int:5
-         .:int:10
-      Summer
-         .:int:4
-         .:int:7
-         .:int:10
-      Autumn
-         .:int:2
-         .:int:5
-         .:int:4
-   ticks
-      .:Spring
-      .:Summer
-      .:Autumn
-   legend
-      .:Phones
-      .:Computers
-      .:Tablets
+// Delete one record from your plugins table in your cms database
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:plugins
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.plugins.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

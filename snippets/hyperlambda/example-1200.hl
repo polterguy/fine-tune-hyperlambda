@@ -1,35 +1,20 @@
 
-// Endpoint inserting one record into your crawl_urls table in your scraper database.
+// Generate a Hyperlambda snippet that updates an employee record in the 'hr_db' database within the 'employees' table.
+
+// Updates an employee record in the "hr_db" database within the "employees" table.
 .arguments
+   employee_id:int
+data.connect:hr_db
+   database-type:mysql
 
-   // url column value
-   url:string
-
-   // type column value
-   type:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up database connection.
-data.connect:[generic|scraper]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:crawl_urls
-      return-id:bool:true
+   // Updating the employee's department and salary.
+   data.update
+      database-type:mysql
+      table:employees
       values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+         department:Finance
+         salary:decimal:75000.00
+      where
+         and
+            employee_id.eq:x:@.arguments/*/employee_id
+   return:x:@data.update

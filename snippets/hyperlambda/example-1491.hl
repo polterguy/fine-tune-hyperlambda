@@ -1,49 +1,59 @@
 
-// Count unique and distinct items from your CustomerDemographics table in your northwind database
+// Hyperlambda script for a CRUD update endpoint that updates all filtered records in the ml_training_snippets table in the magic database, ensuring authentication and authorization for root roles.
 .arguments
+   filter
+      ml_training_snippets.prompt.like:string
+      ml_training_snippets.uri.like:string
+      ml_training_snippets.type.eq:string
+   values
+      type:string
+      pushed:long
 
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
-
-   // Optional filtering args
-   CustomerDemographics.CustomerTypeID.like:string
-   CustomerDemographics.CustomerTypeID.eq:string
-   CustomerDemographics.CustomerDesc.like:string
-   CustomerDemographics.CustomerDesc.eq:string
-
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:CustomerDemographics.CustomerTypeID
-   .:CustomerDemographics.CustomerDesc
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
 // Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
+data.connect:[generic|magic]
 
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
-      strings.concat
-         .:"count(distinct "
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.update/*/where/*/*/or
+      get-nodes:x:@.arguments/*/filter/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/filter/*/ml_training_snippets.uri.like
+   remove-nodes:x:@.arguments/*/filter/*/ml_training_snippets.prompt.like
+   remove-nodes:x:@.arguments/*/filter/*/ml_training_snippets.uri.like
+   add:x:./*/data.update/*/where/*
+      get-nodes:x:@.arguments/*/filter/*
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/values/*
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+   // Removing [or] parts unless we've got something to actually or.
+   if
+      not-exists:x:@data.connect/*/data.update/*/where/*/and/*/or/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.update/*/where/*/and/*/or
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:CustomerDemographics
-      columns
-         distinct_functor
-            as:count
+   // Invoking our update slot.
+   data.update
+      table:ml_training_snippets
+      values
       where
          and
+            or
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

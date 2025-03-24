@@ -1,84 +1,21 @@
 
-// HTTP Hyperlambda endpoint for a CRUD read endpoint with paging, sorting, and filtering that selects records from the ml_requests table in the magic database, ensuring authentication and authorization for root roles.
+// Hyperlambda endpoint that creates a log entry with a specified 'type' (info, error, fatal, debug) and 'message'. Also allows for passing in optional 'args' for additional meta information.
 .arguments
-   limit:long
-   offset:long
-   order:string
-   direction:string
-   filter:string
-   ml_requests.id.eq:long
-   ml_requests.id.mt:long
-   ml_requests.id.lt:long
-   ml_requests.created.eq:date
-   ml_requests.type.like:string
-   ml_requests.type.eq:string
-   ml_requests.prompt.like:string
-   ml_requests.prompt.eq:string
-   ml_requests.completion.like:string
-   ml_requests.completion.eq:string
-   ml_requests.finish_reason.like:string
-   ml_requests.finish_reason.eq:string
+   type:string
+   message:string
+   args:*
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Lambda object actually creating our log entry.
+.invoke-log
+   name:x:@.arguments/*/message
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+// Parametrising invocation.
+set-name:x:@.invoke-log/*/name
+   strings.concat
+      .:log.
+      get-value:x:@.arguments/*/type
+add:x:@.invoke-log/*
+   get-nodes:x:@.arguments/*/args/*
 
-   // Parametrising our read invocation with ordering arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-
-   // Parametrising our read invocation with paging arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-
-   // Checking if user provided a [filter]
-   if
-      exists:x:@.arguments/*/filter
-      .lambda
-
-         // Adding filter and removing it from arguments collection.
-         strings.concat
-            .:%
-            get-value:x:@.arguments/*/filter
-            .:%
-         unwrap:x:+/*/*/*
-         add:x:@data.connect/*/data.read/*/where/*/and
-            .
-               or
-                  ml_requests.prompt.like:x:@strings.concat
-                  ml_requests.completion.like:x:@strings.concat
-                  ml_requests.user_id.eq:x:@.arguments/*/filter
-         remove-nodes:x:@.arguments/*/filter
-
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      table:ml_requests
-      columns
-         ml_requests.id
-         ml_requests.created
-         ml_requests.type
-         ml_requests.prompt
-         ml_requests.completion
-         ml_requests.finish_reason
-         ml_requests.cached
-         ml_requests.questionnaire
-         ml_requests.session
-         ml_requests.user_id
-         ml_requests.referrer
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+// Invoking lambda object responsible for creating our log entry.
+eval:x:@.invoke-log

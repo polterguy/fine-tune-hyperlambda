@@ -1,32 +1,12 @@
 
-// Hyperlambda endpoint that counts items from your Categories table in your northwind database with optional filtering arguments
+// Retrieves all shopping cart items for the current [session].
 .arguments
-   Categories.CategoryID.eq:long
-   Categories.CategoryName.like:string
-   Categories.CategoryName.eq:string
-   Categories.Description.like:string
-   Categories.Description.eq:string
-   Categories.Picture.like:string
-   Categories.Picture.eq:string
+   _session:string
 
 // Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
+data.connect:[generic|shopping-cart-demo]
 
-   // Adding all arguments into [and] node ensuring filtering is applied
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Categories
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Reading items from our items table.
+   data.select:"\nselect i.item_id, i.quantity, p.name, p.description, p.image_url, p.price\n   from items i inner join products p on i.product_id = p.product_id\n   where i.session_id = @session"
+      @session:x:@.arguments/*/_session
+   return:x:@data.select/*

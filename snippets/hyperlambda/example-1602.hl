@@ -1,17 +1,75 @@
 
-// Hyperlambda endpoint taking arguments. This SQL query retrieves and returns the names of artists and the titles of their albums from the Chinook database, ordering the results by artist name and limiting the output to 50 records.
+// Count unique and distinct items from your comments table in your cms database
 .arguments
 
-// Making sure user is authorized to invoke endpoint.
-auth.ticket.verify:enterprise
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
 
-// Connecting to database.
-data.connect:chinook
+   // Optional arguments for filtering
+   comments.id.eq:long
+   comments.post_id.eq:long
+   comments.user_id.eq:long
+   comments.content.like:string
+   comments.content.eq:string
+   comments.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
+   user_id.username.eq:string
+   user_id.username.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:comments.id
+   .:comments.post_id
+   .:comments.user_id
+   .:comments.content
+   .:comments.created_at
+   .:post_id.title
+   .:user_id.username
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
+
+// Opening up our database connection.
+data.connect:[generic|cms]
    database-type:sqlite
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Script to join artists to albums in your Chinook database.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect ar.Name, al.Title\n  from Album al\n    inner join Artist ar on al.ArtistId = ar.ArtistId\n  order by ar.Name\n  limit 50\n"
-      database-type:sqlite
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:comments
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  comments.post_id:post_id.id
+         join:users
+            as:user_id
+            type:left
+            on
+               and
+                  comments.user_id:user_id.id
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

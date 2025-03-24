@@ -1,77 +1,113 @@
 
-// Returns unique and distinct values from your Categories table in your northwind database
+// Write a Hyperlambda script to add a specified table to a specified database.
 .arguments
+   databaseType:string
+   connectionString:string
+   databaseName:string
+   generate:bool
 
-   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/connectionString
+validators.mandatory:x:@.arguments/*/databaseName
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:sqlite
+   .:pgsql
+   .:mssql
 
-   // Offset into the dataset of where to start retrieving records
-   offset:long
+// SQLite special case, simply implying deleting file on disc.
+if
+   eq:x:@.arguments/*/databaseType
+      .:sqlite
+   .lambda
 
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
+      // Checking if caller only wants to generate SQL.
+      if:x:@.arguments/*/generate
+         return
+            result:/* SQLite does not support drop database syntax */
 
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Filtering args
-   Categories.CategoryID.eq:long
-   Categories.CategoryName.like:string
-   Categories.CategoryName.eq:string
-   Categories.Description.like:string
-   Categories.Description.eq:string
-   Categories.Picture.like:string
-   Categories.Picture.eq:string
-
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:Categories.CategoryID
-   .:Categories.CategoryName
-   .:Categories.Description
-   .:Categories.Picture
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      // Deleting the file for our database.
       strings.concat
-         .:distinct(
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+         .:/data/
+         get-value:x:@.arguments/*/databaseName
+         .:.db
+      io.file.delete:x:-
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
+      // Flushing connections cache.
+      sqlite.connections.flush
+else
 
-   // Adding [limit] and [offset] arguments
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+   // Buffer to hold SQL and 'master' database.
+   .sql
+   .master
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Categories
-      columns
-         distinct_functor
-            as:.
-      where
-         and
+   // Creating our correct SQL according to [databaseType].
+   switch:x:@.arguments/*/databaseType
+      case:mysql
+         set-value:x:@.master
+            .:information_schema
+         set-value:x:@.sql
+            strings.concat
+               .:drop database `
+               get-value:x:@.arguments/*/databaseName
+               .:`;
+      case:pgsql
+         set-value:x:@.master
+            .:template1
+         set-value:x:@.sql
+            strings.concat
+               .:"revoke connect on database \""
+               get-value:x:@.arguments/*/databaseName
+               .:"\" from public; "
+               .:"select pid, pg_terminate_backend(pid) from pg_stat_activity "
+               .:"where datname = '"
+               get-value:x:@.arguments/*/databaseName
+               .:"'; "
+               .:"drop database \""
+               get-value:x:@.arguments/*/databaseName
+               .:"\";"
+      case:mssql
+         set-value:x:@.master
+            .:master
+         set-value:x:@.sql
+            strings.concat
+               .:alter database [
+               .:x:@.arguments/*/databaseName
+               .:"] set single_user with rollback immediate; "
+               .:drop database [
+               get-value:x:@.arguments/*/databaseName
+               .:];
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Checking if caller only wants to generate SQL statement.
+   if:x:@.arguments/*/generate
+      unwrap:x:+/*
+      return
+         sql:x:@.sql
+
+   // Opening up database connection and executing SQL.
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connectionString
+      .:|
+      get-value:x:@.master
+      .:]
+   data.connect:x:@strings.concat
+      database-type:x:@.arguments/*/databaseType
+      data.execute:x:@.sql
+         database-type:x:@.arguments/*/databaseType
+
+// Flushing database cache.
+strings.concat
+   .:magic.sql.databases.
+   get-value:x:@.arguments/*/databaseType
+   :.
+   get-value:x:@.arguments/*/connectionString
+cache.set:x:-
+
+// Returning result to caller.
+return
+   result:success

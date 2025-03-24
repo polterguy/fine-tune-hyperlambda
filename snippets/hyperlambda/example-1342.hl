@@ -1,29 +1,14 @@
-// Nested [if] within [for-each] to handle complex conditions
-.inventory
-   part1
-      name:engine
-      status:out-of-stock
-   part2
-      name:wheel
-      status:out-of-stock
-   part3
-      name:door
-      status:available
 
-for-each:x:@.inventory/*
-   if
-      eq:x:@.dp/#/*/status
-         .:available
-      .lambda
-         set-value:x:@.dp/#/*/status
-            .:checked
-   else
-      if
-         eq:x:@.dp/#/*/name
-            .:wheel
-         .lambda
-            set-value:x:@.dp/#/*/status
-               .:urgent restock
-      else
-         set-value:x:@.dp/*/status
-            .:restock
+// Hyperlambda endpoint that returns the reCAPTCHA secret and key if existing, ensuring the user is authorized.
+.arguments
+
+// Making sure user is allowed to invoke endpoint
+auth.ticket.verify:root
+
+// Retrieving key configuration setting and returning to caller.
+config.get:"magic:auth:recaptcha:secret"
+config.get:"magic:auth:recaptcha:key"
+unwrap:x:+/*
+return-nodes
+   key:x:@config.get
+   secret:x:@config.get/@config.get

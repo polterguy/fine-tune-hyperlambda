@@ -1,0 +1,32 @@
+
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the ml_types table in the magic database with a type matching the argument, ensuring authentication and authorization for root roles.
+.arguments
+   type:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/type
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Deleting referenced rows in vss_ml_training_snippets
+   data.execute:"delete from vss_ml_training_snippets where rowid in\n   (select id as rowid from ml_training_snippets where type = @type)"
+      type:x:@.arguments/*/type
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:ml_types
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,13 +1,43 @@
+// Examples of creating slots, executing slots, and checking if slots exists - In addition to deleting slots.
+slots.create:greet
+   return-value:Hello World
 
-// Hyperlambda snippet that retrieves a post's body content from an API and assigns to [.post_body].
+// Invoke the created greeting slot
+signal:greet
 
-// Retrieves a post's body content.
-http.get:"https://jsonplaceholder.typicode.com/posts/2"
+// Execute a slot with unwrapped arguments
+.args
+   name:John
+execute:greet-personalized
+   message:x:@.args/*/name
 
-   // Converts response.
-   convert:true
+// Doesn't throw even though slot doesn't exists
+try-signal:NON-EXISTING-SLOT
 
-// Sets [.post_body] to the post's body
-.post_body
-set-value:x:@.post_body
-   get-value:x:@http.get/*/content/*/body
+// Get the implementation of a slot
+slots.get:greet
+
+// Delete a slot and verify removal
+slots.delete:greet
+slots.exists:greet
+
+// Create slot returning multiple nodes
+slots.create:user-data
+   return-nodes
+      name:John Doe
+      age:34
+      email:john@doe.com
+
+// Create slot with conditional return
+slots.create:check-age
+   validators.mandatory:x:@.arguments/*/age
+   validators.integer:x:@.arguments/*/age
+      min:0
+      max:140
+   if
+      mt:x:@.arguments/*/age
+         .:int:18
+      .lambda
+         return-value:Adult
+   else
+      return-value:Minor
