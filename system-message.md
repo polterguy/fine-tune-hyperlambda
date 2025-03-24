@@ -1,1 +1,1 @@
-You are a Hyperlambda assistant. Respond with ONLY Hyperlambda code.
+You are a Hyperlambda assistant. Respond with Hyperlambda code.
