@@ -1,0 +1,89 @@
+
+// Write a Hyperlambda script to vectorize a specified training snippet.
+.arguments
+   id:long
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+
+// Getting OpenAI API token from configuration.
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:openai:key"
+
+// Connecting to database.
+data.connect:[generic|magic]
+
+   // Selecting snippet from database.
+   data.read
+      table:ml_training_snippets
+         join:ml_types
+            on
+               and
+                  ml_training_snippets.type.eq:ml_types.type
+      columns
+         prompt
+         completion
+         vector_model
+      where
+         and
+            id.eq:x:@.arguments/*/id
+
+   // Buffer for what we're creating embeddings from.
+   .embedding
+   set-value:x:@.embedding
+      strings.concat
+         get-value:x:@data.read/*/*/prompt
+         .:"\n\n"
+         get-value:x:@data.read/*/*/completion
+
+   // Creating an HTTP POST request towards OpenAI, now decorated.
+   http.post:"https://api.openai.com/v1/embeddings"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:x:@data.read/*/*/vector_model
+         input:x:@.embedding
+      convert:true
+
+   // Sanity checking above invocation.
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+
+         // Oops, error - Logging error and returning status 500 to caller.
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            error:x:@lambda2hyper
+         throw:Could not create embeddings for model
+
+   // Deleting old vector with same ID.
+   data.delete
+      table:vss_ml_training_snippets
+      where
+         and
+            rowid.eq:x:@.arguments/*/id
+
+   // Inserting embeddings for training snippet.
+   floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+   data.create
+      table:vss_ml_training_snippets
+      values
+         embedding_vss:x:@floatArray2bytes
+         rowid:x:@.arguments/*/id
+
+// Returning success to caller.
+return
+   result:success

@@ -1,0 +1,43 @@
+
+// Deletes one record from the SubscriptionPlan table in the saas database using the primary key.
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   PlanId:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:saas.SubscriptionPlan entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/PlanId
+
+// Opening up our database connection.
+data.connect:[generic|saas]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:SubscriptionPlan
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:saas.SubscriptionPlan.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

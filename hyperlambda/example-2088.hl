@@ -1,0 +1,26 @@
+// Hyperlambda HTTP endpoint with filtering and paging that allows me to return contacts from my crm database where filter is optional and paging is mandatory
+.arguments
+   limit:int
+   offset:int
+   filter:string
+
+// Adding filter argument if given.
+if
+   exists:x:@.arguments/*/filter
+   .lambda
+
+      unwrap:x:+/*/*
+      add:x:../*/data.connect/*/data.read/*/where/*/or
+         .
+            first_name.like:x:@.arguments/*/filter
+            last_name.like:x:@.arguments/*/filter
+
+// Connect to the CRM database and read contacts with optional filtering and mandatory paging.
+data.connect:[generic|crm]
+   data.read
+      table:contacts
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+      where
+         or
+   return-nodes:x:@data.read/*

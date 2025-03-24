@@ -1,0 +1,44 @@
+// Submits feedback and handles all common HTTP status codes using [switch] and [throw] with correct value syntax
+
+.arguments
+
+// Final feedback submission result
+.feedback.status
+
+// Send HTTP POST to feedback API
+http.post:"https://api.feedbackly.io/v1/submit"
+   convert:true
+   payload
+      name:Sarah Lee
+      email:sarah.lee@example.com
+      message:This platform is fantastic!
+
+// Branch based on HTTP status code
+switch:x:@http.post
+
+   case:int:200
+      set-value:x:@.feedback.status
+         .:Feedback submitted successfully
+
+   case:int:400
+      throw:400 Bad Request – Please check your input data
+
+   case:int:401
+      throw:401 Unauthorized – You must log in to submit feedback
+
+   case:int:403
+      throw:403 Forbidden – You don’t have permission to perform this action
+
+   case:int:404
+      throw:404 Not Found – The feedback endpoint does not exist
+
+   case:int:500
+      throw:500 Internal Server Error – Please try again later
+
+   default
+      set-value:x:@.feedback.status
+         .:Unhandled response – unknown status code
+
+// Return the result
+yield
+   result:x:@.feedback.status

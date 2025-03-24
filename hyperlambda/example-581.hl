@@ -1,0 +1,64 @@
+
+// Hyperlambda file that exports all questionnaire data from training requests for a specified type and returns it as a CSV file, ensuring the user is authorized.
+.arguments
+   type:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Selecting data.
+   data.select:select distinct(user_id) from ml_requests where type = @type and questionnaire != 1
+      @type:x:@.arguments/*/type
+
+   // Buffer for data
+   .data
+
+   // Iterating through above result to create our CSV file.
+   for-each:x:@data.select/*
+
+      // Finding all prompts and answers for currently iterated user.
+      data.select:select prompt, completion from ml_requests where type = @type and user_id = @user_id and questionnaire != 1
+         @type:x:@.arguments/*/type
+         @user_id:x:@.dp/#/*/user_id
+
+      // Temporary buffer for all questions and answers for currently iterated user.
+      .tmp:
+
+      // Looping through all questions/answers.
+      for-each:x:@data.select/*
+
+         // Appending currently iterated question answer to above [.tmp] variable.
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.tmp
+               get-value:x:@.dp/#/*/prompt
+               .:"\n"
+               .:"\n"
+               get-value:x:@.dp/#/*/completion
+               .:"\n"
+               .:"\n"
+
+      // Adding currently iterated conversation to above [.data]
+      unwrap:x:+/*/*/*
+      add:x:@.data
+         .
+            .
+               conversation:x:@.tmp
+
+   // Converting result to CSV.
+   lambda2csv:x:@.data/*
+
+   // Applying correct HTTP header.
+   response.headers.set
+      Content-Type:text/csv
+      Access-Control-Expose-Headers:Content-Disposition
+      Content-Disposition:"attachment; filename=\"conversations.csv\""
+
+   // Returning content to caller.
+   return:x:@lambda2csv

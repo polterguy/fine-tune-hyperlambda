@@ -1,0 +1,26 @@
+/*
+ * Returns all active companies the specified director is part of
+ * 
+ * director_id is required
+ */
+.arguments
+   director_id:long
+   limit:long
+   offset:long
+
+data.connect:[mssql|director_db]
+   database-type:mssql
+
+   data.select:@"
+select d.org_number, b.company_name, d.role_name
+   from directors d
+      inner join basic b on d.org_number = b.org_number
+   where d.director_id = @id and d.active = 1
+   limit @limit offset @offset"
+      database-type:mssql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   yield
+      companies:x:@data.select/*

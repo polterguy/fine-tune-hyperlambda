@@ -1,0 +1,19 @@
+
+// Hyperlambda endpoint taking arguments. This SQL query selects media types and their aggregate counts, ordering the results by count in descending order, filtered by a specified name pattern.
+.arguments
+   filter:string
+
+// Connecting to database.
+data.connect:chinook
+   database-type:sqlite
+
+   // Parametrizing [data.select].
+   add:x:./*/data.select
+      get-nodes:x:@.arguments/*
+
+   // Executing [data.select] slot with our SQL.
+   data.select:"\n/*\n * Selects media types and aggregate of counts, and orders by count descending.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect mt.Name, count(mt.MediaTypeId) as Amount \n  from MediaType mt\n    inner join Track t on mt.MediaTypeId = t.MediaTypeId\n  where mt.Name like @filter\n  group by mt.MediaTypeId\n  order by Amount desc;\n"
+      database-type:sqlite
+
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

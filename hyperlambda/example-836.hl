@@ -1,0 +1,28 @@
+/*
+ * Sends an email to customers with expired subscriptions.
+ */
+
+data.connect:[pgsql|billing]
+   database-type:pgsql
+
+   data.select:@"
+select name, email
+   from subscriptions
+   where status = 'expired'"
+      database-type:pgsql
+
+   for-each:x:@data.select/*
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            from
+               .
+                  name:Billing Team
+                  email:billing@yourcompany.com
+            subject:Your Subscription Has Expired
+            entity:text/plain
+               content:Hi, your subscription has expired. Please renew to continue using our services.

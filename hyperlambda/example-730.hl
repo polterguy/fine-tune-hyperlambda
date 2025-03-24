@@ -1,0 +1,75 @@
+
+/*
+ * Common helper slot to return the specified [columns] from accounts/group_accounts, matching
+ * the specified [org_number].
+ */
+slots.create:finovo.accounts.get-data
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/org_number
+   set-value:x:@.arguments/*/org_number
+      strings.replace-not-of:x:@.arguments/*/org_number
+         .:0123456789
+         .:
+   validators.string:x:@.arguments/*/org_number
+      min:10
+      max:10
+
+   // Connecting to database.
+   data.connect:[finovo|finovo]
+      database-type:pgsql
+
+      // Trying group accounts.
+      add:x:+/*/columns
+         get-nodes:x:@.arguments/*/columns/*
+      data.read
+         database-type:pgsql
+         table:group_accounts
+         columns
+         where
+            and
+               org_number.eq:x:@.arguments/*/org_number
+               or
+                  n_account_shortage_text.eq:
+                  n_account_shortage_text.eq
+
+      // Checking if we've got data.
+      if
+         not-exists:x:@data.read/*
+         .lambda
+
+            // Trying accounts.
+            add:x:+/*/columns
+               get-nodes:x:@.arguments/*/columns/*
+            data.read
+               database-type:pgsql
+               table:accounts
+               columns
+               where
+                  and
+                     org_number.eq:x:@.arguments/*/org_number
+
+            // Checking if we've got data.
+            if
+               not-exists:x:@data.read/*
+               .lambda
+
+                  // No data.
+                  return
+                     result:No results were found
+
+            else
+
+               // Making sure we return company information related to the account.
+               add:x:../*/return-nodes
+                  get-nodes:x:@data.read/*
+
+      else
+
+         // Making sure we return company information related to the account.
+         add:x:../*/return-nodes
+            get-nodes:x:@data.read/*
+
+   // Returning result to caller.
+   return-nodes
+

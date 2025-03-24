@@ -1,0 +1,74 @@
+
+/*
+ * Returns all quotes for a specified segment
+ * 
+ * Optionally apply limit or offset as you see fit.
+ *
+ * Filter is mandatory, and becomes an equal condition that filters on segmentation name
+ */
+.arguments
+
+   // Mandatory filtering argument allowing to filter items on segmentation name
+   filter:string
+
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
+
+   // Optional offset into records of where to start returning items.
+   offset:long
+
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Getting limit value, defaulting to 10
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:10
+
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Reading records.
+   mssql.read
+      table:addv_Cotizaciones
+         as:q
+         join:MNDG$Customer$437dbf0e-84ff-417a-965d-ed2bb9650972
+            as:c
+            type:left
+            on
+               and
+                  q.Sell-to Customer No_:c.No_
+         join:MNDG$Customer$88c9935b-5e96-4804-b105-5618aa274ae1
+            type:left
+            as:s
+            on
+               and
+                  c.No_.eq:s.No_
+      columns
+         c.No_
+            as:CustomerNumber
+         c.Name
+         sum(q.Amount)
+            as:QuotationTotal
+         count(*)
+            as:count
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         and
+            s.Segment No_.eq:x:@.arguments/*/filter
+      group
+         c.No_
+         c.Name
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.read/*

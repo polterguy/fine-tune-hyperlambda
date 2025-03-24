@@ -1,0 +1,38 @@
+// Build the dynamic JSON payload
+.payload
+   email:user@example.com
+   pin:4321
+   source:mobile-app
+
+// Create headers for content-type and custom request ID
+.headers
+   Content-Type:application/json
+   X-Request-ID:abc-001-login
+
+// Make the HTTP POST request
+add:x:./*/http.post/*/headers
+   get-value:x:@.headers/*
+add:x:./*/http.post/*/payload
+   get-value:x:@.payload/*
+http.post:"https://api.example.com/login/email"
+   headers
+   payload
+   convert:true
+
+// Verify response status is 2xx
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      .user-name
+      set-value:x:@.user-name
+         get-value:x:@http.post/*/content/*/user-name
+
+      .session-id
+      set-value:x:@.session-id
+         get-value:x:@http.post/*/content/*/session-id
+else
+   throw:Email login failed

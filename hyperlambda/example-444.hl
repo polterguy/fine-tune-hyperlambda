@@ -1,0 +1,27 @@
+// Requests weather forecast from NOAA in XML format and handles selected HTTP status codes
+
+.arguments
+
+// Result node for weather info
+.weather.result
+
+http.get:"https://api.weather.gov/gridpoints/MPX/107,71/forecast"
+   convert:true
+   headers
+      Accept:application/xml
+
+switch:x:@http.get
+
+   case:int:200
+      set-value:x:@.weather.result
+         .:Weather data received in XML format
+
+   case:int:406
+      throw:406 Not Acceptable – Server cannot return XML
+
+   default
+      set-value:x:@.weather.result
+         .:Unable to fetch weather data
+
+yield
+   result:x:@.weather.result

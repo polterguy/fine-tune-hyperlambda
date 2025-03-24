@@ -1,0 +1,66 @@
+
+// Hyperlambda script that authenticates a user with the specified username and password, returning a JWT token if successful.
+slots.create:magic.auth.authenticate
+
+   // Opens up our database connection.
+   data.connect:magic
+
+      // Selects password from our users table belonging to specified [username].
+      data.read
+         table:users
+         columns
+            password
+         where
+            and
+               username.eq:x:@.arguments/*/username
+
+      // Checking if user with specified [username] exists.
+      if
+         not-exists:x:@data.read/*
+         .lambda
+
+            // No such user.
+            throw:Access denied
+               status:int:401
+               public:bool:true
+
+      // Verifying that the password is a match.
+      if
+         or
+            eq:x:@.arguments/*/password-check
+               .:bool:false
+            crypto.password.verify:x:@.arguments/*/password
+               hash:x:@data.read/*/*/password
+         .lambda
+
+            // Logging the fact that user successfully logged in.
+            log.info:User successfully authenticated
+               username:x:@.arguments/*/username
+
+            // Now we need to select all roles user belongs to.
+            data.read
+               table:users_roles
+               columns
+                  role
+               where
+                  and
+                     user.eq:x:@.arguments/*/username
+
+            // Parametrizing [auth.ticket.create] with roles user belongs to.
+            add:x:./*/auth.ticket.create/*/roles
+               get-nodes:x:@data.read/*/*
+
+            // Now we can create our JWT token/ticket.
+            auth.ticket.create
+               username:x:@.arguments/*/username
+               expires:x:@.arguments/*/expires
+               roles
+
+            // Returning JWT token to caller.
+            yield
+               ticket:x:@auth.ticket.create
+
+      // Hash version of password didn't match.
+      throw:Access denied
+         status:int:401
+         public:bool:true

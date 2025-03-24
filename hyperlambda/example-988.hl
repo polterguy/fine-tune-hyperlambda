@@ -1,0 +1,77 @@
+
+// Hyperlambda script that authenticates a user and returns a JWT token if successful, handling default root credentials for initial setup.
+.arguments
+   username:string
+   password:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
+
+/*
+ * Checking if JWT secret has been changed, and if not, simply checking if username/password is
+ * root/root, and if so returning a valid token allowing the user to setup his or her cloudlet.
+ * 
+ * This is necessary to allow for configuring a new cloudlet where the user haven't selected a root
+ * password yet.
+ */
+config.get:"magic:auth:secret"
+if
+   or
+      null:x:@config.get
+      lt
+         strings.length:x:@config.get
+         .:int:50
+   .lambda
+
+      // System has not been setup.
+      if
+         and
+            eq
+               get-value:x:@.arguments/*/username
+               .:root
+            eq
+               get-value:x:@.arguments/*/password
+               .:root
+         .lambda
+
+            // Success!
+            auth.ticket.create
+               username:root
+               roles
+                  .:root
+            yield
+               ticket:x:@auth.ticket.create
+
+/*
+ * Invokes [magic.auth.authenticate] that does the heavy lifting, and creates our JWT token,
+ * making sure we return that token to caller.
+ */
+execute:magic.auth.authenticate
+   username:x:@.arguments/*/username
+   password:x:@.arguments/*/password
+
+// Buffer for extra information.
+.extra
+data.connect:magic
+   data.read
+      table:users_extra
+      where
+         and
+            user.eq:x:@.arguments/*/username
+            or
+               type.eq:name
+               type.eq:email
+   for-each:x:@data.read/*
+      set-name:x:./*/add/*/*
+         get-value:x:@.dp/#/*/type
+      set-value:x:./*/add/*/*
+         get-value:x:@.dp/#/*/value
+      add:x:@.extra
+         .
+            .
+
+// Returns the authentication JWT ticket created above to caller.
+yield
+   ticket:x:@execute/*/ticket
+   extra:x:@.extra/*

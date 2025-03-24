@@ -1,0 +1,61 @@
+
+// Crawls all URLs found in database.
+slots.create:scraper.crawl-all-urls
+
+   // Buffer for spice URLs.
+   .spice
+
+   // Buffer for crawl URLs.
+   .crawl
+
+   // Connecting to database.
+   data.connect:[generic|scraper]
+
+      // Reading all spice URLs.
+      add:x:@.spice
+         data.read
+            table:spice_urls
+            columns
+               url
+               type
+
+      // Reading all crawl URLs.
+      add:x:@.crawl
+         data.read
+            table:crawl_urls
+            columns
+               url
+               type
+
+   // Looping through all records returned in above invocation.
+   for-each:x:@.spice/*
+
+      // Invoking slot responsible for spicing specified type by scraping URL.
+      execute:magic.ai.url.scrape
+         url:x:@.dp/#/*/url
+         type:x:@.dp/#/*/type
+         threshold:int:150
+         summarize:bool:true
+
+      // Vectorizing model.
+      execute:magic.ai.vectorise
+         type:x:@.dp/#/*/type
+
+   // Looping through all records returned in above invocation.
+   for-each:x:@.crawl/*
+
+      // Invoking slot responsible for spicing specified type by scraping URL.
+      execute:magic.ai.crawl-site-on-thread
+         url:x:@.dp/#/*/url
+         type:x:@.dp/#/*/type
+         threshold:int:150
+         summarize:bool:true
+         delay:int:1000
+         images:bool:true
+         lists:bool:true
+         code:bool:true
+         max:int:5000
+
+      // Vectorizing model.
+      execute:magic.ai.vectorise
+         type:x:@.dp/#/*/type

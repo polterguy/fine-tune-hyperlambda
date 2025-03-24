@@ -1,0 +1,82 @@
+
+// Checkout and pay for the items in your shopping cart.
+.arguments
+
+   // Session ID of user executing file
+   _session:string
+   name:string
+   email:string
+
+// Opening up database connection.
+data.connect:[generic|shopping-cart-demo]
+
+   // Selecting price and name of items in cart.
+   data.select:select p.name, p.price, p.sku, i.quantity from items i inner join products p on i.product_id = p.product_id where session_id = @session
+      @session:x:@.arguments/*/_session
+
+   /*
+    * TODO: Here is where you would somehow invoke your actual backend shopping cart API to generate
+    * and actual payment link or something. We just send the user an email for simplicity reasons.
+    */
+   .total:decimal:0
+   .body:"Thank you for your order 00X, below are your items and your total\n\n"
+   for-each:x:@data.select/*
+      set-value:x:@.body
+         strings.concat
+            get-value:x:@.body
+            .:"* "
+            get-value:x:@.dp/#/*/name
+            .:, $
+            format:x:@.dp/#/*/price
+               pattern:"{0:#,##0.##}"
+            .:", quantity; "
+            get-value:x:@.dp/#/*/quantity
+            .:"\n\n"
+      set-value:x:@.total
+         math.add
+            get-value:x:@.total
+            get-value:x:@.dp/#/*/price
+   set-value:x:@.body
+      strings.concat
+         get-value:x:@.body
+         .:"Your total is: **"
+         format:x:@.total
+            pattern:"{0:#,##0.##}"
+         .:"**\n\n"
+         .:"This is of course just a small demonstration of how you could build an E-Commerce AI chatbot, but if you're interested in a real AI chatbot similar to this one, or a completely custom AI chatbot, you can reply to this message and our CEO will come back to you.\n\nStay Safe 00X,\n\nQ"
+
+   // Transforms the specified [markdown] to HTML and returns to caller.
+   execute:magic.workflows.actions.execute
+      name:markdown2html
+      filename:/misc/workflows/actions/misc/markdown2html.hl
+      arguments
+         markdown:x:@.body
+
+   /*
+    * Sends an email to the specified [name]/[email] recipient, with the specified [subject] and [body].
+    * 
+    * Optionally supply [from] and [from-email] as name/email sender, and/or [reply-to] and [reply-to-email]
+    * as the email to reply to. If you don't supply [from] or [from-email] then this action will use the
+    * default sender settings from your configuration.
+    */
+   execute:magic.workflows.actions.execute
+      name:email
+      filename:/misc/workflows/actions/misc/email.hl
+      arguments
+         name:x:@.arguments/*/name
+         email:x:@.arguments/*/email
+         html:bool:true
+         subject:Your spy gear order is complete
+         body:x:--/execute/=markdown2html/*/html
+
+   // Resetting shopping cart items.
+   data.delete
+      table:items
+      where
+         and
+            session_id.eq:x:@.arguments/*/_session
+
+   // Returning success to caller to indicate process successfully completed.
+   return
+      result:success
+      message:Checkout was successful and your cart was reset. An email has been sent to you with the details of your order. Your items will be shipped to your door and be available for you in 24 hours.

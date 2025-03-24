@@ -1,0 +1,88 @@
+
+// Returns minimum, maximum, average or sum from your comments table in your cms database
+.arguments
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+
+   // Optional filtering conditions
+   comments.id.eq:long
+   comments.post_id.eq:long
+   comments.user_id.eq:long
+   comments.content.like:string
+   comments.content.eq:string
+   comments.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
+   user_id.username.eq:string
+   user_id.username.like:string
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:comments.id
+   .:comments.post_id
+   .:comments.user_id
+   .:comments.content
+   .:comments.created_at
+   .:post_id.title
+   .:user_id.username
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:comments
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  comments.post_id:post_id.id
+         join:users
+            as:user_id
+            type:left
+            on
+               and
+                  comments.user_id:user_id.id
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

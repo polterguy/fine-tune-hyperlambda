@@ -1,0 +1,49 @@
+
+// Count unique and distinct items from your CustomerCustomerDemo table in your northwind database
+.arguments
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Optional filtering arguments
+   CustomerCustomerDemo.CustomerID.like:string
+   CustomerCustomerDemo.CustomerID.eq:string
+   CustomerCustomerDemo.CustomerTypeID.like:string
+   CustomerCustomerDemo.CustomerTypeID.eq:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:CustomerCustomerDemo.CustomerID
+   .:CustomerCustomerDemo.CustomerTypeID
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:CustomerCustomerDemo
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

@@ -1,10 +1,19 @@
 /*
  * This script generates training data from Hyperlambda files.
  */
-execute:magic.io.file.load-recursively
-   .:/etc/hyperlambda-training-material/hyperlambda/
+
+// Deleting old records
 data.connect:fine-tune
    data.execute:delete from hyperlambda
+
+// Loading all files recursively
+execute:magic.io.file.load-recursively
+   .:/etc/hyperlambda-training-material/
+
+// Counting training data
+.no:int:0
+
+// Looping through all files.
 for-each:x:@execute/*
 
    // Making sure we catch exceptions such that we can see which file fails.
@@ -35,6 +44,15 @@ for-each:x:@execute/*
                   lambda2hyper:x:@hyper2lambda/*
                      comments:true
 
+                  // Checking if this is validation data.
+                  .validation:int:0
+                  if
+                     strings.contains:x:@.dp/#
+                        .:/validation/
+                     .lambda
+                        set-value:x:@.validation
+                           .:int:1
+
                   // Saving above code snippet.
                   data.connect:fine-tune
 
@@ -55,6 +73,15 @@ for-each:x:@execute/*
                               values
                                  code:x:@lambda2hyper
                                  prompt:x:@.prompt
+                                 validation:x:@.validation
+
+                           // Counting how many training snippets we're inserting
+                           math.increment:x:@.no
+
+                     else
+
+                        // Cleaning up training data for duplicates.
+                        io.file.delete:x:@.dp/#
    .catch
    
       // This throws an exception being the name of the currently processed filename
@@ -62,3 +89,6 @@ for-each:x:@execute/*
 
 // House cleanups.
 remove-nodes:x:@execute/*
+
+yield
+   count:x:@.no

@@ -1,0 +1,137 @@
+
+// Write a Hyperlambda script for an OpenAI chat endpoint to handle conversations using 'gpt-xxx' models, including streaming and lead email handling.
+.arguments
+   prompt:string
+   type:string
+   references:bool
+   chat:bool
+   recaptcha_response:string
+   user_id:string
+   session:string
+   stream:bool
+   data:string
+   referrer:string
+
+// Executing all registered interceptor slots.
+add:x:+/*/arguments
+   get-nodes:x:@.arguments/*
+execute:magic.misc.execute-slots
+   namespace:magic.openai.chat-interceptor.
+   arguments
+
+// Invoking slot containing commonalities for all endpoints.
+insert-before:x:../*/signal/*/.callback
+   get-nodes:x:@.arguments/*
+signal:magic.ai.endpoint-common
+   .callback
+
+      // Checking if prompt contains an email address.
+      if
+         and
+            strings.contains:x:@.arguments/*/prompt
+               .:@
+            not-null:x:@.arguments/*/contact_us
+            neq:x:@.arguments/*/contact_us
+               .:
+            not-null:x:@.arguments/*/lead_email
+            neq:x:@.arguments/*/lead_email
+               .:
+         .lambda
+
+            /*
+             * Prompt contains an email address, and model is configured with a
+             * lead email address or [contact_us]/[lead_email] property - Hence
+             * treating prompt as a lead if we can, sending an email to lead email
+             * address with the conversation.
+             */
+            unwrap:x:+/*
+            signal:magic.ai.send-lead-email
+               type:x:@.arguments/*/type
+               prompt:x:@.arguments/*/prompt
+               session:x:@.arguments/*/session
+               user_id:x:@.arguments/*/user_id
+               lead_email:x:@.arguments/*/lead_email
+               contact_us:x:@.arguments/*/contact_us
+            if:x:@signal
+               unwrap:x:+/*
+               return
+                  db_time:decimal:-1
+                  finish_reason:cached
+                  result:x:@.arguments/*/contact_us
+
+      // Checking if [referrer] argument was given, and if not, using HTTP Referrer header.
+      .referrer
+      if
+         and
+            exists:x:@.arguments/*/referrer
+            not-null:x:@.arguments/*/referrer
+            neq:x:@.arguments/*/referrer
+               .:
+         .lambda
+
+            // Referrer argument specified.
+            set-value:x:@.referrer
+               get-value:x:@.arguments/*/referrer
+      else
+
+         // No referrer argument, defaulting to HTTP header
+         set-value:x:@.referrer
+            request.headers.get:Referer
+
+      // Checking if max-tokens have been overridden.
+      .tokens
+      set-value:x:@.tokens
+         config.get:"magic:openai:max_tokens"
+
+      // Checking what type of model this is, and invoking correct slot accordingly.
+      if
+         or
+            strings.starts-with:x:@.arguments/*/model
+               .:gpt
+            strings.starts-with:x:@.arguments/*/model
+               .:o1-
+            strings.starts-with:x:@.arguments/*/model
+               .:o3-
+            neq:x:@.slot
+               .:magic.ai.chat
+         .lambda
+
+            // Retrieving Referrer value and passing into slot.
+            unwrap:x:+/*/*
+            add:x:./*/signal
+               .
+                  referrer:x:@.referrer
+            remove-nodes:x:@.arguments/*/referrer
+
+            // Invoking chat slot.
+            add:x:./*/signal
+               get-nodes:x:@.arguments/*
+
+            // Checking if max_tokens have been overridden.
+            if
+               not-null:x:@.tokens
+               .lambda
+                  set-value:x:@.lambda/@.lambda/*/signal/*/model_size
+                     convert:x:@.tokens
+                        type:int
+
+            // Invoking chat slot and returning result to caller.
+            signal:x:@.arguments/*/completion_slot
+            return-nodes:x:@signal/*
+      else
+
+         // Retrieving Referrer value and passing into slot.
+         unwrap:x:+/*/*
+         add:x:./*/signal
+            .
+               referrer:x:@.referrer
+         remove-nodes:x:@.arguments/*/referrer
+
+         // Invoking completion slot.
+         add:x:./*/signal
+            get-nodes:x:@.arguments/*
+         signal:magic.ai.completion
+         return-nodes:x:@signal/*
+
+// Returning result of worker slot to caller.
+return-nodes:x:@signal/*

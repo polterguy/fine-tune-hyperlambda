@@ -1,0 +1,110 @@
+
+// Endpoint sending a Stripe payment link to the specified email address.
+.arguments
+   plan:string
+   name:string
+   email:string
+
+/*
+ * Ensures the specified [arg] was given.
+ * 
+ * This action will throw an exception with a descriptive text explaining if the argument is missing.
+ */
+execute:magic.workflows.actions.execute
+   name:validators-enum
+   filename:/misc/workflows/actions/security/validators-enum.hl
+   arguments
+      values
+         .:professional
+         .:enterprise
+      value:x:@.arguments/*/plan
+
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
+
+// Returns a single plan
+execute:magic.workflows.actions.execute
+   name:hub-plan-get
+   filename:/modules/hub/workflows/actions/hub-plan-get.hl
+   arguments
+      plan:x:@.arguments/*/plan
+
+/*
+ * Creates a Stripe payment link from the specified [price_reference], being
+ * a Stripe payment ID, for [quantity] amount of items, returning the user to
+ * [success_url] after payment has been successfully finished.
+ * 
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-payment-link-create
+   filename:/modules/stripe/workflows/actions/stripe-payment-link-create.hl
+   arguments
+      price_reference:x:--/execute/=hub-plan-get/*/price_reference
+      quantity:int:1
+      success_url:"https://ainiro.io"
+
+// Loads the specified [file] and returns to caller as [content].
+execute:magic.workflows.actions.execute
+   name:file-load
+   filename:/misc/workflows/actions/file/file-load.hl
+   arguments
+      file:/modules/hub/magic.startup/templates/payment-link.html
+
+/*
+ * Replaces the specified [source] string's [what] occurencies with [with].
+ * 
+ * Returns the result as [result].
+ */
+execute:magic.workflows.actions.execute
+   name:strings-replace-1
+   filename:/misc/workflows/actions/strings/strings-replace.hl
+   arguments
+      source:x:--/execute/=file-load/*/content
+      what:{{name}}
+      with:x:@.arguments/*/name
+
+/*
+ * Replaces the specified [source] string's [what] occurencies with [with].
+ * 
+ * Returns the result as [result].
+ */
+execute:magic.workflows.actions.execute
+   name:strings-replace-2
+   filename:/misc/workflows/actions/strings/strings-replace.hl
+   arguments
+      source:x:--/execute/=strings-replace-1/*/result
+      what:{{url}}
+      with:x:--/execute/=stripe-payment-link-create/*/purchase_link
+
+/*
+ * Sends an email to the specified [name]/[email] recipient, with the specified [subject] and [body].
+ * 
+ * Optionally supply [from] and [from-email] as name/email sender. If you don't supply from, this action
+ * will use the default sender settings from your configuration.
+ */
+execute:magic.workflows.actions.execute
+   name:email
+   filename:/misc/workflows/actions/misc/email.hl
+   arguments
+      name:x:--/execute/=hub-plan-get/*/name
+      email:x:@.arguments/*/email
+      html:bool:true
+      subject:Your AINIRO.IO Payment link
+      body:x:--/execute/=strings-replace-2/*/result
+
+// Returning success to caller.
+return
+   result:success

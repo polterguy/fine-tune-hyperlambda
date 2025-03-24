@@ -1,0 +1,88 @@
+
+// Dynamic slot that tracks the specified order and returns status to caller.
+slots.create:shopify.orders.track
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/shop
+   validators.mandatory:x:@.arguments/*/secret
+   validators.mandatory:x:@.arguments/*/order_no
+
+   // Creating our URL.
+   .url
+   set-value:x:@.url
+      strings.concat
+         .:"https://"
+         get-value:x:@.arguments/*/shop
+         .:.myshopify.com/admin/api/2023-07/orders.json?name=
+         strings.url-encode:x:@.arguments/*/order_no
+         .:&status=any
+
+   // Retrieving order status.
+   http.get:x:@.url
+      convert:bool:true
+      headers
+         X-Shopify-Access-Token:x:@.arguments/*/secret
+
+   // Sanity checking HTTP request.
+   if
+      not
+         and
+            mte:x:@http.get
+               .:int:200
+            lt:x:@http.get
+               .:int:300
+      .lambda
+
+         // Oops ...!!
+         log.error:x:@.arguments/*/message
+         throw:Something went wrong while invoking Shopify, check your log for details.
+            status:int:500
+            public:bool:true
+
+   // Creating our order status that we return to caller.
+   .status
+   .status-description
+   switch:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      case:fulfilled
+         set-value:x:@.status-description
+            .:"Order is fulfilled by us. "
+         set-value:x:@.status
+            get-value:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      case:shipped
+         set-value:x:@.status-description
+            .:"Order is in shipping. "
+         set-value:x:@.status
+            get-value:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      case:partial
+         set-value:x:@.status-description
+            .:"Order has been partially shipped. "
+         set-value:x:@.status
+            get-value:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      case:unshipped
+         set-value:x:@.status-description
+            .:"Order is not shipped. "
+         set-value:x:@.status
+            get-value:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      default
+         set-value:x:@.status-description
+            .:No such order
+         set-value:x:@.status
+            .:unknown
+
+   // Checking if we've got fulfillments.
+   if
+      exists:x:@http.get/*/content/*/orders/0/*/fulfillments/0/*/tracking_urls/0
+      .lambda
+
+         // Order is fulfilled from merchant's side, and we've got a tracking url.
+         set-value:x:@.status-description
+            strings.concat
+               get-value:x:@.status-description
+               .:You can track your shipping [here](
+               get-value:x:@http.get/*/content/*/orders/0/*/fulfillments/0/*/tracking_urls/0
+               .:)
+
+   // Returning status to caller.
+   yield
+      status:x:@.status
+      description:x:@.status-description
