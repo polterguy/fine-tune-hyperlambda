@@ -1,48 +1,32 @@
-/*
- * Returns all support tickets for a specific category
- */
+
+// Delete one record from your Genre table in your chinook database.
 .arguments
-   filter:string
-   limit:long
-   offset:long
 
-auth.ticket.verify:support-agent
+   // Primary key of record to delete, mandatory argument
+   GenreId:long
 
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:25
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,basic
 
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
+// Making sure primary key was supplied so we don't delete ALL records.
+validators.mandatory:x:@.arguments/*/GenreId
 
-mssql.connect:[support|TICKETS_DB]
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-   mssql.read
-      table:Tickets
-         as:t
-         join:Categories
-            as:cat
-            type:left
-            on
-               and
-                  t.CategoryId.eq:cat.Id
-      columns
-         cat.Name
-            as:Category
-         count(*)
-            as:TicketCount
-         max(t.CreatedAt)
-            as:LatestTicket
-      limit:x:@.limit
-      offset:x:@.offset
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Genre
       where
          and
-            cat.Name.eq:x:@.arguments/*/filter
-      group
-         cat.Name
-   return-nodes:x:@mssql.read/*
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

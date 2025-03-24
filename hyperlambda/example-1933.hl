@@ -1,18 +1,23 @@
 
-// Write a Hyperlambda script to save an SQL template file according to specified arguments.
+// Creates a contact in HubSpot by executing helper Hyperlambda file
 .arguments
-   databaseType:string
-   filename:string
-   content:string
+   email:string
+   first_name:string
+   last_name:string
+   phone:string
+   company:string
+   website:string
+   lifecyclestage:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/email
 
-// Saving file.
-strings.concat
-   .:/etc/
-   get-value:x:@.arguments/*/databaseType
-   .:/templates/
-   get-value:x:@.arguments/*/filename
-io.file.save:x:-
-   get-value:x:@.arguments/*/content
+// Forwarding request to our HTTP POST Hyperlambda file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/hubspot/contacts.post.hl
+
+// Returning whatever above invocation returned.
+add:x:./*/return
+   get-nodes:x:@execute-file/*
+return

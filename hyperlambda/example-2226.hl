@@ -1,11 +1,20 @@
-// Create a slot 'test' that returns a value
-slots.create:test  
-   return-value:OK
 
-// Invoke 'test' safely (slot exists)
-try-signal:test  
-// The try-signal node's value is "OK"
+// Returns number of registrations for the last 14 days grouped by day.
+.arguments
 
-// Invoke a non-existent slot 'missing' safely
-try-signal:missing  
-// No exception is thrown even though 'missing' is not defined (result is empty)
+// Making sure user is authorised to invoke endpoint.
+auth.ticket.verify:root, admin, guest
+config.get:"magic:databases:default"
+switch:x:@config.get
+   case:mysql
+   case:sqlite
+      strings.concat
+         .:/modules/hub/affiliates/db.overrides/
+         get-value:x:@config.get
+         .:.affiliate-registrations.get.hl
+      add:x:+
+         get-nodes:x:@.arguments/*
+      io.file.execute:x:@strings.concat
+      return-nodes:x:-/*
+   default
+      throw:Unsupport database type for Hub

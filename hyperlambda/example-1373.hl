@@ -1,30 +1,43 @@
 
-// Returns a bar chart image to caller. Values is a mandatory comma separated list of values.
-.arguments:*
+// Updates an existing item in your clusters table in your [generic|hub] database according to the specified arguments.
+.arguments
+   id:string
+   country:string
+   name:string
+   enabled:bool
 
-// Creating our individual bars.
-.bars
-for-each:x:@.arguments/*
+// Only root users can execute endpoint
+auth.ticket.verify:root
 
-   // Adding primary node for bar.
-   unwrap:x:+/+/*/*
-   set-name:x:+/*/*
-      get-name:x:@.dp/#
-   add:x:@.bars
-      .
-         .:x:@.dp/#
+// Verifying user is authorized to access endpoint.
+validators.mandatory:x:@.arguments/*/id
 
-// Parametrizing [image.chart] invocation.
-add:x:../*/image.chart/*/bars
-   get-nodes:x:@.bars/*
-image.chart:bars
-   width:800
-   height:500
-   bars
+// Opening up our database connection.
+data.connect:[generic|hub]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
 
-// Applying correct HTTP header.
-response.headers.set
-   Content-Type:image/png
+   // Invoking our update slot.
+   data.update
+      table:clusters
+      values
+      where
+         and
 
-// Returning chart to caller.
-return:x:@image.chart
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning success to caller.
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

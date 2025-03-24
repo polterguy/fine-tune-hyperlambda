@@ -1,17 +1,41 @@
 
-// Generate a Hyperlambda snippet that retrieves records from the sales database and its transactions table.
+/*
+ * Returns Stripe charges.
+ * 
+ * [limit] and [starting_after] are optional arguments and [limit] is the number of charges to return while [starting_after] is from which record to start returning charges.
+ */
+.arguments
+   limit:int
+   starting_after:string
+   customer_id:string
 
-// Retrieves records from the sales database and its transactions table.
-data.connect:sales_db
+/*
+ * Ensures user is authorized to access endpoint.
+ *
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
 
-   // Using MySQL as the database type.
-   database-type:mysql
+/*
+ * Retrieves charges from Stripe.
+ *
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-charges-get
+   filename:/modules/stripe/workflows/actions/stripe-charges-get.hl
+   arguments
+      limit:x:@.arguments/*/limit
+      starting_after:x:@.arguments/*/starting_after
+      customer_id:x:@.arguments/*/customer_id
 
-   // Fetching data from the database.
-   data.read
-      database-type:mysql
-      table:transactions
-      limit:20
-      sort
-         transaction_date
-      direction:asc
+// Returns the result of your last action.
+return-nodes:x:@execute/*

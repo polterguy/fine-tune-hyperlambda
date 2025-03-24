@@ -1,3 +1,40 @@
-// How can I set a public caching header on a successful GET request?
-response.headers.set
-   Cache-Control:public, max-age=3600
+/*
+ * Compiles a snippet of C# code down to a library,
+ * for then to dynamically load it as a plugin.
+ */
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.node.extensions
+      .:magic.signals.contracts
+   code:@"
+
+// Example C# code creating a Hyperlambda slot.
+using System;
+using magic.node;
+using magic.node.extensions;
+using magic.signals.contracts;
+
+// Our slot class.
+[Slot(Name = ""foo"")]
+public class Foo : ISlot
+{
+   public void Signal(ISignaler signaler, Node input)
+   {
+      input.Value = $""Hi {input.GetEx<string>()}, how may I assist you?"";
+   }
+}"
+   assembly-name:foo.dll
+
+// Loading assembly from raw bytes now that we've created it.
+system.plugin.load:x:@system.compile
+
+// Executing [foo] slot now dynamically injected into AppDomain.
+.name:John Doe
+foo:x:@.name
+
+// Unloading plugin.
+system.plugin.unload:foo.dll

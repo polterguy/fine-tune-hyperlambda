@@ -1,34 +1,22 @@
 
-// Lists all database in your MySQL instance.
-slots.create:magic.db.pgsql.databases
+// Hyperlambda script that returns cryptographically secure random text based on specified arguments.
+.arguments
 
-   // Opens up our connection
-   .connection:[postgres]
-   if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
-      .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               .:postgres]
-   pgsql.connect:x:@.connection
+   // Minimum value
+   min:long
 
-      // Runs our query
-      pgsql.select:select datname from pg_database
+   // Maximum value
+   max:long
 
-      // Renaming "Database" nodes.
-      set-name:x:@pgsql.select/*/*
-         .:db
+// Required to make it possible to add as AI function to machine learning type
+.type:public
 
-      // Returns the remaining databases to caller.
-      return-nodes:x:@pgsql.select/*
+// Generating gibberish text.
+add:x:./*/crypto.random
+   get-nodes:x:@.arguments/*
+crypto.random
+
+// Generating gibberish text.
+unwrap:x:+/*
+return
+   result:x:@crypto.random

@@ -1,21 +1,33 @@
+// Sends GET request to fetch user profile with dynamic Authorization header and handles common HTTP statuses
 
-// Hyperlambda endpoint that creates a log entry with a specified 'type' (info, error, fatal, debug) and 'message'. Also allows for passing in optional 'args' for additional meta information.
 .arguments
-   type:string
-   message:string
-   args:*
 
-// Lambda object actually creating our log entry.
-.invoke-log
-   name:x:@.arguments/*/message
+// API token
+.token:Bearer xyz.abc.123
 
-// Parametrising invocation.
-set-name:x:@.invoke-log/*/name
-   strings.concat
-      .:log.
-      get-value:x:@.arguments/*/type
-add:x:@.invoke-log/*
-   get-nodes:x:@.arguments/*/args/*
+// Where result will be stored
+.profile.result
 
-// Invoking lambda object responsible for creating our log entry.
-eval:x:@.invoke-log
+http.get:"https://api.example.com/user/profile"
+   convert:true
+   headers
+      Authorization:x:@.token
+
+switch:x:@http.get
+
+   case:int:200
+      set-value:x:@.profile.result
+         get-value:x:@http.get/*/content/*/name
+
+   case:int:401
+      throw:401 Unauthorized – Invalid or missing token
+
+   case:int:404
+      throw:404 Not Found – User profile endpoint does not exist
+
+   default
+      set-value:x:@.profile.result
+         .:Unexpected error occurred
+
+yield
+   result:x:@.profile.result

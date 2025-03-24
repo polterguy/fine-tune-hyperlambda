@@ -1,63 +1,9 @@
-
-// Create a Hyperlambda script that returns all filtered training snippets as a CSV file, ensuring the user is authorized.
-.arguments
-   ml_training_snippets.completion.like:string
-   ml_training_snippets.prompt.like:string
-   ml_training_snippets.uri.like:string
-   ml_training_snippets.type.eq:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*/*/or
-      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
-      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
-      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
-   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
-   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
-   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Removing [or] parts unless we've got something to actually or.
-   if
-      not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
-      .lambda
-         remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
-
-   // Invoking our read slot.
-   data.read
-      table:ml_training_snippets
-      columns
-         type
-         uri
-         prompt
-         completion
-      where
-         and
-            or
-      limit:-1
-
-   // Verifying records exists.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         response.status.set:404
-         return
-            result:No records found
-
-   // Converting result to CSV.
-   lambda2csv:x:@data.read/*
-
-   // Applying correct HTTP header.
-   response.headers.set
-      Content-Type:text/csv
-      Access-Control-Expose-Headers:Content-Disposition
-      Content-Disposition:"attachment; filename=\"training-snippets.csv\""
-
-   // Returning content to caller.
-   return:x:@lambda2csv
+// Hyperlambda [if] checking for empty value
+.user-input:
+.validation-message
+if
+   eq:x:@.user-input
+      .:
+   .lambda
+      set-value:x:@.validation-message
+         .:Input required

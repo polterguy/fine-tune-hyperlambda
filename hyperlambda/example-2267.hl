@@ -1,14 +1,127 @@
 
-// Create a new RSA key pair and encrypt a message using its public key before finally decrypting it
-crypto.rsa.create-key
-   key-size:int:2048
+// Count unique and distinct items from your address table in your sakila database without authorization
+.arguments
 
-// Encrypt a message using RSA public key
-.message
-   content:Secret Message
-crypto.rsa.encrypt:x:@.message/*/content
-   public-key:x:@crypto.rsa.create-key/*/public
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
 
-// Decrypting message we encrypted above
-crypto.rsa.decrypt:x:-
-   private-key:x:@crypto.rsa.create-key/*/private
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   // Optional filtering arguments
+   address.address_id.mt:long
+   address.address_id.lt:long
+   address.address_id.mteq:long
+   address.address_id.lteq:long
+   address.address_id.neq:long
+   address.address_id.eq:long
+   address.address.like:string
+   address.address.mt:string
+   address.address.lt:string
+   address.address.mteq:string
+   address.address.lteq:string
+   address.address.neq:string
+   address.address.eq:string
+   address.address2.like:string
+   address.address2.mt:string
+   address.address2.lt:string
+   address.address2.mteq:string
+   address.address2.lteq:string
+   address.address2.neq:string
+   address.address2.eq:string
+   address.district.like:string
+   address.district.mt:string
+   address.district.lt:string
+   address.district.mteq:string
+   address.district.lteq:string
+   address.district.neq:string
+   address.district.eq:string
+   address.city_id.mt:long
+   address.city_id.lt:long
+   address.city_id.mteq:long
+   address.city_id.lteq:long
+   address.city_id.neq:long
+   address.city_id.eq:long
+   address.postal_code.like:string
+   address.postal_code.mt:string
+   address.postal_code.lt:string
+   address.postal_code.mteq:string
+   address.postal_code.lteq:string
+   address.postal_code.neq:string
+   address.postal_code.eq:string
+   address.phone.like:string
+   address.phone.mt:string
+   address.phone.lt:string
+   address.phone.mteq:string
+   address.phone.lteq:string
+   address.phone.neq:string
+   address.phone.eq:string
+   address.last_update.mt:date
+   address.last_update.lt:date
+   address.last_update.mteq:date
+   address.last_update.lteq:date
+   address.last_update.neq:date
+   address.last_update.eq:date
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:address.address_id
+   .:address.address
+   .:address.address2
+   .:address.district
+   .:address.city_id
+   .:address.postal_code
+   .:address.phone
+   .:address.last_update
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:address
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

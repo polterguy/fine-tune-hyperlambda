@@ -1,54 +1,13 @@
+/*
+ * This example illustrates the use of the `.finally` block to ensure
+ * that resources are cleaned up, regardless of whether an exception occurs.
+ * It opens a file, reads its content, and ensures the file is closed afterward.
+ */
 
-// Create one record in your address table in your sakila database without authorization. Log invocation
-.arguments
+try
+   io.file.load:x:@.file-path
+.finally
+   log.info:"We're done trying to read the file, byt we don't know if it was a success"
 
-   // address column value
-   address:string
-
-   // address2 column value
-   address2:string
-
-   // district column value
-   district:string
-
-   // city_id column value
-   city_id:long
-
-   // postal_code column value
-   postal_code:string
-
-   // phone column value
-   phone:string
-
-   // last_update column value
-   last_update:date
-
-// Logging invocation.
-auth.ticket.get
-lambda2hyper:x:@.arguments/*
-log.info:sakila.address entry created
-   username:x:@auth.ticket.get
-   arguments:x:@lambda2hyper
-
-// Opening up database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:address
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+// Notice, this code will throw an exception as is, since the [.file-path] doesn't exists, implying the code will try to open a file with a null file name
+// When an exception is thrown, the [.finally] block will execute, creating a log entry - But the exception will propagate out

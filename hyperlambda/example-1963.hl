@@ -1,17 +1,32 @@
-// Executing the following Hyperlambda results in the following
 
-// When executing the following Hyperlambda
-data.connect:magic
-   database-type:sqlite
-   data.create
-      database-type:sqlite
-      table:log_entries
-      values
-         content:Foo bar log content
-         type:info
+// Write a Hyperlambda script to vectorize all training snippets in a specified model/type.
+.arguments
+   type:string
+   feedback-channel:string
 
-// We end up with this result
-data.connect
-   data.create:long:75152
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Notice how lists are declared with nodes having names of "." or even sometimes ""
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+
+// Doing some basic logging.
+log.info:Started vectorising model
+   model:x:@.arguments/*/type
+
+// Creating a thread and invoking file doing the heavy lifting.
+insert-before:x:./*/fork/0
+   get-nodes:x:@.arguments
+fork
+   add:x:./*/signal
+      get-nodes:x:@.arguments/*
+   signal:magic.ai.vectorise
+      .onafter
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Done!
+               type:success
+
+// Returning success to caller.
+return
+   result:success

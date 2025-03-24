@@ -1,26 +1,30 @@
 
-// Write a Hyperlambda script to invoke a specified action with given values.
+// Delete one record from your MediaType table in your chinook database.
 .arguments
-   action:string
-   values:*
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/action
+   // Primary key of record to delete, mandatory argument
+   MediaTypeId:long
 
-// Figuring out what slot to invoke.
-.slot
-set-value:x:@.slot
-   strings.concat
-      .:magic.questionnaires.action.
-      get-value:x:@.arguments/*/action
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/MediaTypeId
 
-// Parametrising slot.
-add:x:./*/signal
-   get-nodes:x:@.arguments/*/values/*
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-// Invoking slot.
-signal:x:@.slot
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-// Returning success to caller.
-return
-   result:success
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:MediaType
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

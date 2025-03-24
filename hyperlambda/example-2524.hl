@@ -1,7 +1,37 @@
 /*
- * Changes the name of the specified node(s) to whatever the results of its
- * parameter is.
+ * Compiles a snippet of C# code down to a library,
+ * for then to dynamically load it as a plugin.
+ *
+ * This particular code creates a slot, but you can create any
+ * code you wish, and it doesn't have to be Hyperlambda related.
  */
-.destination
-set-name:x:@.destination
-   .:foo
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.signals.contracts
+   code:@"
+
+// Example C# code creating a Hyperlambda slot.
+using System;
+using magic.node;
+using magic.signals.contracts;
+
+// Our slot class.
+[Slot(Name = ""bar"")]
+public class Bar : ISlot
+{
+   public void Signal(ISignaler signaler, Node input)
+   {
+      input.Value = ""Hello from C#"";
+   }
+}"
+   assembly-name:bar.dll
+
+// Loading assembly now that we've created it.
+system.plugin.execute:x:@system.compile
+
+   // Invoking dynamically created C# slot.
+   bar

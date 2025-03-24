@@ -1,6 +1,44 @@
-// This example connects to the 'ocean' database and retrieves the maximum depth from the 'creatures' table.
-// It uses the sqlite.scalar slot to execute a SQL query that finds the maximum value in the 'depth' column.
-// The result is returned as a single scalar value representing the maximum depth of creatures.
 
-sqlite.connect:ocean
-   sqlite.scalar:select max(depth) from creatures
+// Create endpoint inserting one record into your products table in your shopping-cart-demo database.
+.arguments
+
+   // name column value
+   name:string
+
+   // description column value
+   description:string
+
+   // sku column value
+   sku:string
+
+   // price column value
+   price:decimal
+
+   // image_url column value
+   image_url:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:products
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

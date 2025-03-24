@@ -1,44 +1,54 @@
 
-// Sends the user a warning email informing them that their cloudlet is about to be destroyed 5 days from now.
-slots.create:hub.emails.user.warn-destruction-of-cloudlet
+// Create one record in your address table in your sakila database without authorization. Log invocation
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/username
-   validators.mandatory:x:@.arguments/*/cloudlet
+   // address column value
+   address:string
 
-   // Retrieving frontend URL.
-   .url
-   set-value:x:@.url
-      config.get:"magic:hub:frontend-url"
+   // address2 column value
+   address2:string
 
-   // Retrieving user's name and email address.
-   .email
-   .name
-   data.connect:[generic|magic]
-      data.read
-         table:users_extra
-         values
-            type
-            name
-         where
-            and
-               user.eq:x:@.arguments/*/username
-               or
-                  type.eq:email
-                  type.eq:name
-      set-value:x:@.email
-         get-value:x:@data.read/*/*/type/=email/./*/value
-      set-value:x:@.name
-         get-value:x:@data.read/*/*/type/=name/./*/value
+   // district column value
+   district:string
 
-   // Sending user his warning email.
-   unwrap:x:+/**
-   signal:magic.emails.send
-      subject:[Important] - Your AINIRO cloudlet is scheduled for destruction!
-      template-file:/modules/hub/magic.startup/templates/cloudlet-to-be-destroyed.html
-      substitutes
-         url:x:@.url
-         cloudlet:x:@.arguments/*/cloudlet
-      mime-type:text/html
-      email:x:@.email
-      name:x:@.name
+   // city_id column value
+   city_id:long
+
+   // postal_code column value
+   postal_code:string
+
+   // phone column value
+   phone:string
+
+   // last_update column value
+   last_update:date
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.address entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:address
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

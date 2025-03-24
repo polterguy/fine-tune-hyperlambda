@@ -1,29 +1,24 @@
-// Nested [if] within [for-each] to handle complex conditions
-.inventory
-   part1
-      name:engine
-      status:out-of-stock
-   part2
-      name:wheel
-      status:out-of-stock
-   part3
-      name:door
-      status:available
 
-for-each:x:@.inventory/*
-   if
-      eq:x:@.dp/#/*/status
-         .:available
-      .lambda
-         set-value:x:@.dp/#/*/status
-            .:checked
-   else
-      if
-         eq:x:@.dp/#/*/name
-            .:wheel
-         .lambda
-            set-value:x:@.dp/#/*/status
-               .:urgent restock
-      else
-         set-value:x:@.dp/*/status
-            .:restock
+// Hyperlambda slot that loads all files recursively from a specified folder.
+slots.create:magic.io.file.load-recursively
+
+   // In case we've got a "slot" type of argument.
+   eval:x:@.arguments
+
+   // Lists all files in current [folder], and adds up the result to return value.
+   io.file.list-recursively:x:@.arguments/0
+      show-hidden:x:@.arguments/*/.hidden-files
+
+   /*
+    * Iterating through all files listed above, and loads them,
+    * for then to add their contents as a child node of iterated file.
+    */
+   for-each:x:@io.file.list-recursively/*
+      io.file.load:x:@.dp/#
+      add:x:@.dp/#
+         get-nodes:x:@io.file.load
+      set-name:x:@.dp/#/*
+         .:
+
+   // Returning to caller all files in folder, and sub folder(s).
+   return-nodes:x:@io.file.list-recursively/*

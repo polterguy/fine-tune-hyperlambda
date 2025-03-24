@@ -1,11 +1,49 @@
-/*
- * This Hyperlambda snippet joins `table1` and `table2` on `id`.
- */
 
-data.read
-   table:table1
-      join:table2
-         type:inner
-         on
-            and
-               table1.id.eq:table2.ref_id
+// Hyperlambda file that executes a SQL select statement with specified 'database-type', 'connection-string', 'database', and 'sql'. Include optional 'params'. Validate mandatory fields and enums.
+.arguments
+   database-type:string
+   connection-string:string
+   database:string
+   sql:string
+
+   // Allows for passing in anything as `params`.
+   params:*
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/sql
+validators.enum:x:@.arguments/*/database-type
+   .:sqlite
+   .:mssql
+   .:mysql
+   .:pgsql
+
+// Applying defaults.
+validators.default:x:@.arguments
+   connection-string:generic
+   database-type:sqlite
+   database:magic
+
+// Connection string to actually use as we connect.
+.connection-string
+
+// Caller supplied an explicit [connection-string] argument.
+set-value:x:@.connection-string
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connection-string
+      .:|
+      get-value:x:@.arguments/*/database
+      .:]
+
+// Connecting to database.
+data.connect:x:@.connection-string
+   database-type:x:@.arguments/*/database-type
+
+   // Parametrizing SQL.
+   add:x:./*/data.select
+      get-nodes:x:@.arguments/*/params/*
+
+   // Executing SQL.
+   data.select:x:@.arguments/*/sql
+      database-type:x:@.arguments/*/database-type
+   return-nodes:x:@data.select/*

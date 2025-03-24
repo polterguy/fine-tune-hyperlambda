@@ -1,30 +1,34 @@
 
-// Hyperlambda endpoint that takes two arguments, calculates the modulo, and then returns true if it's 0, otherwise false
+// Delete one record from your address table in your sakila database without authorization. Log invocation
 .arguments
-   arg1:int
-   arg2:int
-.accept:application/json
 
-// Sanity checking invocation
-validators.mandatory:x:@.arguments/*/arg1
-validators.mandatory:x:@.arguments/*/arg2
+   // Primary key of record to delete, mandatory argument
+   address_id:long
 
-// Calculating modulo
-math.modulo
-   get-value:x:@.arguments/*/arg1
-   get-value:x:@.arguments/*/arg2
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.address entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/address_id
 
-// Checking if modulo result is 0
-if
-   eq:x:@math.modulo
-      .:int:0
-   .lambda
-      set-value:x:../*/return/*/result
-         .:bool:true
-else
-   set-value:x:../*/return/*/result
-      .:bool:false
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
 
-// Returning result to caller
-return
-   result
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:address
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

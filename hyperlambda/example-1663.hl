@@ -1,12 +1,66 @@
+
 /*
- * Retrieves temperature readings from multiple sensors and finds the lowest one.
+ * Scrapes the specified URL, and creates an image prompt from the content on the URL,
+ * that creates a high quality image encapsulating the content of the link and returns a
+ * link to the generated image.
  */
-.sensors
-   t1:int:23
-   t2:int:18
-   t3:int:27
-.lowest
-math.min
-   get-value:x:@.sensors/*/t1
-   get-value:x:@.sensors/*/t2
-   get-value:x:@.sensors/*/t3
+.arguments
+   url:string
+
+/*
+ * Ensures user is authorized to access endpoint.
+ *
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
+
+// Returns [max_tokens] context from the specified [url].
+execute:magic.workflows.actions.execute
+   name:openai-context-from-url
+   filename:/modules/openai/workflows/actions/openai-context-from-url.hl
+   arguments
+      url:x:@.arguments/*/url
+      max_tokens:int:4000
+
+/*
+ * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+ * [instruction] and [query].
+ *
+ * Will use the default API key found from configurations.
+ *
+ * [context] is additional data you can supply to OpenAI such that it responds using
+ * your data as its source for information. [instruction] is a system message allowing
+ * you to change how OpenAI responds.
+ */
+execute:magic.workflows.actions.execute
+   name:openai-query
+   filename:/modules/openai/workflows/actions/openai-query.hl
+   arguments
+      model:gpt-4-1106-preview
+      max_tokens:int:1500
+      context:x:--/execute/=openai-context-from-url/*/context
+      query:Create an image prompt from the information in the context that creates a high quality natural image for an article about the subject. DO NOT add text or infographics to the resulting image. Return ONLY the prompt required to create the image. Do not return explanations.
+
+/*
+ * Invokes OpenAI's image generation API with the specified [query] and [model].
+ *
+ * Will use the default API key found from configurations.
+ */
+execute:magic.workflows.actions.execute
+   name:openai-image
+   filename:/modules/openai/workflows/actions/openai-image.hl
+   arguments
+      model:dall-e-3
+      size:1792x1024
+      style:vivid
+      query:x:--/execute/=openai-query/*/answer
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

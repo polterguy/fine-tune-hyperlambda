@@ -1,67 +1,36 @@
 
-// Update one record in your comments table in your cms database
+// Delete one record from your roles table in your cms database
 .arguments
 
-   // id column value being primary key of record to update, mandatory argument
+   // Primary key of record to delete, mandatory argument
    id:long
 
-   // post_id column's new value
-   post_id:long
-
-   // user_id column's new value
-   user_id:long
-
-   // content column's new value
-   content:string
-
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
-
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
 
 // Opening up our database connection.
 data.connect:[generic|cms]
    database-type:sqlite
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-   // Invoking our update slot.
-   data.update
+   // Deleting item from database.
+   data.delete
       database-type:sqlite
-      table:comments
-      values
+      table:roles
       where
          and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
 
    // Publishing socket message.
    add:x:./*/sockets.signal/*/args
       get-nodes:x:@.arguments/*
-   add:x:./*/sockets.signal
-      get-nodes:x:@auth.ticket.verify
-   set-name:x:./*/sockets.signal/*/auth.ticket.verify
-      .:roles
-   sockets.signal:cms.comments.put
+   sockets.signal:cms.roles.delete
       args
 
-   // Returning success to caller.
+   // Returning result of above invocation to caller.
    unwrap:x:+/*
    return
-      affected:x:@data.update
+      affected:x:@data.delete

@@ -1,42 +1,14 @@
 
-// Returns all cloudlets in the system using Hyperlambda workflow actions.
+// Hyperlambda endpoint returning the OpenAI API key to the caller.
 .arguments
-   name:string
-   limit:int
-   offset:int
 
-/*
- * Ensures user is authorized to access endpoint.
- * 
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+// Making sure user has access to invoked endpoint.
+auth.ticket.verify:root
 
-/*
- * Returns the username of the currently authenticated user,
- * or null if user isn't authenticated.
- */
-execute:magic.workflows.actions.execute
-   name:username-get
-   filename:/misc/workflows/actions/security/username-get.hl
-   arguments
+// Reading OpenAI API key from configuration.
+config.get:"magic:openai:key"
 
-// Returns all cloudlets in the system.
-execute:magic.workflows.actions.execute
-   name:hub-cloudlets-get
-   filename:/modules/hub/workflows/actions/hub-cloudlets-get.hl
-   arguments
-      username:x:--/execute/=username-get/*/username
-      name:x:@.arguments/*/name
-      limit:x:@.arguments/*/limit
-      offset:x:@.arguments/*/offset
-
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+// Returning key to caller.
+unwrap:x:+/*
+return
+   result:x:@config.get

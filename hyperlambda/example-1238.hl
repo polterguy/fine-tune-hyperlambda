@@ -1,15 +1,19 @@
 
-// Create a Hyperlambda endpoint that fetches recent orders from 'ecommerce_db' using PostgreSQL.
+/*
+ * Endpoint that takes any arguments, converts all arguments to integers, adds all together, and returns result
+ * 
+ * Pass in whatever arguments you wish.
+ */
+.arguments:*
 
-// Endpoint accepts no arguments
-.arguments
+// Adding all arguments
+.result:int:0
+for-each:x:@.arguments/*
+   set-value:x:@.result
+      math.add:x:@.result
+         convert:x:@.dp/#
+            type:int
 
-.result
-data.connect:ecommerce_db
-   database-type:pgsql
-   data.select:"select order_id, user_id, total from orders where order_status='shipped' order by order_date desc limit 30"
-      database-type:pgsql
-   add:x:@.result
-      get-nodes:x:@data.select/*
+// Returning result (notice, [yield] unwraps all its arguments)
 yield
-   result:x:@.result/*
+   result:x:@.result

@@ -1,64 +1,7 @@
 /*
- * Returns all sales orders for a specified region
- * 
- * Optionally apply limit or offset as needed.
- *
- * Filter is mandatory and matches the region name.
+ * This example checks if "/tmp/logs.txt" exists before deleting it.
  */
-.arguments
-
-   // Mandatory region filter
-   filter:string
-
-   // Optional record limit (defaults to 20)
-   limit:long
-
-   // Optional offset into results
-   offset:long
-
-// Authorisation for sales portal
-auth.ticket.verify:sales-admin
-
-// Assign limit or default
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:20
-
-// Assign offset or default
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
-
-// Connect to order system
-mssql.connect:[production|ORDSYS_MAIN]
-
-   // Read from orders and customer tables
-   mssql.read
-      table:SalesOrders
-         as:o
-         join:Customers
-            as:c
-            type:left
-            on
-               and
-                  o.CustomerId.eq:c.Id
-      columns
-         c.Region
-         c.CompanyName
-         sum(o.TotalAmount)
-            as:TotalSales
-         count(*)
-            as:OrdersCount
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         and
-            c.Region.eq:x:@.arguments/*/filter
-      group
-         c.Region
-         c.CompanyName
-   return-nodes:x:@mssql.read/*
+io.file.exists:/tmp/logs.txt
+if:x:-
+   .lambda
+      io.file.delete:/tmp/logs.txt

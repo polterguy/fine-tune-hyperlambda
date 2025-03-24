@@ -1,27 +1,33 @@
 
-// Create a Hyperlambda script for a CRUD create endpoint that creates an item in the users_roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+// Create a Hyperlambda script for an endpoint that counts items in the questions table in the magic database, ensuring the user is authorized and handling optional filters.
 .arguments
-   role:string
-   user:string
+
+   // Optional filtering arguments
+   questions.question_id.eq:long
+   questions.question.like:string
+   questions.question.eq:string
+   questions.questionnaire.like:string
+   questions.questionnaire.eq:string
 
 // Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Opening up database connection.
+// Opening up our database connection.
 data.connect:[generic|magic]
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
+   database-type:sqlite
+   add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 
-   // Creating our record.
-   data.create
-      table:users_roles
-      return-id:bool:false
-      values
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:questions
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
 
-   // Returning result of above invoction to caller.
-   response.status.set:201
-   unwrap:x:+/*
-   return
-      result:success
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

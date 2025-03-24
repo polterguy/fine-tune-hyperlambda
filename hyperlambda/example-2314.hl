@@ -1,15 +1,79 @@
-// Hyperlambda [set-value]
-.data
-   item1:apple
-   item2:banana
-.item:item2
-set-value:x:@.data/*/{@.item}
-   .:orange
 
-// Results in:
-.data
-   item1:apple
-   item2:orange
-.item:item2
-set-value:x:@.data/*/{@.item}
-   .:orange
+/*
+ * Searches for a company
+ * 
+ * Will search for a company having a name containing the specified query.
+ */
+.arguments
+   query:string
+   limit:long
+   offset:long
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
+validators.default:x:@.arguments
+   limit:long:10
+   offset:long:0
+
+// Connecting to database.
+data.connect:[finovo|finovo]
+   database-type:pgsql
+
+   /*
+    * Parametrising invocations below.
+    *
+    * Notice, we're parametrising both count and get items invocations here!
+    */
+   .query
+   set-value:x:@.query
+      strings.concat
+         .:%
+         get-value:x:@.arguments/*/query
+         .:%
+   unwrap:x:+/*/*
+   add:x:./*/data.read/*/where/*/and
+      .
+         company_name.ilike:x:@.query
+
+   // Applying paging if existing.
+   add:x:@data.connect/*/data.read/[0,1]
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:basic
+      columns
+         org_number
+         company_name
+      where
+         and
+            legalgroup_code.eq:AB
+
+   // Checking we've got data.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         return
+            result:No results were found
+
+   // Making sure we return company information related to the account.
+   add:x:./*/yield/*/companies
+      get-nodes:x:@data.read/*
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:basic
+      columns
+         count(*)
+            as:count
+      where
+         and
+            legalgroup_code.eq:AB
+
+   // Returning result to caller.
+   yield
+      companies
+      total_companies:x:@data.read/0/0

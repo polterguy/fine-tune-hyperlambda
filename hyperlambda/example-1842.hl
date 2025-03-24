@@ -1,27 +1,63 @@
 
-// Hyperlambda snippet that executes [.lambda] if at least one condition is met.
+// Write a Hyperlambda script to create a system message from specified arguments, including URL, template, and instruction.
+.arguments
+   url:string
+   template:string
+   instruction:string
+   channel:string
 
-// Executes [.lambda] if at least one condition is met.
-.output
-.numA:int:6
-.numB:int:12
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/channel
+validators.mandatory:x:@.arguments/*/template
+validators.mandatory:x:@.arguments/*/instruction
+
+// Prepending scheme to URL unless explicitly specified.
 if
-   or
-
-      // Less than check
-      lt:x:@.numA
-         .:int:7
-
-      // Greater than check
-      mt:x:@.numB
-         .:int:11
+   and
+      not
+         strings.starts-with:x:@.arguments/*/url
+            .:"http://"
+      not
+         strings.starts-with:x:@.arguments/*/url
+            .:"https://"
    .lambda
+      set-value:x:@.arguments/*/url
+         strings.concat
+            .:"https://"
+            get-value:x:@.arguments/*/url
 
-      // Setting [.output] to true
-      set-value:x:@.output
-         .:bool:true
-else
+// Sanity checking URL.
+validators.url:x:@.arguments/*/url
 
-   // Setting [.output] to false
-   set-value:x:@.output
-      .:bool:false
+// Doing heavy lifting on a background thread to avoid 60 second timeouts.
+insert-before:x:./*/fork/0
+   get-nodes:x:@.arguments
+fork
+   try
+
+      // Creating our system message.
+      execute:magic.ai.create-system-message
+         url:x:@.arguments/*/url
+         template:x:@.arguments/*/template
+         instruction:x:@.arguments/*/instruction
+
+      // Invoking frontend with message.
+      unwrap:x:+/*/*/message
+      sockets.signal:x:@.arguments/*/channel
+         roles:root
+         args
+            message:x:@execute
+   .catch
+
+      // Oops, signaling frontend that we experienced an error.
+      unwrap:x:+/*/*
+      sockets.signal:x:@.arguments/@.arguments/*/channel
+         roles:root
+         args
+            message:ERROR
+            extra:x:@.arguments/*/message
+
+// Returning result of invocation to caller.
+yield
+   result:success

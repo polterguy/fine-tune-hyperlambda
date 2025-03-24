@@ -1,15 +1,42 @@
-// HTTP endpoint that selects users from database and returns as XML
-.arguments
+// Build the dynamic JSON payload
+.payload
+   username:admin
+   password:supersecret123
+   client_id:web-client
 
-// Connect to the database and retrieve employee
-data.connect:company_database
-   data.read
-      table:employees
-   response.headers.set
-      Content-Type:application/xml
+// Create headers for content-type and custom request ID
+.headers
+   Content-Type:application/json
+   X-Request-ID:xyz-123-abc
 
-   // Converting lambda object to XML
-   lambda2xml:x:@data.read/*
+// Make the HTTP POST request
+add:x:./*/http.post/*/headers
+   get-value:x:@.headers/*
+add:x:./*/http.post/*/payload
+   get-value:x:@.payload/*
+http.post:"https://api.example.com/auth/login"
+   headers
+   payload
 
-   // Returning lambda object to caller
-   return:x:-
+   // This automatically converts result to lambda object
+   convert:true
+
+// Verify above POST was a success.
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+
+      // Store response status and body
+      .name
+      set-value:x:@.name
+         get-value:x:@http.post/*/content/*/name
+
+      .user-id
+      set-value:x:@.user-id
+         get-value:x:@http.post/*/content/*/user-id
+else
+   throw:Something went wrong when invoking HTTP POST

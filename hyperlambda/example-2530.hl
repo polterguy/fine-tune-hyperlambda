@@ -1,11 +1,28 @@
-// Create and update a task
-tasks.create:foo-bar-task-4
-   .lambda
 
-      log.info:Executing foo-bar-task-1
+// Create a Hyperlambda endpoint for a CRUD delete endpoint that deletes one record from the ml_requests table in the magic database with an ID matching the argument, ensuring authentication and authorization for root roles.
+.arguments
+   id:long
 
-tasks.update:foo-bar-task-4
-   description:This is the foo bar task
-   .lambda
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-      log.info:Another log entry now!
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:ml_requests
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

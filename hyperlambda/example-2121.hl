@@ -1,8 +1,216 @@
-// Update resource with HTTP PUT
-http.put:"https://jsonplaceholder.typicode.com/todos/1"
-   headers
-      Content-Type: application/json
-   payload
-      value
-         title:Updated title
-         completed:true
+
+// Creates task that automatically destroys the cloudlet after trial period is over.
+slots.create:hub.cloudlet.ensure-demo-destruction
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/cluster
+   validators.mandatory:x:@.arguments/*/username
+   validators.mandatory:x:@.arguments/*/cloudlet-id
+   validators.mandatory:x:@.arguments/*/cloudlet-name
+
+   // Deleting old hanging tasks for cloudlet with the same name.
+   .old-tasks
+   set-value:x:-
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.arguments/*/cloudlet-name
+         .:-
+   tasks.list:x:@.old-tasks
+   for-each:x:-/*
+      tasks.delete:x:@.dp/#/*/id
+
+   // Creating soft delete task.
+   .task-name
+   set-value:x:-
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.arguments/*/cloudlet-name
+         .:-delete
+   .soft-delete
+   set-value:x:@.soft-delete
+      config.get:"magic:hub:soft-delete"
+         .:120
+   math.add
+      date.now
+      time
+         days:x:@.soft-delete
+   unwrap:x:+/**/.args/*
+   tasks.create:x:@.task-name
+      due:x:@math.add
+      .lambda
+
+         // Forward evaluated further up.
+         .args
+            cluster:x:@.arguments/*/cluster
+            cloudlet-name:x:@.arguments/*/cloudlet-name
+            task-name:x:@.task-name
+
+         // Deleting cloudlet.
+         unwrap:x:+/*
+         signal:hub.cloudlets.delete
+            cluster:x:@.args/*/cluster
+            name:x:@.args/*/cloudlet-name
+
+         // Deleting cloudlet from database.
+         strings.split:x:@.args/*/cloudlet-name
+            .:-
+         data.connect:[generic|hub]
+            data.update
+               table:cloudlets
+               values
+                  enabled:bool:false
+               where
+                  and
+                     cluster.eq:x:@.args/*/cluster
+                     name.eq:x:@strings.split/0
+                     user.eq:x:@strings.split/1
+
+         // Logging that we deleted the cloudlet.
+         log.info:Cloudlet was automatically soft deleted due to trial period ending
+            cloudlet:x:@.args/*/cloudlet-name
+            cluster:x:@.args/*/cluster
+
+         // Deleting task.
+         tasks.delete:x:@.args/*/task-name
+
+   // Creating hard delete task.
+   .task-name
+   set-value:x:-
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.arguments/*/cloudlet-name
+         .:-hard-delete
+   .hard-delete
+   set-value:x:@.hard-delete
+      config.get:"magic:hub:hard-delete"
+         .:150
+   math.add
+      date.now
+      time
+         days:x:@.hard-delete
+   unwrap:x:+/**/.args/*
+   tasks.create:x:@.task-name
+      due:x:@math.add
+      .lambda
+
+         // Forward evaluated further up.
+         .args
+            cluster:x:@.arguments/*/cluster
+            cloudlet-name:x:@.arguments/*/cloudlet-name
+            task-name:x:@.task-name
+
+         // Deleting cloudlet.
+         unwrap:x:+/*
+         signal:hub.cloudlets.hard-delete
+            cluster:x:@.args/*/cluster
+            name:x:@.args/*/cloudlet-name
+
+         // Deleting cloudlet from database.
+         strings.split:x:@.args/*/cloudlet-name
+            .:-
+         data.connect:[generic|hub]
+            data.delete
+               table:cloudlets
+               where
+                  and
+                     cluster.eq:x:@.args/*/cluster
+                     name.eq:x:@strings.split/0
+                     user.eq:x:@strings.split/1
+
+         // Logging that we deleted the cloudlet.
+         log.info:Cloudlet was automatically hard deleted due to trial period ending
+            cloudlet:x:@.args/*/cloudlet-name
+            cluster:x:@.args/*/cluster
+
+         // Deleting task.
+         tasks.delete:x:@.args/*/task-name
+
+   // Updating cloudlet to initialise its destruction date.
+   data.update
+      table:cloudlets
+      values
+         destruction_date:x:@math.add/@math.add
+      where
+         and
+            id.eq:x:@.arguments/*/cloudlet-id
+
+   // Logging that we created a scheduled task.
+   log.debug:Cloudlet is automatically scheduled for deletion
+      cluster:x:@.arguments/*/cluster
+      cloudlet-name:x:@.arguments/*/cloudlet-name
+      task-name:x:@strings.concat
+      cloudlet-id:x:@.arguments/*/cloudlet-id
+      days:x:@.soft-delete
+
+   // Signaling user that the cloudlet has been scheduled for destruction as trial period expires.
+   strings.concat
+      .:"Destroying cloudlet in "
+      get-value:x:@.soft-delete
+      .:" days"
+   unwrap:x:+/**
+   sockets.signal:hub.cloudlets.create
+      users:x:@.arguments/*/username
+      args
+         status:x:@strings.concat
+         finished:bool:false
+         error:bool:false
+
+   // Retrieving number of days trial period lasts.
+   .grace-period
+   set-value:x:@.grace-period
+      config.get:"magic:hub:trial-days"
+         .:90
+
+   // Creating task that warns user about destruction of cloudlet.
+   .task-name
+   set-value:x:-
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.arguments/*/cloudlet-name
+         .:-warn-about-destruction
+   math.add
+      date.now
+      time
+         days:x:@.grace-period
+   unwrap:x:+/**/.args/*
+   tasks.create:x:@.task-name
+      due:x:@math.add
+      .lambda
+
+         // Sends the user an email to warn him his cloudlet is scheduled for destruction 5 days from now.
+         .args
+            username:x:@.arguments/*/username
+            task-name:x:@.task-name
+            cloudlet-name:x:@.arguments/*/cloudlet-name
+         unwrap:x:+/*
+         signal:hub.emails.user.warn-destruction-of-cloudlet
+            username:x:@.args/*/username
+            cloudlet:x:@.args/*/cloudlet-name
+
+         // Logging that we have warned the user.
+         log.info:User has been warned about cloudlet deletion
+            user:x:@.args/*/username
+            cloudlet-name:x:@.args/*/cloudlet-name
+
+         // Deleting task.
+         tasks.delete:x:@.args/*/task-name
+
+   // Logging that we created a scheduled task.
+   log.debug:Automatically warning user about cloudlet deletion
+      cluster:x:@.arguments/*/cluster
+      cloudlet-name:x:@.arguments/*/cloudlet-name
+      task-name:x:@strings.concat
+      days:x:@math.subtract
+
+   // Signaling user that the cloudlet has been scheduled for destruction as trial period expires.
+   strings.concat
+      .:"Warning user about cloudlet deletion "
+      get-value:x:@.grace-period
+      .:" days from now"
+   unwrap:x:+/**
+   sockets.signal:hub.cloudlets.create
+      users:x:@.arguments/*/username
+      args
+         status:x:@strings.concat
+         finished:bool:false
+         error:bool:false

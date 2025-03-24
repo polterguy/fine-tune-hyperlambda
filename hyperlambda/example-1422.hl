@@ -1,21 +1,53 @@
 
-// Hyperlambda snippet that updates a user's email in the 'auth_db' database within the 'users' table.
-
-// Updates a user's email in the "auth_db" database within the "users" table.
+// Counts items from your items table in your shopping-cart-demo database.
 .arguments
-   user_id:int
 
-data.connect:auth_db
-   database-type:pgsql
+   // items table item_id column equality exact match filtering
+   items.item_id.eq:long
 
-   // Updating the user's email and status.
-   data.update
-      database-type:pgsql
-      table:users
-      values
-         email:newuser@example.com
-         status:active
+   // items table product_id column equality exact match filtering
+   items.product_id.eq:long
+
+   // items table quantity column equality exact match filtering
+   items.quantity.eq:long
+
+   // items table session_id column wildcard filtering with SQL like '%' comparison
+   items.session_id.like:string
+
+   // items table session_id column equality exact match filtering
+   items.session_id.eq:string
+
+   // products table name column equality exact match filtering
+   product_id.name.eq:string
+
+   // products table name column wildcard filtering with SQL like '%' comparison
+   product_id.name.like:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:items
+         join:products
+            as:product_id
+            type:left
+            on
+               and
+                  items.product_id:product_id.product_id
+      columns
+         count(*)
+            as:count
       where
          and
-            user_id.eq:x:@.arguments/*/user_id
-   return:x:@data.update
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

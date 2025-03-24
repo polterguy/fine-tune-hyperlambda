@@ -1,6 +1,40 @@
-// Check if one value is less than another
 
-.foo1:int:3
-lt
-   get-value:x:../*/.foo1
-   .:int:5
+// Returns subsidiary companies from specified org number
+.arguments
+   org_number:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/org_number
+set-value:x:@.arguments/*/org_number
+   strings.replace-not-of:x:@.arguments/*/org_number
+      .:0123456789
+      .:
+
+// Connecting to database.
+data.connect:[finovo|finovo]
+   database-type:pgsql
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:group_structure
+      columns
+         org_number
+         company_name
+         company_country_name
+         owned_percent
+      where
+         and
+            group_mother_orgnumber.eq:x:@.arguments/*/org_number
+            org_number.neq:x:@.arguments/*/org_number
+      limit:-1
+
+   // Verifying the company has subsidiaries.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         return
+            result:"This company doesn't have any subsidiaries"
+
+   // Returning result to caller.
+   return-nodes:x:@data.read/*

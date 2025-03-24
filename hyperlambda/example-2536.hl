@@ -1,20 +1,24 @@
-// Search through a log file and extract all ISO-formatted dates from it
 
-// Reading file's content as text.
-io.file.load:/var/logs/server.log
+// Hyperlambda script that lists all connection strings in your installation for a specified database type.
+.arguments
+   databaseType:string
 
-// A temporary place to hold the extracted dates
-.dates
+// This prevents all users to invoke endpoint, EXCEPT 'root' users.
+auth.ticket.verify:root
 
-// Extracting ISO date strings using regex (e.g., 2023-12-31)
-strings.matches:x:@io.file.load
-   .:"\\b\\d{4}-\\d{2}-\\d{2}\\b"
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:pgsql
+   .:mssql
+   .:sqlite
 
-// Loop through the matches and add them to the list
-for-each:x:@strings.matches/*/match
-   unwrap:x:+/*/*
-   add:x:@.dates
-      .
-         .:x:@.dp/#
-
-// Notice, this Hyperlambda DOES NOT check if the file exists before it's trying to read it. This will result in an exception if the file doesn't exist
+// Retrieves all connection strings according to database type specified.
+strings.concat
+   .:"magic:databases:"
+   get-value:x:@.arguments/*/databaseType
+config.section:x:-
+add:x:+
+   get-nodes:x:@config.section/*
+return

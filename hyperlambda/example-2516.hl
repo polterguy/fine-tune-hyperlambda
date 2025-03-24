@@ -1,91 +1,27 @@
 
-// Workflow action that returns all cloudlets in the system.
+// Counts items from your CustomerCustomerDemo table in your northwind database
 .arguments
-   username
-      type:string
-      mandatory:bool:false
-   name
-      type:string
-      mandatory:bool:false
-   limit
-      type:int
-      mandatory:bool:false
-   offset
-      type:int
-      mandatory:bool:false
+   CustomerCustomerDemo.CustomerID.like:string
+   CustomerCustomerDemo.CustomerID.eq:string
+   CustomerCustomerDemo.CustomerTypeID.like:string
+   CustomerCustomerDemo.CustomerTypeID.eq:string
 
-// Applying defaults
-validators.default:x:@.arguments
-   limit:int:5
-   offset:int:0
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-// Connecting to database.
-data.connect:[generic|hub]
-
-   /*
-    * Checking if caller provided a [username] argument,
-    * and if so, applying it to [where].
-    */
-   if
-      and
-         exists:x:@.arguments/*/username
-         not-null:x:@.arguments/*/username
-      .lambda
-
-         // Adding [user.eq] filter criteria to [data.read].
-         unwrap:x:+/*/*
-         add:x:@data.connect/*/data.read/*/where/*/and
-            .
-               user.eq:x:@.arguments/*/username
-
-   /*
-    * Checking if caller provided a [name] argument,
-    * and if so, applying it to [where].
-    */
-   if
-      and
-         exists:x:@.arguments/*/name
-         not-null:x:@.arguments/*/name
-      .lambda
-
-         // Adding [user.eq] filter criteria to [data.read].
-         unwrap:x:+/*/*
-         add:x:@data.connect/*/data.read/*/where/*/and
-            .
-               name.eq:x:@.arguments/*/name
-
-   // Removing [where] if there are no conditions.
-   if
-      not-exists:x:@data.connect/*/data.read/*/where/*/and/*
-      .lambda
-         remove-nodes:x:@data.connect/*/data.read/*/where
-
-   // Adding [limit] and [offset]
-   add:x:@data.connect/*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-
-   // Reading records.
+   // Reading data from database.
    data.read
-      table:cloudlets
+      database-type:sqlite
+      table:CustomerCustomerDemo
       columns
-         created
-         name
-         user
-         plan
-         "('https://' || name || '-' || user || '.' || cluster)"
-            as:login
+         count(*)
+            as:count
       where
          and
-      order:created
-      direction:desc
+      limit:long:1
 
-   // Iterating through above result to change it to dashboard login link.
-   for-each:x:@data.read/*
-      set-value:x:@.dp/#/*/login
-         strings.concat
-            .:"https://dashboard.ainiro.io?backend="
-            strings.url-encode:x:@.dp/#/*/login
-
-   // Returning result of above invocation back to caller.
-   return-nodes:x:@data.read/*
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

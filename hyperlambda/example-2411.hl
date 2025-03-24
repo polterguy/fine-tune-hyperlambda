@@ -1,31 +1,52 @@
 
-// Write a Hyperlambda snippet that evaluates HTTP response codes using a switch case without a default option.
+// Counts clients that are affiliated with the currently authenticated client.
+.arguments
 
-// Switch case comparison for HTTP response codes.
-.http_code:int:404
-.result
-switch:x:@.http_code
+// Verifying user has access to endpoint.
+auth.ticket.verify:root, admin, guest
 
-   case:int:200
+// Retrieving currently authenticated user to parametrise invocation towards database.
+auth.ticket.get
 
-      // If response code is 200.
-      set-value:x:@.result
-         .:Success
+// Counting users affiliated with currently authenticated user.
+data.connect:[generic|magic]
 
-   case:int:400
+   // Retrieving affiliate percent for user.
+   data.read
+      table:users_extra
+      columns
+         value
+      where
+         and
+            type.eq:affiliate_percent
+            user.eq:x:@auth.ticket.get
+   if
+      not-exists:x:@data.read/*/*/value
+      .lambda
 
-      // If response code is 400.
-      set-value:x:@.result
-         .:Bad Request
+         // Oops ...!!
+         log.error:User is not affiliate
+            username:x:@auth.ticket.get
+         throw:You are not an affiliate
+            public:true
+            status:400
 
-   case:int:404
+   // Invoking read slot to count users affiliated with currently authenticated user.
+   data.read
+      table:users_extra
+      columns
+         count(*)
+            as:count
+      where
+         and
+            type.eq:affiliate
+            value.eq:x:@auth.ticket.get
 
-      // If response code is 404.
-      set-value:x:@.result
-         .:Not Found
+   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
+   response.headers.set
+      Cache-Control:private, max-age=3600
 
-   case:int:500
-
-      // If response code is 500.
-      set-value:x:@.result
-         .:Internal Server Error
+   // Returning result to caller.
+   unwrap:x:+/*
+   return
+      count:x:@data.read/*/*/count

@@ -1,44 +1,22 @@
+// Find all nodes having a name of 'foo', extract their values, and concatenates into string builder
+.data
+   foo:Hello
+      bar
+   hello
+      howdy
+         foo:" world. "
+      some-node
+         some-other-node
+            foo:"This is cool"
 
-// Create endpoint inserting one record into your products table in your shopping-cart-demo database.
-.arguments
+// Creating a string builder
+strings.builder
 
-   // name column value
-   name:string
+   // Looping through all nodes from above with a name of 'foo'
+   for-each:x:@.data/**/foo
 
-   // description column value
-   description:string
+      // Appending to current string builder (created above)
+      strings.builder.append:x:@.dp/#
 
-   // sku column value
-   sku:string
+// After execution, the above [strings.builder] node's value will be "Hello world. This is cool"
 
-   // price column value
-   price:decimal
-
-   // image_url column value
-   image_url:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up database connection.
-data.connect:[generic|shopping-cart-demo]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:products
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create

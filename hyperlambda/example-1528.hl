@@ -1,42 +1,61 @@
-// Build the dynamic JSON payload
-.payload
-   username:admin
-   password:supersecret123
-   client_id:web-client
 
-// Create headers for content-type and custom request ID
-.headers
-   Content-Type:application/json
-   X-Request-ID:xyz-123-abc
+// Hyperlambda script to test a specified connection string, ensuring the backend can connect to the database.
+.arguments
+   databaseType:string
+   connectionString:string
 
-// Make the HTTP POST request
-add:x:./*/http.post/*/headers
-   get-value:x:@.headers/*
-add:x:./*/http.post/*/payload
-   get-value:x:@.payload/*
-http.post:"https://api.example.com/auth/login"
-   headers
-   payload
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // This automatically converts result to lambda object
-   convert:true
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/connectionString
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:pgsql
+   .:mssql
 
-// Verify above POST was a success.
+// Sanity checking that connection string contains {database} allowing for dynamic substitutions.
 if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
+   not
+      strings.contains:x:@.arguments/*/connectionString
+         .:{database}
    .lambda
 
-      // Store response status and body
-      .name
-      set-value:x:@.name
-         get-value:x:@http.post/*/content/*/name
+      // Oops!
+      return
+         result:failure
+         message:Connection string does not contain {database}
 
-      .user-id
-      set-value:x:@.user-id
-         get-value:x:@http.post/*/content/*/user-id
-else
-   throw:Something went wrong when invoking HTTP POST
+// Doing the try catch thing, to return failure if connection string is invalid.
+try
+   switch:x:@.arguments/*/databaseType
+      case:mssql
+         strings.replace:x:@.arguments/*/connectionString
+            .:{database}
+            .:master
+         mssql.connect:x:@strings.replace
+            mssql.select:select name from master.dbo.sysdatabases
+      case:mysql
+         strings.replace:x:@.arguments/*/connectionString
+            .:{database}
+            .:information_schema
+         mysql.connect:x:@strings.replace
+            mysql.select:show databases
+      case:pgsql
+         strings.replace:x:@.arguments/*/connectionString
+            .:{database}
+            .:postgres
+         pgsql.connect:x:@strings.replace
+            pgsql.select:select datname from pg_database
+
+   // Success, connetion string is valid.
+   return
+      result:success
+.catch
+
+   // Oops, failure ...
+   unwrap:x:+/*
+   return
+      result:failure
+      message:x:@.arguments/*/message

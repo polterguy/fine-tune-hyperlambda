@@ -1,29 +1,30 @@
 
-// Create a Hyperlambda script for a CRUD delete endpoint that deletes one item from the users_roles table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
+// Hyperlambda endpoint that takes two arguments, calculates the modulo, and then returns true if it's 0, otherwise false
 .arguments
-   role:string
-   user:string
+   arg1:int
+   arg2:int
+.accept:application/json
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Sanity checking invocation
+validators.mandatory:x:@.arguments/*/arg1
+validators.mandatory:x:@.arguments/*/arg2
 
-validators.mandatory:x:@.arguments/*/role
-validators.mandatory:x:@.arguments/*/user
+// Calculating modulo
+math.modulo
+   get-value:x:@.arguments/*/arg1
+   get-value:x:@.arguments/*/arg2
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+// Checking if modulo result is 0
+if
+   eq:x:@math.modulo
+      .:int:0
+   .lambda
+      set-value:x:../*/return/*/result
+         .:bool:true
+else
+   set-value:x:../*/return/*/result
+      .:bool:false
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      table:users_roles
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returning result to caller
+return
+   result

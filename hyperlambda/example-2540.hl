@@ -1,19 +1,20 @@
-/*
- * Save this file as `/modules/files/endpoints/read.hl`
- * This exposes an HTTP POST endpoint at `/files/read`
- *
- * It requires a `filename` argument to be passed,
- * and returns the file contents if valid.
- */
 
+// Search the web and returns only the URLs found
 .arguments
-   filename
 
-validators.mandatory:x:@.arguments/*/filename
+   // Mandatory argument being the actual query to submit to DuckDuckGo.
+   query:string
 
-.result
-set-value:x:@.result
-   io.file.load:x:@.arguments/*/filename
+   // Optional argument being how many URLs to return. Defaults to 10 if not specified.
+   max_urls:int
 
-yield
-   file:x:@.result
+// Returns [max_urls] for the specified [query] by searching DuckDuckGo.
+execute:magic.workflows.actions.execute
+   name:openai-urls-search
+   filename:/modules/openai/workflows/actions/openai-urls-search.hl
+   arguments
+      query:x:@.arguments/*/query
+      max_urls:x:@.arguments/*/max_urls
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

@@ -1,15 +1,21 @@
 
-// Hyperlambda script to return all saved SQL files in the system for a specified database type.
+// Hyperlambda endpoint that creates a log entry with a specified 'type' (info, error, fatal, debug) and 'message'. Also allows for passing in optional 'args' for additional meta information.
 .arguments
-   databaseType:string
+   type:string
+   message:string
+   args:*
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Lambda object actually creating our log entry.
+.invoke-log
+   name:x:@.arguments/*/message
 
-// Returns all files in the "/etc/[databaseType]/templates/" folder.
-strings.concat
-   .:/etc/
-   get-value:x:@.arguments/*/databaseType
-   .:/templates/
-io.file.list:x:@strings.concat
-return-nodes:x:-/*
+// Parametrising invocation.
+set-name:x:@.invoke-log/*/name
+   strings.concat
+      .:log.
+      get-value:x:@.arguments/*/type
+add:x:@.invoke-log/*
+   get-nodes:x:@.arguments/*/args/*
+
+// Invoking lambda object responsible for creating our log entry.
+eval:x:@.invoke-log

@@ -1,37 +1,37 @@
 
-// Delete one record from your plugins table in your cms database
+// Returns Stripe customers.
 .arguments
+   limit:int
+   starting_after:string
+   email:string
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+/*
+ * Retrieves charges from Stripe.
+ * 
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-customers-get
+   filename:/modules/stripe/workflows/actions/stripe-customers-get.hl
+   arguments
+      limit:x:@.arguments/*/limit
+      email:x:@.arguments/*/email
+      starting_after:x:@.arguments/*/starting_after
 
-validators.mandatory:x:@.arguments/*/id
-
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:plugins
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.plugins.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returns the result of your last action.
+return-nodes:x:@execute/*

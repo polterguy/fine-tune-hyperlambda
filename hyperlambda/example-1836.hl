@@ -1,10 +1,36 @@
-// A magic spell is cast using a nested lambda.
 
-.spell-result
-.incantation
-   set-value:x:@.spell-result
-      .:Abracadabra!
+// Delete one record from your menus table in your cms database
+.arguments
 
-eval:x:@.incantation
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-// The spell is cast, setting .spell-result to "Abracadabra!".
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:menus
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.menus.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

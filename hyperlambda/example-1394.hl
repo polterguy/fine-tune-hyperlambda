@@ -1,30 +1,18 @@
+// Executing the following Hyperlambda results in the following
 
-// Hyperlambda endpoint for a CRUD delete endpoint that deletes one record from the questions table in the magic database with a question_id matching the argument, ensuring authentication and authorization for root roles.
-.arguments
-   question_id:long
+// When executing the following Hyperlambda
+data.connect:magic
+   data.read
+      table:log_entries
+      columns
+         count(*)
+            as:count
+      limit:long:1
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// We end up with this result
+data.connect
+   data.read
+      .
+         count:long:58354
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/question_id
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:questions
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Notice how lists are declared with nodes having names of "." or even sometimes ""

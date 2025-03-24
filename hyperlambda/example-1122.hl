@@ -1,21 +1,30 @@
 
-// Tracks an order in Shopify.
-.arguments
-   order:string
+// Hyperlambda script that creates a scheduled task that resets no_requests at the first day of the month, with conditions for SQLite.
+if
+   eq
+      config.get:"magic:databases:default"
+      .:sqlite
+   .lambda
 
-// Retrieving secret and shop.
-.secret
-set-value:x:@.secret
-   config.get:"magic:shopify:secret"
-.shop
-set-value:x:@.shop
-   config.get:"magic:shopify:shop"
+      // Wrapping in try/catch in case task already exists.
+      try
 
-// Invoking slot to do the heavy work.
-execute:shopify.orders.track
-   secret:x:@.secret
-   shop:x:@.shop
-   order_no:x:@.arguments/*/order
+         // Deleting old task if existing.
+         tasks.list:reset-no_requests
+         if
+            exists:x:@tasks.list/*
+            .lambda
+               tasks.delete:x:@tasks.list/0/*/id
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+         // Creating task that periodically deletes old historical requests.
+         tasks.create:reset-no_requests
+            description:Resets no_requests at the first day of the month
+            repeats:**.01.01.01.01
+            .lambda
+               sqlite.connect:magic
+                  sqlite.execute:update ml_types set no_requests = 0
+               log.info:All machine learning models had their no_requests values reset
+      .catch
+
+         // Task already exists.
+         console.log:Task to reset no_requests already exists

@@ -1,27 +1,44 @@
-/*# What are the different ways to declare typed variables in Hyperlambda?
+// Submits feedback and handles all common HTTP status codes using [switch] and [throw] with correct value syntax
 
-   This example demonstrates how to declare variables with various types in Hyperlambda.
-   The types include numeric types, boolean, string, datetime, timespan, guid, char,
-   byte types, and object references. Each node is prefixed with a '.' to indicate it
-   is a data segment and not a slot invocation.
-*/
+.arguments
 
-.my-string:string:Hello world
-.my-short:short:123
-.my-ushort:ushort:456
-.my-int:int:789
-.my-uint:uint:101112
-.my-long:long:1314151617
-.my-ulong:ulong:1819202122
-.my-decimal:decimal:12345.67
-.my-double:double:3.14159
-.my-float:float:2.71828
-.my-boolean:bool:true
-.my-date:date:"2025-03-21T10:00:00Z"
-.my-guid:guid:12345678-1234-1234-1234-1234567890ab
-.my-char:char:A
-.my-byte:byte:255
-.my-sbyte:sbyte:-128
-.my-expression:x:@.some/node
-.my-node:node:
-.my-default-string:Hello again
+// Final feedback submission result
+.feedback.status
+
+// Send HTTP POST to feedback API
+http.post:"https://api.feedbackly.io/v1/submit"
+   convert:true
+   payload
+      name:Sarah Lee
+      email:sarah.lee@example.com
+      message:This platform is fantastic!
+
+// Branch based on HTTP status code
+switch:x:@http.post
+
+   case:int:200
+      set-value:x:@.feedback.status
+         .:Feedback submitted successfully
+
+   case:int:400
+      throw:400 Bad Request – Please check your input data
+
+   case:int:401
+      throw:401 Unauthorized – You must log in to submit feedback
+
+   case:int:403
+      throw:403 Forbidden – You don’t have permission to perform this action
+
+   case:int:404
+      throw:404 Not Found – The feedback endpoint does not exist
+
+   case:int:500
+      throw:500 Internal Server Error – Please try again later
+
+   default
+      set-value:x:@.feedback.status
+         .:Unhandled response – unknown status code
+
+// Return the result
+yield
+   result:x:@.feedback.status

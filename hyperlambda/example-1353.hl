@@ -1,13 +1,31 @@
+/*
+ * This script generates training data from Markdown files.
+ */
+execute:magic.io.file.load-recursively
+   .:/etc/slett/
+for-each:x:@execute/*
 
-// Create a Hyperlambda script that returns the reCAPTCHA secret and key if existing, ensuring the user is authorized.
+   // Verifying we're dealing with a Markdown file.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.md
+      .lambda
 
-// Making sure user is allowed to invoke endpoint
-auth.ticket.verify:root
+         // Extracting training data.
+         markdown2html:x:@.dp/#/0
 
-// Retrieving key configuration setting and returning to caller.
-config.get:"magic:auth:recaptcha:secret"
-config.get:"magic:auth:recaptcha:key"
-unwrap:x:+/*
-return-nodes
-   key:x:@config.get
-   secret:x:@config.get/@config.get
+         // Converts the value of the previous node to a lambda object, allowing us to traverse it using expressions
+         html2lambda:x:-
+
+         for-each:x:@html2lambda/*/pre/*/code
+
+            // The [.dp] pointer is passed in a a "node by reference" pointer by [for-each]
+            strings.trim:x:@.dp/#/*/\#text
+            data.connect:fine-tune
+               data.create
+                  table:hyperlambda
+                  values
+                     code:x:@strings.trim
+
+// House cleanups.
+remove-nodes:x:@execute/*

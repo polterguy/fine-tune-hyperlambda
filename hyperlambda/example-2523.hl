@@ -1,8 +1,35 @@
-// Changes all descendant nodes' values to "updated"
-.settings
-   mode:auto
-   theme:dark
-   layout:responsive
-for-each:x:@.settings/*/**
-   set-value:x:@.dp/#
-      .:updated
+
+// Delete one record from your Employee table in your chinook database.
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   EmployeeId:long
+
+validators.mandatory:x:@.arguments/*/EmployeeId
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Employee
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:chinook.employee.delete
+      args
+      roles:enterprise,guest
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

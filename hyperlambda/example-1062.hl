@@ -1,43 +1,30 @@
 
-// Hyperlambda script for a CRUD update endpoint that updates an existing item in the users_extra table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
-.arguments
-   user:string
-   type:string
-   value:string
+// Ensures our system messages are updated during deployments
+io.file.list:/modules/finovo/system-messages/
 
-// Verifying user is authorized to access endpoint.
-validators.mandatory:x:@.arguments/*/type
-validators.mandatory:x:@.arguments/*/user
-auth.ticket.verify:root
+// Opening up database connection.
+data.connect:magic
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+   // Looping through each system message and updating our machine learning type accordingly.
+   for-each:x:@io.file.list/*
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[2,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,2]
+      // Loading file.
+      io.file.load:x:@.dp/#
 
-   // Invoking our update slot.
-   data.update
-      table:users_extra
-      values
-      where
-         and
+      // Finding type name
+      .type
+      strings.split:x:@.dp/#
+         .:/
+      strings.split:x:-/0/-
+         .:.
+      set-value:x:@.type
+         get-value:x:@strings.split/0
 
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning success to caller.
-   response.status.set:202
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+      // Updating type name's system message.
+      data.update
+         table:ml_types
+         values
+            system_message:x:@io.file.load
+         where
+            and
+               type.eq:x:@.type

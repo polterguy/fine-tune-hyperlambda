@@ -1,43 +1,6 @@
 
-// Updates an existing item in your clusters table in your [generic|hub] database according to the specified arguments.
-.arguments
-   id:string
-   country:string
-   name:string
-   enabled:bool
+// Encodes the specified HTML
+.html:"<html>\n<body>\n  <h1>Quarterly Newsletter - Q1 2025</h1>\n  <p>Our Q1 results are now available.</p>\n  <ul>\n    <li>Total revenue increased by <strong>15%</strong> compared to Q4 2024</li>\n    <li>Customer satisfaction reached <strong>94%</strong></li>\n  </ul>\n  <p>View the <a href=\"https://company.com/reports/q1-2025\">full report</a>.</p>\n</body>\n</html>"
 
-// Only root users can execute endpoint
-auth.ticket.verify:root
-
-// Verifying user is authorized to access endpoint.
-validators.mandatory:x:@.arguments/*/id
-
-// Opening up our database connection.
-data.connect:[generic|hub]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-
-   // Invoking our update slot.
-   data.update
-      table:clusters
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning success to caller.
-   response.status.set:202
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+// HTML decodes the above HTML
+strings.html-encode:x:@.html

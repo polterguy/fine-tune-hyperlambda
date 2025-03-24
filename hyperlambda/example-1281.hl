@@ -1,68 +1,85 @@
 
-// Hyperlambda script that returns all supported OpenID Connect providers the system supports, allowing for dynamic extension with additional providers.
-.arguments
-   createNonce:bool
+// Hyperlambda script to create a task that periodically crawls all models to add new pages, with error handling.
+tasks.list:ainiro-crawl-machine-learning-models
+if
+   exists:x:@tasks.list/*
+   .lambda
+      tasks.delete:ainiro-crawl-machine-learning-models
 
-// Finding all slots declaring OpenID Providers.
-slots.vocabulary:magic.openid.providers.
+// Creating task that crawls all models periodically.
+tasks.create:ainiro-crawl-machine-learning-models
+   description:Periodically crawls all models once every day to add new pages to model
+   repeats:24.hours
+   .lambda
 
-// Looping through each slot returned above and executing it.
-for-each:x:@slots.vocabulary/*
+      // Basic logging.
+      log.info:Task to periodically crawl models about to be executed
 
-   // Changing slot invocation name.
-   set-value:x:./*/execute
-      get-value:x:@.dp/#
+      // Connecting to database.
+      data.connect:[generic|magic]
 
-   /*
-    * Executing slot to retrieve supported providers.
-    * 
-    * Notice, name of slot (value of node) is dynamically created above.
-    */
-   execute
-      createNonce:x:@.arguments/*/createNonce
+         // Finding all types with a [base_url].
+         data.read
+            table:ml_types
+            columns
+               type
+               base_url
+            where
+               and
+                  base_url.neq
+                  base_url.neq:
 
-   // Looping through all providers returned above to return them to client.
-   for-each:x:@execute/*
+         // Looping through all types returned above.
+         for-each:x:@data.read/*
 
-      // Sanity checking OpenID provider.
-      if
-         or
-            not-exists:x:@.dp/#/*/issuer
-            not-exists:x:@.dp/#/*/name
-         .lambda
+            // Verifying URL is not null and not empty.
+            if
+               and
+                  not-null:x:@.dp/#/*/base_url
+                  neq:x:@.dp/#/*/base_url
+                     .:
+               .lambda
 
-            // Oops, bogus provider ...!!
-            throw:Bogus OpenID provider
-               status:int:500
-               public:bool:true
+                  // Making sure exceptions never leave thread.
+                  try
 
-      /*
-       * Checking that this particular provider was not registered
-       * by some other slot invocation perviously.
-       * 
-       * This prevents having two different slots in two different modules
-       * registering the same OpenID Connect provider twice.
-       */
-      .exists:bool:false
-      for-each:x:../*/return/*
-         if
-            eq:x:@.dp/#/*/issuer
-               get-value:x:@for-each/@.dp/#/*/issuer
-            .lambda
+                     // Verifying user can create more snippets.
+                     add:x:+
+                        get-nodes:x:@.dp/#/*/type
+                     try-signal:magic.ai.can-create-snippet
 
-               // OpenID provider already exists.
-               set-value:x:@.exists
-                  .:bool:true
+                     // Doing some logging.
+                     log.info:Crawling website
+                        url:x:@.dp/#/*/base_url
+                        type:x:@.dp/#/*/type
 
-      // Adding provider unless it was registered by another slot invoction.
-      if
-         eq:x:@.exists
-            .:bool:false
-         .lambda
+                     // Invoking slot doing the heavy lifting.
+                     unwrap:x:./*/signal/*
+                     unwrap:x:./*/signal/*/.onafter/**/type
+                     unwrap:x:./*/signal/*/.onafter/**/.type
+                     signal:magic.ai.crawl-site
+                        delay:int:2000
+                        threshold:int:150
+                        max:int:1250
+                        summarize:bool:true
+                        url:x:@.dp/#/*/base_url
+                        type:x:@.dp/#/*/type
+                        feedback-channel:non-existing
+                        .onafter
+                           signal:magic.ai.vectorise
+                              feedback-channel:non-existing
+                              type:x:@.dp/#/*/type
+                              .onafter
 
-            // Adding currently iterated provider to [return] invocation below.
-            add:x:../*/return
-               get-nodes:x:@.dp/#
+                                 // Basic logging.
+                                 .type:x:@.dp/#/*/type
+                                 strings.concat
+                                    get-value:x:@.type
+                                    .:" successfully crawled"
+                                 log.info:x:-
+                  .catch
 
-// Returning providers to client.
-return
+                     // Logging.
+                     log.error:Could not crawl site
+                        error:x:@.arguments/*/message
+                        site:x:@.dp/#/*/base_url

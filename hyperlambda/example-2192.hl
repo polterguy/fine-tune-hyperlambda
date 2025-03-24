@@ -1,17 +1,30 @@
 
-// Create a Hyperlambda script to delete a task due with a specified ID.
+// Delete one record from your Track table in your chinook database
 .arguments
-   id:long
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/id
+   // Primary key of record to delete, mandatory argument
+   TrackId:long
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/TrackId
 
-// Deletes task due instance.
-tasks.schedule.delete:x:@.arguments/*/id
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-// Returns success to caller.
-return-nodes
-   result:Success
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Track
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

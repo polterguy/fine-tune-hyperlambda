@@ -1,11 +1,27 @@
 
-// Provide a Hyperlambda example where 'hr_db' is opened to get employee details.
+// Hyperlambda action that returns specified HTTP headers from a request. Use 'headers' as an input array to determine which headers to return.
+.arguments
+   headers
+      type:array
+      mandatory:bool:true
+.icon:http
 
-// Opens "hr_db" and gets employee details.
-.result
-data.connect:hr_db
-   database-type:mssql
-   data.select:"select employee_id, name, department, hire_date from employees where status='active'"
-      database-type:mssql
-   add:x:@.result
-      get-nodes:x:@data.select/*
+// Retrieving HTTP headers from request.
+request.headers.list
+
+/*
+ * Iterating through each header from above invocation and checking if caller is interested in it,
+ * and if caller wants this particular header, we make sure we return it below.
+ */
+for-each:x:@request.headers.list/*
+   get-name:x:@.dp/#
+   if
+      exists:x:@.arguments/*/headers/*/={@get-name}
+      .lambda
+
+         // Caller wants currently iterated HTTP header.
+         add:x:../*/return-nodes
+            get-nodes:x:@.dp/#
+
+// Returning result to caller.
+return-nodes

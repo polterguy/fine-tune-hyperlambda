@@ -1,30 +1,21 @@
+/*
+ * Sends a plain text email where 'to', 'subject', and 'body' are dynamically
+ * retrieved from other nodes using expressions.
+ */
 
-// Write a Hyperlambda script to return the initial questionnaire for a specified type.
-.arguments
-   type:string
+.recipient-email:john.doe@example.com
+.email-subject:Greetings
+.email-body:Hello John, this is a dynamically generated email.
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
+// Unwrapping all descendant nodes of [mail.smtp.send]
+unwrap:x:+/**
+mail.smtp.send
+   message
+      to
+         .
+            email:x:@.recipient-email
+      subject:x:@.email-subject
+      entity:text/plain
+         content:x:@.email-body
 
-// Opening up database connection.
-data.connect:[generic|magic]
-
-   // Retrieving all questions from database.
-   data.select:"\nselect q.question, q.type, q.context, q.name\n\tfrom questions q\n\t\tinner join questionnaires qu on qu.name = q.questionnaire\n        inner join ml_types t on t.initial_questionnaire = qu.name\n\twhere t.type = @type\n   order by q.question_id"
-      type:x:@.arguments/*/type
-
-   // Retrieving main questionnaire from database.
-   data.select:"\nselect q.name, q.type, q.action\n   from questionnaires q\n      inner join ml_types t on t.initial_questionnaire = q.name\n   where t.type = @type"
-      type:x:@.arguments/*/type
-
-   // Returning result to caller.
-   insert-before:x:./*/return/0
-      get-nodes:x:@data.connect/*/data.select/[1,2]/*/*
-   add:x:./*/return/*/questions
-      get-nodes:x:@data.connect/*/data.select/[0,1]/*
-   if
-      not-exists:x:@data.connect/*/return/*/questions/*
-      .lambda
-         remove-nodes:x:@data.connect/*/return/*/questions
-   return
-      questions
+// Notice, when using [mail.smtp.send] with expressions we HAVE to invoke [unwrap] to evaluate these BEFORE we execute the slot.

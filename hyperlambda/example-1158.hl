@@ -1,17 +1,20 @@
 
-// Delete one record from your Invoice table in your chinook database.
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the ml_types table in the magic database with a type matching the argument, ensuring authentication and authorization for root roles.
 .arguments
-
-   // Primary key of record to delete, mandatory argument
-   InvoiceId:long
+   type:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-validators.mandatory:x:@.arguments/*/InvoiceId
+auth.ticket.verify:root
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/type
 
 // Opening up our database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
+data.connect:[generic|magic]
+
+   // Deleting referenced rows in vss_ml_training_snippets
+   data.execute:"delete from vss_ml_training_snippets where rowid in\n   (select id as rowid from ml_training_snippets where type = @type)"
+      type:x:@.arguments/*/type
 
    // Parametrising our delete invocation.
    add:x:./*/data.delete/*/where/*/and
@@ -19,8 +22,7 @@ data.connect:[generic|chinook]
 
    // Deleting item from database.
    data.delete
-      database-type:sqlite
-      table:Invoice
+      table:ml_types
       where
          and
 

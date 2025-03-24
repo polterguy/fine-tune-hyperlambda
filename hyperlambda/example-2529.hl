@@ -1,20 +1,27 @@
-/*
- * Save this file as `/modules/web-cleaner/endpoints/update-branding.hl`
- * This exposes an HTTP POST endpoint at `/web-cleaner/update-branding`
- *
- * The endpoint loads a file defined in `.arguments/*/filename`, replaces branding strings
- * using `what` and `with` keys provided in `.arguments`, and returns the result.
- */
-
+// HTTP endpoint that does an age check from employees database by username and returns true if the person 18 or more
 .arguments
+   username:string
 
-.result
-set-value:x:-
-   io.file.load:x:@.arguments/*/filename
-for-each:x:@.arguments/*
-   set-value:x:@.result
-      strings.replace:x:@.result
-         get-value:x:@.dp/#/*/what
-         get-value:x:@.dp/#/*/with
-yield
-   result:x:@.result
+// Connect to the database and retrieve employee's birth date
+data.connect:HR
+   data.read
+      table:employees
+      columns
+         birth_day
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   if
+      mt
+         math.subtract
+            date.now
+            get-value:x:@data.read/*/*/birth_date
+         math.multiply
+            time
+               days:365
+            .:int:18
+      .lambda
+         return
+            result:bool:true
+return
+   result:bool:false

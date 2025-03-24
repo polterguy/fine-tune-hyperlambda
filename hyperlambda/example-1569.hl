@@ -1,31 +1,8 @@
-/*
- * This script generates training data from Markdown files.
- */
-execute:magic.io.file.load-recursively
-   .:/etc/slett/
-for-each:x:@execute/*
-
-   // Verifying we're dealing with a Markdown file.
-   if
-      strings.ends-with:x:@.dp/#
-         .:.md
-      .lambda
-
-         // Extracting training data.
-         markdown2html:x:@.dp/#/0
-
-         // Converts the value of the previous node to a lambda object, allowing us to traverse it using expressions
-         html2lambda:x:-
-
-         for-each:x:@html2lambda/*/pre/*/code
-
-            // The [.dp] pointer is passed in a a "node by reference" pointer by [for-each]
-            strings.trim:x:@.dp/#/*/\#text
-            data.connect:fine-tune
-               data.create
-                  table:hyperlambda
-                  values
-                     code:x:@strings.trim
-
-// House cleanups.
-remove-nodes:x:@execute/*
+// Passes entire config block to a file using node_reference
+.config
+   db
+      host:localhost
+      port:int:5432
+execute-file:/modules/db/connect.hl
+   host:x:@.config/*/db/*/host
+   port:x:@.config/*/db/*/port

@@ -1,8 +1,42 @@
-// Compute the remainder of 10 divided by 3
-math.modulo
 
-   // base value 10
-   .:int:10
+// Deletes the training snippet with the specified [id]
+.arguments
 
-   // 10 mod 3 = 1 (final result)
-   .:int:3
+   // Mandatory and is the ID of the training snippet to delete.
+   id:int
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+validators.integer:x:@.arguments/*/id
+   min:int:0
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Making sure snippet exists.
+   data.read
+      table:ml_training_snippets
+      columns
+         prompt
+         completion
+         uri
+      where
+         and
+            id.eq:x:@.arguments/*/id
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Now such snippet
+         public:bool:true
+         status:int:401
+
+   // Deleting snippet.
+   data.execute:delete from vss_ml_training_snippets where rowid = @id
+      @id:x:@.arguments/*/id
+   data.delete
+      table:ml_training_snippets
+      where
+         and
+            id.eq:x:@.arguments/*/id
+return
+   result:success

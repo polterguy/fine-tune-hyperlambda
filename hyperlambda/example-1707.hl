@@ -1,18 +1,52 @@
-// Compares role and returns whether user is an admin
-slots.create:is.admin
-   if
-      eq:x:@.arguments/*/role
-         .:admin
-      .lambda
-         return
-            isAdmin:bool:true
-   return
-      isAdmin:bool:false
 
-// Returns true
-execute:is.admin
-   role:admin
+// Returns a specific patent from its patent ID using Google API.
+.arguments
 
-// Returns false
-execute:is.admin
-   role:guest
+   // Mandatory ID for patent as return from search API.
+   patent_id:string
+
+// Retrieving Google API key and making sure we've got one.
+.api-key
+set-value:x:@.api-key
+   config.get:"magic:serp-api:api_key"
+if
+   or
+      null:x:@.api-key
+      eq:x:@.api-key
+         .:
+   .lambda
+      throw:Could not find a Google API key to use for fetching patents.
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/patent_id
+
+// Creating our URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://serpapi.com/search.json?engine=google_patents_details&api_key="
+      get-value:x:@.api-key
+      .:&patent_id=
+      strings.url-encode:x:@.arguments/*/patent_id
+
+// Retrieving result.
+http.get:x:@.url
+   convert:true
+
+// Sanity checking result of above invocation.
+if
+   not
+      and
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+   .lambda
+
+      // Oops ...!!
+      lambda2hyper:x:../*
+      log.info:x:-
+      throw:Something went wrong while invoking Google patent API
+
+// Returning everything as is.
+return-nodes:x:@http.get/*/content/*

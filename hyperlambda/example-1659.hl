@@ -1,6 +1,449 @@
-// How to use [data.read] and have it order by name desc
-sql.read
-   table:people
-   order
-      name
-   direction:desc
+
+// Hyperlambda script to scrape a specified website for training data to create a new machine learning type, including options for crawling and vectorization.
+.arguments
+   url:string
+   model:string
+   flavor:string
+   max:int
+   autocrawl:bool
+   auto_destruct:bool
+   feedback-channel:string
+   vectorize:bool
+   instruction:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Prepending scheme unless given.
+if
+   not
+      strings.starts-with:x:@.arguments/*/url
+         .:http
+   .lambda
+      set-value:x:@.arguments/*/url
+         strings.concat
+            .:"https://"
+            get-value:x:@.arguments/*/url
+
+// Trimming extra slash.
+set-value:x:@.arguments/*/url
+   strings.trim-end:x:@.arguments/*/url
+      .:/
+
+// Making sure URL does not contain CAPS characters.
+set-value:x:@.arguments/*/url
+   strings.to-lower:x:@.arguments/*/url
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/model
+validators.mandatory:x:@.arguments/*/url
+validators.url:x:@.arguments/*/url
+
+// Defaulting max snippets to 1,250 unless specified explicitly.
+validators.default:x:@.arguments
+   max:int:1250
+   autocrawl:bool:false
+   vectorize:bool:true
+   auto_destruct:bool:false
+
+// Doing some basic logging.
+log.info:Crawling URL to generate OpenAI training data for a chatbot
+   url:x:@.arguments/*/url
+   flavor:x:@.arguments/*/flavor
+
+// Making sure we trap exceptions.
+try
+
+   // Informing client what model we're using to generate chatbot.
+   strings.concat
+      .:"Creating AINIRO machine learning model using "
+      get-value:x:@.arguments/*/model
+      .:" as our OpenAI base model"
+   unwrap:x:+/*/args/**
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:x:@strings.concat
+         type:info
+   sleep:1000
+
+   // Informing client that we've successfully started crawling.
+   strings.concat
+      .:"Crawling URL "
+      get-value:x:@.arguments/*/url
+   unwrap:x:+/*/args/**
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:x:@strings.concat
+         type:info
+   sleep:100
+
+   // Figuring out what to name our type.
+   .type
+   set-value:x:@.type
+      strings.replace:x:@.arguments/*/url
+         .:"http://"
+         .:
+   set-value:x:@.type
+      strings.replace:x:@.type
+         .:"https://"
+         .:
+   set-value:x:@.type
+      strings.replace:x:@.type
+         .:.
+         .:_
+   set-value:x:@.type
+      strings.replace:x:@.type
+         .:/
+         .:_
+   set-value:x:@.type
+      strings.replace-not-of:x:@.type
+         .:abcdefghijklmnopqrstuvwxyz_0987654321
+         .:_
+
+   // Creating our type
+   data.connect:[generic|magic]
+
+      // Checking if type already exists.
+      data.read
+         table:ml_types
+         columns
+            type
+         where
+            and
+               type.eq:x:@.type
+      if
+         exists:x:@data.read/*
+         .lambda
+            throw:Model already exists!
+
+      // Verifying user can create a-(nother) machine learning model.
+      try-signal:magic.ai.can-create-machine-learning-model
+
+      // Adding URL if [autocrawl] is true.
+      if:x:@.arguments/*/autocrawl
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/data.create/[0,1]/*/values
+            .
+               base_url:x:@.arguments/*/url
+
+      // Figuring out max tokens to use, which varies according to base model.
+      .max-tokens:int:4000
+      .max-context-tokens:int:4000
+      if
+         not
+            strings.starts-with:x:@.arguments/*/model
+               .:gpt-4
+         .lambda
+
+            // Not GPT4, hence reducing tokens to 1000.
+            set-value:x:@.max-context-tokens
+               .:int:1000
+            set-value:x:@.max-tokens
+               .:int:1000
+
+      // Creating our type.
+      data.create
+         table:ml_types
+         values
+            type:x:@.type
+            model:x:@.arguments/*/model
+            max_tokens:x:@.max-tokens
+            max_context_tokens:x:@.max-context-tokens
+            max_request_tokens:int:1000
+            temperature:decimal:0.3
+            recaptcha:decimal:0.0
+            supervised:int:1
+            cached:int:0
+            use_embeddings:int:1
+            threshold:decimal:0.3
+            vector_model:text-embedding-ada-002
+            system_message:x:@.arguments/*/flavor
+            greeting:Hi there, how can I help you?
+            conversation_starters:"* What can I ask you about?\n* How do I contact you?\n* Who created this chatbot?"
+
+   // Invoking slot doing the heavy lifting
+   request.host
+   add:x:./*/signal
+      get-nodes:x:@.arguments/*
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/type
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onafter/*/.type
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onafter/*/.url
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onafter/*/.instruction
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onafter/*/.flavor
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onafter/*/.host
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onafter/*/.feedback-channel
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onafter/*/.auto_destruct
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onafter/*/.vectorize
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onerror/*/.type
+   unwrap:x:./*/signal/=magic.ai.crawl-site/*/.onerror/*/.feedback-channel
+   signal:magic.ai.crawl-site
+      delay:int:1000
+      threshold:int:150
+      summarize:bool:true
+      type:x:@.type
+      .onerror
+
+         // Forward evaluated further up.
+         .type:x:@.type
+         .feedback-channel:x:@.arguments/*/feedback-channel
+
+         // Cleaning up by deleting model.
+         data.connect:[generic|magic]
+            data.delete
+               table:ml_types
+               where
+                  and
+                     type.eq:x:@.type
+      .onafter
+
+         // Forward evaluated further up.
+         .type:x:@.type
+         .url:x:@.arguments/*/url
+         .flavor:x:@.arguments/*/flavor
+         .instruction:x:@.arguments/*/instruction
+         .host:x:@request.host
+         .feedback-channel:x:@.arguments/*/feedback-channel
+         .vectorize:x:@.arguments/*/vectorize
+         .auto_destruct:x:@.arguments/*/auto_destruct
+
+         // Connecting to database to sanity check model.
+         data.connect:[generic|magic]
+
+            // Making sure we actually have training snippets in model.
+            data.read
+               table:ml_training_snippets
+               columns
+                  count(*)
+                     as:count
+               where
+                  and
+                     type.eq:x:@.type
+
+         // Verifying we've got training snippets for model in database.
+         if
+            eq
+               convert:x:@data.connect/*/data.read/*/*/count
+                  type:int
+               .:int:0
+            .lambda
+
+               // Informing client.
+               sockets.signal:x:@.feedback-channel
+                  args
+                     message:We could not find any training data on your website
+                     type:error
+
+               // Connecting to database to delete model.
+               data.connect:[generic|magic]
+
+                  // Deleting model.
+                  data.delete
+                     table:ml_types
+                     where
+                        and
+                           type.eq:x:@.type
+         else
+
+            // Informing client of how many training snippets we created in total.
+            strings.concat
+               .:"We found "
+               get-value:x:@data.connect/*/data.read/*/*/count
+               .:" training snippets we could use on website in total"
+            unwrap:x:+/**
+            sockets.signal:x:@.feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info
+            sleep:100
+
+            // Verifying we've got at least 10 training snippets, and if not, warning user.
+            if
+               lt
+                  convert:x:@data.connect/*/data.read/*/*/count
+                     type:int
+                  .:int:10
+               .lambda
+
+                  // Warning user about quality of chatbot.
+                  strings.concat
+                     .:"Warning! Only "
+                     get-value:x:@data.connect/*/data.read/*/*/count
+                     .:" training snippets will provide a poor chatbot experience!"
+                  unwrap:x:+/**
+                  sockets.signal:x:@.feedback-channel
+                     args
+                        message:x:@strings.concat
+                        type:warning
+                  sleep:100
+
+            // Connecting to database to create default snippets.
+            data.connect:[generic|magic]
+
+               // Adding "Who created this chatbot" snippet.
+               data.create
+                  table:ml_training_snippets
+                  values
+                     type:x:@.type
+                     prompt:Who created this AI chatbot?
+                     completion:"This chatbot is a custom AI chatbot powered by OpenAI allowing you to use natural language to ask questions related to the website you're currently visiting. It was created by [AINIRO.IO](https://ainiro.io). If you want a similar AI chatbot for your own site, you can [contact AINIRO here](https://ainiro.io/contact-us)."
+                     uri:"https://ainiro.io"
+
+            // Creating landing page for model.
+            unwrap:x:+/*
+            signal:magic.ai.create-landing-page
+               url:x:@.url
+               type:x:@.type
+               host:x:@.host
+               feedback-channel:x:@.feedback-channel
+
+            // Creating custom system message if we've got an instruction.
+            if
+               and
+                  exists:x:@.arguments/*/instruction
+                  neq:x:@.arguments/*/instruction
+                     .:
+               .lambda
+
+                  /*
+                   * Caller selected a dynamic system message and provided an instruction
+                   * to create a custom system message.
+                   */
+                  sockets.signal:x:@.feedback-channel
+                     args
+                        message:Invoking OpenAI to create a custom system message. Notice, this might take some time ...
+                        type:info
+
+                  // Catching exceptions to make sure we continue in case of error.
+                  try
+
+                     // Invoking slot responsible for creating custom system message.
+                     execute:magic.ai.create-system-message
+                        url:x:@.url
+                        template:x:@.flavor
+                        instruction:x:@.instruction
+
+                     // Updating system message to result returned from OpenAI.
+                     data.connect:[generic|magic]
+
+                        // Checking if type already exists.
+                        data.update
+                           table:ml_types
+                           values
+                              system_message:x:@execute
+                           where
+                              and
+                                 type.eq:x:@.type
+
+                     // Separator.
+                     sockets.signal:x:@.feedback-channel
+                        args
+                           message:------------------------------------------------------------------------------------------------------------------------
+                           type:info
+                  .catch
+
+                     // Oops ...!!
+                     log.error:x:@.arguments/*/message
+                     sockets.signal:x:@.feedback-channel
+                        args
+                           message:We could not create a custom system message, check your log for details
+                           type:warning
+
+            // Vectorizing model.
+            if
+               eq:x:@.vectorize
+                  .:bool:true
+               .lambda
+
+                  // Caller wants to vectorize model.
+                  unwrap:x:+/*
+                  signal:magic.ai.vectorise
+                     type:x:@.type
+                     feedback-channel:x:@.feedback-channel
+            else
+
+               // Providing feedback to caller.
+               sockets.signal:x:@.feedback-channel
+                  args
+                     message:Remember to vectorize before attempting to use your model
+                     type:info
+
+            // Checking if we're supposed to automatically destroy chatbot after 7 days.
+            if:x:@.auto_destruct
+
+               // Informing user that chatbot will be deleted in 7 days.
+               sockets.signal:x:@.feedback-channel
+                  args
+                     message:Creating scheduled task that deletes chatbot 7 days from now
+                     type:info
+               sleep:100
+
+               // Creating scheduled task that deletes chatbot 7 days from now.
+               math.add
+                  date.now
+                  time
+                     days:7
+               strings.concat
+                  .:delete-chatbot-
+                  get-value:x:@.type
+               unwrap:x:+/+/*/.lambda/*/.task
+               unwrap:x:+/*/.lambda/*/.type
+               tasks.create:x:@strings.concat
+                  description:Deletes demo chatbot 7 days after creating it
+                  due:x:@math.add
+                  .lambda
+
+                     // Forward evaluated further up.
+                     .type:x:@.type
+
+                     // Deleting vectors.
+                     data.connect:[generic|magic]
+                        data.execute:"\ndelete from vss_ml_training_snippets\n   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+                           type:x:@.type
+
+                     // Deleting ML type.
+                     .task:x:@strings.concat
+                     data.connect:[generic|magic]
+                        data.delete
+                           table:ml_types
+                           where
+                              and
+                                 type.eq:x:@.type
+
+                     // Deleting example HTML page.
+                     strings.concat
+                        .:/etc/www/
+                        get-value:x:@.type
+                        .:.html
+                     io.file.delete:x:@strings.concat
+
+                     // Doing some basic logging.
+                     log.info:Demo chatbot was deleted
+                        type:x:@.type
+
+                     // Deleting currently executing task.
+                     tasks.delete:x:@.task
+
+            // Informing user that we're done.
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Done!
+                  type:success
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      result:x:@.type
+.catch
+
+   // Signaling frontend.
+   unwrap:x:+/*/args/**
+   sockets.signal:x:@.arguments/@.arguments/*/feedback-channel
+      roles:root
+      args
+         message:x:@.arguments/*/message
+         type:error
+
+   // Returning failure to caller.
+   response.status.set:400
+   return
+      result:failure

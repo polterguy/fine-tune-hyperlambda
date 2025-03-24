@@ -1,32 +1,32 @@
 
-// Create a Hyperlambda workflow action with two arguments, 'arg1' and 'arg2'. 'arg1' should be a mandatory string, and 'arg2' should be an optional integer. Include an icon for the action and yield a result.
+// Delete endpoint deleting one record from your products table in your shopping-cart-demo database.
 .arguments
 
-   // Argument collection. Notice, this is action syntax.
-   arg1
+   // Primary key of record to delete
+   product_id:long
 
-      /*
-       * Type of argument, can be; key-value, array, int, decimal, float, double, long,
-       * email, string, enum, textarea, workflow, action, sql, csharp, hyperlambda or bool.
-       */
-      type:string
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
 
-      // If true then argument is required and mandatory.
-      mandatory:bool:true
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/product_id
 
-   arg2
-      type:int
-      mandatory:bool:false
+// Opening up our database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
 
-// Some icon for your action
-.icon:home
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-/*
- * Actual content of your action.
- * 
- * This iw where you put your action's implementation.
- */
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:products
+      where
+         and
 
-// Returning result of above invocation to caller.
-yield
-   result:Some result here!
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

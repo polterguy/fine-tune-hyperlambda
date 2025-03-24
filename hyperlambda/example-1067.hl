@@ -1,22 +1,30 @@
-// Create grouped chart
-image.chart:grouped
-   filename:/grouped-chart.png
-   width:600
-   height:300
-   bars
-      Spring
-         .:int:2
-         .:int:5
-         .:int:10
-      Summer
-         .:int:4
-         .:int:7
-         .:int:10
-      Autumn
-         .:int:2
-         .:int:5
-         .:int:4
-   legend
-      .:Phones
-      .:Computers
-      .:Tablets
+
+// Hyperlambda script for an endpoint that counts items in the questionnaires table in the magic database, ensuring the user is authorized and handling optional filters.
+.arguments
+   questionnaires.name.like:string
+   questionnaires.name.eq:string
+   questionnaires.type.like:string
+   questionnaires.type.eq:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:questionnaires
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

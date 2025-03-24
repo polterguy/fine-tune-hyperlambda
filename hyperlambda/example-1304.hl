@@ -1,72 +1,40 @@
 
-// Hyperlambda script for an upsert endpoint that upserts questions for a questionnaire, assuming questions are in Markdown with list items, ensuring the user is authorized.
+// Hyperlambda script for an OpenAI AI search endpoint returning only references to matching training snippets.
 .arguments
-   name:string
-   questions:string
+   prompt:string
+   type:string
+   recaptcha_response:string
+   max:int
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Invoking slot containing commonalities for all endpoints.
+insert-before:x:../*/signal/*/.callback
+   get-nodes:x:@.arguments/*
+signal:magic.ai.endpoint-common
+   .callback
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/name
-validators.mandatory:x:@.arguments/*/questions
+      // Invoking slot responsible for returning URLs to us.
+      add:x:+
+         get-nodes:x:@.arguments/*
+      signal:magic.ai.search
 
-// Connecting to database.
-data.connect:[generic|magic]
+      // Returning results of above invocation to caller.
+      add:x:./*/return-nodes/*/snippets
+         get-nodes:x:@signal/*/snippets/*
+      add:x:./*/return-nodes
+         get-nodes:x:@signal/*/db_time
+      return-nodes
+         snippets
 
-   // Deleting all old questions.
-   data.delete
-      table:questions
-      where
-         and
-            questionnaire.eq:x:@.arguments/*/name
+/*
+ * Applying some HTTP caching to avoid invoking OpenAI again with
+ * the same question before some minimum amount of time has passed.
+ * 
+ * Notice, we can apply more "aggressive" caching here than in our
+ * chat endpoints, since the same query will mostly always return
+ * the same result, since there is no room for "creativity" here.
+ */
+response.headers.set
+   Cache-Control:max-age=300
 
-   /*
-    * Turning questions string into individual questions by transforming
-    * to HTML and then semantically traversing.
-    */
-   markdown2html:x:@.arguments/*/questions
-   html2lambda:x:-
-
-   // Iterating all li elements in HTML.
-   for-each:x:@html2lambda/**/li
-
-      // Semantically parsing question.
-      strings.split:x:"@.dp/#/*/\\#text"
-         .:=>
-      .question
-      set-value:x:@.question
-         strings.trim:x:@strings.split/0
-
-      // Checking if question contains meta information.
-      if
-         mt
-            get-count:x:@strings.split/*
-            .:int:1
-         .lambda
-
-            // Question contain meta information.
-            strings.trim:x:@strings.split/1
-            strings.split:x:-
-               .:,
-            for-each:x:@strings.split/*
-               strings.split:x:@.dp/#
-                  .:=
-               set-value:x:./*/add/*/*/name
-                  strings.trim:x:@strings.split/1
-               set-name:x:./*/add/*/*/name
-                  strings.trim:x:@strings.split/0
-               add:x:@for-each/@for-each/*/data.create/*/values
-                  .
-                     name:value
-
-      // Inserting currently iterated question and associating it with specified questionnaire.
-      data.create
-         table:questions
-         values
-            questionnaire:x:@.arguments/*/name
-            question:x:@.question
-
-   // Returning success to caller.
-   return
-      result:success
+// Returning result of worker slot to caller.
+return-nodes:x:@signal/*

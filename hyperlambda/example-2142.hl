@@ -1,48 +1,15 @@
-/*
- * Returns enrollment records for a specific course
- */
 
-.arguments
-   filter:string
-   limit:long
-   offset:long
+// Hyperlambda snippet that counts products in the 'inventory_db' database from the 'products' table.
 
-auth.ticket.verify:lms-manager
+// Counts products in the "inventory_db" database from the "products" table.
+data.connect:inventory_db
+   database-type:sqlite
 
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:15
-
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
-
-mssql.connect:[training|LMS_Enrollments]
-
-   mssql.read
-      table:Enrollments
-         as:e
-         join:Courses
-            as:c
-            type:left
-            on
-               and
-                  e.CourseId.eq:c.Id
+   // Counting total products.
+   data.read
+      database-type:sqlite
+      table:products
       columns
-         c.CourseName
          count(*)
-            as:EnrollmentCount
-         sum(e.CreditsEarned)
-            as:TotalCredits
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         and
-            c.CourseName.eq:x:@.arguments/*/filter
-      group
-         c.CourseName
-   return-nodes:x:@mssql.read/*
+            as:count
+      limit:long:1

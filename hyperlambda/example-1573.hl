@@ -1,48 +1,88 @@
 
-// A Hyperlambda endpoint for a CRUD update endpoint that updates one record in the ml_requests table in the magic database, filtering which item to update with ID and updating type, prompt, completion, and finish_reason fields, ensuring authentication and authorization for root roles.
-.arguments
-   id:long
-   type:string
-   prompt:string
-   completion:string
-   finish_reason:string
-   cached:int
+// Hyperlambda script to create a slot that avoids abuse of AI chatbot by limiting the number of chat requests per user per day.
+slots.create:magic.openai.chat-interceptor.avoid-abuse
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
+   // Getting original IP address of request.
+   request.headers.get:cf-connecting-ip
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      table:ml_requests
-      values
-      where
-         and
-
-   // Verifying record exists.
+   // Verifying we've actually got an IP address.
    if
-      eq
-         get-value:x:@data.update
-         .:int:0
+      and
+         not-null:x:@request.headers.get
+         neq:x:@request.headers.get
+            .:
       .lambda
-         response.status.set:404
-         return
-            result:Record not found
 
-   // Returning the correct status code.
-   response.status.set:202
+         // Connecting to magic database.
+         data.connect:magic
 
-   // Returning success to caller.
-   yield
-      affected:x:@data.update
+            // Checking if IP address has been blocked previously.
+            data.read
+               table:ml_blocked_ips
+               where
+                  and
+                     ip_address.eq:x:@request.headers.get
+            if
+               exists:x:@data.read/*
+               .lambda
+
+                  // IP address has been blocked.
+                  request.headers.list
+                  add:x:./*/log.info
+                     get-nodes:x:@request.headers.list/*
+                  log.info:Potential abuse, user has been permanently blocked
+                  throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
+                     public:bool:true
+                     status:int:401
+
+            // True if we should block IP address.
+            .block:bool:false
+
+            // Checking if cloudlet is configured for maximum number of requests per day per user.
+            config.get:"magic:openai:max-daily-requests"
+            if
+               and
+                  not-null:x:@config.get
+                  neq:x:@config.get
+                     .:
+               .lambda
+
+                  // Cloudlet is configured to only answer the same user n times per day.
+                  .no
+                  set-value:x:@.no
+                     convert:x:@config.get
+                        type:int
+
+                  // Counting questions user has asked today.
+                  data.scalar:"select count(*) from ml_requests where user_id = @user and created >= date('now', '-1 day')"
+                     @user:x:@.arguments/*/user_id
+
+                  // Checking if user has exhausted his daily requests.
+                  if
+                     mt
+                        convert:x:@data.scalar
+                           type:int
+                        get-value:x:@.no
+                     .lambda
+
+                        // Blocking user.
+                        set-value:x:@.block
+                           .:bool:true
+
+            // Checking if we should block user.
+            if:x:@.block
+
+               // Blocking IP address.
+               data.create
+                  table:ml_blocked_ips
+                  values
+                     ip_address:x:@request.headers.get
+                     user_id:x:@.arguments/*/user_id
+
+               // Writing it into our log.
+               add:x:./*/log.info
+                  request.headers.list
+               log.info:IP address was permanently blocked
+               throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
+                  public:bool:true
+                  status:int:401

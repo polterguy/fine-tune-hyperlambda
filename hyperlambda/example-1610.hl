@@ -1,34 +1,69 @@
+/*
+ * This script generates training data from Hyperlambda files.
+ */
 
-// Delete one record from your PlaylistTrack table in your chinook database.
-.arguments
+// Loads all files recursively from the specified folder
+execute:magic.io.file.load-recursively
+   .:/etc/hyperlambda-training-material/hyperlambda/
+for-each:x:@execute/*
 
-   // Primary key of record to delete, mandatory argument
-   PlaylistId:long
+   // Making sure we catch exceptions such that we can see which file fails.
+   try
 
-   // Primary key of record to delete, mandatory argument
-   TrackId:long
+      // Verifying we're dealing with a Hyperlambda file.
+      if
+         strings.ends-with:x:@.dp/#
+            .:.hl
+         .lambda
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-validators.mandatory:x:@.arguments/*/PlaylistId
-validators.mandatory:x:@.arguments/*/TrackId
+            // Transforming file to lambda object.
+            hyper2lambda:x:@.dp/#/0
+               comments:true
+            remove-nodes:x:-/*/.description
+            if
+               eq
+                  get-name:x:@hyper2lambda/0
+                  .:..
+               .lambda
 
-// Opening up our database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
+                  .prompt
+                  set-value:x:-
+                     get-value:x:@hyper2lambda/0
+                  remove-nodes:x:@hyper2lambda/0
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+                  // Creating our code segment
+                  lambda2hyper:x:@hyper2lambda/*
+                     comments:true
+                  if
+                     lt
+                        openai.tokenize:x:@lambda2hyper
+                        .:int:5000
+                     .lambda
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:PlaylistTrack
-      where
-         and
+                        // Saving above code snippet.
+                        data.connect:fine-tune
+                        
+                           // Making sure we avoid double inserts.
+                           data.read
+                              table:hyperlambda
+                              where
+                                 and
+                                    code.eq:x:@lambda2hyper
+                                    prompt.eq:x:@.prompt
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+                           // Making sure we avoid double inserts of the same snippets
+                           if
+                              not-exists:x:@data.read/*
+                              .lambda
+                                 data.create
+                                    table:hyperlambda
+                                    values
+                                       code:x:@lambda2hyper
+                                       prompt:x:@.prompt
+   .catch
+   
+      // This throws an exception being the name of the currently processed filename
+      throw:x:@.dp/#
+
+// House cleanups.
+remove-nodes:x:@execute/*

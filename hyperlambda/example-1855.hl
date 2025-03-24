@@ -1,183 +1,131 @@
 
-// Hyperlambda file that deletes a cloudlet belonging to the currently authenticated user, ensuring no dependencies exist.
+// Read or list records from your address table in your sakila database without authorization
 .arguments
-   name:string
-   recaptcha_response:string
 
-// Ensuring user is authorised to invoke endpoint.
-auth.ticket.verify:root, admin, guest
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
 
-// Sanity checking invocation
-validators.mandatory:x:@.arguments/*/name
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   address.address_id.mt:long
+   address.address_id.lt:long
+   address.address_id.mteq:long
+   address.address_id.lteq:long
+   address.address_id.neq:long
+   address.address_id.eq:long
+   address.address.like:string
+   address.address.mt:string
+   address.address.lt:string
+   address.address.mteq:string
+   address.address.lteq:string
+   address.address.neq:string
+   address.address.eq:string
+   address.address2.like:string
+   address.address2.mt:string
+   address.address2.lt:string
+   address.address2.mteq:string
+   address.address2.lteq:string
+   address.address2.neq:string
+   address.address2.eq:string
+   address.district.like:string
+   address.district.mt:string
+   address.district.lt:string
+   address.district.mteq:string
+   address.district.lteq:string
+   address.district.neq:string
+   address.district.eq:string
+   address.city_id.mt:long
+   address.city_id.lt:long
+   address.city_id.mteq:long
+   address.city_id.lteq:long
+   address.city_id.neq:long
+   address.city_id.eq:long
+   address.postal_code.like:string
+   address.postal_code.mt:string
+   address.postal_code.lt:string
+   address.postal_code.mteq:string
+   address.postal_code.lteq:string
+   address.postal_code.neq:string
+   address.postal_code.eq:string
+   address.phone.like:string
+   address.phone.mt:string
+   address.phone.lt:string
+   address.phone.mteq:string
+   address.phone.lteq:string
+   address.phone.neq:string
+   address.phone.eq:string
+   address.last_update.mt:date
+   address.last_update.lt:date
+   address.last_update.mteq:date
+   address.last_update.lteq:date
+   address.last_update.neq:date
+   address.last_update.eq:date
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
 
 /*
- * Checking if backend is configured to use reCAPTCHA, and if so,
- * making sure we ensure the frontend supplied a [recaptcha_response],
- * and invoking slot responsible for verifying reCAPTCHA value.
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
  */
-config.get:"magic:auth:recaptcha:key"
 if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
+   exists:x:@.arguments/*/operator
    .lambda
 
-      // [recaptcha_response] is a mandatory field.
-      validators.mandatory:x:@.arguments/*/recaptcha_response
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
 
-      // Retrieving secret and invoking slot responsible for verifying reCAPTCHA value.
-      config.get:"magic:auth:recaptcha:secret"
-      validators.recaptcha:x:@.arguments/*/recaptcha_response
-         min:decimal:0.3
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
 
-/*
- * Retrieving currently authenticated user to prevent a user
- * from deleting cloudlets not belonging to him or her.
- */
-auth.ticket.get
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
 
-/*
- * Notice, we don't allow deleting a cloudlet if other cloudlets are using
- * it as a "source_cloudlet", since this would result in "hanging bogus cloudlets"
- * for the user. Hence, we first need to verify that the cloudlet the user is trying
- * to delete is NOT the source_cloudlet for other cloudlets.
- */
-data.connect:[generic|hub]
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
    data.read
-      table:cloudlets
-      values
-         name
+      database-type:sqlite
+      table:address
+      columns
+         address.address_id
+         address.address
+         address.address2
+         address.district
+         address.city_id
+         address.postal_code
+         address.phone
+         address.last_update
       where
          and
-            user.eq:x:@auth.ticket.get
-            source_cloudlet.eq:x:@.arguments/*/name
-   if
-      exists:x:@data.read/*/*
-      .lambda
 
-         // Oops, child cloudlet(s) needs to be deleted first.
-         response.status.set:412
-         for-each:x:@data.read/*/*/name
-            unwrap:x:+/*/*/*
-            add:x:././*/return-nodes
-               .
-                  .
-                     name:x:@.dp/#
-         return-nodes
-
-/*
- * Checking if there exists a subscription for cloudlet,
- * at which point we forward deletion to stripe module since the Stripe
- * module will delete the cloudlet automatically through its callback sinks.
- */
-data.connect:[generic|stripe]
-
-   // Checking if we can find subscription for cloudlet.
-   data.read
-      table:subscriptions
-      values
-         subscription
-      where
-         and
-            username.eq:x:@auth.ticket.get
-            meta.eq:x:@.arguments/*/name
-
-   // Checking if subscription exists for cloudlet.
-   if
-      exists:x:@data.read/*/*
-      .lambda
-
-         /*
-          * Deleting subscription information associated with cloudlet.
-          * Due to the way the Stripe module and HUB is connected, this will invoke
-          * Stripe callback sink, deleting the cloudlet after the subscriptiuon is deleted.
-          */
-         unwrap:x:+/*
-         io.file.execute:/modules/stripe/subscriptions.delete.hl
-            subscription:x:@data.read/*/*/subscription
-
-         // Returning success to caller
-         return
-            affected:int:1
-            subscriptions_deleted:int:1
-   else
-
-      // No Stripe subscription associated with cloudlet, hence manually deleting it.
-      data.connect:[generic|hub]
-
-         // Verifying cloudlet exists and belongs to currently authenticated user.
-         data.read
-            table:cloudlets
-            values
-               name
-               cluster
-            where
-               and
-                  user.eq:x:@auth.ticket.get
-                  name.eq:x:@.arguments/*/name
-         if
-            not
-               exists:x:@data.read/*/*
-            .lambda
-
-               // Oops, cloudlet doesn't exists or does not belong to authenticated user.
-               log.error:User tried to delete non-existent cloudlet
-                  user:x:@auth.ticket.get
-                  cloudlet:x:@.arguments/*/name
-               throw:Cloudlet does not exist
-                  public:true
-                  status:404
-
-         // Invoking slot responsible for deleting cloudlet.
-         .name
-         set-value:x:@.name
-            strings.concat
-               get-value:x:@.arguments/*/name
-               .:-
-               get-value:x:@auth.ticket.get
-         unwrap:x:+/*
-         signal:hub.cloudlets.hard-delete
-            cluster:x:@data.read/*/*/cluster
-            name:x:@.name
-
-         /*
-          * Checking if there exists scheduled tasks associated with the cloudlet,
-          * and if so deleting all tasks associated with cloudlet.
-          */
-         strings.concat
-            .:cloudlet-
-            get-value:x:@.name
-            .:-%
-         tasks.list:x:@strings.concat
-            limit:1000
-         for-each:x:@tasks.list/*
-            tasks.delete:x:@.dp/#/*/id
-
-         // Doing some basic logging.
-         get-count:x:@tasks.list/*
-         log.debug:Tasks associated with cloudlet has been deleted
-            name:x:@.arguments/*/name
-            user:x:@auth.ticket.get
-            no_tasks:x:@get-count
-
-         // Deleting item from database.
-         data.delete
-            table:cloudlets
-            where
-               and
-                  name.eq:x:@.arguments/*/name
-                  user.eq:x:@auth.ticket.get
-
-         // Doing some basic logging
-         log.info:Cloudlet successfully destroyed
-            name:x:@.arguments/*/name
-            user:x:@auth.ticket.get
-
-         // Returning result of above invocation to caller.
-         unwrap:x:+/*
-         return
-            affected:x:@data.delete
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

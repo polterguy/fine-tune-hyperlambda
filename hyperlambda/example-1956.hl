@@ -1,35 +1,26 @@
-// Attempts to register a user, throws on 500, fallback message on other errors, and return success to caller if the invocation was a success
 
+// Hyperlambda script for a CRUD delete endpoint that deletes one item from the users table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
 .arguments
+   username:string
 
-// Status to return
-.register.status
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/username
 
-// Invoking GET
-http.post:"https://api.example.com/users/register"
-   convert:true
-   payload
-      username:alice
-      email:alice@example.com
-      password:Secure123!
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      set-value:x:@.register.status
-         .:Registration successful
-else-if
-   eq:x:@http.post
-      .:int:500
-   .lambda
-      throw
-         .:Internal server error during registration (500)
-else
-   set-value:x:@.register.status
-      .:Registration failed
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-yield
-   result:x:@.register.status
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:users
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

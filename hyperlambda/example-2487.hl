@@ -1,47 +1,20 @@
 
-// Read or list records from your media table in your cms database
+// Search the web
 .arguments
-   media.id.eq:long
-   media.post_id.eq:long
-   media.file_path.like:string
-   media.file_path.eq:string
-   media.file_type.like:string
-   media.file_type.eq:string
-   media.created_at.eq:date
-   post_id.title.eq:string
-   post_id.title.like:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
+   // Mandatory argument being the actual query to submit to DuckDuckGo.
+   query:string
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+   // Optional argument being the maximum number of tokens to return.
+   max_tokens:int
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
+// Returns [max_tokens] context for the specified [query] by searching DuckDuckGo.
+execute:magic.workflows.actions.execute
+   name:openai-context-from-search
+   filename:/modules/openai/workflows/actions/openai-context-from-search.hl
+   arguments
+      query:x:@.arguments/*/query
+      max_tokens:x:@.arguments/*/max_tokens
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:media
-         join:posts
-            as:post_id
-            type:left
-            on
-               and
-                  media.post_id:post_id.id
-      columns
-         media.id
-         media.post_id
-         media.file_path
-         media.file_type
-         media.created_at
-         post_id.title
-            as:post_id.title
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+// Returns the result of your last action.
+return-nodes:x:@execute/*

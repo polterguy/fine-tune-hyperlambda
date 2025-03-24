@@ -1,27 +1,54 @@
 
-// Hyperlambda file and endpoint that changes the password of the currently authenticated user, ensuring the user is authorized.
+// Counts items from your clusters table in your [generic|hub] database according to the specified arguments.
 .arguments
-   password:string
+   operator:string
+   clusters.id.like:string
+   clusters.id.eq:string
+   clusters.country.like:string
+   clusters.country.eq:string
+   clusters.name.like:string
+   clusters.name.eq:string
+   clusters.enabled.eq:bool
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/password
-
-// Making sure password is at least 12 characters in length
-validators.string:x:@.arguments/*/password
-   min:12
-
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
 
 /*
- * Invokes the slot that does the heavy lifting, and updates the user's current password.
- * 
- * This slot will change the password of the currently logged in user.
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
  */
-unwrap:x:+/*
-signal:magic.auth.change-password
-   password:x:@.arguments/*/password
+if
+   exists:x:@.arguments/*/operator
+   .lambda
 
-// Returns success to caller.
-return-nodes
-   result:success
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/*
+         get-value:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|hub]
+
+   // Parametrising our read invocation.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/operator
+   remove-nodes:x:@.arguments/*/operator
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      table:clusters
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

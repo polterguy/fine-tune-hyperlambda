@@ -1,64 +1,74 @@
 
-// Create a Hyperlambda script that returns the Google OpenID provider configuration, generating a nonce if required.
-slots.create:magic.openid.providers.google
+// Slot responsible for hard deletion of an existing cloudlet.
+slots.create:hub.cloudlets.hard-delete
 
    // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/createNonce
+   validators.mandatory:x:@.arguments/*/cluster
+   validators.mandatory:x:@.arguments/*/name
 
-   // Getting client ID for Google from configuration.
-   .client-id
-   set-value:x:@.client-id
-      config.get:"magic:oidc:google:client-id"
+   // Invoking soft delete first.
+   add:x:+
+      get-nodes:x:@.arguments/*
+   signal:hub.cloudlets.delete
 
-   // Checking to see if we've got Google provider configured.
+   // Figuring out base URL of Kubernetes REST API.
+   .base-url
+   strings.concat
+      .:"magic:hub:"
+      get-value:x:@.arguments/*/cluster
+      .:":manager-url"
+   set-value:x:@.base-url
+      config.get:x:@strings.concat
+
+   // Figuring out Kubernetes namespace cloudlets exists in.
+   .namespace
+   set-value:x:@.namespace
+      config.get:"magic:hub:default-namespace"
+
+   // Retrieving token that's required to invoke Kubernetes REST API.
+   .token
+   strings.concat
+      .:"magic:hub:"
+      get-value:x:@.arguments/*/cluster
+      .:":token"
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:x:@strings.concat/@strings.concat
+
+   // Invoking Web API responsible for deleting volume claim.
+   .url
+   set-value:x:@.url
+      strings.concat
+         get-value:x:@.base-url
+         .:/api/v1/namespaces/
+         get-value:x:@.namespace
+         .:/persistentvolumeclaims/
+         get-value:x:@.arguments/*/name
+   http.delete:x:@.url
+      headers
+         Authorization:x:@.token
+
+   // Sanity checking above invocation
    if
-      not-null:x:@.client-id
+      not
+         and
+            mte:x:@http.delete
+               .:int:200
+            lt:x:@http.delete
+               .:int:300
       .lambda
 
-         // Buffer for nonce.
-         .nonce
+         // Oops, web API didn't return success
+         log.error:Kubernetes could not delete volume claim
+            status:x:@http.post
+            response:x:@http.post/*/content
+            cluster:x:@.arguments/*/cluster
+            name:x:@.arguments/*/name
+   else
 
-         // Checking if caller wants us to generate a nonce.
-         if
-            eq:x:@.arguments/*/createNonce
-               .:bool:true
-            .lambda
-
-               // Creating a unique nonce.
-               set-value:x:@.nonce
-                  crypto.random
-                     min:20
-                     max:30
-
-               /*
-                * Storing nonce to avoid replay attacks.
-                * 
-                * Notice, nonce is only stored for 60 minutes, implying the configuration
-                * returned below can only be used within 60 minutes of having been generated.
-                * 
-                * And we store the issuer value in cache such that we can verify later that the id_token
-                * was created by the correct issuer.
-                */
-               cache.set:x:@.nonce
-                  value:"https://accounts.google.com"
-                  expiration:3600
-
-               // Making sure we return nonce to caller.
-               add:x:@.lambda/@.lambda/*/add/*/*
-                  .
-                     nonce:x:@.nonce
-                     url:"https://accounts.google.com/o/oauth2/v2/auth"
-                     client_id:x:@.client-id
-                     response_type:id_token
-                     scope:openid email profile
-
-         // Returning providers to caller.
-         unwrap:x:+/*/*/*
-         add:x:../*/return
-            .
-               .
-                  name:Google
-                  issuer:"https://accounts.google.com"
-
-   // Returning result to caller.
-   return
+      // Logging the fact that we successfully deleted ingress.
+      log.debug:Kubernetes volume claim successfully deleted
+         cluster:x:@.arguments/*/cluster
+         name:x:@.arguments/*/name
+         response:x:@http.post/*/content

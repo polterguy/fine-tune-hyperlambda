@@ -1,16 +1,123 @@
+/*
+ * Lists all products from NetSuite
+ * 
+ * Returns id, itemid, displayname, description, and unitprice from products in your NetSuite account.
+ */
+.arguments
 
-// Provide a Hyperlambda example where a value increases until [.value] is greater than 15.
+   // Optionally how many rows to maximumly return. Defaults to 25 unless specified.
+   limit:long
 
-// Increases value until [.value] is greater than 15.
-.value:int:5
-while
-   lt
-      get-value:x:@.value
-      .:int:15
+   // Optional ID of product from where to start returning rows. Defaults to nothing.
+   from:string
+
+   // Optional filtering argument the displayname must match. For instance 'xyz' here will match products with displaynames of 'xyz_1' and 'entity-2-xyz_2'.
+   filter:string
+
+   // Mandatory argument for subsidiary ID to retrieve products for.
+   subsidiaryid:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/subsidiaryid
+
+// Checking if caller supplied -1 as limit.
+if
+   or
+      and
+         exists:x:@.arguments/*/limit
+         not-null:x:@.arguments/*/limit
+         eq
+            convert:x:@.arguments/*/limit
+               type:long
+            .:long:-1
+      mt
+         convert:x:@.arguments/*/limit
+            type:long
+         .:long:25
    .lambda
 
-      // Logging current value.
-      log.info:Increasing value
+      // Defaulting limit to 25 to avoid returning too many records.
+      set-value:x:@.arguments/*/limit
+         .:long:25
+      add:x:../*/return-nodes
+         .
+            warning:We can only retrieve a maximum of 25 products at the same time, ask for more products to see more products.
 
-      // Incrementing value.
-      math.increment:x:@.value
+// Dynamically creating our query.
+.q
+log.info:Constructing query...
+set-value:x:@.q
+   strings.concat
+      .:@"SELECT
+   i.id,
+   i.itemid,
+   i.displayname,
+   i.description,
+   p.unitprice
+FROM item i
+JOIN kitItemSubsidiaryMap k ON i.id = k.item
+LEFT JOIN pricing p ON p.item = i.id
+WHERE p.pricelevel = '1'"
+
+// Checking if we've got a subsidiaryid filter.
+set-value:x:@.q
+   strings.concat
+      get-value:x:@.q
+      .:" AND k.subsidiary = '"
+      get-value:x:@.arguments/*/subsidiaryid
+      .:"'"
+
+// Checking if we're doing paging.
+if
+   exists:x:@.arguments/*/from
+   .lambda
+      set-value:x:@.q
+         strings.concat
+            get-value:x:@.q
+            .:" AND i.id > "
+            get-value:x:@.arguments/*/from
+
+// Checking if we're doing filtering.
+if
+   exists:x:@.arguments/*/filter
+   .lambda
+      set-value:x:@.q
+         strings.concat
+            get-value:x:@.q
+            .:" AND UPPER(i.description) LIKE UPPER('%"
+            get-value:x:@.arguments/*/filter
+            .:"%')"
+
+// Adding limit.
+set-value:x:@.q
+   strings.concat
+      get-value:x:@.q
+      .:" ORDER BY i.id FETCH FIRST "
+      get-first-value
+         get-value:x:@.arguments/*/limit
+         .:long:25
+      .:" ROWS ONLY"
+
+// Logging the generated query for debugging.
+log.info:x:@.q
+
+// Forwarding heavy lifting to core file.
+log.info:Executing query...
+execute-file:/modules/netsuite/workflows/workflows/netsuite-query.hl
+   q:x:@.q
+   timeout:30000
+
+// Handling empty results.
+if
+   not
+      exists:x:@execute-file/*
+   .lambda
+      add:x:../*/return-nodes
+         .
+            message:No products found for the specified subsidiary.
+
+// Returning result to caller.
+log.info:Query executed successfully.
+add:x:../*/return-nodes
+   get-nodes:x:@execute-file/*
+return-nodes

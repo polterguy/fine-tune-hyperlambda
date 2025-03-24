@@ -1,5 +1,37 @@
-/*
- * This example saves the text "Hello, Hyperlambda!" to "/logs/app.log".
- */
-io.file.save:/logs/app.log
-   .:Hello, Hyperlambda!
+
+// Returns context for the specified [query] from the specified [type], and returns to caller.
+.arguments
+   type:string
+   query:string
+   threshold:decimal
+   max_tokens:int
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/query
+
+// Applying default values for optional arguments.
+validators.default:x:@.arguments
+   threshold:decimal:0.3
+   max_tokens:int:4000
+
+// Converting to decimal to be sure.
+set-value:x:@.arguments/*/threshold
+   convert:x:@.arguments/*/threshold
+      type:decimal
+
+// Converting to decimal to be sure.
+set-value:x:@.arguments/*/max_tokens
+   convert:x:@.arguments/*/max_tokens
+      type:int
+
+// Retrieving context.
+execute:magic.ai.get-context
+   type:x:@.arguments/*/type
+   prompt:x:@.arguments/*/query
+   threshold:x:@.arguments/*/threshold
+   max_tokens:x:@.arguments/*/max_tokens
+
+// Returning result of invocation to caller.
+yield
+   context:x:@execute/*/context

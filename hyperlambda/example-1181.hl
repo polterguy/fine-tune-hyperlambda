@@ -1,18 +1,29 @@
 
-// Write a Hyperlambda snippet that checks if [.state] does not match Open and executes [.lambda].
+// Returns all companies that the specified director is associated with
+.arguments
+   director_id:long
+   limit:long
+   offset:long
 
-// Checks if [.state] does not match Open and executes [.lambda].
-.state:Open
-if
+// Opening database connection.
+data.connect:[finovo|finovo]
+   database-type:pgsql
 
-   // Executes only if state is not Open.
-   neq:x:@.state
-      .:Open
-   .lambda
+   // Reading from directors.
+   data.select:"\nselect d1.org_number, b.company_name, d1.role_name\n   from directors d1\n      inner join basic b on b.org_number = d1.org_number\n      inner join directors d2 on d1.director_nbr = d2.director_nbr\n   where d2.director_id = @id and d1.org_number != d2.org_number\n   limit @limit offset @offset"
+      database-type:pgsql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+   if
+      mte
+         get-count:x:@data.select/*
+         .:int:10
+      .lambda
 
-      // Runs if [.state] is different.
-      log.info:[.state] is NOT Open
-else
-
-   // Runs if [.state] is exactly Open.
-   log.info:[.state] is Open
+         // Making sure we inform caller that there might exist additional companies.
+         add:x:@data.connect/*/yield
+            .
+               notice:The director is probably associated with more companies
+   yield
+      companies:x:@data.select/*

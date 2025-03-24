@@ -1,3 +1,36 @@
-// Logging from a thread
-fork
-   info.log:I was invoked from another thread
+/*
+ * Loads every file in specified folder, changes its filename, saves as a new file, and deletes the original file
+ */
+execute:magic.io.file.load-recursively
+   .:/etc/hyperlambda-training-material/hyperlambda/
+
+// Counter
+.no:int:1
+
+// Looping through each file returned above.
+for-each:x:@execute/*
+
+   // Removing existing filename
+   strings.split:x:@.dp/#
+      .:/
+   remove-nodes:x:@strings.split/0/-
+
+   // Creating a new filename based upob the counter
+   strings.concat
+      .:/
+      strings.join:x:@strings.split/*
+         .:/
+      .:/
+      .:example-
+      get-value:x:@.no
+      .:.hl
+
+   // Saving new file
+   io.file.save:x:@strings.concat
+      get-value:x:@.dp/#/*
+
+   // Deleting old file
+   io.file.delete:x:@.dp/#
+
+   // Incrementing counter
+   math.increment:x:@.no

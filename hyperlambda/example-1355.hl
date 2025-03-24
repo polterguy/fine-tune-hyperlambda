@@ -1,25 +1,15 @@
 
-// Returns all cloudlet plans that exists using Hyperlambda workflow actions
+// A Hyperlambda endpoint to count the number of tasks in the system given an optional filter.
+.arguments
+   filter:string
 
-/*
- * Ensures user is authorized to access endpoint.
- * 
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Returns all plans in the system.
-execute:magic.workflows.actions.execute
-   name:hub-plans-get
-   filename:/modules/hub/workflows/actions/hub-plans-get.hl
-   arguments
+// Retrieves all scheduled tasks in the system.
+tasks.count:x:@.arguments/*/filter
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+// Returning the results of the evaluation to caller.
+unwrap:x:+/*
+return-nodes
+   count:x:@tasks.count

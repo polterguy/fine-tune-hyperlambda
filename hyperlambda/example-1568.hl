@@ -1,8 +1,228 @@
-// This snippet uses the '*' iterator to retrieve all children of a node, in addition to the # reference iterator.
-.data
-   item1:one
-   item2:two
-for-each:x:@.data/*   
-   set-value:x:@.dp/#
-      :processed
-// The expression @.data/* selects both item1 and item2 nodes, and the for-each loop sets each of their values to "processed" since it's using the [.dp] node by reference which is injected by the [for-each] slot.
+
+/*
+ * Returns the company with the specified org. number.
+ *
+ * This function will return company information such as the address, founding date, status, activity description, etc.
+ */
+.arguments
+   org_number:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/org_number
+set-value:x:@.arguments/*/org_number
+   strings.replace-not-of:x:@.arguments/*/org_number
+      .:0123456789
+      .:
+validators.string:x:@.arguments/*/org_number
+   min:10
+   max:10
+
+// Connecting to database.
+data.connect:[finovo|finovo]
+   database-type:pgsql
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:basic
+      columns
+         org_number
+         complete_ef_pnr
+         company_name
+         post_co_street
+         post_street
+         post_zipcode
+         post_town
+         post_community_code
+         post_community_name
+         post_region_code
+         post_region_name
+         registered_co_street
+         registered_street
+         registered_zipcode
+         registered_town
+         registered_community_code
+         registered_community_name
+         registered_region_code
+         registered_region_name
+         visiting_street
+         visiting_zipcode
+         visiting_town
+         visiting_community_code
+         visiting_community_name
+         visiting_region_code
+         visiting_region_name
+         phone_number
+         fax_number
+         status_date
+         status_code
+         status_text_high
+         status_text_detailed
+         orgnr_status_affected
+         company_formed_date
+         registration_date
+         deregistration_date
+         legalgroup_code
+         legalgroup_text
+         f_tax_reg
+         f_tax_yes_no
+         f_tax_reg_spec
+         f_tax_start_date
+         f_tax_end_date
+         f_tax_dereg_reason_code
+         moms_reg
+         moms_yes_no
+         moms_start_date
+         moms_end_date
+         sni_code
+         sni_text
+         accountant_reservation
+         date_accountant_reservation
+         number_of_units
+         top_director_name
+         top_director_function
+         turnover_interval
+         nbr_employees_interval
+      where
+         and
+            legalgroup_code.eq:AB
+            org_number.eq:x:@.arguments/*/org_number
+
+   // Checking if we've got data.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         return
+            result:No results were found
+
+   // Making sure we return basic company information.
+   add:x:../*/return-nodes/*/basic
+      get-nodes:x:@data.read/*
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:activity_text
+      columns
+         sequence
+         activity_text
+      where
+         and
+            org_number.eq:x:@.arguments/*/org_number
+
+   // Making sure we return activity_text information, but only if existing
+   if
+      exists:x:@data.read/*
+      .lambda
+
+         // Making sure we return activity_text information.
+         add:x:+/*/*
+            get-nodes:x:@data.read/*
+         add:x:../*/return-nodes
+            .
+               activity_text
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:accountant_comments
+      columns
+         account_period_start
+         account_period_end
+         account_not_approved_code
+         accountant_comment_code
+         accountant_comment_text
+         other_accountant_comment
+      where
+         and
+            accountant_comment_text.neq:
+            accountant_comment_text.neq
+            org_number.eq:x:@.arguments/*/org_number
+
+   // Making sure we return accountant_comments information, but only if existing
+   if
+      exists:x:@data.read/*
+      .lambda
+
+         // Making sure we return accountant_comments information.
+         add:x:+/*/*
+            get-nodes:x:@data.read/*
+         add:x:../*/return-nodes
+            .
+               accountant_comment
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:company_sign
+      columns
+         company_sign_text
+      where
+         and
+            org_number.eq:x:@.arguments/*/org_number
+      order:sequence
+
+   // Making sure we return company_sign information, but only if existing
+   if
+      exists:x:@data.read/*
+      .lambda
+
+         // Making sure we return company_sign information.
+         add:x:+/*/*
+            get-nodes:x:@data.read/*
+         add:x:../*/return-nodes
+            .
+               company_sign
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:group_structure
+      columns
+         company_name
+         company_country_code
+         company_country_name
+         owned_percent
+         company_level
+         closest_group_mother_orgnumber
+         group_mother_orgnumber
+         date_last_group_struct_update
+      where
+         and
+            org_number.eq:x:@.arguments/*/org_number
+
+   // Making sure we return company_sign information, but only if existing
+   if
+      exists:x:@data.read/*
+      .lambda
+
+         // Making sure we return company_sign information.
+         add:x:+/*/*
+            get-nodes:x:@data.read/*
+         add:x:../*/return-nodes
+            .
+               group_structure
+
+   // Figuring out who is the actual owner of the company
+   execute:finovo.get-actual-owner
+      org_number:x:@.arguments/*/org_number
+   if
+      exists:x:@execute/*
+      .lambda
+
+         // We have an actual owner of the company.
+         add:x:../*/return-nodes
+            .
+               actual_owners
+         for-each:x:@execute/*
+            unwrap:x:+/*/*/*
+            add:x:../*/return-nodes/*/actual_owners
+               .
+                  .
+                     name:x:@.dp/#/*/name
+                     ownership:x:@.dp/#/*/ownership
+                     control_text:x:@.dp/#/*/control_text
+                     director_id:x:@.dp/#/*/director_id
+
+return-nodes
+   basic

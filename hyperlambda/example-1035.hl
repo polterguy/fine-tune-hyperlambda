@@ -1,205 +1,313 @@
 
-/*
- * Distinct Keyword Search from Customers table in northwind database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
- */
+// Write a Hyperlambda script to query an endpoint with an instruction and a query, using OpenAI to process the context.
 .arguments
-
-   // Mandatory query for records to search for
+   session:string
    query:string
+   instruction:string
+   recaptcha_response:string
 
-   // Optional number of records to return, defaults to 10 if not specified. Pass in -1 to return all records
-   limit:long
-
-   // Optional offset into the dataset of where to start retrieving records
-   offset:long
-
-// Make sure the user has provided a query.
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/session
+validators.string:x:@.arguments/*/session
+   min:5
+   max:50
 validators.mandatory:x:@.arguments/*/query
+validators.string:x:@.arguments/*/query
+   min:2
+   max:200
+validators.mandatory:x:@.arguments/*/instruction
+validators.string:x:@.arguments/*/instruction
+   min:5
+   max:750
 
-// Apply defaults if not specified.
-validators.default:x:@.arguments
-   limit:long:10
+/*
+ * Checking if backend is configured to use reCAPTCHA, and if so,
+ * making sure we ensure the frontend supplied a [recaptcha_response],
+ * and invoking slot responsible for verifying reCAPTCHA value.
+ */
+config.get:"magic:auth:recaptcha:key"
+if
+   and
+      neq:x:@config.get
+         .
+      neq:x:@config.get
+         .:
+   .lambda
 
-// Split the user's query into individual keywords, separated by spaces.
-.words
-add:x:@.words
-   strings.split:x:@.arguments/*/query
-      .:" "
+      // [recaptcha_response] is a mandatory field.
+      validators.mandatory:x:@.arguments/*/recaptcha_response
 
-// Enforce lower characters for each keyword, and guard against SQL injection.
-.no:int:0
-for-each:x:@.words/*
-   set-value:x:@.dp/#
-      strings.to-lower:x:@.dp/#
+      // Retrieving secret and invoking slot responsible for verifying reCAPTCHA value.
+      config.get:"magic:auth:recaptcha:secret"
+      validators.recaptcha:x:@.arguments/*/recaptcha_response
+         min:decimal:0.3
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
 
-// Specify which columns to search against.
-.columns
-   .:CustomerID
-   .:CompanyName
-   .:ContactName
-   .:ContactTitle
-   .:Address
-   .:City
-   .:Region
-   .:PostalCode
-   .:Country
-   .:Phone
-   .:Fax
+// Buffer for context data.
+.context
 
-// Connect to the specified database.
-data.connect:[generic|northwind]
-   database-type:sqlite
+// Checking if caller supplied a URL or a search query.
+if
+   or
+      strings.starts-with:x:@.arguments/*/query
+         .:"http://"
+      strings.starts-with:x:@.arguments/*/query
+         .:"https://"
+   .lambda
 
-   // Start building our SQL.
-   .sql:select *, (
-
-   // 1) Dynamically create the full text by concatenating all columns we want to search.
-   .fields
-   for-each:x:@.columns/*
+      // Caller supplied a URL.
       strings.concat
-         .:coalesce(
-         get-value:x:@.dp/#
-         .:", '')"
-      unwrap:x:+/*/*
-      add:x:@.fields
-         .
-            .:x:@strings.concat
-   set-value:x:@.fields
-      strings.join:x:@.fields/*
-         .:" || "
-   remove-nodes:x:@.fields/*
+         .:"Scraping URL: "
+         get-value:x:@.arguments/*/query
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/session
+         args
+            message:x:@strings.concat
+            type:system
+      sleep:100
 
-   // 2) Keyword density calculation
-   .no:int:0
-   for-each:x:@.words/*
+      // Scraping specified URL.
+      unwrap:x:+/*
+      signal:magic.ai.url.get
+         url:x:@.arguments/*/query
+      unwrap:x:+/*
+      signal:magic.ai.html.extract
+         url:x:@.arguments/*/query
+         images:bool:true
+         code:bool:true
+         lists:bool:true
+         main:bool:true
+         html:x:@signal/@signal
 
-      // Adding SQL parameter.
-      set-name:x:+/+/*/*
+      // Building our context making sure we don't overflow 10,000 tokens.
+      .tmp:
+      while
+         and
+            exists:x:@signal/*/snippets/0
+            lt
+               openai.tokenize:x:@.tmp
+               .:int:5000
+         .lambda
+
+            // Updating [.context] to current value of [.tmp].
+            set-value:x:@.context
+               get-value:x:@.tmp
+
+            // Checking if prompt is not-null and existing.
+            if
+               and
+                  exists:x:@signal/*/snippets/0/*/prompt
+                  not-null:x:@signal/*/snippets/0/*/prompt
+                  neq:x:@signal/*/snippets/0/*/prompt
+                     .:
+               .lambda
+
+                  // We have a prompt.
+                  set-value:x:@.tmp
+                     strings.concat
+                        get-value:x:@.tmp
+                        .:"\n"
+                        .:"\n"
+                        get-value:x:@signal/*/snippets/0/*/prompt
+
+            // Checking if completion is not-null and existing.
+            if
+               and
+                  exists:x:@signal/*/snippets/0/*/completion
+                  not-null:x:@signal/*/snippets/0/*/completion
+                  neq:x:@signal/*/snippets/0/*/completion
+                     .:
+               .lambda
+
+                  // We have a completion.
+                  set-value:x:@.tmp
+                     strings.concat
+                        get-value:x:@.tmp
+                        .:"\n"
+                        .:"\n"
+                        get-value:x:@signal/*/snippets/0/*/completion
+
+            // Removing top snippet.
+            remove-nodes:x:@signal/*/snippets/0
+else
+
+   // Caller supplied a search query, informing caller that we're searching.
+   strings.concat
+      .:"Searching DuckDuckGo for: "
+      get-value:x:@.arguments/*/query
+   unwrap:x:+/**
+   sockets.signal:x:@.arguments/*/session
+      args
+         message:x:@strings.concat
+         type:system
+   sleep:100
+
+   // Caller supplied a search query.
+   unwrap:x:+/*
+   signal:magic.ai.create-search-context
+      query:x:@.arguments/*/query
+      max_tokens:int:5000
+      session:x:@.arguments/*/session
+   set-value:x:@.context
+      strings.trim:x:@signal
+
+// Trimming context.
+set-value:x:@.context
+   strings.trim:x:@.context
+
+// Adding all arguments to [fork] invocation.
+insert-before:x:./*/fork/0
+   get-nodes:x:@.arguments
+   get-nodes:x:@.context
+
+// Signaling caller on sockets.
+openai.tokenize:x:@.arguments/*/instruction
+openai.tokenize:x:@.context
+strings.concat
+   .:"Invoking OpenAI with "
+   get-value:x:@openai.tokenize
+   .:" context tokens and "
+   get-value:x:@openai.tokenize/@openai.tokenize
+   .:" instruction tokens"
+unwrap:x:+/**
+sockets.signal:x:@.arguments/*/session
+   args
+      message:x:@strings.concat
+      type:system
+sleep:100
+
+// Creating a fork to take advantage of SSE features of OpenAI.
+fork
+
+   // Making sure we catch exceptions.
+   try
+
+      // Retrieving OpenAI API token to use.
+      .token
+      set-value:x:@.token
          strings.concat
-            .:@p
-            get-value:x:@.no
-      unwrap:x:+/*/*
-      add:x:@data.connect/*/data.select
-         .
-            .:x:@.dp/#
+            .:"Bearer "
+            get-first-value
+               get-value:x:@.arguments/*/api_key
+               config.get:"magic:openai:key"
 
-      // Modifying our SQL.
+      // Unwrapping [.session] inside our [.sse].
+      unwrap:x:+/*/.sse/*/.session
+
+      // Invoking OpenAI, now with a decorated prompt and an SSE callback.
+      http.post:"https://api.openai.com/v1/chat/completions"
+         convert:true
+         .sse
+
+            // Our socket channel for notifying client of new tokens.
+            .session:x:@.arguments/*/session
+
+            // Verifying OpenAI sent us actual content.
+            if
+               and
+                  exists:x:@.arguments/*/message
+                  not-null:x:@.arguments/*/message
+                  strings.starts-with:x:@.arguments/*/message
+                     .:"data:"
+               .lambda
+
+                  // Parsing message sent to us from OpenAI.
+                  strings.substring:x:@.arguments/*/message
+                     .:int:5
+                  strings.trim:x:@strings.substring
+
+                  // Making sure OpenAI sent us something at all.
+                  if
+                     neq:x:@strings.trim
+                        .:
+                     .lambda
+
+                        // Checking if we're done.
+                        if
+                           eq:x:@strings.trim
+                              .:[DONE]
+                           .lambda
+
+                              // OpenAI is done.
+                              sockets.signal:x:@.session
+                                 args
+                                    finished:bool:true
+                        else
+
+                           // More data to come.
+                           json2lambda:x:@strings.trim
+
+                           // Updating finish reason if we were given a reason.
+                           if
+                              and
+                                 exists:x:@json2lambda/*/choices/0/*/finish_reason
+                                 not-null:x:@json2lambda/*/choices/0/*/finish_reason
+                              .lambda
+
+                                 // Signaling client what finish reason we have.
+                                 unwrap:x:+/*/*
+                                 sockets.signal:x:@.session
+                                    args
+                                       finish_reason:x:@json2lambda/*/choices/0/*/finish_reason
+
+                           // Making sure we have a message.
+                           if
+                              and
+                                 not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+                                 neq:x:@json2lambda/*/choices/0/*/delta/*/content
+                                    .:
+                              .lambda
+
+                                 // Appending content to above [.result].
+                                 set-value:x:@.result
+                                    strings.concat
+                                       get-value:x:@.result
+                                       get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+
+                                 // Signaling client with the newly acquired data from OpenAI.
+                                 unwrap:x:+/*/*
+                                 sockets.signal:x:@.session
+                                    args
+                                       message:x:@json2lambda/*/choices/0/*/delta/*/content
+         headers
+            Authorization:x:@.token
+            Content-Type:application/json
+            Accept:text/event-stream
+         payload
+            model:gpt-4o
+            max_tokens:int:4000
+            temperature:decimal:0.3
+            stream:bool:true
+            messages
+               .
+                  role:system
+                  content:x:@.arguments/*/instruction
+               .
+                  role:system
+                  content:x:@.context
+
+      // Sanity checking above invocation.
       if
-         eq:x:@.no
-            .:int:0
+         not
+            and
+               mte:x:@http.post
+                  .:int:200
+               lt:x:@http.post
+                  .:int:300
          .lambda
 
-            // First keyword => no leading plus
-            set-value:x:@.sql
-               strings.concat:x:@.sql
-                  get-value:x:@.sql
-                  .:" (length("
-                  get-value:x:@.fields
-                  .:) - length(replace(lower(
-                  get-value:x:@.fields
-                  .:), @p
-                  get-value:x:@.no
-                  .:", ''))) / length(@p"
-                  get-value:x:@.no
-                  .:)
+            // Oops, error - Logging error and returning status 500 to caller.
+            throw:x:@http.post/*/content/*/error/*/message
       else
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" + (length("
-               get-value:x:@.fields
-               .:) - length(replace(lower(
-               get-value:x:@.fields
-               .:), @p
-               get-value:x:@.no
-               .:", ''))) / length(@p"
-               get-value:x:@.no
-               .:)
-      math.increment:x:@.no
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:) * 1.0 / length(
-         get-value:x:@.fields
-         .:) as keyword_density, (
 
-   // 3) Distinct keyword count => For each keyword, 1 if present, 0 if not.
-   .no:int:0
-   for-each:x:@.words/*
-      if
-         eq:x:@.no
-            .:int:0
-         .lambda
+         // Success! Logging as such!
+         log.info:Invoking OpenAI was a success
+   .catch
 
-            // First keyword => no leading plus
-            set-value:x:@.sql
-               strings.concat:x:@.sql
-                  get-value:x:@.sql
-                  .:" CASE WHEN ((length("
-                  get-value:x:@.fields
-                  .:) - length(replace(lower(
-                  get-value:x:@.fields
-                  .:), @p
-                  get-value:x:@.no
-                  .:", ''))) / length(@p"
-                  get-value:x:@.no
-                  .:)) > 0 THEN 1 ELSE 0 END
-      else
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" + CASE WHEN ((length("
-               get-value:x:@.fields
-               .:) - length(replace(lower(
-               get-value:x:@.fields
-               .:), @p
-               get-value:x:@.no
-               .:", ''))) / length(@p"
-               get-value:x:@.no
-               .:)) > 0 THEN 1 ELSE 0 END
-      math.increment:x:@.no
+      // Oops!
+      log.error:x:@.arguments/*/message
 
-   // Finalize "keyword_count".
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:) as keyword_count
-
-   // 4) Finish SELECT + WHERE
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:" from "
-         .:Customers
-         .:" where keyword_count > 0"
-
-   // 5) Order by distinct keyword_count (higher means more distinct keywords), then keyword_density.
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:" order by keyword_count desc, keyword_density desc limit "
-         get-value:x:@.arguments/*/limit
-
-   // (Optional) offset => pagination
-   if
-      exists:x:@.arguments/*/offset
-      .lambda
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" offset "
-               get-value:x:@.arguments/*/offset
-
-   // Execute the SQL
-   data.select:x:@.sql
-      database-type:sqlite
-
-   // Remove helper fields if you don't want them in your final JSON
-   remove-nodes:x:@data.select/*/*/keyword_density
-   remove-nodes:x:@data.select/*/*/keyword_count
-
-   // Return the final result set
-   return-nodes:x:@data.select/*
+// Returning success to caller.
+return
+   result:success

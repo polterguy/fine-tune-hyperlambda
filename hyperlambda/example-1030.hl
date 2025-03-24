@@ -1,31 +1,25 @@
 
-// Counts items from your roles table in your cms database
-.arguments
+// Creates a Hyperlambda dynamica slot that returns the specified URL to the caller with a 5-minute server-side cache to avoid re-fetching the URL too frequently.
+slots.create:magic.http.get-with-cache
 
-   // Optional filtering arguments
-   roles.id.eq:long
-   roles.name.like:string
-   roles.name.eq:string
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+   // Checking cache.
+   unwrap:x:+/*/.lambda/*/.url
+   cache.try-get:x:@.arguments/*/url
+      expiration:300
+      .lambda
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+         // Forward evaluated above.
+         .url:x:@.arguments/*/url
+         http.get:x:@.url
+            headers
+               User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
+               Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+               Accept-Language:en-GB,en-US;q=0.9,en;q=0.8,no;q=0.7
+         return:x:-/*/content
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:roles
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Returning result of above invocation to caller.
+   return:x:@cache.try-get

@@ -1,17 +1,29 @@
 
-// Deletes the specified [username] from the system.
-.arguments
-   username:string
+// Write a Hyperlambda script to return the default database type the system is using and options for alternative database types.
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Opens up database connection.
-data.connect:[generic|magic]
+// Retrieving database section from configuration.
+config.section:"magic:databases"
 
-   // Deleting user from database.
-   data.delete
-      table:users
-      where
-         and
-            username.eq:x:@.arguments/*/username
+// Adding default database type to return value.
+add:x:../*/return
+   get-nodes:x:@config.section/*/default
+
+/*
+ * Iterating through each optional database type,
+ * and making sure we return those too, making sure
+ * we remove 'default' parts before iterating.
+ */
+remove-nodes:x:@config.section/*/default
+for-each:x:@config.section/*
+   set-value:x:+/*/*
+      get-name:x:@.dp/#
+   add:x:../*/return/*/options
+      .
+         .
+
+// Returning result of above to caller.
+return
+   options

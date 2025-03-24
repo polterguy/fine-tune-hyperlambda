@@ -1,16 +1,203 @@
 
-// Hyperlambda snippet that evaluates specified [.check] if condition evaluates to true.
+// Hyperlambda script creating a slot that chops up specified text into multiple training snippets and optionally use OpenAI to summarize or massage the content.
+slots.create:magic.ai.massage
 
-// Evaluates specified [.check] if condition evaluates to true.
-.check:bool:true
-if
-   eq:x:@.check
-      .:bool:true
-   .lambda
+   /*
+    * Buffer for snippets since a single invocation might have more
+    * characters than whatever OpenAI can maximum tolerate.
+    */
+   .snippets
 
-      // Lambda evaluates if condition is true.
-      log.info:[.check] is true
-else
+   // Retrieving max_context_tokens from type specified by caller.
+   .max_tokens
+   data.connect:[generic|magic]
+      data.scalar:select max_context_tokens from ml_types where type = @type
+         @type:x:@.arguments/*/type
 
-   // Lambda evaluated if condition is NOT true.
-   log.info:[.check] is false
+      // Making sure we never create training snippets larger than 80% of type's maximum context size.
+      set-value:x:@.max_tokens
+         math.divide
+            math.multiply
+               convert:x:@data.scalar
+                  type:int
+               .:int:80
+            .:int:100
+
+   // Chopping up content into multiple snippets to avoid max_token overflow with OpenAI.
+   .current:
+   while
+      mt
+         strings.length:x:@.arguments/*/content
+         .:int:0
+      .lambda
+
+         // Creating a 500 character long sub-section from current content.
+         strings.substring:x:@.arguments/*/content
+            .:int:0
+            .:int:500
+
+         // Removing part we're currently handling.
+         if
+            mt
+               strings.length:x:@.arguments/*/content
+               .:int:500
+            .lambda
+
+               // Removing 500 first characters.
+               set-value:x:@.arguments/*/content
+                  strings.substring:x:@.arguments/*/content
+                     .:int:500
+         else
+
+            // There aren't 500 characters left, so we're just setting string to empty to escape [while].
+            set-value:x:@.arguments/*/content
+               .:
+
+         /*
+          * Checking if current string + above substring overflows [.max_tokens],
+          * at which point we create a new training snippet.
+          */
+         .tmp
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.current
+               get-value:x:@strings.substring
+         if
+            mt
+               openai.tokenize:x:@.tmp
+               get-value:x:@.max_tokens
+            .lambda
+
+               // Creating new training snippet.
+               unwrap:x:+/*/*/*
+               add:x:@.snippets
+                  .
+                     .
+                        content:x:@.current
+               set-value:x:@.tmp
+                  get-value:x:@strings.substring
+
+         // Updating [.current].
+         set-value:x:@.current
+            get-value:x:@.tmp
+
+   // Appending the remaining parts, if there are any.
+   if
+      neq:x:@.current
+         .:
+      .lambda
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
+               .
+                  content:x:@.current
+
+   // Checking if user wants to "massage" content.
+   if
+      or
+         not-exists:x:@.arguments/*/massage
+         null:x:@.arguments/*/massage
+         eq:x:@.arguments/*/massage
+            .:
+      .lambda
+
+         // User wants to use content as is.
+         for-each:x:@.snippets/*
+
+            // Adding currently iterated snippet to return invocation.
+            unwrap:x:+/*/*/*
+            add:x:../*/return
+               .
+                  .
+                     prompt:x:@.arguments/*/prompt
+                     completion:x:@.dp/#/*/content
+   else
+
+      // Getting OpenAI API token from configuration.
+      .token
+      set-value:x:@.token
+         strings.concat
+            .:"Bearer "
+            config.get:"magic:openai:key"
+
+      /*
+       * User wants to use OpenAI to create for instance a summary
+       * from the content before creating training data.
+       * 
+       * The first line returned from OpenAI is assumed to be the prompt, all other lines
+       * will be treated as the completion.
+       * 
+       * Iterating through each snippet created above.
+       */
+      for-each:x:@.snippets/*
+
+         // Creating an HTTP POST request towards OpenAI to create structured data of the specified content.
+         .max-tokens
+         set-value:x:@.max-tokens
+            math.subtract
+               .:int:4000
+               openai.tokenize:x:@.dp/#/*/content
+         http.post:"https://api.openai.com/v1/chat/completions"
+            headers
+               Authorization:x:@.token
+               Content-Type:application/json
+            payload
+               model:gpt-3.5-turbo
+               max_tokens:x:@.max-tokens
+               temperature:decimal:0.8
+               messages
+                  .
+                     role:user
+                     content:x:@.arguments/*/massage
+                  .
+                     role:user
+                     content:x:@.dp/#/*/content
+            convert:true
+
+         // Sanity checking above invocation.
+         if
+            not
+               and
+                  mte:x:@http.post
+                     .:int:200
+                  lt:x:@http.post
+                     .:int:300
+            .lambda
+
+               // Oops, error - Logging error and returning status 500 to caller.
+               lambda2hyper:x:@http.post
+               log.error:Something went wrong while invoking OpenAI
+                  message:x:@http.post/*/content/*/error/*/message
+                  status:x:@http.post
+                  error:x:@lambda2hyper
+
+         // Creating our prompt.
+         .prompt
+         strings.split:x:@http.post/*/content/*/choices/0/*/message/*/content
+            .:"\n"
+         set-value:x:@.prompt
+            strings.trim:x:@strings.split/0
+         remove-nodes:x:@strings.split/0
+
+         // Trimming the rest.
+         for-each:x:@strings.split/*
+            set-value:x:@.dp/#
+               strings.trim:x:@.dp/#
+                  .:"\n \t"
+
+         // Creating our completion.
+         .completion
+         set-value:x:@.completion
+            strings.join:x:@strings.split/*
+               .:"\n\n"
+
+         // Adding currently iterated snippets to return invocation.
+         unwrap:x:+/*/*/*
+         add:x:../*/return
+            .
+               .
+                  prompt:x:@.prompt
+                  completion:x:@.completion
+
+   // Returning result of invocation to caller.
+   return

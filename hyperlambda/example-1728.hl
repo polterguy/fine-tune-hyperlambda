@@ -1,20 +1,44 @@
-// Connects to sakila with database transactions
-data.connect:sakila
-   data.transaction.create
-      data.execute:delete from film_actor
+/*
+ * Compiles a snippet of C# code down to a library,
+ * for then to dynamically load it as a plugin.
+ *
+ * This particular code creates a slot, but you can create any
+ * code you wish, and it doesn't have to be Hyperlambda related.
+ */
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.signals.contracts
+   code:@"
 
-      /*
-       * If you uncomment the line below the
-       * transaction will be committed, resulting
-       * in that everything from your film_actor
-       * table will be deleted.
-       */
-      //data.transaction.commit
+// Example C# code creating a Hyperlambda slot.
+using System;
+using magic.node;
+using magic.signals.contracts;
 
-data.connect:sakila
+// Our slot class.
+[Slot(Name = ""bar"")]
+public class Bar : ISlot
+{
+   public void Signal(ISignaler signaler, Node input)
+   {
+      input.Value = ""Hello from C#"";
+   }
+}"
+   assembly-name:bar.dll
 
-   /*
-    * Notice, this still returns 5462 items, since
-    * transaction was implicitly rolled back above.
-    */
-   data.scalar:select count(*) from film_actor
+// Loading assembly now that we've created it.
+system.plugin.execute:x:@system.compile
+
+   // Invoking dynamically created C# slot.
+   bar
+
+/*
+ * Now the [bar] slot is no longer available
+ * since the assembly has been unloaded due to
+ * having gone out of scope.
+ */
+system.plugin.list

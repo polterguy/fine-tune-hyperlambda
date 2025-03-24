@@ -1,120 +1,193 @@
 
-// Create a Hyperlambda script that returns the arguments the specified Hyperlambda can handle, ensuring the user is authorized.
+// Returns all clients that are affiliated with the currently authenticated client.
 .arguments
-   hyperlambda:string
-   path:string
+   limit:long
+   offset:long
+   from:date
+   to:date
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Verifying user has access to endpoint.
+auth.ticket.verify:root, admin, guest
 
-// Checking if caller provided a [path] argument instead of a [hyperlambda] argument.
-if
-   and
-      not-exists:x:@.arguments/*/hyperlambda
-      exists:x:@.arguments/*/path
-      not-null:x:@.arguments/*/path
-   .lambda
+// Retrieving currently authenticated user to parametrise invocation towards database.
+auth.ticket.get
 
-      // Loading file.
-      load-file:x:@.arguments/*/path
-      unwrap:x:+/*/*
-      add:x:@.arguments
-         .
-            hyperlambda:x:@load-file
+// Buffer for returning users to caller.
+.result
 
-// Converting Hyperlambda to lambda.
-hyper2lambda:x:@.arguments/*/hyperlambda
-   comments:true
+// Affiliate percentage user has.
+.percent
 
-// Verifying that file is possible to invoke, as in the file has an [.arguments] collection.
-if
-   and
-      exists:x:@.arguments/*/path
-      exists:x:@hyper2lambda/*/.arguments
-   .lambda
+// Returning all usernames that are affiliated with currently authenticated client.
+data.connect:[generic|magic]
 
-      // Signaling to frontend that file has an [.arguments] collection.
-      add:x:../*/return-nodes
-         .
-            function:bool:true
-
-      /*
-       * Removing [session], [user-id] and [type], since these are
-       * dynamically added to the function invocation by the framework.
-       */
-      if
-         exists:x:@.arguments/*/path
-         .lambda
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_session
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_user-id
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_type
-else
-
-   // Signaling to frontend that file does not have an [.arguments] collection.
-   add:x:../*/return-nodes
-      .
-         function:bool:false
-
-/*
- * Iterating through each argument Hyperlambda can handle.
- * 
- * Notice, we ONLY return the first 100 arguments to avoid context overflow.
- */
-for-each:x:@hyper2lambda/*/.arguments/*/[0,100]
+   /*
+    * Retrieving affiliate percent for user.
+    * This is the commission the currently authenticated user gets
+    * from sales originating from users he made register in our platform.
+    */
+   data.read
+      table:users_extra
+      columns
+         value
+      where
+         and
+            type.eq:affiliate_percent
+            user.eq:x:@auth.ticket.get
    if
-      neq
-         get-name:x:@.dp/#
-         .:..
+      not-exists:x:@data.read/*/*/value
       .lambda
 
-         // Checking if user provided a [path], at which point we return more data.
-         if
-            exists:x:@.arguments/*/path
-            .lambda
+         // Oops ...!!
+         log.error:User is not affiliate
+            username:x:@auth.ticket.get
+         throw:You are not an affiliate
+            public:true
+            status:400
 
-               // User provided a [path].
-               set-value:x:+/+/*/*/*/name
-                  get-name:x:@.dp/#
-               set-value:x:+/*/*/*/type
-                  get-value:x:@.dp/#
-               add:x:../*/return-nodes/*/args
-                  .
-                     .
-                        name
-                        type
+   // Setting [.percent] value such that we can calculate affiliate earnings.
+   convert:x:@data.read/*/*/value
+      type:decimal
+   set-value:x:@.percent
+      math.divide:x:@convert
+         .:decimal:100
 
-               // Checking if we've got an argument description / comment.
-               if
-                  eq
-                     get-name:x:@.dp/#/-
-                     .:..
-                  .lambda
-                     unwrap:x:+/*/*
-                     add:x:../*/return-nodes/*/args/0/-
-                        .
-                           description:x:@.dp/#/-
-         else
+   /*
+    * Applying paging and invoking read slot to find all users
+    * affiliated with the currently authenticated user.
+    */
+   add:x:./*/data.read/[1,2]
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:users_extra
+         join:users
+            table:users
+            type:inner
+            on
+               and
+                  users.username.eq:users_extra.user
+      columns
+         users_extra.user
+         users.created
+      where
+         and
+            users_extra.type.eq:affiliate
+            users_extra.value.eq:x:@auth.ticket.get
+      order:users.created
+      direction:desc
 
-            // User provided [hyperlambda] argument.
-            set-name:x:+/+/*/*
-               get-name:x:@.dp/#
-            unwrap:x:+/*/*
-            add:x:../*/return-nodes/*/args
+   // Adding usernames to return buffer.
+   for-each:x:@data.read/*
+
+      // Adding username to result.
+      add:x:@.result
+         get-nodes:x:@.dp/#
+
+      // Invoking read slot to retrieve name, email address and country of affiliated user.
+      data.read
+         table:users_extra
+         columns
+            value
+            type
+         where
+            and
+               or
+                  type.eq:email
+                  type.eq:name
+                  type.eq:country
+               user.eq:x:@.dp/#/*/user
+      unwrap:x:+/*/*
+      add:x:@.result/0/-
+         .
+            name:x:@data.read/*/*/type/=name/./*/value
+            email:x:@data.read/*/*/type/=email/./*/value
+            country:x:@data.read/*/*/type/=country/./*/value
+
+      // Checking if user confirmed his or her email address.
+      data.read
+         table:users_roles
+         columns
+            user
+         where
+            and
+               user.eq:x:@.dp/#/*/user
+               role.eq:guest
+      if
+         exists:x:@data.read/*/*
+         .lambda
+            add:x:@.result/0/-
                .
-                  name:x:@.dp/#
+                  confirmed:bool:true
+      else
+         add:x:@.result/0/-
+            .
+               confirmed:bool:false
 
-// Fetching description if existing.
-.desc
-if
-   eq
-      get-name:x:@hyper2lambda/0
-      .:..
-   .lambda
-      set-value:x:@.desc
-         get-value:x:@hyper2lambda/0
+/*
+ * Returning sum and commission of transactions for each user
+ * retrieved in the above invocation, which becomes the commission
+ * on a per user basis the currently authenticated user earns.
+ */
+data.connect:[generic|stripe]
 
-// Returning arguments to caller, together with their type information.
-unwrap:x:+/*
-return-nodes
-   args
-   description:x:@.desc
+   // Looping through each username in affiliate list.
+   for-each:x:@.result/*
+
+      // Checking if we've got [from] and [to] filters.
+      if
+         not-null:x:@.arguments/*/from
+         .lambda
+            add:x:@for-each/*/data.read/[0,1]/*/where/*/and
+               .
+                  created.mteq:x:@.arguments/*/from
+      if
+         not-null:x:@.arguments/*/to
+         .lambda
+            add:x:@for-each/*/data.read/[0,1]/*/where/*/and
+               .
+                  created.lteq:x:@.arguments/*/to
+
+      // Invoking read slot.
+      data.read
+         table:transactions
+         columns
+            sum(amount)
+               as:sum
+         where
+            and
+               username.eq:x:@.dp/#/*/user
+               type.eq:charge.succeeded
+         group
+            username
+
+      // Checking if above invocation returned a result.
+      if
+         exists:x:@data.read/*/*/sum
+         .lambda
+
+            // Adding sum.
+            add:x:@.dp/#
+               get-nodes:x:@data.read/*/*/sum
+
+            // Adding commission for affiliate.
+            math.multiply:x:@data.read/*/*/sum
+               get-value:x:@.percent
+            unwrap:x:+/*/*
+            add:x:@.dp/#
+               .
+                  commission:x:@math.multiply
+      else
+
+         // Adding zero sum.
+         add:x:@.dp/#
+            .
+               sum:long:0
+               commission:long:0
+
+// Applying some HTTP caching since endpoint is kind of expensive to invoke.
+response.headers.set
+   Cache-Control:private, max-age=3600
+
+// Returning result to caller.
+return-nodes:x:@.result/*

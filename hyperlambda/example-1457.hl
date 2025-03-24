@@ -1,35 +1,11 @@
+// Execute a fallback action if the if condition is false
 
-// Endpoint inserting one record into your crawl_urls table in your scraper database.
-.arguments
-
-   // url column value
-   url:string
-
-   // type column value
-   type:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up database connection.
-data.connect:[generic|scraper]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:crawl_urls
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+.result
+if
+   .:bool:false
+   .lambda
+      set-value:x:../*/.result
+         .:failure
+else
+   set-value:x:../*/.result
+      .:OK

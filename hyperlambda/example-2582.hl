@@ -1,63 +1,43 @@
 
-// Update endpoint updating one record in your products table in your shopping-cart-demo database.
+// Counts items from your spice_urls table in your scraper database.
 .arguments
 
-   // product_id column value being primary key of record to update
-   product_id:long
+   // Optional spice_urls table spice_url_id column equality exact match filtering
+   spice_urls.spice_url_id.eq:long
 
-   // name column's new value
-   name:string
+   // Optional spice_urls table url column wildcard filtering with SQL like '%' comparison
+   spice_urls.url.like:string
 
-   // description column's new value
-   description:string
+   // Optional spice_urls table url column equality exact match filtering
+   spice_urls.url.eq:string
 
-   // sku column's new value
-   sku:string
+   // Optional spice_urls table type column wildcard filtering with SQL like '%' comparison
+   spice_urls.type.like:string
 
-   // price column's new value
-   price:decimal
-
-   // image_url column's new value
-   image_url:string
-
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/product_id
+   // Optional spice_urls table type column equality exact match filtering
+   spice_urls.type.eq:string
 
 // Verifying user is authorized to access endpoint.
 auth.ticket.verify:root,admin
 
 // Opening up our database connection.
-data.connect:[generic|shopping-cart-demo]
+data.connect:[generic|scraper]
    database-type:sqlite
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
+   // Adding all arguments specified to our 'WHERE' SQL parts
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-   // Invoking our update slot.
-   data.update
+   // Reading data from database.
+   data.read
       database-type:sqlite
-      table:products
-      values
+      table:spice_urls
+      columns
+         count(*)
+            as:count
       where
          and
+      limit:long:1
 
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

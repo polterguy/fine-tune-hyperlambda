@@ -1,18 +1,26 @@
 
-// Write a Hyperlambda script to return the maximum tokens for a specified completion slot.
+// Write a Hyperlambda script to invoke a specified action with given values.
 .arguments
-   slot:string
+   action:string
+   values:*
 
-// Making sure user is authenticate to access endpoint
-auth.ticket.verify:root
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/action
 
-// Retrieving max tokens from config.
-strings.split:x:@.arguments/*/slot
-   .:.
-strings.concat
-   .:"magic:"
-   get-value:x:@strings.split/0/-
-   .:":max_tokens"
-config.get:x:@strings.concat
-yield
-   max_tokens:x:@config.get
+// Figuring out what slot to invoke.
+.slot
+set-value:x:@.slot
+   strings.concat
+      .:magic.questionnaires.action.
+      get-value:x:@.arguments/*/action
+
+// Parametrising slot.
+add:x:./*/signal
+   get-nodes:x:@.arguments/*/values/*
+
+// Invoking slot.
+signal:x:@.slot
+
+// Returning success to caller.
+return
+   result:success

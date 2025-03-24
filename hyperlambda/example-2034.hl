@@ -1,58 +1,30 @@
 
-// Returns a payment link.
+// Lists all available products by executing Hyperlambda workflow action taking NO arguments.
+
+// An empty [.arguments] folder such as this, results in a Hyperlambda endpoint that CANNOT be given any arguments at all.
 .arguments
-   plan:string
 
 /*
- * Ensures the specified [arg] was given.
- *
- * This action will throw an exception with a descriptive text explaining if the argument is missing.
+ * Invokes the SQL CRUD Read slot with the specified parameters.
+ * 
+ * Provide [connection-string], [database-type], [database], and [table] to inform the action of
+ * what database/table you want to execute your SQL towards, and add [and] or [or] arguments
+ * to filter your returns, in addition to [limit] and [offset] to apply paging. Use [order]
+ * and [direction] to sort either ascending or descending. Notice, you can only use one of [or]
+ * or [and], and not both.
  */
 execute:magic.workflows.actions.execute
-   name:validators-enum
-   filename:/misc/workflows/actions/security/validators-enum.hl
+   name:sql-read
+   filename:/misc/workflows/actions/sql/sql-read.hl
    arguments
-      values
-         .:professional
-         .:enterprise
-      value:x:@.arguments/*/plan
-
-/*
- * Ensures user is authorized to access endpoint.
- *
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
-
-// Returns a single plan
-execute:magic.workflows.actions.execute
-   name:hub-plan-get
-   filename:/modules/hub/workflows/actions/hub-plan-get.hl
-   arguments
-      plan:x:@.arguments/*/plan
-
-/*
- * Creates a Stripe payment link from the specified [price_reference], being
- * a Stripe payment ID, for [quantity] amount of items, returning the user to
- * [success_url] after payment has been successfully finished.
- *
- * Will use your Stripe API token found from your settings as it's interacting
- * with the Stripe API.
- */
-execute:magic.workflows.actions.execute
-   name:stripe-payment-link-create
-   filename:/modules/stripe/workflows/actions/stripe-payment-link-create.hl
-   arguments
-      price_reference:x:--/execute/=hub-plan-get/*/price_reference
-      quantity:int:1
-      success_url:"https://ainiro.io"
+      columns
+         .:name
+         .:description
+         .:sku
+         .:image_url
+         .:price
+      database:shopping-cart-demo
+      table:products
 
 // Returns the result of your last action.
 return-nodes:x:@execute/*

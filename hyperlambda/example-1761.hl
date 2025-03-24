@@ -1,22 +1,72 @@
 
-// Create a Hyperlambda script to retrieve all URLs from the sitemap of a specified website.
-.url:"https://ainiro.io"
+// Hyperlambda workflow action taking [max_tokens] OpenAI API context tokens to search DuckDuckGo for the specified [query].
+.arguments
+   query
+      type:string
+      mandatory:bool:true
+   max_tokens
+      type:int
+      default:int:4000
+.icon:extension
 
-// will contain all URLs from website
-.urls
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
 
-// Retrieving main sitemap.
-strings.concat
-   get-value:x:@.url
-   .:/sitemap.xml
-http.get:x:@strings.concat
-xml2lambda:x:@http.get/*/content
+// Applying default values for optional arguments.
+validators.default:x:@.arguments
+   max_tokens:int:4000
 
-// Iterating through each URL referenced in main sitemap.
-for-each:x:"@xml2lambda/*/urlset/*/url/*/loc/*/\\#text"
+// Retrieving context.
+execute:magic.http.duckduckgo-and-scrape
+   query:x:@.arguments/*/query
+   max:int:10
 
-   // Getting XML from currently iterated sitemap subset.
-   unwrap:x:+/*/*
-   add:x:@.urls
-      .
-         .:x:@.dp/#
+// Building our context return value.
+.context:
+while
+   and
+      exists:x:@execute/0/*/snippets/0
+      lt
+         openai.tokenize:x:@.context
+         convert:x:@.arguments/*/max_tokens
+            type:int
+   .lambda
+
+      // Temporary value.
+      .tmp
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@.context
+            .:"\n\n"
+            get-value:x:@execute/0/*/snippets/0/*/prompt
+            .:"\n\n"
+            get-value:x:@execute/0/*/snippets/0/*/completion
+      if
+         lt
+            openai.tokenize:x:@.tmp
+            convert:x:@.arguments/*/max_tokens
+               type:int
+         .lambda
+
+            // Still below [max_tokes].
+            set-value:x:@.context
+               get-value:x:@.tmp
+
+      // Removing top snippet.
+      remove-nodes:x:@execute/0/*/snippets/0
+      if
+         not-exists:x:@execute/0/*/snippets/0
+         .lambda
+
+            // TODO: Add reference URL here.
+
+            // Removing currently iterated URL.
+            remove-nodes:x:@execute/0
+
+// Trimming result.
+set-value:x:@.context
+   strings.trim:x:@.context
+
+// Returning result to caller.
+yield
+   context:x:@.context

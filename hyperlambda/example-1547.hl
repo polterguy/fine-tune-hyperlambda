@@ -1,34 +1,68 @@
 
-// Create a Hyperlambda action to publish a web socket message with a specified 'channel' and 'args'. Optionally include 'roles' to restrict notifications. Validate mandatory fields.
-.arguments
-   channel:string
-   args:*
-   roles:*
-.icon:send
+// Write a Hyperlambda script for a Twilio webhook callback to handle notifications when your Twilio account receives messages.
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/channel
-validators.mandatory:x:@.arguments/*/args
+// Retrieving actual message.
+.body
+set-value:x:@.body
+   get-value:x:@.arguments/*/Body
 
-// Decorating invocation.
-add:x:./*/sockets.signal/*/args
-   get-nodes:x:@.arguments/*/args/*
+// Retrieving from value.
+.from
+set-value:x:@.from
+   get-value:x:@.arguments/*/From
 
-// Checking if we've got a [roles] declaration and if so decorating invocation.
+// Retrieving to value.
+.to
+set-value:x:@.to
+   get-value:x:@.arguments/*/To
+
+// Basic logging.
+log.info:Webhook invoked from Twilio
+   body:x:@.body
+   from:x:@.from
+   to:x:@.to
+
+// Lambda object to execute with callback.
+.exe
+
+   // Signaling configured slot.
+   signal:foo
+
+   // Returning whatever callback returned as result of webhook invocation
+   return:x:-
+
+/*
+ * Dynamically creating our lambda [.exe] callback by parametrising with [.arguments]
+ * given to endpoint by Twilio. This makes sure we're using the dynamically configured
+ * slot the backend has been configured to use as your webhook is being invoked.
+ */
+set-value:x:@.exe/*/signal
+   config.get:"magic:twilio:callback"
+
+/*
+ * Sanity checking configuration.
+ * 
+ * This will throw an exception if you have not specified a callback
+ * slot in your configuration.
+ */
+validators.mandatory:x:@.exe/*/signal
+
+// Further parametrising slot invocation with arguments given by Twilio.
+unwrap:x:+/*/*
+add:x:@.exe/0
+   .
+      body:x:@.body
+      from:x:@.from
+      to:x:@.to
+      twilio_account_id:x:@.arguments/*/AccountSid
+
+// Executing callback.
+invoke:x:@.exe
+
+// Returning result of invocation to caller, if caller provided a return value.
 if
-   and
-      exists:x:@.arguments/*/roles
-      not-null:x:@.arguments/*/roles
+   not-null:x:@invoke
    .lambda
 
-      // Decorating invocation with comma separated list of roles.
-      strings.join:x:@.arguments/*/roles
-         .:,
-      unwrap:x:+/*/*
-      add:x:../*/sockets.signal
-         .
-            roles:x:@strings.join
-
-// Publishing socket message.
-sockets.signal:x:@.arguments/*/channel
-   args
+      // Returning result of invocation to Twilio.
+      return:x:@invoke

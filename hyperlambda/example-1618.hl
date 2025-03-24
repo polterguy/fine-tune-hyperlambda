@@ -1,49 +1,17 @@
-
-// Deletes the specified cloudlet
+// Multiply two numbers given as arguments to endpoint or file and return the result to caller
 .arguments
-   cloudlet_name:string
+   arg1:int
+   arg2:int
 
-/*
- * Ensures the specified [arg] was given.
- *
- * This action will throw an exception with a descriptive text explaining if the argument is missing.
- */
-execute:magic.workflows.actions.execute
-   name:validators-mandatory
-   filename:/misc/workflows/actions/security/validators-mandatory.hl
-   arguments
-      arg:x:@.arguments/*/cloudlet_name
+// Making sure arguments are actually passed in, throwing exceptions if not.
+validators.mandatory:x:@.arguments/*/arg1
+validators.mandatory:x:@.arguments/*/arg2
 
-/*
- * Ensures user is authorized to access endpoint.
- *
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+// Multiplication.
+math.multiply
+   get-value:x:@.arguments/*/arg1
+   get-value:x:@.arguments/*/arg2
 
-/*
- * Returns the username of the currently authenticated user,
- * or null if user isn't authenticated.
- */
-execute:magic.workflows.actions.execute
-   name:username-get
-   filename:/misc/workflows/actions/security/username-get.hl
-   arguments
-
-// Deletes the specified cloudlet
-execute:magic.workflows.actions.execute
-   name:hub-cloudlets-delete
-   filename:/modules/hub/workflows/actions/hub-cloudlets-delete.hl
-   arguments
-      cloudlet_name:x:@.arguments/*/cloudlet_name
-      username:x:--/execute/=username-get/*/username
-
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+// Returning result to caller
+yield
+   result:x:@math.multiply

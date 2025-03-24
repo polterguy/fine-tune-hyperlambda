@@ -1,45 +1,48 @@
 
-// Sends the latest log items from the chatbot's history to the specified email address as an attachment in the form of a CSV file
-slots.create:utilities.history.send-email
+// Create a Hyperlambda action to hash a specified input using an optional algorithm (default is SHA 256). Validate the algorithm and return the hash result.
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/email
-   validators.email:x:@.arguments/*/email
+   // Notice, this is action syntax
+   input
+      type:string
+      mandatory:bool:true
+   algorithm
+      type:enum
+      mandatory:bool:false
+      values
+         .:sha1
+         .:md5
+         .:sha256
+         .:sha384
+         .:sha512
+.icon:settings
 
-   // Basic logging.
-   log.info:Sending chatbot log to cloudlet owner
-      email:x:@.arguments/*/email
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/algorithm
+   .:sha1
+   .:md5
+   .:sha256
+   .:sha384
+   .:sha512
 
-   // Opening database connection.
-   data.connect:[generic|magic]
+// Checking if caller wants to override the default hashing algorithm.
+if
+   and
+      exists:x:@.arguments/*/algorithm
+      not-null:x:@.arguments/*/algorithm
+      neq:x:@.arguments/*/algorithm
+         .:
+   .lambda
 
-      // Extracting items from ml_requests
-      data.read
-         table:ml_requests
-         columns
-            prompt
-            completion
-            created
-            type
-            finish_reason
-            user_id
-            session
+      // Overriding hashing algorithm by changing name of slot we invoke below.
+      set-name:x:../*/crypto.hash
+         strings.concat
+            .:crypto.hash.
+            get-value:x:@.arguments/*/algorithm
 
-      // Converting records to CSV
-      lambda2csv:x:@data.read/*
+// Hashing string.
+crypto.hash:x:@.arguments/*/input
 
-      // Sending CSV file to specified email address.
-      mail.smtp.send
-         message
-            to
-               .
-                  email:x:@.arguments/*/email
-                  name:Chatbot Admin
-            subject:Chatbot history log
-            entity:multipart/mixed
-               entity:text/plain
-                  content:Latest AINIRO.IO Chatbot requests
-               entity:text/csv
-                  headers
-                     Content-Disposition:"attachment; filename=\"log.csv\""
-                  content:x:@lambda2csv
+// Returning result to caller.
+yield
+   result:x:./-

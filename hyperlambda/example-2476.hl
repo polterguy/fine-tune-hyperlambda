@@ -1,36 +1,25 @@
+// Gets a random activity from the Bored API and handles common statuses
 
-// Delete one record from your posts table in your cms database
 .arguments
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+// Final output from the activity API
+.activity.result
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-validators.mandatory:x:@.arguments/*/id
+http.get:"https://www.boredapi.com/api/activity"
+   convert:true
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+switch:x:@http.get
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+   case:int:200
+      set-value:x:@.activity.result
+         get-value:x:@http.get/*/content/*/activity
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:posts
-      where
-         and
+   case:int:500
+      throw:500 Internal Server Error – Failed to retrieve activity
 
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.posts.delete
-      args
+   default
+      set-value:x:@.activity.result
+         .:Unexpected error occurred
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+yield
+   result:x:@.activity.result

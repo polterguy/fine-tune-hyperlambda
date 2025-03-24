@@ -1,8 +1,85 @@
 
-// Hyperlambda Example 1: Simple if with boolean constant
-.dest
-if
-   .:bool:true
-   .lambda
-      set-value:x:@.dest
-         .:condition met
+// Verifies the user does not ask more questions than his plan allows for
+slots.create:magic.openai.chat-interceptor.max-queries
+
+   /*
+    * Checking if this is a publicly available type, at which point we don't apply
+    * any restrictions what so ever.
+    */
+   data.connect:magic
+      data.read
+         table:ml_types
+         columns
+            auth
+         where
+            and
+               type.eq:x:@.arguments/*/type
+      if
+         and
+            neq:x:@data.read/*/*/auth
+               .:
+            neq:x:@data.read/*/*/auth
+               .
+         .lambda
+
+            /*
+             * This is not a publicly available type since it has values in its 'auth' field.
+             * 
+             * Retrieving the user's roles since the number of messages the user can ask depends upon
+             * his or her role.
+             * 
+             * Notice, root users can ask infinitie questions per day.
+             */
+            auth.ticket.get
+            if
+               not-exists:x:@auth.ticket.get/*/roles/*/=root
+               .lambda
+
+                  /*
+                   * Now we need to determine the role with the highest amount of messages
+                   * per day the user belongs to, and verify the user has not exhausted his plan.
+                   */
+                  .plans
+                  io.file.load:/etc/stripe-subscription-templates/templates.hl
+                  add:x:@.plans
+                     hyper2lambda:x:@io.file.load
+                  config.get:"magic:stripe-subscription-templates:max-questions"
+                     .:2000
+                  convert:x:@config.get
+                     type:int
+                  unwrap:x:+/*/*/*
+                  insert-before:x:@.plans/0
+                     .
+                        .
+                           role:guest
+                           max_messages:x:@convert
+
+                  /*
+                   * Retrieving the user's role and finding the role the user belongs to
+                   * that has access to asking the most messages per day.
+                   */
+                  .max-messages:int:0
+                  for-each:x:@auth.ticket.get/*/roles/*
+                     if
+                        mt:x:"@.plans/*/*/role/\"={@.dp/#}\"/./*/max_messages"
+                           get-value:x:@.max-messages
+                        .lambda
+
+                           // Updating [.max-messages].
+                           set-value:x:@.max-messages
+                              get-value:x:"@.plans/*/*/role/\"={@.dp/#}\"/./*/max_messages"
+
+                  // Verifying user has not exhausted his or her plan.
+                  data.select:"select count(*) from ml_requests where user_id = @user and created >= date('now', '-1 day')"
+                     @user:x:@auth.ticket.get
+                  if
+                     mte
+                        convert:x:@data.select/*/*
+                           type:int
+                        get-value:x:@.max-messages
+                     .lambda
+
+                        // Oops ...!!
+                        throw:"PAYMENT_REQUIRED: You've spent your questions for today"
+                           status:int:402
+                           public:bool:true

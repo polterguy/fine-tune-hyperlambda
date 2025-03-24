@@ -1,42 +1,50 @@
 
-// Updates an existing item in your cloudlets table in your [generic|hub] database according to the specified arguments.
+// Returns all roles [username] belongs to.
 .arguments
-   id:long
-   name:string
-   plan:string
-   cluster:string
-   user:string
+   username
+      type:string
+      mandatory:bool:true
+.icon:supervisor_account
 
-// Verifying user is authorized to access endpoint.
-validators.mandatory:x:@.arguments/*/id
-auth.ticket.verify:root
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
 
-// Opening up our database connection.
-data.connect:[generic|hub]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
+// Connecting to database.
+data.connect:[generic|magic]
 
-   // Invoking our update slot.
-   data.update
-      table:cloudlets
-      values
+   // Verifying user exists.
+   data.read
+      table:users
+      columns
+         username
       where
          and
+            username.eq:x:@.arguments/*/username
 
-   // Verifying record exists.
+   // Verifying above invocation returned something.
    if
-      eq
-         get-value:x:@data.update
-         .:int:0
+      not-exists:x:@data.read/*
       .lambda
-         response.status.set:404
-         return
-            result:Record not found
 
-   // Returning success to caller.
-   response.status.set:202
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+         // Oops ...!!
+         throw:No such user
+            username:x:@.arguments/*/username
+
+   // Selecting all roles user belongs to.
+   data.read
+      table:users_roles
+      columns
+         role
+      where
+         and
+            user.eq:x:@.arguments/*/username
+
+   // Parametrizing [return] invocation below.
+   for-each:x:@data.read/*
+      unwrap:x:+/*/*
+      add:x:../*/return
+         .
+            .:x:@.dp/#/*/role
+
+// Returning roles to user.
+return

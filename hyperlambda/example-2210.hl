@@ -1,6 +1,46 @@
-// Adding two nodes into another node
-.src
-add:x:@.src
-   .
-      foo:int:57
-      bar:int:10
+
+// Workflow action returning true if the specified username is available.
+.arguments
+   username
+      type:string
+      mandatory:bool:true
+   throw
+      type:bool
+      mandatory:bool:false
+.icon:supervisor_account
+
+// Applying defaults.
+validators.default:x:@.arguments
+   throw:bool:false
+
+// Opens up database connection.
+data.connect:[generic|magic]
+
+   // Selecting user from database such that we can check if it exists or not.
+   data.read
+      table:users
+      columns
+         username
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   // Checks if above invocation returned anything.
+   if
+      exists:x:@data.read/*
+      .lambda
+
+         // Checking if we should throw an exception instead of returning false.
+         if:x:@.arguments/*/throw
+            throw:User already exists
+               status:int:400
+               public:bool:true
+
+         // User exists, returning false to caller.
+         return
+            available:bool:false
+   else
+
+      // User does not exist, returning true to caller.
+      return
+         available:bool:true

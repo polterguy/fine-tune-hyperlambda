@@ -1,35 +1,145 @@
 
-// CRUD / Create Hyperlambda that creates one record in your categories table in your cms database with authentication and authorization
-.arguments
+// Enables a cloudlet when a subscription payment has gone through.
+slots.create:payments.subscriptions.subscribed.cloudlets.enable
 
-   // Optional name column value
-   name:string
+   // Checking if invocation is for us.
+   if
+      neq:x:@.arguments/*/type
+         .:subscription
+      .lambda
 
-   // Optional description column value
-   description:string
+         // Not our guy.
+         return:bool:false
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/meta
+   validators.mandatory:x:@.arguments/*/username
+   validators.mandatory:x:@.arguments/*/price
 
-// Opening up database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+   // Cloudlet name.
+   .cloudlet:x:@.arguments/*/meta
+   unwrap:x:-
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
+   // Connecting to hub database to retrieve cluster and plan.
+   .cluster
+   .plan
+   data.connect:[generic|hub]
 
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:categories
-      return-id:bool:true
-      values
+      // Figuring out cluster from cloudlet+username.
+      data.read
+         table:cloudlets
+         values
+            cluster
+         where
+            and
+               user.eq:x:@.arguments/*/username
+               name.eq:x:@.cloudlet
+      if
+         not-exists:x:@data.read/*/*
+         .lambda
 
-   // Returning the correct status code.
-   response.status.set:201
+            // Oops ...!!
+            log.error:No such cloudlet
+            throw:Cloudlet not found
+               public:true
+               status:400
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+      // Updating cluster.
+      set-value:x:@.cluster
+         get-value:x:@data.read/*/*/cluster
+
+      // Figuring out plan from specified [price].
+      data.read
+         datbase-type:mysql
+         table:plans
+         values
+            name
+         where
+            or
+               price_reference.eq:x:@.arguments/*/price
+               yearly_price_reference.eq:x:@.arguments/*/price
+
+      // Updating plan.
+      set-value:x:@.plan
+         get-value:x:@data.read/*/*/name
+
+      /*
+       * Removing scheduled tasks that soft deletes cloudlet once trial period
+       * is over if existing.
+       */
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.cloudlet
+         .:-
+         get-value:x:@.arguments/*/username
+         .:-delete
+      tasks.list:x:-
+      if
+         exists:x:@tasks.list/0/*/id
+         .lambda
+            tasks.delete:x:@tasks.list/0/*/id
+            log.info:Task to automatically soft delete cloudlet was deleted
+               task-name:x:@strings.concat
+               cloudlet:x:@.cloudlet
+               username:x:@.arguments/*/username
+               cluster:x:@.cluster
+      else
+         log.error:Could not find task to delete
+            task-name:x:@strings.concat
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.cloudlet
+         .:-
+         get-value:x:@.arguments/*/username
+         .:-hard-delete
+      tasks.list:x:-
+      if
+         exists:x:@tasks.list/0/*/id
+         .lambda
+            tasks.delete:x:@tasks.list/0/*/id
+            log.info:Task to automatically hard delete cloudlet was deleted
+               task-name:x:@strings.concat
+               cloudlet:x:@.cloudlet
+               username:x:@.arguments/*/username
+               cluster:x:@.cluster
+      else
+         log.error:Could not find task to delete
+            task-name:x:@strings.concat
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.cloudlet
+         .:-
+         get-value:x:@.arguments/*/username
+         .:-warn-about-destruction
+      tasks.list:x:-
+      if
+         exists:x:@tasks.list/0/*/id
+         .lambda
+            tasks.delete:x:@tasks.list/0/*/id
+            log.info:Task to automatically warn user was deleted
+               task-name:x:@strings.concat
+               cloudlet:x:@.cloudlet
+               username:x:@.arguments/*/username
+               cluster:x:@.cluster
+      else
+         log.error:Could not find task to delete
+            task-name:x:@strings.concat
+
+      /*
+       * Updating the cloudlet type to correct type, such that the
+       * user can see in his dashboard that the cloudlet is no longer a trial cloudlet.
+       */
+      data.update
+         table:cloudlets
+         values
+            plan:x:@.plan
+            enabled:bool:true
+            destruction_date
+         where
+            and
+               name.eq:x:@.cloudlet
+               cluster.eq:x:@.cluster
+               user.eq:x:@.arguments/*/username
+
+   // Returning true to indicate we handled the callback.
+   return:bool:true

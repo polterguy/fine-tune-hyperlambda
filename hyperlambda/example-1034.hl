@@ -1,5 +1,54 @@
-/*
- * Example: Get the length of a basic string.
- */
-// Returns 6
-strings.length:OpenAI
+
+// Create a Hyperlambda script for a CRUD read endpoint with paging, sorting, and filtering that selects records from the questions table in the magic database, returning question_id, question, and questionnaire, ensuring authentication and authorization for root and admin roles.
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   questions.question_id.eq:long
+   questions.question.like:string
+   questions.question.eq:string
+   questions.questionnaire.like:string
+   questions.questionnaire.eq:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:questions
+      columns
+         questions.question_id
+         questions.question
+         questions.questionnaire
+         questions.type
+         questions.context
+         questions.name
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

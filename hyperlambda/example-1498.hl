@@ -1,22 +1,30 @@
 
-// Create a Hyperlambda snippet that compiles a C# file 'logger.cs' into a library and loads it dynamically.
+// Hyperlambda endpoint that deletes a specified cache item, ensuring the user is authorized, and handles both single and multiple cache item deletions.
+.arguments
+   id:string
 
-/*
- * Compiles a C# file "logger.cs" into a library and loads it dynamically.
- * This assumes "logger.cs" exists in "/etc/" and contains a slot named [log_message].
- */
-io.file.load:/etc/logger.cs
-system.compile
-   references
-      .:netstandard
-      .:System.Runtime
-      .:System.IO
-      .:System.Private.CoreLib
-      .:magic.node
-      .:magic.node.extensions
-      .:magic.signals.contracts
-   code:x:@io.file.load
-   assembly-name:logger.dll
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Loading the compiled assembly.
-system.plugin.load:x:@system.compile
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+
+// Checking if caller wants to delete multiple cache items simultaneously.
+if
+   strings.ends-with:x:@.arguments/*/id
+      .:*
+   .lambda
+
+      // Deletes all cache items starting with specified string.
+      strings.split:x:@.arguments/*/id
+         .:*
+      cache.clear
+         filter:x:@strings.split/0
+else
+
+   // Deletes a single cache item.
+   cache.set:x:@.arguments/*/id
+
+// Returning success to caller.
+return
+   result:success

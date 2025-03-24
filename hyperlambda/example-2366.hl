@@ -1,75 +1,69 @@
 
-// Returns balance information for affiliate.
-auth.ticket.get
+// Executes the specified SuiteQL query towards your NetSuite account
+.arguments
 
-// Affiliate percent calculated below.
-.percent
+   // Mandatory argument being your NetSuite query to execute.
+   q:string
 
-// Ensuring user is an affiliate
-data.connect:[generic|magic]
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/q
 
-   /*
-    * Retrieving affiliate percent for user.
-    * Notice, if user doesn't have an affiliate percent, user is
-    * not an affiliate.
-    */
-   data.read
-      table:users_extra
-      columns
-         value
-      where
-         and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
+/*
+ * Returns an access token for NetSuite.
+ * 
+ * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
+ * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
+ * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
+ */
+execute:magic.workflows.actions.execute
+   name:netsuite-get-access-token
+   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
+   arguments
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
+// Creating our idempotency key to prevent replay attacks.
+guid.new
 
-   // Calculating ratio and storing.
-   convert:x:@data.read/*/*/value
-      type:decimal
-   set-value:x:@.percent
-      math.divide:x:@convert
-         .:decimal:100
+// Creating invocation URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://"
+      config.get:"magic:netsuite:account-id"
+      .:.suitetalk.api.netsuite.com/services/rest/query/v1/suiteql
 
-// Connecting to database.
-data.connect:[generic|stripe]
+// Parametrizing our payload.
+add:x:./*/http.post/*/payload
+   get-nodes:x:@.arguments/*/q
 
-   // Buffer to hold return values.
-   .balance
-      received
-      accepted
-      withdrawals
+// Invoking our HTTP GET endpoint, now correctly parametrised.
+http.post:x:@.url
+   token:x:--/execute/=netsuite-get-access-token/*/access-token
+   headers
+      Prefer:transient
+      X-NetSuite-Idempotency-Key:x:@guid.new
+   payload
 
-   // Retrieving all received amounts from database.
-   set-value:x:@.balance/*/received
-      math.multiply
-         data.scalar:"select coalesce(sum(amount), 0) as sum from transactions\n   where affiliate = @affiliate and\n      type = 'charge.succeeded'"
-            @affiliate:x:@auth.ticket.get
-         get-value:x:@.percent
+// Converts the result to a lambda object.
+json2lambda:x:@http.post/*/content
 
-   // Retrieving all accepted amounts from database.
-   set-value:x:@.balance/*/accepted
-      math.multiply
-         data.scalar:"select coalesce(sum(amount), 0) as sum from transactions t\n   where affiliate = @affiliate and\n      date(t.created, '+30 day') < CURRENT_TIMESTAMP and\n      type = 'charge.succeeded' and not exists(\n         select * from transactions t2\n            where t2.type = 'charge.refunded' and\n               t2.invoice = t.invoice and t2.invoice is not null)"
-            @affiliate:x:@auth.ticket.get
-         get-value:x:@.percent
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
 
-   // Retrieving all withdrawals from database.
-   set-value:x:@.balance/*/withdrawals
-      data.scalar:"select coalesce(sum(amount), 0) as sum from transactions t\n   where affiliate = @affiliate and type = 'withdrawal'"
-         @affiliate:x:@auth.ticket.get
+      // Oops, error ...!!
+      lambda2hyper:x:@json2lambda
+      log.error:x:@lambda2hyper
+      throw:Could not create entity in NetSuite, check your log for details.
 
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:private, max-age=3600
+// Cleaning up redundant stuff.
+remove-nodes:x:@json2lambda/*/items/*/*/links
 
-   // Returning result to caller.
-   return-nodes:x:@.balance/*
+// Returning entities to caller.
+yield
+   items:x:@json2lambda/*/items/*

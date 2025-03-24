@@ -1,32 +1,25 @@
+/*
+ * Endpoint sending a POST request to fetch user metadata by ID.
+ * Extracts and yields the name and email if the request is successful.
+ */
 
-// Ensures our system messages are updated during deployments.
+.arguments
+   id:int
 
-// Listing all system messages we've got.
-io.file.list:/modules/finovo/system-messages/
+http.post:"https://user.example.io/meta"
+   convert:true
+   payload
+      id:x:@.arguments/*/id
 
-// Opening up database connection.
-data.connect:magic
-
-   // Looping through each system message and updating our machine learning type accordingly.
-   for-each:x:@io.file.list/*
-
-      // Loading file.
-      io.file.load:x:@.dp/#
-
-      // Finding type name
-      .type
-      strings.split:x:@.dp/#
-         .:/
-      strings.split:x:-/0/-
-         .:.
-      set-value:x:@.type
-         get-value:x:@strings.split/0
-
-      // Updating type name's system message.
-      data.update
-         table:ml_types
-         values
-            system_message:x:@io.file.load
-         where
-            and
-               type.eq:x:@.type
+if
+   and
+      lt:x:@http.post
+         .:int:300
+      mte:x:@http.post
+         .:int:200
+   .lambda
+      yield
+         name:x:@http.post/*/content/*/name
+         email:x:@http.post/*/content/*/email
+return
+   error:Unable to retrieve user metadata

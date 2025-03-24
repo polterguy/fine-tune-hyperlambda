@@ -1,14 +1,40 @@
 
-// Create Hyperlambda file that returns true if a file specified as an argument exists on the server.
-.arguments
-   file:string
-   query:string
-io.file.load:x:@.arguments/*/file
-if
-   strings.contains:x:@io.file.load
-      .:x:@.arguments/*/query
+// Hyperlambda script that returns all dynamic HTTP endpoints in the system with their associated verbs and roles, caching the results for efficiency.
+
+// Declares how many seconds the operation should be cached.
+.cache-seconds:int:300
+
+/*
+ * Invokes [endpoints.list], making sure we cache the results, since it's a
+ * fairly expensive operation.
+ */
+cache.try-get:magic.auth.endpoints
+   expiration:x:@.cache-seconds
    .lambda
-      return
-         result:bool:true
+
+      // Cache miss, retrieving endpoints, and returning to caller.
+      .result
+      endpoints.list
+      for-each:x:@endpoints.list/*
+         if
+            exists:x:@.dp/#/*/auth/*
+            .lambda
+               add:x:+/*/*
+                  get-nodes:x:@.dp/#/*/auth/*
+               add:x:@if/+/+/*/*
+                  .
+                     auth
+         unwrap:x:+/*/*/*
+         add:x:@.result
+            .
+               .
+                  path:x:@.dp/#/*/path
+                  verb:x:@.dp/#/*/verb
+      lambda2hyper:x:@.result/*
+      return:x:-
+
+// Returning results of above invocation to caller.
+hyper2lambda:x:@cache.try-get
+add:x:../*/return
+   get-nodes:x:@hyper2lambda/*
 return
-   result:bool:false

@@ -1,6 +1,31 @@
-// Converting a date string to date object and assigning to another node
-.data:2023-05-17
-.dest
-set-value:x:-
-   convert:x:@.data
-      type:date
+
+// Write a Hyperlambda script to create a scheduled task that deletes cached questions/answers older than 2 weeks, with conditions for SQLite.
+if
+   eq
+      config.get:"magic:databases:default"
+      .:sqlite
+   .lambda
+
+      // Wrapping in try/catch in case task already exists.
+      try
+
+         // Deleting old task if existing.
+         tasks.list:delete-old-machine-learning-requests
+         if
+            exists:x:@tasks.list/*
+            .lambda
+               tasks.delete:x:@tasks.list/0/*/id
+
+         // Creating task that periodically deletes old historical requests.
+         tasks.create:delete-old-machine-learning-requests
+            description:Periodically deletes all machine learning requests older than 14 days
+            repeats:72.hours
+            .lambda
+               sqlite.connect:magic
+                  sqlite.execute:"delete from ml_requests where created < date('now', '-14 day') and (cached = 0 or cached is null) and (questionnaire = 0 or questionnaire is null)"
+               log.info:Task to cleanup old machine learning requests executed successfully
+                  deleted:x:@sqlite.connect/*/sqlite.execute
+      .catch
+
+         // Task already exists.
+         console.log:Task to periodically delete historical requests already exists

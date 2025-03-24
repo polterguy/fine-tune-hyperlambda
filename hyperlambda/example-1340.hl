@@ -1,35 +1,26 @@
 
-// Create one record in your Categories table in your northwind database
+// Endpoint returning the arguments required by specified Hyperlambda code.
 .arguments
+   hyperlambda:string
 
-   // CategoryName column value
-   CategoryName:string
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Description column value
-   Description:string
+// Transforming Hyperlambda to lambda object.
+hyper2lambda:x:@.arguments/*/hyperlambda
 
-   // Picture column value
-   Picture:string
+// Making sure we "normalize" arguments.
+for-each:x:@hyper2lambda/*/.arguments/*
+   if
+      and
+         not-exists:x:@.dp/#/*/type
+         not-null:x:@.dp/#
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.dp/#
+            .
+               type:x:@.dp/#
+         set-value:x:@.dp/#
 
-// Opening up database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:Categories
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+// Returning arguments Hyperlambda requires to caller.
+return-nodes:x:@hyper2lambda/*/.arguments/*

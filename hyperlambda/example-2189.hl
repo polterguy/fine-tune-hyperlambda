@@ -1,31 +1,43 @@
 
-// Write a Hyperlambda script to create a scheduled task that deletes cached questions/answers older than 2 weeks, with conditions for SQLite.
-if
-   eq
-      config.get:"magic:databases:default"
-      .:sqlite
-   .lambda
+// Hyperlambda script to download a folder from the server by packaging it into a zip file.
+.arguments
+   folder:string
 
-      // Wrapping in try/catch in case task already exists.
-      try
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-         // Deleting old task if existing.
-         tasks.list:delete-old-machine-learning-requests
-         if
-            exists:x:@tasks.list/*
-            .lambda
-               tasks.delete:x:@tasks.list/0/*/id
+// Getting correct HTTP headers.
+strings.split:x:@.arguments/*/folder
+   .:/
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@strings.split/0/-
+   .:".zip\""
+response.headers.set
+   Content-Type:application/zip
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
 
-         // Creating task that periodically deletes old historical requests.
-         tasks.create:delete-old-machine-learning-requests
-            description:Periodically deletes all machine learning requests older than 14 days
-            repeats:72.hours
-            .lambda
-               sqlite.connect:magic
-                  sqlite.execute:"delete from ml_requests where created < date('now', '-14 day') and (cached = 0 or cached is null) and (questionnaire = 0 or questionnaire is null)"
-               log.info:Task to cleanup old machine learning requests executed successfully
-                  deleted:x:@sqlite.connect/*/sqlite.execute
-      .catch
+// Loading all files in specified folder recursively.
+unwrap:x:+/*
+signal:magic.io.file.load-recursively
+   .folder:x:@.arguments/*/folder
 
-         // Task already exists.
-         console.log:Task to periodically delete historical requests already exists
+/*
+ * Making sure we remove root parts of folders and files to get items
+ * in zip file having the correct relative path.
+ */
+for-each:x:@signal/*
+   set-value:x:@.dp/#
+      strings.replace:x:@.dp/#
+         get-value:x:@.arguments/*/folder
+         .:
+
+/*
+ * Creating a ZIP stream from return value of above load-recursively invocation,
+ * and returning to caller as raw stream object.
+ */
+add:x:+
+   get-nodes:x:@signal/*
+io.content.zip-stream
+return-value:x:-

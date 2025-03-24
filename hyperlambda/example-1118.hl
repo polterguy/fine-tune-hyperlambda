@@ -1,23 +1,49 @@
 
-// Creates a contact in HubSpot by executing helper Hyperlambda file
-.arguments
-   email:string
-   first_name:string
-   last_name:string
-   phone:string
-   company:string
-   website:string
-   lifecyclestage:string
+// Returns a grouped chart image to caller. Values is a mandatory comma separated list of values.
+.arguments:*
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/email
+validators.mandatory:x:@.arguments/*/legend
 
-// Forwarding request to our HTTP POST Hyperlambda file.
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/modules/hubspot/contacts.post.hl
+// Creating our individual bars.
+.bars
+for-each:x:@.arguments/*
+   get-name:x:@.dp/#
+   if
+      not
+         strings.starts-with:x:@get-name
+            .:legend
+      .lambda
 
-// Returning whatever above invocation returned.
-add:x:./*/return
-   get-nodes:x:@execute-file/*
-return
+         // Adding primary node for bar.
+         set-name:x:+/*/*
+            get-value:x:@get-name
+         add:x:@.bars
+            .
+               .
+
+         // Adding values for individual cells.
+         add:x:@.bars/0/-
+            strings.split:x:@.dp/#
+               .:,
+
+// Creating our legend.
+add:x:../*/image.chart/*/legend
+   strings.split:x:@.arguments/*/legend
+      .:,
+
+// Parametrizing [image.chart] invocation.
+add:x:../*/image.chart/*/bars
+   get-nodes:x:@.bars/*
+image.chart:grouped
+   width:800
+   height:500
+   bars
+   legend
+
+// Applying correct HTTP header.
+response.headers.set
+   Content-Type:image/png
+
+// Returning chart to caller.
+return:x:@image.chart

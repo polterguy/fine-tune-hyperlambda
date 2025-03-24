@@ -1,21 +1,27 @@
-// Create a new order and update product stock in one atomic transaction
-data.connect:shopDB
+/*
+ * Invokes HTTP post with dynamic set of arguments and returning error if unsuccessful,
+ * otherwise returns name an email of user
+ */
 
-   // MUST be in a [data.connect] invocation
-   data.transaction.create
-      data.create
-         table:orders
-         values
-            customer_id:42
-            total:100.00
-      data.update
-         table:products
-         values
-            stock:long:50
-         where
-            and
-               product_id:123
+.arguments
+   id:int
 
-      // Commit the transaction to save both changes
-      data.transaction.commit
-   // Both the new order and the stock update are committed together
+// Adding ALL arguments to payload.
+add:x:+/*/payload
+   get-nodes:x:@.arguments/*
+http.post:"https://logistics.example.org/get-user"
+   convert:true
+   payload
+
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         name:x:@http.post/*/content/*/name
+         email:x:@http.post/*/content/*/email
+return
+   error:Something went wrong

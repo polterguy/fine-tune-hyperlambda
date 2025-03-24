@@ -1,19 +1,39 @@
 
 /*
- * Endpoint that takes any arguments, converts all arguments to integers, adds all together, and returns result
+ * This file returns all companies that the specified director is associated with
  * 
- * Pass in whatever arguments you wish.
+ * director_id is an integer and a mandatory object
  */
-.arguments:*
+.arguments
+   director_id:long
+   limit:long
+   offset:long
 
-// Adding all arguments
-.result:int:0
-for-each:x:@.arguments/*
-   set-value:x:@.result
-      math.add:x:@.result
-         convert:x:@.dp/#
-            type:int
+// Opening database connection.
+data.connect:[finovo|finovo]
+   database-type:pgsql
 
-// Returning result (notice, [yield] unwraps all its arguments)
-yield
-   result:x:@.result
+   // Reading from directors.
+   data.select:@"
+select d1.org_number, b.company_name, d1.role_name
+   from directors d1
+      inner join basic b on b.org_number = d1.org_number
+      inner join directors d2 on d1.director_nbr = d2.director_nbr
+   where d2.director_id = @id and d1.org_number != d2.org_number
+   limit @limit offset @offset"
+      database-type:pgsql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+   if
+      mte
+         get-count:x:@data.select/*
+         .:int:10
+      .lambda
+
+         // Making sure we inform caller that there might exist additional companies.
+         add:x:@data.connect/*/yield
+            .
+               notice:The director is probably associated with more companies
+   yield
+      companies:x:@data.select/*

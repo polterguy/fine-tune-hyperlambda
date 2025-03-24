@@ -1,4 +1,24 @@
-// This example hashes a string using SHA256 and returns the hash in fingerprint format.
-.data:Hello World
-crypto.hash.sha256:x:@.data
-   format:fingerprint
+/*
+ * Sends a POST request to an internal user service with a user ID.
+ * Verifies that the status code is 2xx and yields the full response content.
+ */
+
+.arguments
+   id:int
+
+http.post:"https://internal.api.example.com/users/lookup"
+   convert:true
+   payload
+      userId:x:@.arguments/*/id
+
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         result:x:@http.post/*/content/*
+else
+   throw:User lookup failed

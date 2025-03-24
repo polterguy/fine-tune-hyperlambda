@@ -1,17 +1,55 @@
 
-// Hyperlambda endpoint taking arguments. This SQL query retrieves and returns the names of artists and the titles of their albums from the Chinook database, ordering the results by artist name and limiting the output to 50 records.\n\nThe SQL script performs an inner join between the 'Artist' and 'Album' tables in the Chinook database, matching records based on the 'ArtistId' field. It selects the 'Name' field from the 'Artist' table and the 'Title' field from the 'Album' table, ordering the results alphabetically by artist name. The query limits the output to the first 50 records, ensuring efficient data retrieval. This operation is executed within a SQLite database environment, and the results are returned to the caller, facilitating data access for authorized users.
+// Action that compiles the specified C# code and loads into the AppDomain
 .arguments
+   assembly-name
+      type:string
+      mandatory:bool:true
+      default:your-assembly-name.dll
+   recompile
+      type:bool
+      mandatory:bool:true
+      default:bool:true
+   references
+      type:array
+      mandatory:bool:true
+      default
+         .:netstandard
+         .:System.Runtime
+         .:System.ComponentModel
+         .:System.Private.CoreLib
+         .:magic.node
+         .:magic.node.extensions
+         .:magic.signals.contracts
+   code
+      type:csharp
+      mandatory:bool:true
+      default:"using System;\nusing magic.node;\nusing magic.node.extensions;\nusing magic.signals.contracts;\n\n[Slot(Name = \"get-employee-details\")]\npublic class Foo : ISlot\n{\n    public void Signal(ISignaler signaler, Node input)\n    {\n        switch (input.GetEx<string>().ToLower())\n        {\n            case \"john\":\n                input.Add(new Node(\"title\", \"cmo\"));\n                input.Add(new Node(\"phone\", \"92929292\"));\n                input.Add(new Node(\"email\", \"john@doe.come\"));\n                break;\n        }\n        input.Value = null;\n    }\n}"
+.icon:rocket_launch
 
-// Making sure user is authorized to invoke endpoint.
-auth.ticket.verify:enterprise
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/code
+validators.mandatory:x:@.arguments/*/references
+validators.mandatory:x:@.arguments/*/assembly-name
 
-// Connecting to database.
-data.connect:chinook
-   database-type:sqlite
+/*
+ * We only compile C# code if it does not already exist in AppDomain,
+ * unless caller explicitly specifies [recompile] as true.
+ */
+system.plugin.list
+if
+   or
+      get-value:x:@.arguments/*/recompile
+      not-exists:x:"@system.plugin.list/*/\"={@.arguments/*/assembly-name}\""
+   .lambda
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Script to join artists to albums in your Chinook database.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect ar.Name, al.Title\n  from Album al\n    inner join Artist ar on al.ArtistId = ar.ArtistId\n  order by ar.Name\n  limit 50\n"
-      database-type:sqlite
+      // Parametrizing [system.compile] invocation.
+      add:x:./*/system.compile
+         get-nodes:x:@.arguments/*/references
+         get-nodes:x:@.arguments/*/assembly-name
+         get-nodes:x:@.arguments/*/code
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+      // Compiling C# code.
+      system.compile
+
+      // Loading assembly into AppDomain.
+      system.plugin.load:x:@system.compile

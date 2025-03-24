@@ -1,16 +1,32 @@
-// Basic usage of the [switch] slot to determine a result based on a car part
-.part:engine
-.result
-switch:x:@.part
 
-   case:engine
-      set-value:x:@.result
-         .:This is an engine
+// Delete endpoint deleting one record from your spice_urls table in your scraper database.
+.arguments
 
-   case:wheel
-      set-value:x:@.result
-         .:This is a wheel
+   // Primary key of record to delete
+   spice_url_id:long
 
-   default
-      set-value:x:@.result
-         .:Unknown car part
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/spice_url_id
+
+// Opening up our database connection.
+data.connect:[generic|scraper]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:spice_urls
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

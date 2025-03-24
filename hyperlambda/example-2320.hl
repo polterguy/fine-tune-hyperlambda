@@ -1,49 +1,47 @@
 
-// Verifies user is allowed to create a demo account.
-slots.create:hub.user.can-create-demo-account
+// Read or list records from your media table in your cms database
+.arguments
+   media.id.eq:long
+   media.post_id.eq:long
+   media.file_path.like:string
+   media.file_path.eq:string
+   media.file_type.like:string
+   media.file_type.eq:string
+   media.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/username
-   validators.mandatory:x:@.arguments/*/plan
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
 
-   // Verifying user belongs to one of the roles that are allowed to create demo clodlets.
-   try
-      auth.ticket.verify:root, admin, partner
-   .catch
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
 
-      // Letting user know that he is not allowed to create demo cloudlets.
-      sockets.signal:hub.cloudlets.create
-         users:x:@auth.ticket.get
-         args
-            status:Only partners can create demo cloudlets. To test AINIRO send en email to team@ainiro.io
-            finished:bool:false
-            error:bool:true
-      log.error:User tried to create demo cloudlets when not allowed
-         user:x:@.arguments/*/username
-         plan:x:@.arguments/*/plan
-      throw:Only partners can create demo cloudlets
-         public:true
-         status:403
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
 
-   // Checking if user alread have a demo cloudlet.
-   data.scalar:select count(*) from cloudlets where user = @user and plan = @plan
-      user:x:@.arguments/*/username
-      plan:x:@.arguments/*/plan
-   if
-      neq:x:@data.scalar
-         .:long:0
-      .lambda
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:media
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  media.post_id:post_id.id
+      columns
+         media.id
+         media.post_id
+         media.file_path
+         media.file_type
+         media.created_at
+         post_id.title
+            as:post_id.title
+      where
+         and
 
-         // Letting user know that he already has a demo account of specified type.
-         sockets.signal:hub.cloudlets.create
-            users:x:@auth.ticket.get
-            args
-               status:You already have one demo account of the specified type
-               finished:bool:false
-               error:bool:true
-         log.error:User tried to create multiple demo cloudlets
-            user:x:@.arguments/*/username
-            plan:x:@.arguments/*/plan
-         throw:We only allow one demo cloudlet of each type for each user
-            public:true
-            status:403
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

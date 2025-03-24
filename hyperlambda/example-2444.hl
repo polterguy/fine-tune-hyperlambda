@@ -1,92 +1,230 @@
 
-// Create a Hyperlambda script that applies specified arguments and a file comment description to the specified Hyperlambda, ensuring the user is authorized.
+// Helper file to import xplain training data from API.
 .arguments
-   hyperlambda:string
-   description:string
-   args:*
+   vectorize:bool
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Applying defaults.
+validators.default:x:@.arguments
+   vectorize:bool:true
 
-// Converting input Hyperlambda to lambda object.
-hyper2lambda:x:@.arguments/*/hyperlambda
-   comments:true
+// Logging invocation.
+log.info:Started importing training snippets from xplain API to xplain-kennisbank model
 
-// Removing old file comment description.
-remove-nodes:x:"@hyper2lambda/0/\\.."
+// API key.
+.api-key:SECRET_HERE
 
-// Removing old [.arguments] collection.
-remove-nodes:x:@hyper2lambda/0/.arguments
+// Buffer for root URL of documents
+// TODO: EDIT THIS PART!!
+.root-url:"https://pro.2xplain.nl"
+.update-count:int:0
 
-// Creating supporting node at the end of lambda object.
-add:x:@hyper2lambda
-   .
-      .support
+// Buffer for type name.
+.type:xplain-kennisbank
 
-// Checking if caller provided an [.arguments] collection for Hyperlambda.
-if
-   exists:x:@.arguments/*/args
-   .lambda
+// Threshold for import. Ensures we ignore small snippets.
+.threshold:int:250
 
-      // Inserting arguments at top of lambda object.
-      add:x:+/*/*
-         get-nodes:x:@.arguments/*/args/*
-      insert-before:x:@hyper2lambda/0
-         .
-            .arguments
-else
+// Making sure we can handle exceptions.
+try
 
-   // Checking if we've got a file level comment.
+   // List modules.
+   http.get:"https://kb-api.2xplain.nl/modules/nocao"
+      convert:true
+      headers
+         X-API-Key:x:@.api-key
+
+   // Sanity checking above invocation.
    if
-      eq
-         get-name:x:@hyper2lambda/0
-         .:..
+      and
+         not-null:x:@http.get
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
       .lambda
 
-         // We have a file level comment, hence applying [.arguments] node after it.
-         insert-after:x:@hyper2lambda/0
-            .
-               .arguments
-   else
+         // We now know web server is available, so now we can delete existing training data.
+         data.connect:[generic|magic]
+            data.execute:"delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type and meta = 'api-import')"
+               @type:x:@.type
+            data.delete
+               table:ml_training_snippets
+               where
+                  and
+                     type.eq:x:@.type
+                     meta.eq:api-import
 
-      // We don't have a file level comment, applying [.arguments] as the first node in the file.
-      insert-before:x:@hyper2lambda/0
-         .
-            .arguments
+         // Looping through modules returned above.
+         for-each:x:@http.get/*/content/*
 
-// Defaulting file [.type] to public.
-insert-after:x:@hyper2lambda/*/.arguments
-   .
-      .type:public
+            // Name of module.
+            .module-name
+            set-value:x:@.module-name
+               get-value:x:@.dp/#/*/name
 
-// Checking if caller provided a [description] for Hyperlambda.
-if
-   and
-      exists:x:@.arguments/*/description
-      not-null:x:@.arguments/*/description
-   .lambda
+            // Retrieving currently iterated module.
+            strings.concat
+               .:"https://kb-api.2xplain.nl/menu/"
+               get-value:x:@.dp/#/*/id
+            http.get:x:@strings.concat
+               convert:true
+               headers
+                  X-API-Key:x:@.api-key
 
-      // Normalising [description] CR/LF characters.
-      strings.replace:x:@.arguments/*/description
-         .:"\n"
-         .:"\n"
-      strings.replace:x:@strings.replace
-         .:"\n"
-         .:"\n"
+            // Sanity checking above invocation.
+            if
+               and
+                  not-null:x:@http.get
+                  mte:x:@http.get
+                     .:int:200
+                  lt:x:@http.get
+                     .:int:300
+               .lambda
 
-      // Inserting file comment / description at top of lambda object.
-      unwrap:x:+/*/*
-      insert-before:x:@hyper2lambda/0
-         .
-            ..:x:@strings.replace
+                  // Looping through each section returned in above invocation.
+                  for-each:x:@http.get/*/content/*
 
-// Removing supporting node.
-remove-nodes:x:@hyper2lambda/0/-/.support
+                     // Verifying currently iterated menu item has a [documentId].
+                     if
+                        not-null:x:@.dp/#/*/documentId
+                        .lambda
 
-// Converting lambda to Hyperlambda again.
-lambda2hyper:x:@hyper2lambda/*
-   comments:true
+                           // Name of menu item.
+                           .menu-item-name
+                           set-value:x:@.menu-item-name
+                              get-value:x:@.dp/#/*/name
 
-// Returning updated Hyperlambda to caller.
-yield
-   result:x:@lambda2hyper
+                           // Retrieving currently iterated document.
+                           strings.concat
+                              .:"https://kb-api.2xplain.nl/pages/doc/"
+                              get-value:x:@.dp/#/*/documentId
+                           http.get:x:@strings.concat
+                              convert:true
+                              headers
+                                 X-API-Key:x:@.api-key
+
+                           // Sleeping for 100 milliseconds to avoid exhausting web server.
+                           sleep:100
+
+                           // Sanity checking above invocation.
+                           if
+                              and
+                                 not-null:x:@http.get
+                                 mte:x:@http.get
+                                    .:int:200
+                                 lt:x:@http.get
+                                    .:int:300
+                              .lambda
+
+                                 // Iterating through each document returned above.
+                                 for-each:x:@http.get/*/content/*
+
+                                    // Making sure we've got some actual content here.
+                                    if
+                                       and
+                                          not-null:x:@.dp/#/*/text
+                                          mt
+                                             strings.length:x:@.dp/#/*/text
+                                             .:int:50
+                                       .lambda
+
+                                          // Creating our URL.
+                                          .url
+                                          set-value:x:@.url
+                                             strings.concat
+                                                get-value:x:@.root-url
+                                                get-value:x:@.dp/#/*/url
+
+                                          // Retrieving content from document.
+                                          .html
+                                          set-value:x:@.html
+                                             strings.concat
+                                                .:<html><head><title>
+                                                get-value:x:@.module-name
+                                                .:" - "
+                                                get-value:x:@.menu-item-name
+                                                .:" - "
+                                                get-value:x:@.dp/#/*/title
+                                                .:</title></head><body>
+                                                get-value:x:@.dp/#/*/text
+                                                .:</body></html>
+                                          execute:magic.ai.html.extract
+                                             html:x:@.html
+                                             images:bool:true
+                                             lists:bool:true
+                                             main:bool:true
+                                             semantic:bool:false
+                                             url:x:@.url
+
+                                          // Sanity checking above.
+                                          if
+                                             exists:x:@execute/*/snippets/*
+                                             .lambda
+
+                                                // Connecting to database.
+                                                data.connect:magic
+
+                                                   // Looping through each snippet found in above invocation.
+                                                   for-each:x:@execute/*/snippets/*
+
+                                                      // Verifying snippet is valid.
+                                                      if
+                                                         and
+                                                            not-null:x:@.dp/#/*/completion
+                                                            or
+                                                               strings.starts-with:x:@.dp/#/*/completion
+                                                                  .:![
+                                                               mt
+                                                                  strings.length:x:@.dp/#/*/completion
+                                                                  get-value:x:@.threshold
+                                                         .lambda
+
+                                                            // Adding URL as reference into the completion itself.
+                                                            set-value:x:@.dp/#/*/completion
+                                                               strings.concat
+                                                                  get-value:x:@.dp/#/*/completion
+                                                                  .:"\r\n"
+                                                                  .:"\r\n"
+                                                                  .:"[Reference]("
+                                                                  get-value:x:@.url
+                                                                  .:)
+
+                                                            // Inserting currently iterated snippet.
+                                                            data.create
+                                                               table:ml_training_snippets
+                                                               values
+                                                                  prompt:x:@.dp/#/*/prompt
+                                                                  completion:x:@.dp/#/*/completion
+                                                                  type:x:@.type
+                                                                  uri:x:@.url
+                                                                  meta:api-import
+
+                                                            // Incrementing updated counter.
+                                                            math.increment:x:@.update-count
+
+   // Logging.
+   log.info:Finished importing training snippets from xplain API to xplain-kennisbank
+      updated:x:@.update-count
+
+   // Vectorising
+   if
+      and
+         get-value:x:@.arguments/*/vectorize
+         mt:x:@.update-count
+            .:int:0
+      .lambda
+
+         // We've got stuff to vectorise.
+         log.info:Started vectorising training data imported from xplain API in xplain-kennisbank
+         execute:magic.ai.vectorise
+            type:x:@.type
+
+         // Logging.
+         log.info:Finished vectorising training data imported from xplain API to xplain-kennisbank
+
+.catch
+
+   // Oops ...!!
+   log.error:Something went wrong as we tried to import snippets from xplain API to xplain-kennisbank
+      error:x:@.arguments/*/message
+      type:x:@.type

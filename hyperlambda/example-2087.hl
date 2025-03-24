@@ -1,14 +1,47 @@
-/*
- * This Hyperlambda snippet demonstrates nested `try` blocks with `finally`.
- * The inner `try` block throws an exception, but the `finally` block still executes.
- * Expected behavior: `.throws` should be `true`.
- */
 
-.throws:bool:false
-try
-   try
-      throw:foo
-   .finally
-      set-value:x:@.throws
-         .:bool:true
-.catch
+// KPI file for accounts that was created each day the last 14 days
+.name:New accounts
+.description:New accounts per day the last 14 days
+.enabled:bool:false
+.type:line
+.lambda
+   .now
+   set-value:x:-
+      math.subtract
+         date.now
+         time
+            days:13
+   data.connect:[generic|robo-crm]
+      while
+         lt:x:@.now
+            date.now
+         .lambda
+            .max
+            set-value:x:@.max
+               math.add:x:@.now
+                  time
+                     days:1
+            date.format:x:@.now
+               format:yyyy-MM-dd
+            date.format:x:@.max
+               format:yyyy-MM-dd
+            data.read
+               table:accounts
+               columns
+                  count(*)
+                     as:name
+               where
+                  and
+                     created.mt:x:@date.format/@date.format
+                     created.lt:x:@date.format
+            unwrap:x:+/*/*/*
+            add:x:../*/return
+               .
+                  .
+                     name:x:@date.format/@date.format
+                     value:x:@data.read/*/*
+            set-value:x:@.now
+               math.add:x:@.now
+                  time
+                     days:1
+   return

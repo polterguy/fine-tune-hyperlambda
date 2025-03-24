@@ -1,21 +1,28 @@
-// An HTTP PUT endpoint to update an existing contact's name and email address.
 
-/*
- * Save as for instance: /modules/contacts/update.put.hl
- */
-
+// Delete one record from your Categories table in your northwind database
 .arguments
-   id:int
-   name:string
-   email:string
 
-data.connect:[generic|crm]
-   data.update
-      table:contacts
-      values
-         name:x:@.arguments/*/name
-         email:x:@.arguments/*/email
+   // Primary key of record to delete, mandatory argument
+   CategoryID:long
+
+validators.mandatory:x:@.arguments/*/CategoryID
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Categories
       where
          and
-            id:x:@.arguments/*/id
-   return-nodes:x:@data.update/*
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

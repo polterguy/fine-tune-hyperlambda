@@ -1,14 +1,55 @@
-// What are lambda expressions?
 
-/*
- * Lambda expressions in Hyperlambda are used to reference any node within the currently executing graph object.
- * They allow for dynamic access to nodes, enabling you to express relationships and hierarchies in the nodes effectively.
- * They are similar to XPath expressions found in other technologies.
- */
+// Write a Hyperlambda script to transcribe a specified audio file using OpenAI Whisper API.
+.arguments
+   file:*
+   type:string
+   mediaType:string
+   references:bool
+   chat:bool
+   recaptcha_response:string
+   user_id:string
+   session:string
+   stream:bool
+   data:string
+   referrer:string
+   whisper:*
+   language:string
 
-// Example of a simple lambda expression referencing the [.person] node.
-.person:John
-set-value:x:@.person
-   .:Jane
+// Retrieving token used to invoke OpenAI.
+config.get:"magic:openai:key"
 
-// In this case, @.person is a lambda expression that points to the .person node, and the [set-value] slot changes its value.
+// Applying defaults.
+validators.default:x:@.arguments
+   mediaType:audio/mp4
+
+// Reading stream.
+io.stream.read:x:@.arguments/*/file/*/stream
+
+// Invoking Whisper to retrieve prompt.
+openai.whisper
+   key:x:@config.get
+   type:x:@.arguments/*/mediaType
+   language:x:@.arguments/*/language
+   content:x:@io.stream.read
+if
+   or
+      null:x:@openai.whisper
+      eq:x:@openai.whisper
+         .:
+   .lambda
+      throw:Nothing returned from Whisper
+         public:bool:true
+         status:int:400
+
+// Invoking main chat file.
+remove-nodes:x:@.arguments/*/file
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/system/openai/chat.get.hl
+   prompt:x:@openai.whisper
+
+// Returning success to caller.
+add:x:+
+   get-nodes:x:@execute-file/*
+yield
+   prompt:x:@openai.whisper

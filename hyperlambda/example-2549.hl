@@ -1,21 +1,51 @@
-/*
- * Save this file as `/modules/math/endpoints/add.hl`
- * This exposes an HTTP POST endpoint at `/math/add`
- *
- * It requires both `a` and `b` arguments, adds them,
- * and returns the result.
- */
 
+// Create one record in your comments table in your cms database
 .arguments
-   a:int
-   b:int
 
-validators.mandatory:x:@.arguments/*/a
-validators.mandatory:x:@.arguments/*/b
+   // post_id column value
+   post_id:long
 
-math.add
-   get-value:x:@.arguments/*/a
-   get-value:x:@.arguments/*/b
+   // user_id column value
+   user_id:long
 
-yield
-   result:x:@math.add
+   // content column value
+   content:string
+
+   // created_at column value
+   created_at:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
+
+// Opening up database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:comments
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:cms.comments.post
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

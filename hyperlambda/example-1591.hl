@@ -1,19 +1,56 @@
 
-// Hyperlambda endpoint taking arguments. The SQL query selects distinct email, first name, last name, and genre name of customers who listen to rock music from the Chinook database.
+// Create a Hyperlambda script for an endpoint that counts items in the ml_types table in the magic database, ensuring the user is authorized and handling optional filters.
 .arguments
-   filter:string
+   ml_types.type.like:string
+   ml_types.type.eq:string
+   ml_types.model.like:string
+   ml_types.model.eq:string
+   ml_types.greeting.like:string
+   ml_types.greeting.eq:string
+   ml_types.max_tokens.eq:long
+   ml_types.max_context_tokens.eq:long
+   ml_types.max_request_tokens.eq:long
+   ml_types.temperature.eq:double
+   ml_types.base_url.like:string
+   ml_types.base_url.eq:string
+   ml_types.contact_us.like:string
+   ml_types.contact_us.eq:string
+   ml_types.lead_email.like:string
+   ml_types.lead_email.eq:string
+   ml_types.api_key.like:string
+   ml_types.api_key.eq:string
+   ml_type.twilio_account_sid.like:string
+   ml_type.twilio_account_sid.eq:string
+   ml_types.webhook_incoming.like:string
+   ml_types.webhook_incoming.eq:string
+   ml_types.webhook_outgoing.like:string
+   ml_types.webhook_outgoing.eq:string
+   ml_types.webhook_incoming_url.like:string
+   ml_types.webhook_incoming_url.eq:string
+   ml_types.initial_questionnaire.like:string
+   ml_types.initial_questionnaire.eq:string
+   ml_types.webhook_outgoing_url.like:string
+   ml_types.webhook_outgoing_url.eq:string
+   ml_types.system_message.like:string
+   ml_types.system_message.eq:string
 
-// Connecting to database.
-data.connect:chinook
-   database-type:sqlite
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Parametrizing [data.select].
-   add:x:./*/data.select
+// Opening up our database connection.
+data.connect:[generic|magic]
+   add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name like @filter\n  order by c.Email\n"
-      database-type:sqlite
+   // Reading data from database.
+   data.read
+      table:ml_types
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

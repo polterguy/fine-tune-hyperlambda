@@ -1,23 +1,34 @@
 
-// Search the web
+// Creates an item in your clusters table in your [generic|hub] database according to the specified arguments.
 .arguments
+   id:string
+   country:string
+   name:string
+   enabled:bool
 
-   // Mandatory argument being the actual query to submit to DuckDuckGo.
-   query:string
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Optional argument being the maximum number of tokens to return.
-   max_tokens:int
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+validators.mandatory:x:@.arguments/*/country
+validators.mandatory:x:@.arguments/*/name
 
-// Public endpoints can also be used as AI functions
-.type:public
+// Opening up database connection.
+data.connect:[generic|hub]
 
-// Returns [max_tokens] context for the specified [query] by searching DuckDuckGo.
-execute:magic.workflows.actions.execute
-   name:openai-context-from-search
-   filename:/modules/openai/workflows/actions/openai-context-from-search.hl
-   arguments
-      query:x:@.arguments/*/query
-      max_tokens:x:@.arguments/*/max_tokens
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+   // Creating our record.
+   data.create
+      table:clusters
+      return-id:bool:false
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      result:success

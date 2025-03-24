@@ -1,53 +1,27 @@
-// How does CRUD slots in Hyperlambda
 
-/*
- * Hyperlambda has 4 basic CRUD slots, you can examples of these below.
- */
+// Create a function to return all existing payment subscription plans in the system. The function should find and execute all slots that declare subscription plans, each returning a name, description, price, currency, period (month or year), and Stripe price ID. The function should loop through these slots, execute them to retrieve the subscription plans, and return the plans to the caller. This setup allows the system to handle Stripe subscriptions effectively.
+slots.vocabulary:stripe.subscriptions.plans.
 
-// [data.create]
-data.create
-   table:table1
-   values
-      column1:value1
-      column2:value2
-      column3:value3
+// Looping through each slot returned above and executing it.
+for-each:x:@slots.vocabulary/*
 
-// Read
-data.read
-   table:table1
+   // Changing slot invocation name.
+   set-value:x:./*/execute
+      get-value:x:@.dp/#
 
-   // Optional
-   limit:5
+   /*
+    * Executing slot to retrieve supported providers.
+    * 
+    * Notice, name of slot (value of node) is dynamically created above.
+    */
+   execute
 
-   // Optional
-   offset:5
+   // Looping through all providers returned above to return them to client.
+   for-each:x:@execute/*
 
-   // Optional
-   order
-      column1
-      column2
+      // Returning subscription plan to caller.
+      add:x:../*/return
+         get-nodes:x:@.dp/#
 
-   // Optional
-   direction:desc
-
-   // Conditions we're filtering on
-   where
-
-      // Use either [or] or [and] here
-      and
-
-// Update
-data.update
-   table:table1
-   values
-      column1:new-value
-   where
-      and
-         id.eq:PRIMARY-KEY-OF-RECORD-TO-UPDATE
-
-// Delete
-data.delete
-   table:table1
-   where
-      and
-         id.eq:PRIMARY-KEY-OF-RECORD-TO-UPDATE
+// Returning subscription plans to caller.
+return

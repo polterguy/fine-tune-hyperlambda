@@ -1,7 +1,35 @@
-/*
- * This example checks if "/tmp/logs.txt" exists before deleting it.
- */
-io.file.exists:/tmp/logs.txt
-if:x:-
-   .lambda
-      io.file.delete:/tmp/logs.txt
+
+// Read or list records from your pages table in your cms database
+.arguments
+   pages.id.eq:long
+   pages.title.like:string
+   pages.title.eq:string
+   pages.content.like:string
+   pages.content.eq:string
+   pages.created_at.eq:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:pages
+      columns
+         pages.id
+         pages.title
+         pages.content
+         pages.created_at
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

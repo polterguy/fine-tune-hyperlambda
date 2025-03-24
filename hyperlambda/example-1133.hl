@@ -1,15 +1,32 @@
 
-// Hyperlambda snippet that counts products in the 'inventory_db' database from the 'products' table.
+// Hyperlambda script for a CRUD create endpoint that inserts one record into the ml_requests table in the magic database, taking type, prompt, completion, and finish_reason, ensuring authentication and authorization for root roles.
+.arguments
+   type:string
+   prompt:string
+   completion:string
+   finish_reason:string
+   cached:int
 
-// Counts products in the "inventory_db" database from the "products" table.
-data.connect:inventory_db
-   database-type:sqlite
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Counting total products.
-   data.read
-      database-type:sqlite
-      table:products
-      columns
-         count(*)
-            as:count
-      limit:long:1
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:ml_requests
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create
