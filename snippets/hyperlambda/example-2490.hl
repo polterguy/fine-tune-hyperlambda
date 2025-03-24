@@ -1,43 +1,32 @@
 
-// Write a Hyperlambda script to download a folder from the server by packaging it into a zip file.
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the ml_types table in the magic database with a type matching the argument, ensuring authentication and authorization for root roles.
 .arguments
-   folder:string
+   type:string
 
-// Ensures user is authorized to access endpoint.
+// Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Getting correct HTTP headers.
-strings.split:x:@.arguments/*/folder
-   .:/
-strings.concat
-   .:"attachment; filename=\""
-   get-value:x:@strings.split/0/-
-   .:".zip\""
-response.headers.set
-   Content-Type:application/zip
-   Content-Disposition:x:@strings.concat
-   Access-Control-Expose-Headers:Content-Disposition
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/type
 
-// Loading all files in specified folder recursively.
-unwrap:x:+/*
-signal:magic.io.file.load-recursively
-   .folder:x:@.arguments/*/folder
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-/*
- * Making sure we remove root parts of folders and files to get items
- * in zip file having the correct relative path.
- */
-for-each:x:@signal/*
-   set-value:x:@.dp/#
-      strings.replace:x:@.dp/#
-         get-value:x:@.arguments/*/folder
-         .:
+   // Deleting referenced rows in vss_ml_training_snippets
+   data.execute:"delete from vss_ml_training_snippets where rowid in\n   (select id as rowid from ml_training_snippets where type = @type)"
+      type:x:@.arguments/*/type
 
-/*
- * Creating a ZIP stream from return value of above load-recursively invocation,
- * and returning to caller as raw stream object.
- */
-add:x:+
-   get-nodes:x:@signal/*
-io.content.zip-stream
-return-value:x:-
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:ml_types
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

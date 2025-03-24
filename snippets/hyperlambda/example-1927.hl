@@ -1,19 +1,30 @@
 
-// Hyperlambda endpoint taking arguments. This SQL query selects media types and their aggregate counts, ordering the results by count in descending order, filtered by a specified name pattern.
+// Delete one record from your Track table in your chinook database
 .arguments
-   filter:string
 
-// Connecting to database.
-data.connect:chinook
+   // Primary key of record to delete, mandatory argument
+   TrackId:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/TrackId
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
    database-type:sqlite
 
-   // Parametrizing [data.select].
-   add:x:./*/data.select
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
       get-nodes:x:@.arguments/*
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Selects media types and aggregate of counts, and orders by count descending.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect mt.Name, count(mt.MediaTypeId) as Amount \n  from MediaType mt\n    inner join Track t on mt.MediaTypeId = t.MediaTypeId\n  where mt.Name like @filter\n  group by mt.MediaTypeId\n  order by Amount desc;\n"
+   // Deleting item from database.
+   data.delete
       database-type:sqlite
+      table:Track
+      where
+         and
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

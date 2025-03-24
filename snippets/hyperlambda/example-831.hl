@@ -1,91 +1,24 @@
 
-// Returns number of registrations for the last 14 days grouped by day.
-auth.ticket.get
+// Generate an endpoint returning line_items from financial database. Add optional paging support and optional filtering on name
+.arguments
+   limit:long
+   offset:long
+   comments.name.eq:string
 
-// Storing commission for later.
-.percent
+// Opening up our database connection.
+data.connect:financial
 
-// Ensuring user is an affiliate
-data.connect:[generic|magic]
-
-   /*
-    * Retrieving affiliate percent for user.
-    * Notice, if user doesn't have an affiliate percent, user ir
-    * not an affiliate.
-    */
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/comments.name.eq
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
    data.read
-      table:users_extra
-      columns
-         value
+      table:line_items
       where
          and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
-
-   // Storing percentage for later.
-   convert:x:@data.read/*/*/value
-      type:decimal
-   set-value:x:@.percent
-      math.divide:x:@convert
-         .:decimal:100
-
-// Connecting to Stripe database.
-data.connect:[generic|stripe]
-
-   // Retrieving transactions from database.
-   data.select:"\nselect date_format(t.created, '%Y-%m-%d') as date, sum(amount) as amount\n   from transactions t\n      where t.created > now() - interval 6 week and\n         t.affiliate = @affiliate and\n         t.type = 'charge.succeeded'\n   group by date\n   order by date asc"
-      @affiliate:x:@auth.ticket.get
-
-   // Looping through all days the last 6 weeks.
-   .buffer
-   .cur
-   set-value:x:@.cur
-      math.subtract
-         date.now
-         time
-            days:42
-   while
-      lt:x:@.cur
-         date.now
-      .lambda
-         date.format:x:@.cur
-            format:yyyy-MM-dd
-         if
-            exists:x:@data.select/*/*/date/={@date.format}
-            .lambda
-               set-value:x:@data.select/*/*/date/={@date.format}/./*/amount
-                  math.multiply:x:@data.select/*/*/date/={@date.format}/./*/amount
-                     get-value:x:@.percent
-               get-nodes:x:@data.select/*/*/date/={@date.format}/.
-               add:x:@.buffer
-                  get-nodes:x:@data.select/*/*/date/={@date.format}/.
-         else
-            unwrap:x:+/*/*/*
-            add:x:@.buffer
-               .
-                  .
-                     date:x:@date.format
-                     amount:int:0
-
-         // Decrementing current day.
-         set-value:x:@.cur
-            math.add:x:@.cur
-               time
-                  days:1
-
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:public, max-age=3600
-
-   // Returning result to caller.
-   return-nodes:x:@.buffer/*
+   // Returning result of above read invocation to caller.
+   yield
+      result:x:@data.read/*

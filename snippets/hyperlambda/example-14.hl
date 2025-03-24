@@ -1,103 +1,13 @@
 
-/*
- * Searches for the specified [query] through your training snippets and returns [max_tokens] training snippets to caller.
- *
- * This AI function will perform an SQL 'like' type of select SQL into your training data database,
- * and return a maximum of [max_tokens] training data context back to caller to use as context data for the AI and LLM.
- * 
- * [query] is mandatory
- * [max_tokens] will default to 4000 if not specified
- */
-.arguments
-   _type:string
-   query:string
-   full_query:string
-   max_tokens:int
+// Provide a Hyperlambda example where a comment's body is retrieved from an API.
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/_type
-validators.mandatory:x:@.arguments/*/query
-validators.mandatory:x:@.arguments/*/full_query
+// Invokes an HTTP GET endpoint to fetch a comment's body.
+http.get:"https://jsonplaceholder.typicode.com/comments/1"
 
-// Applying defaults.
-validators.default:x:@.arguments
-   max_tokens:int:4000
-
-// Retrieving embeddings.
-.token
-set-value:x:@.token
-   strings.concat
-      .:"Bearer "
-      config.get:"magic:openai:key"
-
-// Retrieving embedding for prompt.
-http.post:"https://api.openai.com/v1/embeddings"
-   headers
-      Authorization:x:@.token
-      Content-Type:application/json
-   payload
-      input:x:@.arguments/*/full_query
-      model:text-embedding-ada-002
+   // Converts JSON to lambda.
    convert:true
 
-// Sanity checking above invocation.
-if
-   not
-      and
-         mte:x:@http.post
-            .:int:200
-         lt:x:@http.post
-            .:int:300
-   .lambda
-
-      // Oops, error - Logging error and returning OpenAI's HTTP status code to caller.
-      lambda2hyper:x:@http.post
-      log.error:Something went wrong while invoking OpenAI
-         message:x:@http.post/*/content/*/error/*/message
-         error:x:@lambda2hyper
-      throw:x:@http.post/*/content/*/error/*/message
-         public:bool:true
-         status:x:@http.post
-
-data.connect:[generic|magic]
-
-   // Creating our filter string
-   .filter
-   set-value:x:@.filter
-      strings.concat
-         .:"CAOs - "
-         get-value:x:@.arguments/*/query
-         .:%
-
-   // Converting embeddings to a byte array of floats, since this is how we store embeddings in SQLite.
-   floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
-
-   // Creating our SQL.
-   strings.concat
-      .:@"
-select vss.rowid as id, ts.prompt, ts.completion, ts.uri
-	from vss_ml_training_snippets as vss
-    	inner join ml_training_snippets ts on ts.id = vss.rowid
-   where
-      ts.type = @type and
-      ts.prompt like @filter and
-      vss_search(vss.embedding_vss, @embedding) limit 100"
-   data.select:x:@strings.concat
-      embedding:x:@floatArray2bytes
-      type:x:@.arguments/*/_type
-      filter:x:@.filter
-
-   .cont:bool:true
-   while:x:@.cont
-      lambda2hyper:x:@data.select/*
-      if
-         lt
-            openai.tokenize:x:@lambda2hyper
-            convert:x:@.arguments/*/max_tokens
-               type:int
-         .lambda
-            set-value:x:@.cont
-               .:bool:false
-      else
-         remove-nodes:x:@data.select/0/-
-   return-nodes:x:@data.select/*
+// Stores the comment body in [.comment_body]
+.comment_body
+set-value:x:@.comment_body
+   get-value:x:@http.get/*/content/*/body

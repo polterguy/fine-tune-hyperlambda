@@ -1,28 +1,50 @@
 
-// CRUD Hyperlambda file that deletes one record from your menus table in your cms database
+// Associates the specified [username] with the specified [roles] roles. This is a workflow action
 .arguments
+   username
+      type:string
+      mandatory:bool:true
+   roles
+      type:array
+      mandatory:bool:true
+.icon:supervisor_account
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/roles
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-validators.mandatory:x:@.arguments/*/id
+// Connecting to database.
+data.connect:[generic|magic]
 
-// Opening up our database connection with default database type (SQLite).
-data.connect:[generic|cms]
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database using default database type being SQLite.
-   data.delete
-      table:menus
+   // Verifying user exists.
+   data.read
+      table:users
+      columns
+         username
       where
          and
+            username.eq:x:@.arguments/*/username
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Verifying above invocation returned something.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+
+         // Oops ...!!
+         throw:No such user
+            username:x:@.arguments/*/username
+
+   // Removing all roles user is already associated with.
+   data.delete
+      table:users_roles
+      where
+         and
+            user.eq:x:@.arguments/*/username
+
+   // Associating user with specified [roles].
+   for-each:x:@.arguments/*/roles/*
+      data.create
+         table:users_roles
+         values
+            user:x:@.arguments/*/username
+            role:x:@.dp/#

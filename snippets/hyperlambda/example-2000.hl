@@ -1,35 +1,16 @@
 
-// Lists all database in your MySQL instance.
-slots.create:magic.db.mssql.databases
+// Provide a Hyperlambda example where a value increases until [.value] is greater than 15.
 
-   // Opens up our connection
-   .connection:master
-   if
-      and
-         exists:x:@.arguments/*/connection-string
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
-      .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               .:master]
-   mssql.connect:x:@.connection
+// Increases value until [.value] is greater than 15.
+.value:int:5
+while
+   lt
+      get-value:x:@.value
+      .:int:15
+   .lambda
 
-      // Runs our query
-      mssql.select:select name from master.dbo.sysdatabases where has_dbaccess(name) = 1
+      // Logging current value.
+      log.info:Increasing value
 
-      // Renaming "Database" nodes.
-      set-name:x:@mssql.select/*/*
-         .:db
-
-      // Returns the remaining databases to caller.
-      return-nodes:x:@mssql.select/*
+      // Incrementing value.
+      math.increment:x:@.value

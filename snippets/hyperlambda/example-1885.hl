@@ -1,16 +1,20 @@
-// Sends a contact form via POST and checks for a successful response
-.contact.status:unknown
-http.post:"https://somewhere.com/api/v1/contacts"
-   convert:true
-   payload
-      name:Thomas
-      email:thomas@ainiro.io
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      set-value:x:@.contact.status
-         .:Success
+
+// Returns balance information for affiliate.
+.arguments
+
+// Making sure user is authorised to invoke endpoint.
+auth.ticket.verify:root, admin, guest
+config.get:"magic:databases:default"
+switch:x:@config.get
+   case:mysql
+   case:sqlite
+      strings.concat
+         .:/modules/hub/affiliates/db.overrides/
+         get-value:x:@config.get
+         .:.affiliate-balance.get.hl
+      add:x:+
+         get-nodes:x:@.arguments/*
+      io.file.execute:x:@strings.concat
+      return-nodes:x:-/*
+   default
+      throw:Unsupport database type for Hub

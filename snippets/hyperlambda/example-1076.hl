@@ -1,32 +1,45 @@
 
-// Write a Hyperlambda script to vectorize all training snippets in a specified model/type.
-.arguments
-   type:string
-   feedback-channel:string
+// Moves SQL scripts to the correct folder and creates the Northwind database file if it doesn't exist.
+io.file.list:/modules/sqlite-northwind/magic.startup/
+for-each:x:-/*
+   strings.split:x:@.dp/#
+      .:/
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         strings.concat
+            .:/etc/sqlite/templates/
+            get-value:x:@strings.split/0/-
+         if
+            not
+               io.file.exists:x:@strings.concat
+            .lambda
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+               // File doesn't exists, hence moving it.
+               io.file.move:x:@.dp/#
+                  .:/etc/sqlite/templates/
+               log.info:SQL script moved into etc folder
+                  filename:x:@.dp/#
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
+// Creates the Northwind database file.
+if
+   not
+      io.file.exists:/data/northwind.db
+   .lambda
 
-// Doing some basic logging.
-log.info:Started vectorising model
-   model:x:@.arguments/*/type
+      // Creating a default database file to store database in.
+      io.file.save:/data/northwind.db
+         .:
+      log.info:Northwind database file created
+         filename:/data/northwind.db
 
-// Creating a thread and invoking file doing the heavy lifting.
-insert-before:x:./*/fork/0
-   get-nodes:x:@.arguments
-fork
-   add:x:./*/signal
-      get-nodes:x:@.arguments/*
-   signal:magic.ai.vectorise
-      .onafter
-         sockets.signal:x:@.arguments/*/feedback-channel
-            args
-               message:Done!
-               type:success
+      // Loads and executes the northwind.sql script.
+      io.file.load:/etc/sqlite/templates/northwind.sql
+      sqlite.connect:northwind
+         sqlite.execute:x:@io.file.load
+      log.info:The northwind database was successfully created
+         filename:/etc/sqlite/templates/northwind.sql
 
-// Returning success to caller.
-return
-   result:success
+      // Evicting cache item related to SQLite.
+      cache.set:magic.sql.databases.sqlite.generic

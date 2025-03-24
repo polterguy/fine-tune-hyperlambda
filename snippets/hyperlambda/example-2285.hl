@@ -1,10 +1,25 @@
+// Fetches a random dog image from Dog CEO API and handles basic HTTP status codes
 
-// Hyperlambda snippet that appends several key-value pairs into the given result node.
+.arguments
 
-// Appends several key-value pairs into the given result node.
-.result
-add:x:@.result
-   .
-      keyA:valA
-      keyB:valB
-      keyC:valC
+// Where we store the result of the request
+.dog.result
+
+http.get:"https://dog.ceo/api/breeds/image/random"
+   convert:true
+
+switch:x:@http.get
+
+   case:int:200
+      set-value:x:@.dog.result
+         get-value:x:@http.get/*/content/*/message
+
+   case:int:404
+      throw:404 Not Found – Dog image endpoint is unavailable
+
+   default
+      set-value:x:@.dog.result
+         .:Failed to fetch dog image
+
+yield
+   result:x:@.dog.result

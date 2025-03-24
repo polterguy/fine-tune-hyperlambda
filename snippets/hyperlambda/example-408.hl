@@ -1,77 +1,162 @@
 
-// Update one record in your city table in your sakila database
+/*
+ * Lists quotations
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
 .arguments
-   recaptcha:string
 
-   // city_id column value being primary key of record to update, mandatory argument
-   city_id:long
+   // Optional filtering argument allowing to filter items on No_, Description, etc.
+   filter:string
 
-   // city column's new value
-   city:string
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
 
-   // country_id column's new value
-   country_id:long
+   // Optional offset into records of where to start returning items.
+   offset:long
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/city_id
+   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
+   min_date:string
 
-// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
-config.get:"magic:auth:recaptcha:key"
-config.get:"magic:auth:recaptcha:secret"
+   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
+   max_date:string
+
+   // Optional column to order records.
+   order:string
+
+   // Optional sort direction, can be either 'ASC' or 'DESC'. Defaults to 'ASC' unless specified.
+   direction:string
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Applying default value to sorting.
+validators.default:x:@.arguments
+   order:Document Date
+   direction:DESC
+
+// Getting limit value, defaulting to 300
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:300
+
+// Making sure limit is never more than 10
 if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-      neq:x:@config.get/@config.get
-         .
-      neq:x:@config.get/@config.get
-         .:
+   or
+      eq:x:@.limit
+         .:long:-1
+      mt:x:@.limit
+         .:long:10
    .lambda
+      set-value:x:@.limit
+         .:long:10
 
-      // reCAPTCHA configuration settings found.
-      validators.mandatory:x:@.arguments/*/recaptcha
-      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-         min:decimal:0.3
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
 
-// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
-remove-nodes:x:@.arguments/*/recaptcha/[0,1]
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
 
-// Opening up our database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:"No_"
+            .:"Location Code"
+            .:"Sell-to Customer No_"
+            .:"Bill-to Customer No_"
+            .:"Bill-to Name"
+            .:"Bill-to Address"
+            .:"Bill-to Address 2"
+            .:"Bill-to City"
+            .:"Bill-to Contact"
+            .:"Sell-to E-Mail"
+            .:"Document Date"
+            .:"Payment Terms Code"
+            .:"Salesperson Code"
+            .:"Assigned User ID"
+            .:"Item Category Code"
+            .:"Item_No"
+            .:"Description"
+            .:"Unit of Measure"
+            .:"Quantity"
+            .:"Unit Price"
+            .:"Amount"
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
 
-   // Invoking our update slot.
-   data.update
-      database-type:sqlite
-      table:city
-      values
+   // Checking if we're filtering items on [min_date].
+   if
+      and
+         exists:x:@.arguments/*/min_date
+         not-null:x:@.arguments/*/min_date
+      .lambda
+         convert:x:@.arguments/*/min_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.mt:x:@convert
+
+   // Checking if we're filtering items on [max_date].
+   if
+      and
+         exists:x:@.arguments/*/max_date
+         not-null:x:@.arguments/*/max_date
+      .lambda
+         convert:x:@.arguments/*/max_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.lt:x:@convert
+
+   // Reading records.
+   mssql.read
+      table:addv_Cotizaciones
+      limit:x:@.limit
+      offset:x:@.offset
       where
+         or
          and
+      order:x:@.arguments/*/order
+      direction:x:@.arguments/*/direction
 
-   // Verifying record exists.
+   // Making sure we warn LLM in case there are more than max items returned.
    if
       eq
-         get-value:x:@data.update
-         .:int:0
+         get-count:x:@mssql.read/*
+         get-value:x:@.arguments/*/limit
       .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+         add:x:../*/mssql.connect/*/yield
+            .
+               notice:"There might be more records but the system can only retrieve a maximum of 10 records at the time. Please inform the user that you can show him the next set of records if required."
+   
+   // Returning result of above invocation to caller.
+   yield
+      result:x:@mssql.read/*

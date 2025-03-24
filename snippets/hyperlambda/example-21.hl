@@ -1,32 +1,64 @@
 
-// Hyperlambda endpoint that counts items from your Categories table in your northwind database with optional filtering arguments
-.arguments
-   Categories.CategoryID.eq:long
-   Categories.CategoryName.like:string
-   Categories.CategoryName.eq:string
-   Categories.Description.like:string
-   Categories.Description.eq:string
-   Categories.Picture.like:string
-   Categories.Picture.eq:string
+// Lists all foreign keys in the specified SQLite table.
+slots.create:magic.db.sqlite.indexes
 
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
 
-   // Adding all arguments into [and] node ensuring filtering is applied
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+   // Opens up our connection
+   .connection:
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   sqlite.connect:x:@.connection
+      strings.concat
+         .:"select * from sqlite_master where type = 'index' and tbl_name='"
+         get-value:x:@.arguments/*/table
+         .:"'"
+      sqlite.select:x:@strings.concat
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Categories
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+      /*
+       * Creating our return value, by projecting it into
+       * a generic form, that does not rely upon MySQL's syntactic
+       * details.
+       */
+      for-each:x:@sqlite.select/*
+         unwrap:x:+/*/*/*
+         add:x:../*/return-nodes
+            .
+               .
+                  name:x:@.dp/#/*/name
+                  columns
+         strings.concat
+            .:"pragma index_info('"
+            get-value:x:@.dp/#/*/name
+            .:"')"
+         sqlite.select:x:@strings.concat
+         for-each:x:@sqlite.select/*
+            unwrap:x:+/*/*
+            add:x:../*/return-nodes/0/-/*/columns
+               .
+                  .:x:@.dp/#/*/name
+   return-nodes

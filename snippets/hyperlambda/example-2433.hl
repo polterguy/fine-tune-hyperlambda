@@ -1,28 +1,43 @@
+
+// Write a Hyperlambda script to delete a specified folder on the server, including uninstalling a module if necessary.
+.arguments
+   folder:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
 /*
- * Sends a multipart email with both HTML and plain text parts, where the 'to',
- * 'subject', and 'body' are dynamically retrieved from other nodes. An attachment
- * is also included, with the file path specified dynamically.
+ * Checking if this is a module folder, and if so, we uninstall module before actually
+ * deleting it.
  */
+strings.split:x:@.arguments/*/folder
+   .:/
+if
+   and
+      eq
+         get-count:x:@strings.split/*
+         .:int:2
+      eq
+         get-value:x:@strings.split/0
+         .:modules
+   .lambda
 
-.recipient-email:john.doe@example.com
-.email-subject:Dynamic Multipart Email
-.plain-text-body:This is the plain text version.
-.html-body:<html><body><p>This is the HTML version.</p></body></html>
-.attachment-path:/path/to/attachment.pdf
+      // 'modules' folder, checking if it's got an uninstall file, and if so, executing it.
+      strings.concat
+         get-value:x:@.arguments/*/folder
+         .:uninstall.hl
+      if
+         io.file.exists:x:@strings.concat
+         .lambda
 
-// [mail.smtp.send] requires us to use [unwrap].
-unwrap:x:+/**
-mail.smtp.send
-   message
-      to
-         // Alternative was of declaring both name and email in one node.
-         John Doe:x:@.recipient-email
-      subject:x:@.email-subject
-      entity:multipart/mixed
-         entity:multipart/alternative
-            entity:text/plain
-               content:x:@.plain-text-body
-            entity:text/html
-               content:x:@.html-body
-         entity:application/pdf
-            file-path:x:@.attachment-path
+            // Uninstall file exists
+            log.info:Uninstalling module
+               module:x:@strings.concat
+            io.file.execute:x:@strings.concat
+
+// Deletes the specified folder.
+io.folder.delete:x:@.arguments/*/folder
+
+// Returning success to caller.
+return
+   result:success

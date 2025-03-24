@@ -1,78 +1,11 @@
-
-// Special implementation for MySQL.
-auth.ticket.get
-
-// Used to store commision percent for affiliate.
-.percent
-
-// Ensuring user is an affiliate
-data.connect:[generic|magic]
-
-   /*
-    * Retrieving affiliate percent for user.
-    * Notice, if user doesn't have an affiliate percent, user ir
-    * not an affiliate.
-    */
+/*
+ * This file opens a database connection to the 'sales' database and retrieves the first 15 records from the 'leads' table where the user's email ends with 'outlook.com'.
+ * It uses [data.connect] and [data.read] slots for database interaction.
+ */
+data.connect:[generic|sales]
    data.read
-      table:users_extra
-      columns
-         value
+      table:leads
+      limit:long:15
       where
          and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
-
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
-
-   // Retrieving transactions from database.
-   data.select:"\nselect date_format(u.created, '%Y-%m-%d') as date, count(*) as users\n   from users u\n      inner join users_extra ue on u.username = ue.user and ue.type = 'affiliate'\n      where u.created > now() - interval 6 week and ue.value = @affiliate\n   group by date\n   order by date asc"
-      @affiliate:x:@auth.ticket.get
-
-   // Looping through all days the last 6 weeks.
-   .buffer
-   .cur
-   set-value:x:@.cur
-      math.subtract
-         date.now
-         time
-            days:42
-   while
-      lt:x:@.cur
-         date.now
-      .lambda
-         date.format:x:@.cur
-            format:yyyy-MM-dd
-         if
-            exists:x:@data.select/*/*/date/={@date.format}
-            .lambda
-               get-nodes:x:@data.select/*/*/date/={@date.format}/.
-               add:x:@.buffer
-                  get-nodes:x:@data.select/*/*/date/={@date.format}/.
-         else
-            unwrap:x:+/*/*/*
-            add:x:@.buffer
-               .
-                  .
-                     date:x:@date.format
-                     users:int:0
-
-         // Decrementing current day.
-         set-value:x:@.cur
-            math.add:x:@.cur
-               time
-                  days:1
-
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:private, max-age=3600
-
-   // Returning result to caller.
-   return-nodes:x:@.buffer/*
+            email.like:%outlook.com

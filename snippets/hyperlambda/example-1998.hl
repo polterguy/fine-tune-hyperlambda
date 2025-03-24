@@ -1,14 +1,35 @@
-// Divide a number by a dynamic value and then by a static value
-.dividend:int:24
-.divisor:int:4
 
-math.divide
+// Deletes the user's account entirely on server.
+.arguments
 
-   // fetches 24
-   get-value:x:@.dividend
+// Ensuring user is authenticated to invoke endpoint.
+auth.ticket.verify:guest
 
-   // divides 24 by 4 -> result 6
-   get-value:x:@.divisor
+// Retrieving currently authenticated user.
+auth.ticket.get
 
-   // divides 6 by 2 -> result 3
-   .:int:2
+// Verifying user doesn't have any cloudlets.
+data.connect:[generic|hub]
+   data.read
+      table:cloudlets
+      where
+         and
+            user.eq:x:@auth.ticket.get
+   if
+      exists:x:@data.read/*/*
+      .lambda
+         throw:You have to delete all cloudlets before you delete your account
+            public:true
+            status:400
+
+// Deleting user from magic database.
+data.connect:[generic|magic]
+   data.delete
+      table:users
+      where
+         and
+            username.eq:x:@auth.ticket.get
+
+// Returning success to caller.
+return
+   result:success

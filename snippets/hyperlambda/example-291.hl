@@ -1,55 +1,21 @@
 
-// a Hyperlambda file that returns all cloudlets belonging to the currently authenticated user.
+// Tracks an order in Shopify.
+.arguments
+   order:string
 
-// Ensuring user is authorised to invoke endpoint.
-auth.ticket.verify:root, guest, impersonated
+// Retrieving secret and shop.
+.secret
+set-value:x:@.secret
+   config.get:"magic:shopify:secret"
+.shop
+set-value:x:@.shop
+   config.get:"magic:shopify:shop"
 
-/*
- * Retrieving currently authenticated user to prevent a user
- * from retrieving cloudlets not belonging to him/her.
- */
-auth.ticket.get
+// Invoking slot to do the heavy work.
+execute:shopify.orders.track
+   secret:x:@.secret
+   shop:x:@.shop
+   order_no:x:@.arguments/*/order
 
-// Opening up our database connection.
-data.connect:[generic|hub]
-
-   // Reading data from database.
-   data.read
-      table:cloudlets
-         join:plans
-            type:inner
-            on
-               and
-                  cloudlets.plan.eq:plans.name
-         join:clusters
-            type:inner
-            on
-               and
-                  cloudlets.cluster.eq:clusters.id
-      columns
-         cloudlets.id
-         cloudlets.created
-         cloudlets.name
-         cloudlets.plan
-         cloudlets.cluster
-         cloudlets.destruction_date
-         cloudlets.enabled
-         cloudlets.source_cloudlet
-         plans.price
-         plans.storage
-         plans.cpu
-         plans.memory
-         plans.frontend
-         plans.max_upload
-         plans.bandwidth
-         plans.max_timeout
-         clusters.country
-         clusters.name
-            as:node_name
-         plans.description
-      where
-         and
-            user.eq:x:@auth.ticket.get
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+// Returns the result of your last action.
+return-nodes:x:@execute/*

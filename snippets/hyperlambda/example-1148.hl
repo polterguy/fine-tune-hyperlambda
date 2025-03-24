@@ -1,80 +1,40 @@
+/*
+ * Compiles a snippet of C# code down to a library,
+ * for then to dynamically load it as a plugin.
+ */
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.node.extensions
+      .:magic.signals.contracts
+   code:@"
 
-// Hyperlambda workflow action returning [max_tokens] context from the specified [url].
-.arguments
-   url
-      type:string
-      mandatory:bool:true
-   max_tokens
-      type:int
-      default:int:4000
-   throw
-      type:boolean
-      default:bool:false
-.icon:extension
+// Example C# code creating a Hyperlambda slot.
+using System;
+using magic.node;
+using magic.node.extensions;
+using magic.signals.contracts;
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/url
+// Our slot class.
+[Slot(Name = ""foo"")]
+public class Foo : ISlot
+{
+   public void Signal(ISignaler signaler, Node input)
+   {
+      input.Value = $""Hi {input.GetEx<string>()}, how may I assist you?"";
+   }
+}"
+   assembly-name:foo.dll
 
-// Applying default values for optional arguments.
-validators.default:x:@.arguments
-   max_tokens:int:4000
+// Loading assembly from raw bytes now that we've created it.
+system.plugin.load:x:@system.compile
 
-// Retrieving context.
-execute:magic.http.scrape-url
-   url:x:@.arguments/*/url
-if
-   and
-      get-value:x:@.arguments/*/throw
-      not-null:x:@execute
-   .lambda
-      throw:Could not scrape URL
-         public:bool:true
-         status:x:@execute
+// Executing [foo] slot now dynamically injected into AppDomain.
+.name:John Doe
+foo:x:@.name
 
-// Building our context return value.
-.context:
-while
-   and
-      exists:x:@execute/0
-      lt
-         openai.tokenize:x:@.context
-         convert:x:@.arguments/*/max_tokens
-            type:int
-   .lambda
-
-      // Temporary value.
-      .tmp
-      set-value:x:@.tmp
-         strings.concat
-            get-value:x:@.context
-            .:"\n\n"
-            get-value:x:@execute/0/*/prompt
-            .:"\n\n"
-            get-value:x:@execute/0/*/completion
-      if
-         lt
-            openai.tokenize:x:@.tmp
-            convert:x:@.arguments/*/max_tokens
-               type:int
-         .lambda
-
-            // Still below [max_tokes].
-            set-value:x:@.context
-               get-value:x:@.tmp
-
-      // Removing top snippet.
-      remove-nodes:x:@execute/0/*/snippets/0
-      if
-         not-exists:x:@execute/0/*/snippets/0
-         .lambda
-
-            // Removing currently iterated URL.
-            remove-nodes:x:@execute/0
-
-// Trimming result.
-set-value:x:@.context
-   strings.trim:x:@.context
-
-// Returning result to caller.
-yield
-   context:x:@.context
+// Unloading plugin.
+system.plugin.unload:foo.dll

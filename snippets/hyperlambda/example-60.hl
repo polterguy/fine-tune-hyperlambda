@@ -1,49 +1,47 @@
 
-// Hyperlambda script for an endpoint that counts items from the users_roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
-.arguments
-   operator:string
-   role.eq:string
-   user.eq:string
+// Lists all foreign keys in some MySQL table.
+slots.create:magic.db.mysql.foreign_keys
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
 
-// Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
+   // Opens up our connection
+   .connection:[information_schema]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mysql.connect:x:@.connection
 
-/*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
- */
-if
-   exists:x:@.arguments/*/operator
-   .lambda
+      // Dynamically creating our SQL.
+      mysql.select:"select\n   `column_name` as `column`, `referenced_table_name` as foreign_table, `referenced_column_name` as foreign_column, `constraint_name` as name\n   from `information_schema`.`key_column_usage`\n   where `constraint_schema` = schema() and\n      `table_name` = @table and\n      `referenced_column_name` is not null and\n      `constraint_schema` = @database\n   order by `column_name`"
+         @table:x:@.arguments/*/table
+         @database:x:@.arguments/*/database
 
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/0
-         get-value:x:@.arguments/*/operator
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our read invocation.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/operator
-   remove-nodes:x:@.arguments/*/operator
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      table:users_roles
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+      /*
+       * Creating our return value, by projecting it into
+       * a generic form, that does not rely upon MySQL's syntactic
+       * details.
+       */
+      return-nodes:x:@mysql.select/*

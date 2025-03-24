@@ -1,10 +1,36 @@
-// A dynamic slot that doubles a given number using [math.multiply] and returns the result
-slots.create:double.value
-   math.multiply
-      get-value:x:@.arguments/*/number
-      .:int:2
-   yield
-      result:x:@math.multiply
 
-execute:double.value
-   number:int:7
+// Read or list records from your plugins table in your cms database
+.arguments
+
+   plugins.id.eq:long
+   plugins.name.like:string
+   plugins.name.eq:string
+   plugins.description.like:string
+   plugins.description.eq:string
+   plugins.is_active.eq:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:plugins
+      columns
+         plugins.id
+         plugins.name
+         plugins.description
+         plugins.is_active
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

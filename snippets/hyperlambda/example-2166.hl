@@ -1,44 +1,16 @@
 
-// Creates training data and inserts into fine-tuning database such that it can be exported later.
-.arguments
+// Create a Hyperlambda snippet that keeps checking until [.tries] reaches 5.
 
-   // Mandatory argument being file number to generate training data for. When listing Hyperlambda files, this will generate training data for the nth file listed, allowing us to loop for as long as have have additional files, incrementing the file-no argument for each iteration.
-   file-no:int
-
-// Listing files recursively.
-io.file.list-recursively:/
-
-// Pruning out everything but Hyperlambda files.
-.file
-for-each:x:@io.file.list-recursively/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-         unwrap:x:+/*/*
-         add:x:@.file
-            .
-               .:x:@.dp/#
-
-// Checking if we've dealt with all files.
-if
-   mt
-      get-value:x:@.arguments/*/file-no
-      get-count:x:@.file/*
+// Keeps checking until [.tries] reaches 5.
+.tries:int:0
+while
+   lt
+      get-value:x:@.tries
+      .:int:5
    .lambda
-      return
-         result:There are no more files, you have handled all files.
 
-// Loading nth file.
-.hyperlambda
-strings.concat
-   .:@.file/
-   get-value:x:@.arguments/*/file-no
-set-x:x:+
-   convert:x:@strings.concat
-      type:x
-io.file.load
+      // Attempting operation.
+      log.info:Retrying operation
 
-// Returning Hyperlambda file to caller.
-yield
-   hyperlambda:x:@io.file.load
+      // Incrementing tries counter.
+      math.increment:x:@.tries

@@ -1,29 +1,72 @@
 
-// Returns all companies that the specified director is associated with
+// Search for products on Ebay using SERP API with a mandatory query parameter.
 .arguments
-   director_id:long
-   limit:long
-   offset:long
 
-// Opening database connection.
-data.connect:[finovo|finovo]
-   database-type:pgsql
+   // Mandatory query to search for.
+   query:string
 
-   // Reading from directors.
-   data.select:"\nselect d1.org_number, b.company_name, d1.role_name\n   from directors d1\n      inner join basic b on b.org_number = d1.org_number\n      inner join directors d2 on d1.director_nbr = d2.director_nbr\n   where d2.director_id = @id and d1.org_number != d2.org_number\n   limit @limit offset @offset"
-      database-type:pgsql
-      @id:x:@.arguments/*/director_id
-      @limit:x:@.arguments/*/limit
-      @offset:x:@.arguments/*/offset
-   if
-      mte
-         get-count:x:@data.select/*
-         .:int:10
-      .lambda
+   // Optional parameter filtering result by country. If specified must be a two letter country code such as US or NO.
+   gl:string
 
-         // Making sure we inform caller that there might exist additional companies.
-         add:x:@data.connect/*/yield
-            .
-               notice:The director is probably associated with more companies
-   yield
-      companies:x:@data.select/*
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
+
+// Retrieving SERP API's API key and making sure we've got one.
+.api-key
+set-value:x:@.api-key
+   config.get:"magic:serp-api:api_key"
+if
+   or
+      null:x:@.api-key
+      eq:x:@.api-key
+         .:
+   .lambda
+
+      // Oops ...!!
+      throw:Could not find a SERP API key to use for fetching hotels.
+
+// Creating our URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://serpapi.com/search.json?engine=ebay&api_key="
+      get-value:x:@.api-key
+      .:&_nkw=
+      strings.url-encode:x:@.arguments/*/query
+
+// Retrieving result.
+http.get:x:@.url
+   convert:true
+
+// Sanity checking result of above invocation.
+if
+   not
+      and
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+   .lambda
+
+      // Oops ...!!
+      lambda2hyper:x:../*
+      log.info:x:-
+      throw:Something went wrong while invoking SERP API
+
+// Iterating through result, making sure we return the result to caller.
+for-each:x:@http.get/*/content/*/organic_results/*/[0,5]
+   unwrap:x:+/*/*/*
+   add:x:../*/return-nodes/*/result
+      .
+         .
+            title:x:@.dp/#/*/title
+            link:x:@.dp/#/*/link
+            condition:x:@.dp/#/*/condition
+            price:x:@.dp/#/*/price/*/raw
+            thumbnail:x:@.dp/#/*/thumbnail
+
+// Returning result to caller.
+unwrap:x:+/*
+return-nodes
+   result
+   total_matches:x:@http.get/*/content/*/search_information/*/total_results

@@ -1,23 +1,21 @@
+/*
+ * This example checks multiple system states before starting a backup process.
+ * If disk space is low OR network is unavailable, the backup is skipped.
+ * If both conditions are good, the backup starts.
+ */
+.disk-space:int:20
+.network:bool:true
+.result
+if
+   or
+      lt:x:@.disk-space
+         .:int:50
+      eq:x:@.network
+         .:bool:false
+   .lambda
+      set-value:x:@.result
+         .:Backup skipped due to low disk space or no network.
 
-// Returns all clusters in system.
-
-// Adding 30 seconds of public caching to avoid DOS attacks from exhausting server.
-response.headers.set
-   Cache-Control:public, max-age=30
-
-// Opening up our database connection.
-data.connect:[generic|hub]
-
-   // Reading data from database.
-   data.read
-      table:clusters
-      columns
-         id
-         country
-         name
-      where
-         and
-            enabled.eq:bool:true
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+else
+   set-value:x:@.result
+      .:Backup started successfully.

@@ -1,45 +1,23 @@
 
-// Create one record in your category table in your sakila database without authorization. Log invocation.
-.arguments
+// Returns all clusters in system.
 
-   // name column value
-   name:string
+// Adding 30 seconds of public caching to avoid DOS attacks from exhausting server.
+response.headers.set
+   Cache-Control:public, max-age=30
 
-   // last_update column value
-   last_update:date
+// Opening up our database connection.
+data.connect:[generic|hub]
 
-// Logging invocation.
-auth.ticket.get
-lambda2hyper:x:@.arguments/*
-log.info:sakila.category entry created
-   username:x:@auth.ticket.get
-   arguments:x:@lambda2hyper
+   // Reading data from database.
+   data.read
+      table:clusters
+      columns
+         id
+         country
+         name
+      where
+         and
+            enabled.eq:bool:true
 
-// Opening up database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:category
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:sakila.category.post
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

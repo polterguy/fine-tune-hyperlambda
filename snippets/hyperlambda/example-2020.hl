@@ -1,15 +1,29 @@
-/*
- * A small script that connects to a POP3 server,
- * and retrieves all emails on the server, simply
- * creating a log entry for each email found on POP3
- * server.
- */
-mail.pop3.fetch
-   .lambda
 
-      /*
-       * Lambda object evaluated once for every
-       * email fetched from POP3 server.
-       */
-      log.info
-         lambda2hyper:x:./.
+// Write a Hyperlambda script to upload a specified backup file.
+.arguments
+   file:*
+.accept:multipart/form-data
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+validators.regex:x:@.arguments/*/file/*/name
+   regex:"\\.db$"
+
+// Saves the file to the specified folder.
+.full-path
+set-value:x:@.full-path
+   strings.concat
+      .:/data/
+      get-value:x:@.arguments/*/file/*/name
+io.stream.save-file:x:@.full-path
+   get-value:x:@.arguments/*/file/*/stream
+
+// Flushing SQLite, and returning success to caller.
+sqlite.connections.flush
+return
+   result:success

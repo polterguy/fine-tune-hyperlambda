@@ -1,12 +1,31 @@
 
-// Hyperlambda endpoint to return all slots registered in the system.
+// CRUD Hyperlambda file that deletes one record from your media table in your cms database
 .arguments
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-// Retrieving all system slots.
-vocabulary
+validators.mandatory:x:@.arguments/*/id
 
-// Returning results of the above to caller.
-return-nodes:x:@vocabulary/*
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:media
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

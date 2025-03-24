@@ -1,17 +1,32 @@
+
+// Create a Hyperlambda script to schedule a task with a specified ID for execution according to specified parameters.
+.arguments
+   id:string
+   due:date
+   repeats:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
 /*
- * Sends an email with an attachment. The 'to', 'subject', and 'body' are static,
- * and the attachment is specified with a file path.
+ * Adds either a [repeats] or [due] argument to invocation below,
+ * depending upon what argument was supplied by caller.
  */
+if
+   not
+      eq
+         get-value:x:@.arguments/*/repeats
+         .
+   .lambda
+      add:x:../*/tasks.schedule
+         get-nodes:x:@.arguments/*/repeats
+else
+   add:x:../*/tasks.schedule
+      get-nodes:x:@.arguments/*/due
 
-mail.smtp.send
-   message
-      to
-         recipient:john.doe@example.com
-      subject:Email with Attachment
+// Performs actual scheduling of task.
+tasks.schedule:x:@.arguments/*/id
 
-      // This is how we declare a multipart MIME message of type `mixed`
-      entity:multipart/mixed
-         entity:text/plain
-            content:Please find the attachment.
-         entity:text/plain
-            filename:/path/to/attachment.txt
+// Returns success to caller.
+return-nodes
+   result:success

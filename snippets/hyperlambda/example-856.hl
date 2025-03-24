@@ -1,56 +1,37 @@
 
-// Read or list records from your CustomerDemographics table in your northwind database
+// Delete one record from your categories table in your cms database
 .arguments
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-   // Offset into the dataset of where to start retrieving records
-   offset:long
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
 
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Filtering (optional)
-   CustomerDemographics.CustomerTypeID.like:string
-   CustomerDemographics.CustomerTypeID.eq:string
-   CustomerDemographics.CustomerDesc.like:string
-   CustomerDemographics.CustomerDesc.eq:string
+validators.mandatory:x:@.arguments/*/id
 
 // Opening up our database connection.
-data.connect:[generic|northwind]
+data.connect:[generic|cms]
    database-type:sqlite
 
-   // Parametrising our read invocation with ordering arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-
-   // Parametrising our read invocation with paging arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
       get-nodes:x:@.arguments/*
 
-   // Reading data from database.
-   data.read
+   // Deleting item from database.
+   data.delete
       database-type:sqlite
-      table:CustomerDemographics
-      columns
-         CustomerDemographics.CustomerTypeID
-         CustomerDemographics.CustomerDesc
+      table:categories
       where
          and
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.categories.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

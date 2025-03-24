@@ -1,30 +1,23 @@
 
-// Hyperlambda script that creates a scheduled task that resets no_requests at the first day of the month, with conditions for SQLite.
-if
-   eq
-      config.get:"magic:databases:default"
-      .:sqlite
-   .lambda
+// Develop a helper action for a Stripe webhook to extract essential information from charge events. The function should accept a mandatory node reference argument, which is forwarded by Stripe. It should convert the amount to a decimal by dividing by 100 and return the customer ID, amount, currency, receipt URL, event type, and metadata. The event type could be one of several charge-related statuses, such as 'charge.succeeded', 'charge.failed', etc. This setup allows efficient handling of Stripe webhook events.
+.arguments
+   node_reference
+      type:string
+      mandatory:bool:true
+      default:":x:@.arguments"
+.icon:payment
 
-      // Wrapping in try/catch in case task already exists.
-      try
+// Converting amount to decimal and dividing by 100.
+math.divide
+   convert:x:@.arguments/*/node_reference/#/*/data/*/object/*/amount
+      type:decimal
+   .:decimal:100
 
-         // Deleting old task if existing.
-         tasks.list:reset-no_requests
-         if
-            exists:x:@tasks.list/*
-            .lambda
-               tasks.delete:x:@tasks.list/0/*/id
-
-         // Creating task that periodically deletes old historical requests.
-         tasks.create:reset-no_requests
-            description:Resets no_requests at the first day of the month
-            repeats:**.01.01.01.01
-            .lambda
-               sqlite.connect:magic
-                  sqlite.execute:update ml_types set no_requests = 0
-               log.info:All machine learning models had their no_requests values reset
-      .catch
-
-         // Task already exists.
-         console.log:Task to reset no_requests already exists
+// Returning result to caller.
+yield
+   customer_id:x:@.arguments/*/node_reference/#/*/data/*/object/*/customer
+   amount:x:@math.divide
+   currency:x:@.arguments/*/node_reference/#/*/data/*/object/*/currency
+   receipt_url:x:@.arguments/*/node_reference/#/*/data/*/object/*/receipt_url
+   type:x:@.arguments/*/node_reference/#/*/type
+   metadata:x:@.arguments/*/node_reference/#/*/data/*/object/*/metadata/*

@@ -1,25 +1,63 @@
 
-// Returns all cloudlet plans that exists using Hyperlambda workflow actions
+// Lists all indexes keys in some MySQL table.
+slots.create:magic.db.mysql.indexes
 
-/*
- * Ensures user is authorized to access endpoint.
- * 
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
 
-// Returns all plans in the system.
-execute:magic.workflows.actions.execute
-   name:hub-plans-get
-   filename:/modules/hub/workflows/actions/hub-plans-get.hl
-   arguments
+   // Opens up our connection
+   .connection:[information_schema]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mysql.connect:x:@.connection
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+      // Dynamically creating our SQL.
+      strings.concat
+         .:"show indexes from "
+         get-value:x:@.arguments/*/table
+      mysql.select:x:@strings.concat
+
+      /*
+       * Creating our return value, by projecting it into
+       * a generic form, that does not rely upon MySQL's syntactic
+       * details.
+       */
+      for-each:x:@mysql.select/*
+         if
+            neq:x:@.dp/#/*/Key_name
+               .:PRIMARY
+            .lambda
+               unwrap:x:+/*/*/*
+               add:x:@mysql.connect/*/return-nodes
+                  .
+                     .
+                        name:x:@.dp/#/*/Key_name
+                        columns
+               unwrap:x:+/*/*
+               add:x:@mysql.connect/*/return-nodes/0/-/*/columns
+                  .
+                     .:x:@.dp/#/*/Column_name
+      return-nodes

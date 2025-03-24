@@ -1,33 +1,101 @@
-/*
- * Hyperlambda file that can be executed with arguments.
- * Prepares a password reset email by replacing the {{user}} and {{reset_link}} placeholders.
- */
+
+// Upgrades existing cloudlet to a professional plan without associating a subscription with it.
 .arguments
-   user:string
-   reset_link:string
-.email-template:@"
-Hi {{user}},
+   id:long
+   plan:string
 
-We received a request to reset your password.
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root, admin, account_manager
 
-Click the link below to proceed:
-{{reset_link}}
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+validators.mandatory:x:@.arguments/*/plan
 
-If you didn't request this, please ignore this message.
+// Opening up our database connection.
+data.connect:[generic|hub]
 
-Thanks,
-Support Team"
+   // Getting cloudlet information from database
+   data.read
+      table:cloudlets
+      columns
+         name
+         user
+      where
+         and
+            id.eq:x:@.arguments/*/id
 
-.reset-email
-set-value:x:@.reset-email
-   strings.replace:x:@.email-template
-      .:{{user}}
-      get-value:x:@.arguments/*/user
+   // Updating database record.
+   data.update
+      table:cloudlets
+      values
+         plan:x:@.arguments/*/plan
+      where
+         and
+            id.eq:x:@.arguments/*/id
 
-set-value:x:@.reset-email
-   strings.replace:x:@.reset-email
-      .:{{reset_link}}
-      get-value:x:@.arguments/*/reset_link
+   /*
+    * Removing scheduled tasks that soft deletes cloudlet once trial period
+    * is over if existing.
+    */
+   strings.concat
+      .:cloudlet-
+      get-value:x:@data.read/*/*/name
+      .:-
+      get-value:x:@data.read/*/*/user
+      .:-delete
+   tasks.list:x:-
+   if
+      exists:x:@tasks.list/0/*/id
+      .lambda
+         tasks.delete:x:@tasks.list/0/*/id
+         log.info:Task to automatically soft delete cloudlet was deleted
+            task-name:x:@strings.concat
+            cloudlet:x:@.cloudlet
+            username:x:@.arguments/*/username
+            cluster:x:@.cluster
+   else
+      log.error:Could not find task to delete
+         task-name:x:@strings.concat
+   strings.concat
+      .:cloudlet-
+      get-value:x:@data.read/*/*/name
+      .:-
+      get-value:x:@data.read/*/*/user
+      .:-hard-delete
+   tasks.list:x:-
+   if
+      exists:x:@tasks.list/0/*/id
+      .lambda
+         tasks.delete:x:@tasks.list/0/*/id
+         log.info:Task to automatically hard delete cloudlet was deleted
+            task-name:x:@strings.concat
+            cloudlet:x:@.cloudlet
+            username:x:@.arguments/*/username
+            cluster:x:@.cluster
+   else
+      log.error:Could not find task to delete
+         task-name:x:@strings.concat
+   strings.concat
+      .:cloudlet-
+      get-value:x:@data.read/*/*/name
+      .:-
+      get-value:x:@data.read/*/*/user
+      .:-warn-about-destruction
+   tasks.list:x:-
+   if
+      exists:x:@tasks.list/0/*/id
+      .lambda
+         tasks.delete:x:@tasks.list/0/*/id
+         log.info:Task to automatically warn user was deleted
+            task-name:x:@strings.concat
+            cloudlet:x:@.cloudlet
+            username:x:@.arguments/*/username
+            cluster:x:@.cluster
+   else
+      log.error:Could not find task to delete
+         task-name:x:@strings.concat
 
-yield
-   email:x:@.reset-email
+   // Returning success to caller.
+   response.status.set:202
+   return
+      result:success

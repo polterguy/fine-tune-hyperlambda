@@ -1,58 +1,10 @@
+// Raising a custom signal
+.message:Hello from signal
 
-// Counts items from your city table in your sakila database
-.arguments
-   recaptcha:string
-   city.city_id.eq:long
-   city.city.like:string
-   city.city.eq:string
-   city.country_id.eq:long
-   city.last_update.eq:date
+// Here the expression will NOT be evaluated.
+signal:custom.signal
+   message:x:@.message
 
-// Adding Cache-Control HTTP header.
-response.headers.set
-   Cache-Control:private, max-age=500
-
-// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
-config.get:"magic:auth:recaptcha:key"
-config.get:"magic:auth:recaptcha:secret"
-if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-      neq:x:@config.get/@config.get
-         .
-      neq:x:@config.get/@config.get
-         .:
-   .lambda
-
-      // reCAPTCHA configuration settings found.
-      validators.mandatory:x:@.arguments/*/recaptcha
-      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-         min:decimal:0.3
-
-// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
-remove-nodes:x:@.arguments/*/recaptcha/[0,1]
-
-// Opening up our database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:city
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+// Here the expression will NOT be evaluated.
+execute:custom.signal
+   message:x:@.message

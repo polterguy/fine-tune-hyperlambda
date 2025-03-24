@@ -1,16 +1,91 @@
 
-// Create a Hyperlambda snippet that repeats logging while [.attempts] is below 3.
+// Workflow action that returns all cloudlets in the system.
+.arguments
+   username
+      type:string
+      mandatory:bool:false
+   name
+      type:string
+      mandatory:bool:false
+   limit
+      type:int
+      mandatory:bool:false
+   offset
+      type:int
+      mandatory:bool:false
 
-// Repeats logging while [.attempts] is below 3.
-.attempts:int:0
-while
-   lt
-      get-value:x:@.attempts
-      .:int:3
-   .lambda
+// Applying defaults
+validators.default:x:@.arguments
+   limit:int:5
+   offset:int:0
 
-      // Logging attempt.
-      log.info:Attempting task
+// Connecting to database.
+data.connect:[generic|hub]
 
-      // Increasing attempt count.
-      math.increment:x:@.attempts
+   /*
+    * Checking if caller provided a [username] argument,
+    * and if so, applying it to [where].
+    */
+   if
+      and
+         exists:x:@.arguments/*/username
+         not-null:x:@.arguments/*/username
+      .lambda
+
+         // Adding [user.eq] filter criteria to [data.read].
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/data.read/*/where/*/and
+            .
+               user.eq:x:@.arguments/*/username
+
+   /*
+    * Checking if caller provided a [name] argument,
+    * and if so, applying it to [where].
+    */
+   if
+      and
+         exists:x:@.arguments/*/name
+         not-null:x:@.arguments/*/name
+      .lambda
+
+         // Adding [user.eq] filter criteria to [data.read].
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/data.read/*/where/*/and
+            .
+               name.eq:x:@.arguments/*/name
+
+   // Removing [where] if there are no conditions.
+   if
+      not-exists:x:@data.connect/*/data.read/*/where/*/and/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.read/*/where
+
+   // Adding [limit] and [offset]
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+
+   // Reading records.
+   data.read
+      table:cloudlets
+      columns
+         created
+         name
+         user
+         plan
+         "('https://' || name || '-' || user || '.' || cluster)"
+            as:login
+      where
+         and
+      order:created
+      direction:desc
+
+   // Iterating through above result to change it to dashboard login link.
+   for-each:x:@data.read/*
+      set-value:x:@.dp/#/*/login
+         strings.concat
+            .:"https://dashboard.ainiro.io?backend="
+            strings.url-encode:x:@.dp/#/*/login
+
+   // Returning result of above invocation back to caller.
+   return-nodes:x:@data.read/*

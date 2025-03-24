@@ -1,41 +1,8 @@
-
-// Create a Hyperlambda script to return the Magic CAPTCHA JavaScript library, substituting the public key dynamically.
-.arguments
-   v:string
-
-// Getting server auth secret.
-config.get:"magic:auth:secret"
-
-// Double hashing auth secret using SHA256 to avoid predictable hash values.
-crypto.hash.sha256:x:@config.get
-crypto.hash.sha256:x:-
-
-// Loading JavaScript file.
-.file
-if
-   io.file.exists:/system/misc/magic-captcha.min.js
-   .lambda
-
-      // We have a minified file.
-      set-value:x:@.file
-         load-file:/system/misc/magic-captcha.min.js
-else
-
-   // We don't have a minified file.
-   set-value:x:@.file
-      load-file:/system/misc/magic-captcha.js
-
 /*
- * Dynamically substituting public key in file with public key that was generated
- * specifically for current server.
+ * This example creates a slot `get.pi` that returns the value of Pi using `return-value`.
  */
-strings.replace:x:@.file
-   .:[[public-key]]
-   get-value:x:@crypto.hash.sha256
+slots.create:get.pi
+   return-value:decimal:3.14159
 
-// Applying correct HTTP headers.
-response.headers.set
-   Content-Type:text/javascript
-
-// Returning result to caller.
-return:x:@strings.replace
+// Invoking the slot
+signal:get.pi

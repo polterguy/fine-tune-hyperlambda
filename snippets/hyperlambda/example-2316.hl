@@ -1,9 +1,25 @@
-// This code connects to the 'company' database and updates the salary of an employee in the 'employees' table.
-pgsql.connect:company
-   pgsql.update
-      table:employees
-      values
-         salary:decimal:75000
-      where
-         and
-            employee_id:int:303
+// Gets a random activity from the Bored API and handles common statuses
+
+.arguments
+
+// Final output from the activity API
+.activity.result
+
+http.get:"https://www.boredapi.com/api/activity"
+   convert:true
+
+switch:x:@http.get
+
+   case:int:200
+      set-value:x:@.activity.result
+         get-value:x:@http.get/*/content/*/activity
+
+   case:int:500
+      throw:500 Internal Server Error – Failed to retrieve activity
+
+   default
+      set-value:x:@.activity.result
+         .:Unexpected error occurred
+
+yield
+   result:x:@.activity.result

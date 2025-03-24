@@ -1,38 +1,23 @@
 
-// Create endpoint inserting one record into your items table in your shopping-cart-demo database.
-.arguments
+// Create a function that returns all clusters in the system.
 
-   // product_id column value
-   product_id:long
+// Adding 30 seconds of public caching to avoid DOS attacks from exhausting server.
+response.headers.set
+   Cache-Control:public, max-age=30
 
-   // quantity column value
-   quantity:long
+// Opening up our database connection.
+data.connect:[generic|hub]
 
-   // session_id column value
-   session_id:string
+   // Reading data from database.
+   data.read
+      table:clusters
+      columns
+         id
+         country
+         name
+      where
+         and
+            enabled.eq:bool:true
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up database connection.
-data.connect:[generic|shopping-cart-demo]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:items
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

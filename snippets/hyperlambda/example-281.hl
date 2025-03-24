@@ -1,8 +1,90 @@
-// Adds 3 days to an initial date
-.start:date:"2025-03-22T00:00:00Z"
-.result
-set-value:x:@.result
-   math.add
-      get-value:x:@.start
-      time
-         days:int:3
+/*
+ * Create a summary or the specified URL using ChatGPT and returns the results to caller.
+ */
+.arguments
+   url:string
+   type:string
+
+// Sanity checking invocation
+validators.mandatory:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/type
+validators.url:x:@.arguments/*/url
+validators.enum:x:@.arguments/*/type
+   .:facebook
+   .:linkedin
+   .:twitter
+   .:inmail
+
+// Checking cache.
+.key
+set-value:x:@.key
+   strings.concat
+      get-value:x:@.arguments/*/url
+      get-value:x:@.arguments/*/type
+unwrap:x:./*/cache.try-get/*/.lambda/*/.url
+unwrap:x:./*/cache.try-get/*/.lambda/*/.type
+cache.try-get:x:@.key
+   expiration:300
+   .lambda
+
+      // Prefix for different models.
+      .prefix
+         facebook:"You are a social media marketing expert, and I want you to create a Facebook marketing status update with relevant emojis summarizing the 3 most important points from the following article"
+         linkedin:"You are a social media marketing expert, and I want you to create a LinkedIn marketing status update with relevant emojis summarizing the 3 most important points from the following article"
+         twitter:"You are a social media marketing expert, and I want you to create a Twitter marketing status update with relevant emojis summarizing the 3 most important points from the following article"
+         inmail:"You are a social media marketing expert, and I want you to create a LinkedIn InMail summarizing the 3 most important points from following article"
+
+      // Scraping URL first.
+      .url:x:@.arguments/*/url
+      .type:x:@.arguments/*/type
+      http.get:x:@.url
+         convert:true
+      html2lambda:x:@http.get/*/content
+      .article
+      for-each:x:@html2lambda/**/body/**/\#text
+         set-value:x:@.article
+            strings.concat
+               get-value:x:@.article
+               get-value:x:@.dp/#
+               .:"\r\n"
+               .:"\r\n"
+
+      // Creating Social Media summary of article using ChatGPT.
+      .token
+      set-value:x:@.token
+         strings.concat
+            .:"Bearer "
+            config.get:"magic:openai:key"
+      unwrap:x:./*/http.post/**
+      http.post:"https://api.openai.com/v1/chat/completions"
+         headers
+            Authorization:x:@.token
+            Content-Type:application/json
+         payload
+            model:gpt-4
+            max_tokens:int:1000
+            temperature:decimal:0.8
+            messages
+               .
+                  role:system
+                  content:x:@.prefix/*/{@.type}
+               .
+                  role:user
+                  content:x:@.article
+         convert:true
+
+      // Caching result.
+      .result:x:@http.post/*/content/*/choices/0/*/message/*/content
+
+      // Returning result to caller.
+      return-value:x:@.result
+
+// Returning result to caller.
+strings.concat
+   get-value:x:@cache.try-get
+   .:"\r\n"
+   .:"\r\n"
+   get-value:x:@.arguments/*/url
+unwrap:x:+/*
+return
+   summary:x:@strings.concat

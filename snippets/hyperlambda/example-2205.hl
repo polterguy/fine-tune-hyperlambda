@@ -1,63 +1,107 @@
 
-// Reads contacts from HubSpot
+// Returns unique and distinct values from your Artist table in your chinook database
 .arguments
-   after:int
 
-// Retrieving token from configuration and verifying it exists.
-config.get:"magic:hubspot:token"
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   // Filtering
+   Artist.ArtistId.mt:long
+   Artist.ArtistId.lt:long
+   Artist.ArtistId.mteq:long
+   Artist.ArtistId.lteq:long
+   Artist.ArtistId.neq:long
+   Artist.ArtistId.eq:long
+   Artist.Name.like:string
+   Artist.Name.mt:string
+   Artist.Name.lt:string
+   Artist.Name.mteq:string
+   Artist.Name.lteq:string
+   Artist.Name.neq:string
+   Artist.Name.eq:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Artist.ArtistId
+   .:Artist.Name
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
 if
-   or
-      eq:x:@config.get
-         .:
-      null:x:@config.get
+   exists:x:@.arguments/*/operator
    .lambda
 
-      // Oops ...!!
-      throw:No authorization token found in your configuration
-         public:bool:true
-         status:int:500
-.token
-set-value:x:@.token
-   strings.concat
-      .:"Bearer "
-      get-value:x:@config.get
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
 
-// Creating our URL.
-.url:"https://api.hubapi.com/crm/v3/objects/contacts"
-if
-   and
-      exists:x:@.arguments/*/after
-      not-null:x:@.arguments/*/after
-      neq:x:@.arguments/*/after
-         .:
-   .lambda
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-      // appending QUERY parameter to URL.
-      set-value:x:@.url
-         strings.concat
-            get-value:x:@.url
-            .:?after=
-            get-value:x:@.arguments/*/after
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
 
-// Reading contacts from HubSpot.
-http.get:x:@.url
-   convert:true
-   headers
-      Authorization:x:@.token
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
 
-// Verifying above invocation was a success.
-if
-   neq:x:@http.get
-      .:int:200
-   .lambda
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
 
-      // Oops ...!!
-      lambda2hyper:x:@http.get
-      log.error:Could not read contacts from HubSpot
-         message:x:@lambda2hyper
-      throw:Something went wrong as we tried to read contacts from HubSpot, check your log for details.
-         status:int:500
-         public:bool:true
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-// Returning result of invocation to caller.
-return-nodes:x:@http.get/*/content/*/results/*
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Artist
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

@@ -1,13 +1,57 @@
 /*
- * This example demonstrates implicit conversion for non-null object to
- * boolean. If an object is not bool, but it is non-null, during boolean
- * conversion it will automatically be defined as "true".
+ * HTTP endpoint taking filtering arguments and reading from database and creating a log invocation.
+ *
+ * The endpoint can select records from contacts and employees, and return rows to caller.
+ * If it's selecting records from employees, it will also send an email
  */
-.result
-.foo:whatever
-if:x:-
-   set-value:x:@.result
-      .:Yup!
-else
-   set-value:x:@.result
-      .:Nope!
+.arguments
+   type:string
+   email.like:string
+   name.like:string
+
+// Logging invocation
+log.debug:Fetching contacts or employees from CRM
+
+// Connecting to the specified database
+data.connect:crm
+
+   // Checking what to select
+   if
+      eq:x:@.arguments/*/type
+         .:contacts
+      .lambda
+
+         // Reading data from the contacts table
+         data.read
+            table:contacts
+            where
+               or
+                  email.eq:x:@.arguments/*/email.eq
+                  name.like:x:@.arguments/*/name.like
+
+         // Returning contacts info
+         yield
+            contacts:x:@data.read/*
+      else
+
+         // Reading data from the employees table
+         data.read
+            table:employees
+            where
+               or
+                  email.eq:x:@.arguments/*/email.eq
+                  name.like:x:@.arguments/*/name.like
+
+         // Sending an email
+         mail.smtp.send
+            message
+               to
+                  .
+                     name:Thomas Hansen
+                     email:thomas@ainiro.io
+               subject:Contact Access Alert
+               body:Somebody accessed the employees table.
+
+         // Returning employees info
+         yield
+            employees:x:@data.read/*

@@ -1,14 +1,41 @@
 
-// Hyperlambda workflow action that loads a specified file and return its content.
+// Workflow action executing the specified shell/bash command with the specified arguments, and returns the result to caller as a string
 .arguments
-   file
+   command
       type:string
       mandatory:bool:true
-.icon:insert_drive_file
+   args
+      type:string
+      mandatory:bool:false
+   structured
+      type:bool
+      mandatory:bool:false
+.icon:rocket_launch
 
-// Loads the specified file.
-load-file:x:@.arguments/*/file
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/command
+
+// Checking if we've got arguments.
+if
+   exists:x:@.arguments/*/args
+   .lambda
+
+      // Adding argument to invocation below.
+      add:x:../*/system.execute
+         .
+            get-value:x:@.arguments/*/args
+
+// Executes shell command
+system.execute:x:@.arguments/*/command
+   structured:x:@.arguments/*/structured
+
+/*
+ * Checking if caller wanted structured results, at which point we return an array
+ * containing lines returned from above invocation.
+ */
+if:x:@.arguments/*/structured
+   return-nodes:x:@system.execute/*
 
 // Returning result of above invocation to caller.
 yield
-   content:x:@load-file
+   result:x:@system.execute

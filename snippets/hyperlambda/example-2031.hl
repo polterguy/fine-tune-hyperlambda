@@ -1,59 +1,27 @@
 
-/*
- * Returns total discounts applied for quotes during period
- * 
- * Optionally apply limit, offset or filter as you see fit
- */
-.arguments
+// Hyperlambda example where [.lambda] runs when all conditions evaluate to true.
 
-   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
-   min_date:string
+// Runs [.lambda] if all conditions evaluate to true.
+.state
+.check1:int:2
+.check2:int:8
+if
+   and
 
-   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
-   max_date:string
+      // First condition: Less than
+      lt:x:@.check1
+         .:int:3
 
-// Making sure user is authorised to access the workflow.
-auth.ticket.verify:mnhc-admin
+      // Second condition: More than
+      mt:x:@.check2
+         .:int:7
+   .lambda
 
-// Opening up database connection.
-mssql.connect:[production|MNDG_LSC18-1]
+      // Updating [.state] to true
+      set-value:x:@.state
+         .:bool:true
+else
 
-   // Checking if we're filtering items on [min_date].
-   if
-      and
-         exists:x:@.arguments/*/min_date
-         not-null:x:@.arguments/*/min_date
-      .lambda
-         convert:x:@.arguments/*/min_date
-            type:date
-         unwrap:x:+/*/*
-         add:x:@mssql.connect/*/mssql.read/*/where/*/and
-            .
-               Document Date.mt:x:@convert
-
-   // Checking if we're filtering items on [max_date].
-   if
-      and
-         exists:x:@.arguments/*/max_date
-         not-null:x:@.arguments/*/max_date
-      .lambda
-         convert:x:@.arguments/*/max_date
-            type:date
-         unwrap:x:+/*/*
-         add:x:@mssql.connect/*/mssql.read/*/where/*/and
-            .
-               Document Date.lt:x:@convert
-
-   // Reading records.
-   mssql.read
-      table:addv_Cotizaciones
-      columns
-         sum((Quantity * [Unit Price]) - Amount)
-            as:TotalDiscountsApplied
-      where
-         and
-      limit:-1
-   
-   // Returning result of above invocation to caller.
-   yield
-      result:x:@mssql.read/*
+   // Updating [.state] to false
+   set-value:x:@.state
+      .:bool:false

@@ -1,89 +1,38 @@
-/*
- * Allows the user to verify his or her email address
- */
-.arguments
-   token:string
-   username:string
 
-/*
- * Returns the specified [key] configuration setting.
- *
- * Notice, to traverse into for instance magic.foo.bar, you'll have to colon separate
- * your path as follows "magic:foo:bar".
- */
-execute:magic.workflows.actions.execute
-   name:config
-   filename:/misc/workflows/actions/misc/config.hl
-   arguments
-      key:"magic:auth:secret"
+// Lists all tables in your MySQL instance.
+slots.create:magic.db.mssql.tables
 
-/*
- * Joins the specified [values] into a single string.
- *
- * Notice, the [separator] is inserted between each string. If no [separator] argument is provided,
- * the strings will simply be concatenated instead.
- */
-execute:magic.workflows.actions.execute
-   name:strings-join
-   filename:/misc/workflows/actions/strings/strings-join.hl
-   arguments
-      values
-         .:x:@.arguments/*/username
-         .:x:--/execute/=config/*/value
-      separator:,
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
 
-/*
- * Creates a hash of the specified [input].
- *
- * Use [algorithm] to override the default hashing algorithm used. The default hashing algorithm
- * is SHA 256.
- */
-execute:magic.workflows.actions.execute
-   name:hash
-   filename:/misc/workflows/actions/misc/hash.hl
-   arguments
-      input:x:--/execute/=strings-join/*/result
-      algorithm:sha256
+   // Opens up our connection
+   .connection:[master]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mssql.connect:x:@.connection
 
-/*
- * Executes the specified [action] if the specified [condition] is true.
- *
- * Will pass in all arguments specified to the action. The [condition] can be two different
- * values or expressions, and the [comparison] can be eq, neq, mt, mte, lt, lte, or some other
- * comparison operator.
- *
- * The action will use the [comparison] to compare the [lhs] and [rhs] values/expressions.
- */
-execute:magic.workflows.actions.execute
-   name:execute-action-if
-   filename:/misc/workflows/actions/misc/execute-action-if.hl
-   arguments
-      lhs:x:--/execute/=hash/*/result
-      comparison:neq
-      rhs:x:@.arguments/*/token
-      action:/misc/workflows/actions/misc/error.hl
-      arguments
-         message:Bogus token, go home!!
-         status:400
-         public:true
-
-/*
- * Associates the specified [username] with the specified [roles] roles.
- *
- * Notice, does not remove roles from user, only adds roles. This action will also throw
- * if you try to associate a user with a role the user is already associated with.
- */
-execute:magic.workflows.actions.execute
-   name:roles-add
-   filename:/modules/auth/workflows/actions/roles-add.hl
-   arguments
-      roles
-         .:guest
-      username:x:@.arguments/*/username
-
-// Redirects the client to the specified [url].
-execute:magic.workflows.actions.execute
-   name:http-redirect
-   filename:/misc/workflows/actions/http/http-redirect.hl
-   arguments
-      url:"https://ainiro.io"
+      // Runs our query
+      mssql.select:"select table_schema + '.' + table_name as \"table\"\n   from information_schema.tables\n   where table_type='base table' and table_name != 'sysdiagrams'"
+      return-nodes:x:@mssql.select/*

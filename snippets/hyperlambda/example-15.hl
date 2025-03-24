@@ -1,8 +1,17 @@
-
-// Create a Hyperlambda script that returns the reCAPTCHA key if required, otherwise returns null or an empty string.
-
-// Retrieving key configuration setting and returning to caller.
-config.get:"magic:auth:recaptcha:key"
-unwrap:x:+/*
-return-nodes
-   result:x:@config.get
+// Creates a new invoice and checks for success
+.invoice.status:unknown
+http.post:"https://billing.example.com/api/v1/invoices"
+   convert:true
+   payload
+      customer_id:int:101
+      amount:decimal:299.99
+      currency:NOK
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      set-value:x:@.invoice.status
+         .:Invoice created successfully

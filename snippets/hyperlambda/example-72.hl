@@ -1,15 +1,41 @@
 
-// Hyperlambda script that refreshes the currently authenticated user's token and returns a new JWT token with a new expiration date, ensuring the user is authorized.
+// Lists all tables in your MySQL instance.
+slots.create:magic.db.mysql.tables
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
 
-/*
- * Invokes [auth.ticket.refresh] that does the heavy lifting, and creates our JWT token,
- * making sure we return that token to caller.
- */
-auth.ticket.refresh
+   // Opens up our connection
+   .connection:[information_schema]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mysql.connect:x:@.connection
 
-// Returns the authentication JWT ticket created above to caller.
-yield
-   ticket:x:@auth.ticket.refresh
+      // Runs our query
+      mysql.select:"show full tables where Table_Type = 'BASE TABLE'"
+      remove-nodes:x:@mysql.select/*/*/Table_type
+      set-name:x:@mysql.select/*/*
+         .:table
+      return-nodes:x:@mysql.select/*

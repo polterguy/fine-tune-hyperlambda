@@ -1,17 +1,75 @@
 
-// Hyperlambda endpoint taking ZERO arguments. The SQL aggregates and returns the top 25 artists with the most albums from the chinook database.
+/*
+ * Lists products
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
 .arguments
 
-// Making sure user is authorized to invoke endpoint.
-auth.ticket.verify:root,admin
+   // Optional filtering argument allowing to filter items on No_ and Description.
+   filter:string
 
-// Connecting to database.
-data.connect:chinook
-   database-type:sqlite
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Script to aggregate records for each artist in chinook database.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect ar.Name, count(*) as count\n  from Album al, Artist ar where al.ArtistId = ar.ArtistId\n  group by al.ArtistId\n  order by count desc\n  limit 25\n"
-      database-type:sqlite
+   // Optional offset into records of where to start returning items.
+   offset:long
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Getting limit value, defaulting to 50
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:50
+
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:No_
+            .:Description
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Reading records.
+   mssql.read
+      table:addv_Productos
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         or
+   
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.read/*

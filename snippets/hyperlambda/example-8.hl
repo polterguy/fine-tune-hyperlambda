@@ -1,177 +1,135 @@
 
-// Slot that imports products from Shopify.
-slots.create:shopify.products.import
+// Hyperlambda that creates a default landing page for a type by copying a specified URL and embedding a chatbot.
+slots.create:magic.ai.create-landing-page
 
    // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/secret
-   validators.mandatory:x:@.arguments/*/shop
+   validators.mandatory:x:@.arguments/*/url
+   validators.mandatory:x:@.arguments/*/type
 
-   // Basic logging.
-   log.info:Starting import from Shopify
-      shop:x:@.arguments/*/shop
+   // Adding [headers] argument unless already specified.
+   if
+      not-exists:x:@.arguments/*/headers
+      .lambda
 
-   // Making sure we catch exceptions.
-   try
+         // Adding [headers] to [.arguments] such that we can create default HTTP headers further down.
+         add:x:@.arguments
+            .
+               headers
 
-      // Deleting old products.
-      data.connect:[generic|shopify]
-         database-type:sqlite
-         data.execute:delete from products
+   // Adding default headers unless they're already specified.
+   validators.default:x:@.arguments/*/headers
+      User-Agent:AINIRO-Crawler 2.0
+      Accept-Encoding:identity
+      Accept:text/xml
 
-      // Retrieving 20 products at the time.
-      .continue:bool:true
-      .page-info
-      while:x:@.continue
+   // Signaling frontend.
+   strings.concat
+      .:"Creating default landing page for "
+      get-value:x:@.arguments/*/type
+      .:" by copying "
+      get-value:x:@.arguments/*/url
+   log.info:Creating default landing page for type
+      type:x:@.arguments/*/type
+      url:x:@.arguments/*/url
+   unwrap:x:+/*/args/**
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:x:@strings.concat
+         type:info
+   sleep:100
 
-         // Creating our URL.
-         .url
-         if
-            not-null:x:@.page-info
-            .lambda
+   // Adding spacer.
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:------------------------------------------------------------------------------------------------------------------------
+         type:info
+   sleep:100
 
-               // Paging next result set.
-               set-value:x:@.url
-                  get-value:x:@.page-info
-         else
+   // Retrieving HTML document from URL specified.
+   add:x:./*/http.get
+      get-nodes:x:@.arguments/*/headers
+   http.get:x:@.arguments/*/url
 
-            // Retrieving first result set.
-            set-value:x:@.url
-               strings.concat
-                  .:"https://"
-                  get-value:x:@.arguments/*/shop
-                  .:.myshopify.com/admin/api/2023-07/products.json?limit=20&published_status=published&status=active
+   // Converting to lambda to verify we've got a "base" element.
+   html2lambda:x:@http.get/*/content
 
-         // Invoking Shopify.
-         http.get:x:@.url
-            headers
-               X-Shopify-Access-Token:x:@.arguments/*/secret
-            convert:true
+   // Checking if document has a "base" element.
+   if
+      not
+         exists:x:@html2lambda/*/html/*/head/*/base
+      .lambda
 
-         // Sanity checking HTTP request.
-         if
-            not
-               and
-                  mte:x:@http.get
-                     .:int:200
-                  lt:x:@http.get
-                     .:int:300
-            .lambda
+         // Adding base.
+         unwrap:x:+/*/*/*
+         add:x:@html2lambda/*/html/*/head
+            .
+               base
+                  @href:x:@.arguments/*/url
 
-               // Oops ...!!
-               lambda2hyper:x:@http.get
-               log.error:Something went wrong while invoking Shopify
-                  result:x:@lambda2hyper
-               throw:Something went wrong while invoking Shopify, check your log for details.
+   // Moving base to the top of "head" section.
+   insert-before:x:@html2lambda/*/html/*/head/0
+      get-nodes:x:@html2lambda/*/html/*/head/*/base
+   remove-nodes:x:@html2lambda/*/html/*/head/*/base/[1,2]
 
-         // Making sure we've got more products, and if not, aborting while.
-         if
-            not-exists:x:@http.get/*/content/*/products/*
-            .lambda
+   // Adding chatbot embed script to page.
+   .header:
+   set-value:x:@.header
+      get-first-value
+         config.get:"magic:white-label:default-header"
+         .:Ask about our products or services
+   set-value:x:@.header
+      strings.url-encode:x:@.header
+   .scheme:"https://"
+   if
+      strings.contains:x:@.arguments/*/host
+         .:localhost
+      .lambda
+         set-value:x:@.scheme
+            .:"http://"
+   .chatbot
+   set-value:x:@.chatbot
+      strings.concat
+         get-value:x:@.scheme
+         get-value:x:@.arguments/*/host
+         .:/magic/system/openai/include-chatbot.js?theme=modern-bubbles&type=
+         get-value:x:@.arguments/*/type
+         .:&header=
+         get-value:x:@.header
+         .:&button=AI%20Chatbot
+         .:&color=%23fefefe&start=%237892e5&end=%23142660&link=%23fe8464&v=
+         version
+         .:&follow_up=true
+   unwrap:x:"+/*/*/*/\\@src"
+   add:x:@html2lambda/*/html/*/body
+      .
+         script
+            @src:x:@.chatbot
+            @defer
 
-               // No more products.
-               set-value:x:@.continue
-                  .:bool:false
-         else
+   // Adding noindex to avoid duplicated content.
+   add:x:@html2lambda/*/html/*/head
+      .
+         meta
+            @name:robots
+            @content:noindex
 
-            /*
-             * We have more products, first figuring out [.page-info]
-             * such that we can offset next iteration.
-             */
-            strings.matches:x:@http.get/*/headers/*/Link
-               .:"<[^;]+\\/(\\w+\\.json[^;]+)>;\\srel=\"next\""
-            if
-               exists:x:@strings.matches/0
-               .lambda
+   // Inserting canonical if it doesn't exist from before.
+   if
+      not
+         exists:x:"@html2lambda/*/html/*/head/*/link/*/\\@rel/=canonical"
+      .lambda
+         unwrap:x:"+/*/*/*/\\@href"
+         add:x:@html2lambda/*/html/*/head
+            .
+               link
+                  @rel:canonical
+                  @href:x:@.arguments/*/url
 
-                  // We have a valid next page.
-                  strings.matches:x:@strings.matches/0
-                     .:[^<>]+
-                  if
-                     exists:x:@strings.matches/0
-                     .lambda
-
-                        // Valid next link.
-                        set-value:x:@.page-info
-                           get-value:x:@strings.matches/0
-                  else
-
-                     // No more pages.
-                     set-value:x:@.continue
-                        .:bool:false
-            else
-
-               // No more pages.
-               set-value:x:@.continue
-                  .:bool:false
-
-            /*
-             * Opening up our database connection, such that we can
-             * import products into our database.
-             */
-            data.connect:[generic|shopify]
-               database-type:sqlite
-
-               // Looping through each result from above invocation.
-               for-each:x:@http.get/*/content/*/products/*
-
-                  // Extracting the important parts to insert into our own database.
-                  .tmp
-                  set-value:x:@.tmp
-                     strings.concat
-                        .:<div>
-                        get-value:x:@.dp/#/*/body_html
-                        .:</div>
-                  html2markdown:x:@.tmp
-                  .data
-                     title:x:@.dp/#/*/title
-                     body_html:x:@html2markdown
-                     vendor:x:@.dp/#/*/vendor
-                     product_type:x:@.dp/#/*/product_type
-                     published_at:x:@.dp/#/*/published_at
-                     handle:x:@.dp/#/*/handle
-                     tags:x:@.dp/#/*/tags
-                  unwrap:x:@.data/*
-
-                  // Inserting product into database.
-                  data.create
-                     database-type:sqlite
-                     table:products
-                     values
-                        title:x:@.data/*/title
-                        body_html:x:@.data/*/body_html
-                        vendor:x:@.data/*/vendor
-                        product_type:x:@.data/*/product_type
-                        published_at:x:@.data/*/published_at
-                        handle:x:@.data/*/handle
-                        tags:x:@.data/*/tags
-
-                  // Inserting variants into database.
-                  for-each:x:@.dp/#/*/variants/*
-                     data.create
-                        database-type:sqlite
-                        table:variants
-                        values
-                           product_id:x:@for-each/@data.create
-                           price:x:@.dp/#/*/price
-                           title:x:@.dp/#/*/title
-
-                  // Inserting images into database.
-                  for-each:x:@.dp/#/*/images/*
-                     data.create
-                        database-type:sqlite
-                        table:images
-                        values
-                           product_id:x:@for-each/@data.create
-                           alt:x:@.dp/#/*/alt
-                           width:x:@.dp/#/*/width
-                           height:x:@.dp/#/*/height
-                           src:x:@.dp/#/*/src
-
-      // Basic logging.
-      log.info:Done importing products from Shopify
-         shop:x:@.arguments/*/shop
-   .catch
-
-      // Oops ...!!
-      log.error:Something went wrong during Shopify import
-         info:x:@.arguments/*/message
+   // Converting to HTML and saving to "/etc/www/" folder.
+   lambda2html:x:@html2lambda/*
+   strings.concat
+      .:/etc/www/
+      get-value:x:@.arguments/*/type
+      .:.html
+   io.file.save:x:@strings.concat
+      get-value:x:@lambda2html

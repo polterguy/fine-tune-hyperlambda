@@ -1,15 +1,55 @@
 
-// A Hyperlambda endpoint to count the number of tasks in the system given an optional filter.
+// Action associating the specified [username] with the specified [extra] fields.
 .arguments
-   filter:string
+   username
+      type:string
+      mandatory:bool:true
+   extra
+      type:key-value
+      mandatory:bool:true
+.icon:supervisor_account
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/extra
 
-// Retrieves all scheduled tasks in the system.
-tasks.count:x:@.arguments/*/filter
+// Connecting to database.
+data.connect:[generic|magic]
 
-// Returning the results of the evaluation to caller.
-unwrap:x:+/*
-return-nodes
-   count:x:@tasks.count
+   // Verifying user exists.
+   data.read
+      table:users
+      columns
+         username
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   // Verifying above invocation returned something.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+
+         // Oops ...!!
+         throw:No such user
+            username:x:@.arguments/*/username
+
+   // Adding extra fields to user.
+   for-each:x:@.arguments/*/extra/*
+      get-name:x:@.dp/#
+
+      // Deleting old value (if existing).
+      data.delete
+         table:users_extra
+         where
+            and
+               user.eq:x:@.arguments/*/username
+               type.eq:x:@get-name
+
+      // Inserting new value.
+      data.create
+         table:users_extra
+         values
+            user:x:@.arguments/*/username
+            type:x:@get-name
+            value:x:@.dp/#

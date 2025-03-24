@@ -1,24 +1,32 @@
 
-// Write a Hyperlambda script to list all connection strings in your installation for a specified database type.
-.arguments
-   databaseType:string
+// Ensures our system messages are updated during deployments.
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Listing all system messages we've got.
+io.file.list:/modules/finovo/system-messages/
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:pgsql
-   .:mssql
-   .:sqlite
+// Opening up database connection.
+data.connect:magic
 
-// Retrieves all connection strings according to database type specified.
-strings.concat
-   .:"magic:databases:"
-   get-value:x:@.arguments/*/databaseType
-config.section:x:-
-add:x:+
-   get-nodes:x:@config.section/*
-return
+   // Looping through each system message and updating our machine learning type accordingly.
+   for-each:x:@io.file.list/*
+
+      // Loading file.
+      io.file.load:x:@.dp/#
+
+      // Finding type name
+      .type
+      strings.split:x:@.dp/#
+         .:/
+      strings.split:x:-/0/-
+         .:.
+      set-value:x:@.type
+         get-value:x:@strings.split/0
+
+      // Updating type name's system message.
+      data.update
+         table:ml_types
+         values
+            system_message:x:@io.file.load
+         where
+            and
+               type.eq:x:@.type

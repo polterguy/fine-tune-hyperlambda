@@ -1,14 +1,63 @@
-// Applies env variable values into the system configuration
-.env
-   vars
-      port:int:8080
-      debug:bool:true
-      region:eu-west
-.system
-   port
-   debug
-   region
-for-each:x:@.env/*/vars/*
-   get-name:x:@.dp/#
-   set-value:x:@.system/*/{@get-name}
-      get-value:x:@.dp/#
+
+// Reads contacts from HubSpot
+.arguments
+   after:int
+
+// Retrieving token from configuration and verifying it exists.
+config.get:"magic:hubspot:token"
+if
+   or
+      eq:x:@config.get
+         .:
+      null:x:@config.get
+   .lambda
+
+      // Oops ...!!
+      throw:No authorization token found in your configuration
+         public:bool:true
+         status:int:500
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      get-value:x:@config.get
+
+// Creating our URL.
+.url:"https://api.hubapi.com/crm/v3/objects/contacts"
+if
+   and
+      exists:x:@.arguments/*/after
+      not-null:x:@.arguments/*/after
+      neq:x:@.arguments/*/after
+         .:
+   .lambda
+
+      // appending QUERY parameter to URL.
+      set-value:x:@.url
+         strings.concat
+            get-value:x:@.url
+            .:?after=
+            get-value:x:@.arguments/*/after
+
+// Reading contacts from HubSpot.
+http.get:x:@.url
+   convert:true
+   headers
+      Authorization:x:@.token
+
+// Verifying above invocation was a success.
+if
+   neq:x:@http.get
+      .:int:200
+   .lambda
+
+      // Oops ...!!
+      lambda2hyper:x:@http.get
+      log.error:Could not read contacts from HubSpot
+         message:x:@lambda2hyper
+      throw:Something went wrong as we tried to read contacts from HubSpot, check your log for details.
+         status:int:500
+         public:bool:true
+
+// Returning result of invocation to caller.
+return-nodes:x:@http.get/*/content/*/results/*

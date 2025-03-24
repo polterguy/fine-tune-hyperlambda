@@ -1,14 +1,27 @@
-/*
- * Loads the file and counts the number of lines by splitting on `\n`.
- */
 
-io.file.load:/README.md
-strings.split:x:@io.file.load
+// Create a function to return all existing payment subscription plans in the system. The function should find and execute all slots that declare subscription plans, each returning a name, description, price, currency, period (month or year), and Stripe price ID. The function should loop through these slots, execute them to retrieve the subscription plans, and return the plans to the caller. This setup allows the system to handle Stripe subscriptions effectively.
+slots.vocabulary:stripe.subscriptions.plans.
 
-   // We must ALWAYS use double quotes if we're adding special characters, or escaped characters, such as for instance \n
-   .:"\n"
+// Looping through each slot returned above and executing it.
+for-each:x:@slots.vocabulary/*
 
-// This node will have its value becoming the number of lines from the file
-.number-of-lines-in-file
-set-value:x:-
-   get-count:x:@strings.split/*
+   // Changing slot invocation name.
+   set-value:x:./*/execute
+      get-value:x:@.dp/#
+
+   /*
+    * Executing slot to retrieve supported providers.
+    * 
+    * Notice, name of slot (value of node) is dynamically created above.
+    */
+   execute
+
+   // Looping through all providers returned above to return them to client.
+   for-each:x:@execute/*
+
+      // Returning subscription plan to caller.
+      add:x:../*/return
+         get-nodes:x:@.dp/#
+
+// Returning subscription plans to caller.
+return

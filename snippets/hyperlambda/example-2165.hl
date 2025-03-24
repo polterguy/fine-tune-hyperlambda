@@ -1,6 +1,69 @@
+
+// Executes the specified SuiteQL query towards your NetSuite account
+.arguments
+
+   // Mandatory argument being your NetSuite query to execute.
+   q:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/q
+
 /*
- * Example: String consisting entirely of trim characters (result is empty).
+ * Returns an access token for NetSuite.
+ * 
+ * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
+ * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
+ * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
  */
-// Result: "" (empty string)
-strings.trim-start:"xxx"
-   .:"x"
+execute:magic.workflows.actions.execute
+   name:netsuite-get-access-token
+   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
+   arguments
+
+// Creating our idempotency key to prevent replay attacks.
+guid.new
+
+// Creating invocation URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://"
+      config.get:"magic:netsuite:account-id"
+      .:.suitetalk.api.netsuite.com/services/rest/query/v1/suiteql
+
+// Parametrizing our payload.
+add:x:./*/http.post/*/payload
+   get-nodes:x:@.arguments/*/q
+
+// Invoking our HTTP GET endpoint, now correctly parametrised.
+http.post:x:@.url
+   token:x:--/execute/=netsuite-get-access-token/*/access-token
+   headers
+      Prefer:transient
+      X-NetSuite-Idempotency-Key:x:@guid.new
+   payload
+
+// Converts the result to a lambda object.
+json2lambda:x:@http.post/*/content
+
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+
+      // Oops, error ...!!
+      lambda2hyper:x:@json2lambda
+      log.error:x:@lambda2hyper
+      throw:Could not create entity in NetSuite, check your log for details.
+
+// Cleaning up redundant stuff.
+remove-nodes:x:@json2lambda/*/items/*/*/links
+
+// Returning entities to caller.
+yield
+   items:x:@json2lambda/*/items/*

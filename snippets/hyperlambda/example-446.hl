@@ -1,79 +1,27 @@
 
-// Deletes the specified index from your database.
+// Imports training snippets into the specified [type]. Exah training snippet must contain a prompt and completion value.
 .arguments
-   databaseType:string
-   connectionString:string
-   databaseName:string
-   tableName:string
-   indexName:string
-   generate:bool
-
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   type:string
+   snippets:*
+   meta:string
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/connectionString
-validators.mandatory:x:@.arguments/*/databaseName
-validators.mandatory:x:@.arguments/*/tableName
-validators.mandatory:x:@.arguments/*/indexName
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:sqlite
-   .:pgsql
-   .:mssql
+validators.mandatory:x:@.arguments/*/type
 
-// SQL that executes to modify DDL.
-.sql
-switch:x:@.arguments/*/databaseType
-   case:mssql
-      set-value:x:@.sql
-         strings.concat
-            .:"drop index "
-            get-value:x:@.arguments/*/tableName
-            .:.
-            get-value:x:@.arguments/*/indexName
-   case:mysql
-      set-value:x:@.sql
-         strings.concat
-            .:"alter table "
-            get-value:x:@.arguments/*/tableName
-            .:" drop index "
-            get-value:x:@.arguments/*/indexName
-   default
-      set-value:x:@.sql
-         strings.concat
-            .:"drop index "
-            get-value:x:@.arguments/*/indexName
+// Connecting to database.
+data.connect:[generic|magic]
 
-// Checking if caller only wants to generate SQL statement.
-if:x:@.arguments/*/generate
-   unwrap:x:+/*
-   return
-      sql:x:@.sql
+   // Looping through each record specified in [snippets] collection.
+   for-each:x:@.arguments/*/snippets/*
 
-// Creating our database connection and executing SQL.
-strings.concat
-   .:[
-   get-value:x:@.arguments/*/connectionString
-   .:|
-   get-value:x:@.arguments/*/databaseName
-   .:]
-data.connect:x:-
-   database-type:x:@.arguments/*/databaseType
-   data.execute:x:@.sql
-      database-type:x:@.arguments/*/databaseType
+      // Verifying prompt is not null.
+      if:x:@.dp/#/*/prompt
 
-// Flushing database cache.
-strings.concat
-   .:magic.sql.databases.
-   get-value:x:@.arguments/*/databaseType
-   :.
-   get-value:x:@.arguments/*/connectionString
-cache.set:x:-
-
-// Returning result to caller.
-unwrap:x:+/*
-return
-   result:success
-   sql:x:@.sql
+         // Inserting into database.
+         data.create
+            table:ml_training_snippets
+            values
+               type:x:@.arguments/*/type
+               prompt:x:@.dp/#/*/prompt
+               completion:x:@.dp/#/*/completion
+               meta:x:@.arguments/*/meta

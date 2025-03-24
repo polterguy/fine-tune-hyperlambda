@@ -1,76 +1,100 @@
 
-/*
- * Lists sales
- * 
- * Optionally apply limit, offset or filter as you see fit
- */
+// Creates a new cloudlet
 .arguments
+   name:string
+   email:string
+   plan:string
+   cloudlet_name:string
 
-   // Optional filtering argument allowing to filter items on No_ and Description
-   filter:string
+/*
+ * Ensures the specified [arg] was given.
+ *
+ * This action will throw an exception with a descriptive text explaining if the argument is missing.
+ */
+execute:magic.workflows.actions.execute
+   name:validators-mandatory
+   filename:/misc/workflows/actions/validators/validators-mandatory.hl
+   arguments
+      arg:x:@.arguments/*/cloudlet_name
 
-   // Optional maximum number of records to return. Defaults to 10 if not specified.
-   limit:long
+/*
+ * Ensures the specified [arg] was given.
+ *
+ * This action will throw an exception with a descriptive text explaining if the argument is missing.
+ */
+execute:magic.workflows.actions.execute
+   name:validators-mandatory
+   filename:/misc/workflows/actions/validators/validators-mandatory.hl
+   arguments
+      arg:x:@.arguments/*/plan
 
-   // Optional offset into records of where to start returning items.
-   offset:long
+/*
+ * Ensures the specified [arg] was given.
+ *
+ * This action will throw an exception with a descriptive text explaining if the argument is missing.
+ */
+execute:magic.workflows.actions.execute
+   name:validators-mandatory
+   filename:/misc/workflows/actions/validators/validators-mandatory.hl
+   arguments
+      arg:x:@.arguments/*/name
 
-// Making sure user is authorised to access the workflow.
-auth.ticket.verify:mnhc-admin
+/*
+ * Ensures the specified [arg] was given.
+ *
+ * This action will throw an exception with a descriptive text explaining if the argument is missing.
+ */
+execute:magic.workflows.actions.execute
+   name:validators-mandatory
+   filename:/misc/workflows/actions/validators/validators-mandatory.hl
+   arguments
+      arg:x:@.arguments/*/email
 
-// Getting limit value, defaulting to 10
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:10
+/*
+ * Ensures the specified [email] is a valid emails.
+ *
+ * This action will throw an exception with a descriptive text if [email] is not a valid email.
+ */
+execute:magic.workflows.actions.execute
+   name:validators-email
+   filename:/misc/workflows/actions/validators/validators-email.hl
+   arguments
+      email:x:@.arguments/*/email
 
-// Getting offset value, defaulting to 0
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
 
-// Opening up database connection.
-mssql.connect:[production|MNDG_LSC18-1]
+/*
+ * Ensures user is authorized to access endpoint.
+ *
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/modules/auth/workflows/actions/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
 
-   // Checking if we're filtering items.
-   if
-      and
-         exists:x:@.arguments/*/filter
-         not-null:x:@.arguments/*/filter
-         neq:x:@.arguments/*/filter
-            .:
-      .lambda
+/*
+ * Returns the username of the currently authenticated user,
+ * or null if user isn't authenticated.
+ */
+execute:magic.workflows.actions.execute
+   name:username-get
+   filename:/modules/auth/workflows/actions/username-get.hl
+   arguments
 
-         // Creating our filtering condition. To filter on additional columns, add these columns here.
-         .fields
-            .:No_
-            .:Description
-            .:Source No_
-         for-each:x:@.fields/*
-            .condition
-               cond
-            set-name:x:@.condition/*
-               strings.concat
-                  get-value:x:@.dp/#
-                  .:.like
-            set-value:x:@.condition/*
-               strings.concat
-                  .:%
-                  get-value:x:@.arguments/*/filter
-                  .:%
-            add:x:@mssql.connect/*/mssql.read/*/where/*/or
-               get-nodes:x:@.condition/*
+// Creates a new cloudlet.
+execute:magic.workflows.actions.execute
+   name:hub-cloudlets-create
+   filename:/modules/hub/workflows/actions/hub-cloudlets-create.hl
+   arguments
+      name:x:@.arguments/*/name
+      email:x:@.arguments/*/email
+      cloudlet_name:x:@.arguments/*/cloudlet_name
+      username:x:--/execute/=username-get/*/username
+      plan:x:@.arguments/*/plan
 
-   // Reading records.
-   mssql.read
-      table:avwVentasDet
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         or
-   
-   // Returning result of above invocation to caller.
-   return-nodes:x:@mssql.read/*
+// Returns the result of your last action.
+return-nodes:x:@execute/*

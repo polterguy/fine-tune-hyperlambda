@@ -1,5 +1,30 @@
 
-// Create a Hyperlambda script to scrape a specified web page and include semantics.
-signal:magic.http.scrape-url
-   url:"https://www.cnn.com/2023/06/18/golf/wyndham-clark-2023-us-open-winner-spt-intl/index.html"
-   semantics:bool:true
+// Creates an item in your cloudlets table in your [generic|hub] database according to the specified arguments.
+.arguments
+   created:date
+   name:string
+   plan:string
+   cluster:string
+   user:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up database connection.
+data.connect:[generic|hub]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:cloudlets
+      return-id:bool:true
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      id:x:@data.create

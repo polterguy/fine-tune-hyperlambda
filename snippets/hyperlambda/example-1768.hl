@@ -1,44 +1,50 @@
 
-// Create a Hyperlambda script for an endpoint that counts items from the users_extra table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+// Counts items from your products table in your shopping-cart-demo database.
 .arguments
-   operator:string
-   type.eq:string
-   value.like:string
-   user.eq:string
+
+   // products table product_id column equality exact match filtering
+   products.product_id.eq:long
+
+   // products table name column wildcard filtering with SQL like '%' comparison
+   products.name.like:string
+
+   // products table name column equality exact match filtering
+   products.name.eq:string
+
+   // products table description column wildcard filtering with SQL like '%' comparison
+   products.description.like:string
+
+   // products table description column equality exact match filtering
+   products.description.eq:string
+
+   // products table sku column wildcard filtering with SQL like '%' comparison
+   products.sku.like:string
+
+   // products table sku column equality exact match filtering
+   products.sku.eq:string
+
+   // products table price column equality exact match filtering
+   products.price.eq:decimal
+
+   // products table image_url column wildcard filtering with SQL like '%' comparison
+   products.image_url.like:string
+
+   // products table image_url column equality exact match filtering
+   products.image_url.eq:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
-
-/*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
- */
-if
-   exists:x:@.arguments/*/operator
-   .lambda
-
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/0
-         get-value:x:@.arguments/*/operator
+auth.ticket.verify:root,admin
 
 // Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our read invocation.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/operator
-   remove-nodes:x:@.arguments/*/operator
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
    add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 
    // Reading data from database.
    data.read
-      table:users_extra
+      database-type:sqlite
+      table:products
       columns
          count(*)
             as:count

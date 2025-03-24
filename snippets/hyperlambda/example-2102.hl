@@ -1,35 +1,47 @@
-/*
- * This snippet demonstrates how to perform basic string manipulation by iterating 
- * through a collection of strings and transforming each one
- */
-.strings
-   string1:Hello World
-   string2:Hyperlambda is fun
-   string3:Magic Cloud
-   
-// Create a destination node to store our results
-.transformed
 
-// Iterate through each string and transform it
-for-each:x:@.strings/*
-   
-   // Get the current string value
-   .current-value:x:@.dp/#
+// Read or list records from your media table in your cms database
+.arguments
+   media.id.eq:long
+   media.post_id.eq:long
+   media.file_path.like:string
+   media.file_path.eq:string
+   media.file_type.like:string
+   media.file_type.eq:string
+   media.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
 
-   // Unwrapping above expression.
-   unwrap:x:-
-   
-   // Transform the string (uppercase + add exclamation)
-   strings.to-upper:x:@.current-value
-   strings.concat
-      get-value:x:@strings.to-upper
-      .:!
-   
-   // Add the transformed string to our results
-   unwrap:x:+/*/*
-   add:x:@.transformed
-      .
-         transformed-string:x:@strings.concat
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
 
-// Log our results
-log.info:Transformation complete
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:media
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  media.post_id:post_id.id
+      columns
+         media.id
+         media.post_id
+         media.file_path
+         media.file_type
+         media.created_at
+         post_id.title
+            as:post_id.title
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

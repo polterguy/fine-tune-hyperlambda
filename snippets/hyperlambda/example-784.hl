@@ -1,40 +1,27 @@
-
-// Returns subsidiary companies from specified org number
+/*
+ * Database CRUD example.
+ * Creates a new record in the 'users' table.
+ */
 .arguments
-   org_number:string
+   username:string
+   email:string
+   age:int
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/org_number
-set-value:x:@.arguments/*/org_number
-   strings.replace-not-of:x:@.arguments/*/org_number
-      .:0123456789
-      .:
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/email
+validators.email:x:@.arguments/*/email
 
-// Connecting to database.
-data.connect:[finovo|finovo]
-   database-type:pgsql
+// Must be 18!
+validators.integer:x:@.arguments/*/age
+   min:18
+   max:120
 
-   // Retrieving items.
-   data.read
-      database-type:pgsql
-      table:group_structure
-      columns
-         org_number
-         company_name
-         company_country_name
-         owned_percent
-      where
-         and
-            group_mother_orgnumber.eq:x:@.arguments/*/org_number
-            org_number.neq:x:@.arguments/*/org_number
-      limit:-1
-
-   // Verifying the company has subsidiaries.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         return
-            result:"This company doesn't have any subsidiaries"
-
-   // Returning result to caller.
-   return-nodes:x:@data.read/*
+data.connect:magic
+   data.create
+      table:users
+      values
+         username:x:@.arguments/*/username
+         email:x:@.arguments/*/email
+         age:x:@.arguments/*/age
+yield
+   id:x:@data.select/*/*/id

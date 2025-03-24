@@ -1,33 +1,44 @@
 
-// Write a Hyperlambda script to rename a specified file or folder.
+// Write a Hyperlambda script to create a new training snippet with optional URL, prompt, completion, and type.
 .arguments
-   oldName:string
-   newName:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Optional URL for citations
+   uri:string
 
-// Basic logging.
-log.info:Renaming file object
-   old_name:x:@.arguments/*/oldName
-   new_name:x:@.arguments/*/newName
+   // Mandatory prompt or short one liner description
+   prompt:string
 
-// Checking if specified object is a file or a folder.
-if
-   io.folder.exists:x:@.arguments/*/oldName
-   .lambda
+   // Mandatory completion being the content or body of your snippet
+   completion:string
 
-      // File object is a folder, renaming it.
-      io.folder.move:x:@.arguments/*/oldName
-         get-value:x:@.arguments/*/newName
-else
+   // Mandatory machine learning to to associate snippet with
+   type:string
 
-   // File object is a file, renaming it.
-   io.file.move:x:@.arguments/*/oldName
-      strings.concat
-         io.path.get-folder:x:@.arguments/*/oldName
-         get-value:x:@.arguments/*/newName
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,service
 
-// Returning result to caller.
-return-nodes
-   result:success
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Verifying user can create more snippets.
+   add:x:+
+      get-nodes:x:@.arguments/*/type
+   try-signal:magic.ai.can-create-snippet
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:ml_training_snippets
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

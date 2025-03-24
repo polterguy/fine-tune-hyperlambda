@@ -1,23 +1,26 @@
 
-// Hyperlambda script creating a new scheduled task according to specified arguments.
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one item from the roles table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
 .arguments
-   id:string
-   description:string
-   hyperlambda:string
+   name:string
 
-// Ensures user is authorized to access endpoint.
+// Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/name
 
-// Converting Hyperlambda to lambda.
-hyper2lambda:x:@.arguments/*/hyperlambda
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-// Creates task.
-add:x:../*/tasks.create/*/.lambda
-   get-nodes:x:@hyper2lambda/*
-tasks.create:x:@.arguments/*/id
-   description:x:@.arguments/*/description
-   .lambda
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-// Returning success to caller.
-return
-   result:success
+   // Deleting item from database.
+   data.delete
+      table:roles
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,51 +1,54 @@
 
-// Create one record in your media table in your cms database
+// Create a Hyperlambda script for a CRUD read endpoint with paging, sorting, and filtering that selects records from the questions table in the magic database, returning question_id, question, and questionnaire, ensuring authentication and authorization for root and admin roles.
 .arguments
-
-   // post_id column value
-   post_id:long
-
-   // file_path column value
-   file_path:string
-
-   // file_type column value
-   file_type:string
-
-   // created_at column value
-   created_at:date
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   questions.question_id.eq:long
+   questions.question.like:string
+   questions.question.eq:string
+   questions.questionnaire.like:string
+   questions.questionnaire.eq:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
+auth.ticket.verify:root
 
-// Opening up database connection.
-data.connect:[generic|cms]
+// Opening up our database connection.
+data.connect:[generic|magic]
    database-type:sqlite
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
       get-nodes:x:@.arguments/*
 
-   // Creating our record.
-   data.create
+   // Reading data from database.
+   data.read
       database-type:sqlite
-      table:media
-      return-id:bool:true
-      values
+      table:questions
+      columns
+         questions.question_id
+         questions.question
+         questions.questionnaire
+         questions.type
+         questions.context
+         questions.name
+      where
+         and
 
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   add:x:./*/sockets.signal
-      get-nodes:x:@auth.ticket.verify
-   set-name:x:./*/sockets.signal/*/auth.ticket.verify
-      .:roles
-   sockets.signal:cms.media.post
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

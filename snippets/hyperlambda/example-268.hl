@@ -1,19 +1,23 @@
-
 /*
- * Endpoint that takes any arguments, converts all arguments to integers, adds all together, and returns result
- * 
- * Pass in whatever arguments you wish.
+ * Hyperlambda action that returns artists and count of records per artist, sorted by artist having the most albums.
  */
-.arguments:*
+.arguments
 
-// Adding all arguments
-.result:int:0
-for-each:x:@.arguments/*
-   set-value:x:@.result
-      math.add:x:@.result
-         convert:x:@.dp/#
-            type:int
+   // Notice, action syntax
+   filter
+      type:string
+      mandatory:bool:true
 
-// Returning result (notice, [yield] unwraps all its arguments)
-yield
-   result:x:@.result
+// This becomes the icon used to show the activity in your toolbox
+.icon:home
+
+data.connect:chinook
+   data.select:@"
+select ar.Name, count(*) as count
+   from Album al, Artist ar where al.ArtistId = ar.ArtistId
+   and ar.Name like @filter
+   group by al.ArtistId
+   order by count desc
+   limit 25"
+      @filter:x:@.arguments/*/filter
+   return:x:-/*

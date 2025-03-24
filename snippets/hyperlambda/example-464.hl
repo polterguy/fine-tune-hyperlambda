@@ -1,40 +1,57 @@
 /*
- * Compiles a snippet of C# code down to a library,
- * for then to dynamically load it as a plugin.
+ * Returns a grouped chart image to caller.
+ * 
+ * Values is a mandatory comma separated list of values.
  */
-system.compile
-   references
-      .:netstandard
-      .:System.Runtime
-      .:System.Private.CoreLib
-      .:magic.node
-      .:magic.node.extensions
-      .:magic.signals.contracts
-   code:@"
+.arguments:*
 
-// Example C# code creating a Hyperlambda slot.
-using System;
-using magic.node;
-using magic.node.extensions;
-using magic.signals.contracts;
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/ticks
+validators.mandatory:x:@.arguments/*/legend
+validators.mandatory:x:@.arguments/*/values1
 
-// Our slot class.
-[Slot(Name = ""foo"")]
-public class Foo : ISlot
-{
-   public void Signal(ISignaler signaler, Node input)
-   {
-      input.Value = $""Hi {input.GetEx<string>()}, how may I assist you?"";
-   }
-}"
-   assembly-name:foo.dll
+// Creating our individual bars.
+.bars
+for-each:x:@.arguments/*
+   get-name:x:@.dp/#
+   if
+      strings.starts-with:x:@get-name
+         .:values
+      .lambda
 
-// Loading assembly from raw bytes now that we've created it.
-system.plugin.load:x:@system.compile
+         // Adding primary node for bar.
+         add:x:@.bars
+            .
+               .
 
-// Executing [foo] slot now dynamically injected into AppDomain.
-.name:John Doe
-foo:x:@.name
+         // Adding values for individual cells.
+         add:x:@.bars/0/-
+            strings.split:x:@.dp/#
+               .:,
 
-// Unloading plugin.
-system.plugin.unload:foo.dll
+// Creating our individual ticks.
+add:x:../*/image.chart/*/ticks
+   strings.split:x:@.arguments/*/ticks
+      .:,
+
+// Creating our legend.
+add:x:../*/image.chart/*/legend
+   strings.split:x:@.arguments/*/legend
+      .:,
+
+// Parametrizing [image.chart] invocation.
+add:x:../*/image.chart/*/bars
+   get-nodes:x:@.bars/*
+image.chart:grouped
+   width:800
+   height:500
+   bars
+   ticks
+   legend
+
+// Applying correct HTTP header.
+response.headers.set
+   Content-Type:application/octet-stream
+
+// Returning chart to caller.
+return:x:@image.chart

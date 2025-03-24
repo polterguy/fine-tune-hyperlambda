@@ -1,39 +1,71 @@
-/*
- * Sends a welcome email to all new employees.
- * Includes HR Manager in CC and logs all messages via BCC to an internal archive.
- */
 
-.company
-   new_hires
-      .
-         name:Emily Zhang
-         email:emily@acme.com
-      .
-         name:Noah Clarke
-         email:noah@acme.com
-      .
-         name:Liam Davis
-         email:liam@acme.com
-for-each:x:@.company/*/new_hires/*
-   unwrap:x:+/**
-   mail.smtp.send
-      message
-         to
-            .
-               name:x:@.dp/#/*/name
-               email:x:@.dp/#/*/email
-         cc
-            .
-               name:HR Manager
-               email:manager.hr@acme.com
-         bcc
-            .
-               name:System Archive
-               email:archive@acme.com
-         from
-            .
-               name:HR Team
-               email:hr@acme.com
-         subject:Welcome to the Company!
-         entity:text/plain
-            content:We're excited to have you on the team! Please check your onboarding tasks in the portal.
+// Creates a new object in NetSuite of the specified type
+.arguments
+
+   // Mandatory argument declaring the type of entity we want to create.
+   type:string
+
+   // Mandatory argument declaring the actual content of the new entity we want to create.
+   object:*
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/object
+validators.mandatory:x:@.arguments/*/object/0
+
+/*
+ * Returns an access token for NetSuite.
+ * 
+ * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
+ * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
+ * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
+ */
+execute:magic.workflows.actions.execute
+   name:netsuite-get-access-token
+   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
+   arguments
+
+// Creating our idempotency key to prevent replay attacks.
+guid.new
+
+// Creating invocation URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://"
+      config.get:"magic:netsuite:account-id"
+      .:.suitetalk.api.netsuite.com/services/rest/record/v1
+      .:/
+      get-value:x:@.arguments/*/type
+
+// Parametrizing our payload.
+add:x:./*/http.post/*/payload
+   get-nodes:x:@.arguments/*/object/*
+
+// Invoking our HTTP GET endpoint, now correctly parametrised.
+http.post:x:@.url
+   token:x:--/execute/=netsuite-get-access-token/*/access-token
+   headers
+      X-NetSuite-Idempotency-Key:x:@guid.new
+      Content-Type:application/json; charset=UTF-8
+   payload
+
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+
+      // Oops, error ...!!
+      json2lambda:x:@http.post
+      lambda2hyper:x:@json2lambda
+      log.error:x:@lambda2hyper
+      throw:Could not create entity in NetSuite, check your log for details.
+
+// Returning success to caller.
+return
+   result:success

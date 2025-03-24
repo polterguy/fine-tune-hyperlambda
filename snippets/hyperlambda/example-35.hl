@@ -1,61 +1,45 @@
 
-// Read or list records from your Categories table in your northwind database
-.arguments
+// Dynamic Hyperlambda slot that invokes an HTTP endpoint using POST, passing in arguments as payload, ensuring the user is authorized.
+slots.create:magic.http.post
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
 
-   // Offset into the dataset of where to start retrieving records
-   offset:long
+   // Retrieving URL.
+   .url:x:@.arguments/*/url
+   unwrap:x:@.url
+   remove-nodes:x:@.arguments/*/url
 
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // filtering (optional)
-   Categories.CategoryID.eq:long
-   Categories.CategoryName.like:string
-   Categories.CategoryName.eq:string
-   Categories.Description.like:string
-   Categories.Description.eq:string
-   Categories.Picture.like:string
-   Categories.Picture.eq:string
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Parametrising our read invocation with ordering arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-
-   // Parametrising our read invocation with paging arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
+   // Decorating invocation.
+   unwrap:x:./*/http.post
+   add:x:./*/http.post/*/payload
       get-nodes:x:@.arguments/*
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Categories
-      columns
-         Categories.CategoryID
-         Categories.CategoryName
-         Categories.Description
-         Categories.Picture
-      where
-         and
+   // Invoking endpoint.
+   http.post:x:@.url
+      payload
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+   // Verifying invocation was a success.
+   if
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+      .lambda
+
+         // Success!
+         add:x:./*/log.info
+            get-nodes:x:@.arguments/*
+         log.info:Webhook successfull invoked
+            url:x:@.url
+   else
+
+      // Failure!
+      add:x:./*/log.info
+         get-nodes:x:@.arguments/*
+      lambda2hyper:x:@http.post/*/content
+      log.error:Webhook failed
+         url:x:@.url
+         content:x:@lambda2hyper

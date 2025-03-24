@@ -1,6 +1,35 @@
-// Check if nodes exists
-.src1
-   foo
-.src2
-exists:x:@.src1/*
-exists:x:@.src2/*
+// Attempts to register a user, throws on 500, fallback message on other errors, and return success to caller if the invocation was a success
+
+.arguments
+
+// Status to return
+.register.status
+
+// Invoking GET
+http.post:"https://api.example.com/users/register"
+   convert:true
+   payload
+      username:alice
+      email:alice@example.com
+      password:Secure123!
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      set-value:x:@.register.status
+         .:Registration successful
+else-if
+   eq:x:@http.post
+      .:int:500
+   .lambda
+      throw
+         .:Internal server error during registration (500)
+else
+   set-value:x:@.register.status
+      .:Registration failed
+
+yield
+   result:x:@.register.status

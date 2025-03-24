@@ -1,43 +1,17 @@
-
-// Hyperlambda action to validate a Magic CAPTCHA token with optional 'workload' and 'age'. Only validate if the user is not in the 'root' role. Default 'workload' to 3 and 'age' to 10000 milliseconds.
-.arguments
-   token
-      type:string
-      mandatory:bool:true
-   workload
-      type:int
-      mandatory:bool:false
-      default:int:3
-   age
-      type:int
-      mandatory:bool:false
-      default:int:10000
-.icon:shield
-
-// Notice, we only validate token if user is not root.
-if
-   not
-      auth.ticket.in-role:root
-   .lambda
-
-      // [token] is a mandatory field.
-      validators.mandatory:x:@.arguments/*/token
-
-      // Defaulting [workload] to 3 and age to 10 seconds.
-      validators.default:x:@.arguments
-         workload:int:3
-         age:int:10000
-
-      // Converting to correct types.
-      set-value:x:@.arguments/*/workload
-         convert:x:@.arguments/*/workload
-            type:int
-      set-value:x:@.arguments/*/age
-         convert:x:@.arguments/*/age
-            type:int
-
-      // Validating token with specified [workload] and [age].
-      execute:magic.auth.captcha-verify
-         token:x:@.arguments/*/token
-         workload:x:@.arguments/*/workload
-         age:x:@.arguments/*/age
+/*
+ * This file opens a connection to the 'marketing' database and selects the top 10 records
+ * from the 'campaigns' table where the email contains 'mailchimp' and the 'company' field
+ * is Microsoft.
+ */
+data.connect:[generic|marketing]
+   database-type:sqlite
+   data.read
+      database-type:sqlite
+      table:campaigns
+      
+      // [data.read] slot will automatically convert the following argument to a long value
+      limit:10
+      where
+         and
+            email.like:%mailchimp%
+            company.eq:Microsoft

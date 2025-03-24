@@ -1,63 +1,20 @@
 
-// Write a Hyperlambda script to create a system message from specified arguments, including URL, template, and instruction.
+// Provide a Hyperlambda example where an order status is updated in the 'ecommerce_db' database within the 'orders' table.
+
+// Updates an order status in the "ecommerce_db" database within the "orders" table.
 .arguments
-   url:string
-   template:string
-   instruction:string
-   channel:string
+   order_id:int
+data.connect:ecommerce_db
+   database-type:mssql
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/url
-validators.mandatory:x:@.arguments/*/channel
-validators.mandatory:x:@.arguments/*/template
-validators.mandatory:x:@.arguments/*/instruction
-
-// Prepending scheme to URL unless explicitly specified.
-if
-   and
-      not
-         strings.starts-with:x:@.arguments/*/url
-            .:"http://"
-      not
-         strings.starts-with:x:@.arguments/*/url
-            .:"https://"
-   .lambda
-      set-value:x:@.arguments/*/url
-         strings.concat
-            .:"https://"
-            get-value:x:@.arguments/*/url
-
-// Sanity checking URL.
-validators.url:x:@.arguments/*/url
-
-// Doing heavy lifting on a background thread to avoid 60 second timeouts.
-insert-before:x:./*/fork/0
-   get-nodes:x:@.arguments
-fork
-   try
-
-      // Creating our system message.
-      execute:magic.ai.create-system-message
-         url:x:@.arguments/*/url
-         template:x:@.arguments/*/template
-         instruction:x:@.arguments/*/instruction
-
-      // Invoking frontend with message.
-      unwrap:x:+/*/*/message
-      sockets.signal:x:@.arguments/*/channel
-         roles:root
-         args
-            message:x:@execute
-   .catch
-
-      // Oops, signaling frontend that we experienced an error.
-      unwrap:x:+/*/*
-      sockets.signal:x:@.arguments/@.arguments/*/channel
-         roles:root
-         args
-            message:ERROR
-            extra:x:@.arguments/*/message
-
-// Returning result of invocation to caller.
-yield
-   result:success
+   // Updating the order status.
+   data.update
+      database-type:mssql
+      table:orders
+      values
+         order_status:shipped
+         shipped_date:date:"2025-04-01T00:00:00.000"
+      where
+         and
+            order_id.eq:x:@.arguments/*/order_id
+   return:x:@data.update

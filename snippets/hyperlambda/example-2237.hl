@@ -1,36 +1,12 @@
+// Combining the words of an ancient prophecy into one.
 
-// Returns parent company from specified org number
-.arguments
-   org_number:string
+.scroll-part1:Elders
+.scroll-part2:" of the Universe"
+.final-scroll
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/org_number
-set-value:x:@.arguments/*/org_number
-   strings.replace-not-of:x:@.arguments/*/org_number
-      .:0123456789
-      .:
+set-value:x:@.final-scroll
+   strings.concat
+      get-value:x:@.scroll-part1
+      get-value:x:@.scroll-part2
 
-// Connecting to database.
-data.connect:[finovo|finovo]
-   database-type:pgsql
-
-   // Retrieving items.
-   data.read
-      database-type:pgsql
-      table:group_structure
-      columns
-         group_mother_orgnumber
-      where
-         and
-            org_number.eq:x:@.arguments/*/org_number
-      limit:-1
-
-   // Verifying the company has a parent company.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         return
-            result:"This company doesn't have any parent company"
-
-   // Returning result to caller.
-   return-nodes:x:@data.read/*
+// After execution, .final-scroll contains "Elders of the Universe".

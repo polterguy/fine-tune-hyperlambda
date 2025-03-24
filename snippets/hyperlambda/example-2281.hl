@@ -1,25 +1,63 @@
 
-// Hyperlambda script that deletes all existing vectors for a specified model.
+// Update endpoint updating one record in your products table in your shopping-cart-demo database.
 .arguments
-   type:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // product_id column value being primary key of record to update
+   product_id:long
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
+   // name column's new value
+   name:string
 
-// Connecting to database.
-data.connect:[generic|magic]
+   // description column's new value
+   description:string
 
-   // Deleting VSS data.
-   data.execute:delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type)
-      @type:x:@.arguments/*/type
+   // sku column's new value
+   sku:string
 
-   // Deleting embeddings.
-   data.execute:update ml_training_snippets set embedding = null where type = @type
-      @type:x:@.arguments/*/type
+   // price column's new value
+   price:decimal
 
-// Returning success to caller.
-return
-   result:success
+   // image_url column's new value
+   image_url:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/product_id
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:products
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

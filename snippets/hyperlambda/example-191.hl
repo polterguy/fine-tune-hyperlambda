@@ -1,130 +1,98 @@
 
-// Deletes a specified cloudlet and its associated subscription.
+// Returns minimum, maximum, average or sum from your Artist table in your chinook database
 .arguments
-   id:long
 
-// Ensuring user is authorised to invoke endpoint.
-auth.ticket.verify:root, admin, account_manager
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
 
-// Sanity checking invocation
-validators.mandatory:x:@.arguments/*/id
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
 
-// Retrieving name of cloudlet.
-.name
-.username
-.cluster
-data.connect:[generic|hub]
-   data.read
-      table:cloudlets
-      columns
-         name
-         user
-         cluster
-      where
-         and
-            id.eq:x:@.arguments/*/id
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
 
-   // Making sure cloudlet exists
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         throw:Cloudlet does not exist
-            public:true
-            status:404
+   // Optional filtering arguments.
+   // `.mt` implies 'more than', `.lt` implies 'less than, `.eq'` implies 'equal to', `.mteq` implies 'more than or equal, etc.
+   Artist.ArtistId.mt:long
+   Artist.ArtistId.lt:long
+   Artist.ArtistId.mteq:long
+   Artist.ArtistId.lteq:long
+   Artist.ArtistId.neq:long
+   Artist.ArtistId.eq:long
+   Artist.Name.like:string
+   Artist.Name.mt:string
+   Artist.Name.lt:string
+   Artist.Name.mteq:string
+   Artist.Name.lteq:string
+   Artist.Name.neq:string
+   Artist.Name.eq:string
 
-   // Setting temporary values.
-   set-value:x:@.name
-      get-value:x:@data.read/*/*/name
-   set-value:x:@.username
-      get-value:x:@data.read/*/*/user
-   set-value:x:@.cluster
-      get-value:x:@data.read/*/*/cluster
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:Artist.ArtistId
+   .:Artist.Name
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
 
 /*
- * Checking if there exists a subscription for cloudlet,
- * at which point we forward deletion to stripe module since the Stripe
- * module will delete the cloudlet automatically through its callback sinks.
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
  */
-data.connect:[generic|stripe]
+if
+   exists:x:@.arguments/*/operator
+   .lambda
 
-   // Checking if we can find subscription for cloudlet.
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
    data.read
-      table:subscriptions
-      values
-         subscription
+      database-type:sqlite
+      table:Artist
+      columns
+         aggregate_functor
+            as:result
       where
          and
-            username.eq:x:@.username
-            meta.eq:x:@.name
+      limit:long:1
 
-   // Checking if subscription exists for cloudlet.
-   if
-      exists:x:@data.read/*/*
-      .lambda
-
-         /*
-          * Deleting subscription information associated with cloudlet.
-          * Due to the way the Stripe module and HUB is connected, this will invoke
-          * Stripe callback sink, deleting the cloudlet after the subscription is deleted.
-          */
-         unwrap:x:+/*
-         io.file.execute:/modules/stripe/admin/subscriptions.delete.hl
-            subscription:x:@data.read/*/*/subscription
-            username:x:../*/.username
-
-         // Returning success to caller
-         return
-            affected:int:1
-            subscriptions_deleted:int:1
-   else
-
-      // No Stripe subscription associated with cloudlet, hence manually deleting it.
-      .name
-      set-value:x:@.name
-         strings.concat
-            get-value:x:../*/.name
-            .:-
-            get-value:x:@.username
-      unwrap:x:+/*
-      signal:hub.cloudlets.hard-delete
-         cluster:x:@.cluster
-         name:x:@.name
-
-      /*
-       * Checking if there exists scheduled tasks associated with the cloudlet,
-       * and if so deleting all tasks associated with cloudlet.
-       */
-      strings.concat
-         .:cloudlet-
-         get-value:x:@.name
-         .:-%
-      tasks.list:x:@strings.concat
-         limit:1000
-      for-each:x:@tasks.list/*
-         tasks.delete:x:@.dp/#/*/id
-
-      // Doing some basic logging.
-      get-count:x:@tasks.list/*
-      log.debug:Tasks associated with cloudlet has been deleted
-         name:x:@.name
-         user:x:@.username
-         no_tasks:x:@get-count
-
-      // Deleting item from database.
-      data.connect:[generic|hub]
-         data.delete
-            table:cloudlets
-            where
-               and
-                  name.eq:x:../*/.name
-                  user.eq:x:@.username
-
-         // Doing some basic logging
-         log.info:Cloudlet successfully destroyed
-            name:x:../*/.name
-            user:x:@.username
-
-         // Returning result of above invocation to caller.
-         unwrap:x:+/*
-         return
-            affected:x:@data.delete
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

@@ -1,121 +1,23 @@
 
-// Hyperlambda script that searches DuckDuckGo for some query, finds URLs matching a CSS selector, scrapes each URL, and returns the aggregated result as a single Markdown.
-slots.create:magic.http.duckduckgo-and-scrape
+// Updates an existing object of the specified type with the specified fields
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/query
-   validators.string:x:@.arguments/*/query
-      min:3
-      max:250
-   validators.integer:x:@.arguments/*/max
-      min:1
-      max:10
+   // Type of object to update. Mandatory.
+   type:string
 
-   // Searching DuckDuckGo for matches.
-   add:x:+
-      get-nodes:x:@.arguments/*
-   signal:magic.http.duckduckgo-search
+   // Id of object to update. Mandatory.
+   id:long
 
-   // Checking if we've got a session, and if so, notifying user using web sockets.
-   if
-      exists:x:@.arguments/*/session
-      .lambda
-         for-each:x:@signal/*/result/*
-            strings.concat
-               .:"Scraping: "
-               get-value:x:@.dp/#/*/url
-            unwrap:x:+/**
-            sockets.signal:x:@.arguments/*/session
-               args
-                  message:x:@strings.concat
-                  type:system
-            sleep:100
+   // Key/value list of fields to update in object. Mandatory.
+   object:*
 
-   // Building our execution object that fetches all URLs simultaneously in parallel.
-   .exe
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
 
-      // Waiting for all scraping operations to return.
-      join
-   for-each:x:@signal/*/result/*
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-update-record.hl
 
-      // Dynamically contructing our lambda object.
-      .cur
-         fork
-            .reference
-            try
-               unwrap:x:+/*
-               signal:magic.http.scrape-url
-                  url:x:@.reference/*/url
-                  semantics:bool:true
-               if
-                  exists:x:@.reference/*/session
-                  .lambda
-                     strings.concat
-                        .:"Done scraping "
-                        get-value:x:@.reference/*/url
-                     unwrap:x:+/**
-                     sockets.signal:x:@.reference/*/session
-                        args
-                           message:x:@strings.concat
-                           type:system
-            .catch
-               log.error:Could not scrape URL
-                  url:x:@.reference/*/url
-                  message:x:@.arguments/*/message
-
-      // Adding URL and title as reference to currently iterated [fork].
-      add:x:+/+/*
-         get-nodes:x:@.arguments/*/session
-      unwrap:x:+/*/*
-      add:x:@.cur/*/fork/*/.reference
-         .
-            url:x:@.dp/#/*/url
-            title:x:@.dp/#/*/title
-
-      // Adding current thread to above [join].
-      add:x:@.exe/*/join
-         get-nodes:x:@.cur/*
-
-   // Executing [.exe] retrieving all URLs in parallel.
-   eval:x:@.exe
-   remove-nodes:x:@.exe/**/session
-
-   // Signaling caller on sockets.
-   if
-      exists:x:@.arguments/*/session
-      .lambda
-         sockets.signal:x:@.arguments/*/session
-            args
-               message:Building context
-               type:system
-         sleep:100
-
-   /*
-    * Iterating through each above result,
-    * returning result to caller.
-    * 
-    * Notice, we only iterate through invocations that have result, and
-    * did not timeout by verifying [signal] slot has children.
-    */
-   for-each:x:@.exe/*/join/*/fork
-
-      // Verifying currently iterated node has result, containing both prompt and completion.
-      if
-         exists:x:@.dp/#/*/try/*/signal/*/*/prompt/./*/completion
-         .lambda
-
-            // Adding primary return lambda to [return] below.
-            unwrap:x:+/*/*/*
-            add:x:../*/return
-               .
-                  .
-                     url:x:@.dp/#/*/.reference/*/url
-                     title:x:@.dp/#/*/.reference/*/title
-                     snippets
-
-            // Adding [snippets] to return below.
-            add:x:../*/return/0/-/*/snippets
-               get-nodes:x:@.dp/#/*/try/*/signal/*
-
-   // Returning result of invocation to caller.
-   return
+// Returning result to caller.
+return-nodes:x:@execute-file/*

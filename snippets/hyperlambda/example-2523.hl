@@ -1,42 +1,41 @@
 
-// Updates an existing item in your cloudlets table in your [generic|hub] database according to the specified arguments.
+// Counts items from your categories table in your cms database
 .arguments
-   id:long
-   name:string
-   plan:string
-   cluster:string
-   user:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+
+   // Offset into the dataset of where to start retrieving records
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   categories.id.eq:long
+
+   // Filtering arguments
+   categories.name.like:string
+   categories.name.eq:string
+   categories.description.like:string
+   categories.description.eq:string
 
 // Verifying user is authorized to access endpoint.
-validators.mandatory:x:@.arguments/*/id
-auth.ticket.verify:root
+auth.ticket.verify:guest
 
 // Opening up our database connection.
-data.connect:[generic|hub]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-   // Invoking our update slot.
-   data.update
-      table:cloudlets
-      values
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:categories
+      columns
+         count(*)
+            as:count
       where
          and
+      limit:long:1
 
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning success to caller.
-   response.status.set:202
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

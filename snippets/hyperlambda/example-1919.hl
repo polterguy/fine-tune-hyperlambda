@@ -1,22 +1,17 @@
-/*
- * FILE: /modules/api/sql/multiple-results.get.hl
- *
- * DESCRIPTION:
- * Demonstrates how to use [data.select] with multiple SQL statements.
- * Returns multiple result sets as arrays.
- *
- * HOW TO CREATE THIS ENDPOINT:
- * Save the file as `/modules/api/sql/multiple-results.get.hl`.
- * Becomes accessible at:
- *     GET /modules/api/sql/multiple-results
- *
- * NOTES:
- * - Be cautious when using raw SQL; it must be sanitized or parameterized in production use.
- */
 
-data.connect:sakila
-   data.select:"SELECT * FROM actor LIMIT 2; SELECT * FROM film LIMIT 2;"
-      multiple-result-sets:bool:true
+// Create a Hyperlambda script to compile a snippet of C# code into a library, load it as a plugin, and invoke a slot.
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.signals.contracts
+   code:"\n\n// Example C# code creating a Hyperlambda slot.\nusing System;\nusing magic.node;\nusing magic.signals.contracts;\n\n// Our slot class.\n[Slot(Name = \"bar\")]\npublic class Bar : ISlot\n{\n   public void Signal(ISignaler signaler, Node input)\n   {\n      input.Value = \"Hello from C#\";\n   }\n}"
+   assembly-name:bar.dll
 
-   yield
-      results:x:@data.select/*
+// Loading assembly now that we've created it.
+system.plugin.execute:x:@system.compile
+
+   // Invoking dynamically created C# slot.
+   bar

@@ -1,7 +1,34 @@
-// Illustrates how creating a cache item, for then to deleting it, and retrieving it after returns nothing
-cache.set:cache-item-key
-   expiration:5
-   value:Howdy world
 
-cache.clear
-cache.get:cache-item-key
+// Create a Hyperlambda endpoint for a CRUD create endpoint that creates an item in the users table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   username:string
+   password:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
+eval:x:+
+signal:transformers.hash-password
+   reference:x:@.arguments/*/password
+
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:users
+      return-id:bool:false
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      result:success

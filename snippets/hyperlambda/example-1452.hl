@@ -1,12 +1,37 @@
-// A slot that calculates net income after tax
-slots.create:finance.net-income
-   math.subtract
-      get-value:x:@.arguments/*/income
-      get-value:x:@.arguments/*/tax
-   yield
-      result:x:@math.subtract
 
-// Invoke the slot with income=5000 and tax=1200
-signal:finance.net-income
-   income:int:5000
-   tax:int:1200
+// Returns Stripe customers.
+.arguments
+   limit:int
+   starting_after:string
+   email:string
+
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
+
+/*
+ * Retrieves charges from Stripe.
+ * 
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-customers-get
+   filename:/modules/stripe/workflows/actions/stripe-customers-get.hl
+   arguments
+      limit:x:@.arguments/*/limit
+      email:x:@.arguments/*/email
+      starting_after:x:@.arguments/*/starting_after
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

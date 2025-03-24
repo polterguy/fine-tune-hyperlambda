@@ -1,305 +1,196 @@
 
-// Hyperlambda script to upload training data to OpenAI and start training the model with specified parameters.
+/*
+ * Distinct Keyword Search from CustomerDemographics table in northwind database.
+ * 
+ * This endpoint will return only records containing one or more of the keywords from the specified [query],
+ * with rows containing the most distinct matched keywords appearing first.
+ */
 .arguments
-   type:string
-   model:string
-   epochs:int
-   batch_size:int
-   learning_rate_multiplier:decimal
-   prompt_loss_weight:decimal
 
-// Making sure user has access to invoked endpoint.
-auth.ticket.verify:root
+   // Mandatory query for records to search for
+   query:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
-validators.mandatory:x:@.arguments/*/model
+   // Optional number of records to return, defaults to 10 if not specified. Pass in -1 to return all records
+   limit:long
 
-// Connecting to database.
-data.connect:[generic|magic]
+   // Optional offset into the dataset of where to start retrieving records
+   offset:long
 
-   // Selecting all snippets that have not been pushed of specified type.
-   data.read
-      table:ml_training_snippets
-      columns
-         prompt
-         completion
-      where
-         and
-            type.eq:x:@.arguments/*/type
-            pushed.eq:int:0
-      limit:-1
+// Make sure the user has provided a query.
+validators.mandatory:x:@.arguments/*/query
 
-   // Buffer containing all snippets we're about to send to OpenAI API.
-   .snippets
+// Apply defaults if not specified.
+validators.default:x:@.arguments
+   limit:long:10
 
-   // Looping through each result from above and creating training data.
-   for-each:x:@data.read/*
+// Split the user's query into individual keywords, separated by spaces.
+.words
+add:x:@.words
+   strings.split:x:@.arguments/*/query
+      .:" "
 
-      // Buffer for prompt and completion.
-      .prompt
-      .completion
+// Enforce lower characters for each keyword, and guard against SQL injection.
+.no:int:0
+for-each:x:@.words/*
+   set-value:x:@.dp/#
+      strings.to-lower:x:@.dp/#
 
-      // Getting data into correct format.
-      set-value:x:@.prompt
-         strings.concat
-            get-value:x:@.dp/#/*/prompt
-            .:" ->"
-      set-value:x:@.completion
-         strings.concat
-            get-value:x:@.dp/#/*/completion
-            .:" END"
+// Specify which columns to search against.
+.columns
+   .:CustomerTypeID
+   .:CustomerDesc
 
-      // Adding currently iterated snippet to above buffer.
-      unwrap:x:+/*/*/*
-      add:x:@.snippets
+// Connect to the specified database.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Start building our SQL.
+   .sql:select *, (
+
+   // 1) Dynamically create the full text by concatenating all columns we want to search.
+   .fields
+   for-each:x:@.columns/*
+      strings.concat
+         .:coalesce(
+         get-value:x:@.dp/#
+         .:", '')"
+      unwrap:x:+/*/*
+      add:x:@.fields
          .
-            .
-               prompt:x:@.prompt
-               completion:x:@.completion
+            .:x:@strings.concat
+   set-value:x:@.fields
+      strings.join:x:@.fields/*
+         .:" || "
+   remove-nodes:x:@.fields/*
 
-   // Creating our Bearer token by reading our OpenAI configuration settings.
-   .token
-   set-value:x:@.token
-      strings.concat
-         .:"Bearer "
-         config.get:"magic:openai:key"
+   // 2) Keyword density calculation
+   .no:int:0
+   for-each:x:@.words/*
 
-   // File data buffer containing JSONL content.
-   .file-data
-
-   // Converting [.snippets] to JSON, for then to convert manually to JSONL.
-   lambda2json:x:@.snippets/*
-   set-value:x:@.file-data
-      strings.replace:x:@lambda2json
-         .:},{
-         .:"}\n{"
-   set-value:x:@.file-data
-      strings.substring:x:@.file-data
-         .:1
-         math.subtract
-            strings.length:x:@.file-data
-            .:int:2
-
-   // Creating a unique training data filename.
-   .filename
-   set-value:x:@.filename
-      strings.concat
-         .:"attachment; name=file; filename=\"training-file-"
-         guid.new
-         .:.jsonl
-         .:"\""
-
-   // Uploading file to OpenAI.
-   http.post:"https://api.openai.com/v1/files"
-      headers
-         Authorization:x:@.token
-         Content-Type:multipart/form-data
-      payload
-         entity:application/jsonl
-            headers
-               Content-Disposition:x:@.filename
-            content:x:@.file-data
-         entity:text/plain
-            headers
-               Content-Disposition:form-data; name=purpose
-            content:fine-tune
-      convert:true
-
-   // Sanity checking above invocation.
-   if
-      not
-         and
-            mte:x:@http.post
-               .:int:200
-            lt:x:@http.post
-               .:int:300
-      .lambda
-
-         // Oops, error - Logging error and returning status 500 to caller.
-         lambda2hyper:x:@http.post
-         log.error:Something went wrong while invoking OpenAI
-            error:x:@lambda2hyper
-         response.status.set:500
-         return
-            message:Something went wrong as we invoked OpenAI API
-
-   /*
-    * Using uploaded file to create a fine tuning.
-    * First getting the ID of the file as stored in OpenAI's servers.
-    */
-   .id
-   set-value:x:@.id
-      get-value:x:@http.post/*/content/*/id
-
-   // Parametrising training session invocation.
-   if
-      and
-         exists:x:@.arguments/*/epochs
-         not-null:x:@.arguments/*/epochs
-      .lambda
-         add:x:@data.connect/*/http.post/[1,2]/*/payload
-            get-nodes:x:@.arguments/*/epochs
-   if
-      and
-         exists:x:@.arguments/*/batch_size
-         not-null:x:@.arguments/*/batch_size
-      .lambda
-         add:x:@data.connect/*/http.post/[1,2]/*/payload
-            get-nodes:x:@.arguments/*/batch_size
-   if
-      and
-         exists:x:@.arguments/*/learning_rate_multiplier
-         not-null:x:@.arguments/*/learning_rate_multiplier
-      .lambda
-         add:x:@data.connect/*/http.post/[1,2]/*/payload
-            get-nodes:x:@.arguments/*/learning_rate_multiplier
-   if
-      and
-         exists:x:@.arguments/*/prompt_loss_weight
-         not-null:x:@.arguments/*/prompt_loss_weight
-      .lambda
-         add:x:@data.connect/*/http.post/[1,2]/*/payload
-            get-nodes:x:@.arguments/*/prompt_loss_weight
-
-   // Starting training session.
-   http.post:"https://api.openai.com/v1/fine-tunes"
-      headers
-         Authorization:x:@.token
-         Content-Type:application/json
-      payload
-         training_file:x:@.id
-         model:x:@.arguments/*/model
-         suffix:x:@.arguments/*/type
-      convert:true
-
-   // Sanity checking above invocation.
-   if
-      neq:x:@http.post
-         .:int:200
-      .lambda
-
-         // Oops, error - Logging error and returning status 500 to caller.
-         lambda2hyper:x:@http.post
-         log.error:Something went wrong while invoking OpenAI
-            error:x:@lambda2hyper
-         response.status.set:500
-         return
-            message:Something went wrong as we started our training session
-
-   // Logging that we've started training.
-   get-count:x:@data.read/*
-   log.info:Successfully started training of OpenAI model
-      type:x:@.arguments/*/type
-      snippets:x:@get-count
-      base-model:x:@.arguments/*/model
-      new-model-id:x:@http.post/*/content/*/id
-
-   /*
-    * Creating a task that repeats once every 30 seconds until training is completed,
-    * for then to make sure we associate the new model with the specified type.
-    */
-   .task-id
-   set-value:x:@.task-id
-      strings.concat
-         .:magic.openai.training-session.
-         guid.new
-   unwrap:x:./*/tasks.create/*/*/.task-id
-   unwrap:x:./*/tasks.create/*/*/.model-id
-   unwrap:x:./*/tasks.create/*/*/.type
-   tasks.create:x:@.task-id
-      repeats:30.seconds
-      .lambda
-
-         // Forward evaluated above.
-         .task-id:x:@.lambda/@.task-id
-         .model-id:x:@http.post/*/content/*/id
-         .type:x:@.arguments/*/type
-
-         // Checking model status using OpenAI API, making sure we parametrise Authorization header with token
-         .token
-         set-value:x:@.token
-            strings.concat
-               .:"Bearer "
-               config.get:"magic:openai:key"
+      // Adding SQL parameter.
+      set-name:x:+/+/*/*
          strings.concat
-            .:"https://api.openai.com/v1/fine-tunes/"
-            get-value:x:@.model-id
-         http.get:x:@strings.concat
-            headers
-               Authorization:x:@.token
-            convert:true
-         if
-            and
-               mte:x:@http.get
-                  .:int:200
-               lt:x:@http.get
-                  .:int:300
-            .lambda
+            .:@p
+            get-value:x:@.no
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/data.select
+         .
+            .:x:@.dp/#
 
-               // Checking if job succeeded.
-               if
-                  eq:x:@http.get/*/content/*/status
-                     .:succeeded
-                  .lambda
+      // Modifying our SQL.
+      if
+         eq:x:@.no
+            .:int:0
+         .lambda
 
-                     // Training is done, updating type declaration with new model.
-                     log.info:Training of OpenAI model completed successfully
+            // First keyword => no leading plus
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" (length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:), @p
+                  get-value:x:@.no
+                  .:", ''))) / length(@p"
+                  get-value:x:@.no
+                  .:)
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + (length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)
+      math.increment:x:@.no
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) * 1.0 / length(
+         get-value:x:@.fields
+         .:) as keyword_density, (
 
-                     // Updating type.
-                     data.connect:[generic|magic]
+   // 3) Distinct keyword count => For each keyword, 1 if present, 0 if not.
+   .no:int:0
+   for-each:x:@.words/*
+      if
+         eq:x:@.no
+            .:int:0
+         .lambda
 
-                        // Updating type to use newly created model.
-                        data.update
-                           table:ml_types
-                           values
-                              model:x:@http.get/*/content/*/fine_tuned_model
-                           where
-                              and
-                                 type.eq:x:@.type
+            // First keyword => no leading plus
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" CASE WHEN ((length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:), @p
+                  get-value:x:@.no
+                  .:", ''))) / length(@p"
+                  get-value:x:@.no
+                  .:)) > 0 THEN 1 ELSE 0 END
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + CASE WHEN ((length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)) > 0 THEN 1 ELSE 0 END
+      math.increment:x:@.no
 
-                        // Marking all snippets we've sent as "pushed".
-                        data.update
-                           table:ml_training_snippets
-                           values
-                              pushed:int:1
-                           where
-                              and
-                                 type.eq:x:@.type
+   // Finalize "keyword_count".
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) as keyword_count
 
-                     // Deleting task
-                     tasks.delete:x:@.task-id
+   // 4) Finish SELECT + WHERE
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" from "
+         .:CustomerDemographics
+         .:" where keyword_count > 0"
 
-                     // Signaling root users in the frontend
-                     sockets.signal:magic.backend.message
-                        roles:root
-                        args
-                           message:Training of your OpenAI model succeeded!
-                           type:success
-               else-if
-                  eq:x:@http.get/*/content/*/status
-                     .:failed
-                  .lambda
+   // 5) Order by distinct keyword_count (higher means more distinct keywords), then keyword_density.
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" order by keyword_count desc, keyword_density desc limit "
+         get-value:x:@.arguments/*/limit
 
-                     // Training is done, and it FAILED!
-                     log.error:Training of OpenAI model FAILED!!
+   // (Optional) offset => pagination
+   if
+      exists:x:@.arguments/*/offset
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" offset "
+               get-value:x:@.arguments/*/offset
 
-                     // Deleting task
-                     tasks.delete:x:@.task-id
+   // Execute the SQL
+   data.select:x:@.sql
+      database-type:sqlite
 
-                     // Signaling root users in the frontend
-                     sockets.signal:magic.backend.message
-                        roles:root
-                        args
-                           message:Training of your OpenAI model FAILED!
-                           type:error
-         else
+   // Remove helper fields if you don't want them in your final JSON
+   remove-nodes:x:@data.select/*/*/keyword_density
+   remove-nodes:x:@data.select/*/*/keyword_count
 
-            // Invocation failed
-            lambda2hyper:x:@http.get
-            log.error:Retrieving training session status from OpenAI failed
-               result:x:@lambda2hyper
-
-// Returning success to caller.
-return
-   result:success
+   // Return the final result set
+   return-nodes:x:@data.select/*

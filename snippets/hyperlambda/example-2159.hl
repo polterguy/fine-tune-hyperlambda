@@ -1,102 +1,32 @@
 
-// Hyperlambda workflow action that retrieves customer charges from Stripe using the Stripe API token. The function should accept optional arguments for limit, email, and starting_after, applying a default limit of 10 if not specified. It should construct the appropriate URL for the Stripe API and make a GET request. If the request fails, it should log an error and throw an exception. The function should process the retrieved data, converting balances to decimals and Unix timestamps to UTC dates, and return the results to the caller.
+// Hyperlambda script for a CRUD create endpoint that inserts one record into the ml_requests table in the magic database, taking type, prompt, completion, and finish_reason, ensuring authentication and authorization for root roles.
 .arguments
-   limit
-      type:int
-      mandatory:bool:false
-   email
-      type:string
-      mandatory:bool:false
-   starting_after
-      type:string
-      mandatory:bool:false
-.icon:payment
+   type:string
+   prompt:string
+   completion:string
+   finish_reason:string
+   cached:int
 
-// Applying defaults.
-validators.default:x:@.arguments
-   limit:int:10
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Retrieving token to use for invocations towards Stripe.
-.token
-set-value:x:-
-   strings.concat
-      .:"Bearer "
-      config.get:"magic:stripe:token"
+// Opening up database connection.
+data.connect:[generic|magic]
 
-// Creating URL.
-.url
-for-each:x:@.arguments/*
-   if
-      not-null:x:@.dp/#
-      .lambda
-         if
-            null:x:@.url
-            .lambda
-               set-value:x:@.url
-                  .:"https://api.stripe.com/v1/customers?"
-         else
-            set-value:x:@.url
-               strings.concat
-                  get-value:x:@.url
-                  .:&
-         set-value:x:@.url
-            strings.concat
-               get-value:x:@.url
-               get-name:x:@.dp/#
-               .:=
-               get-value:x:@.dp/#
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-// Invoking Stripe REST API.
-http.get:x:@.url
-   convert:true
-   headers
-      Authorization:x:@.token
+   // Creating our record.
+   data.create
+      table:ml_requests
+      return-id:bool:true
+      values
 
-// Sanity checking above invocation.
-if
-   mte
-      get-value:x:@http.get
-      .:int:400
-   .lambda
+   // Returning the correct status code.
+   response.status.set:201
 
-      // Oops, something went wrong ...!!
-      lambda2hyper:x:@http.post
-      log.error:Something went wrong while invoking Stripe, could not retrieve charges
-         result:x:@lambda2hyper
-         provider:Stripe
-      throw:Something went wrong while invoking Stripe, could not retrieves charges
-         public:true
-         status:500
-
-// Parametrising our [return] invocation.
-for-each:x:@http.get/*/content/*/data/*
-
-   // Buffer for currently iterated item.
-   .tmp
-      .
-         id:x:@.dp/#/*/id
-         balance:x:@.dp/#/*/balance
-         created:x:@.dp/#/*/created
-         email:x:@.dp/#/*/email
-         name:x:@.dp/#/*/name
-         metadata:x:@.dp/#/*/metadata/*
-
-   // Forward evaluating all above expressions.
-   unwrap:x:@.tmp/*/*
-      apply-lists:true
-
-   // Converting amount to decimal and dividing by 100.
-   set-value:x:@.tmp/*/*/balance
-      math.divide
-         convert:x:@.tmp/*/*/balance
-            type:decimal
-         .:int:100
-
-   // Converting Unix time to UTC date.
-   set-value:x:@.tmp/*/*/created
-      date.from-unix:x:@.tmp/*/*/created
-   add:x:../*/return
-      get-nodes:x:@.tmp/*
-
-// Returning result of above invocation to caller.
-return
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

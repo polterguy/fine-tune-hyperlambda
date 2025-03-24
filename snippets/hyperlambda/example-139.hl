@@ -1,35 +1,30 @@
 
-// Deletes the user's account entirely on server.
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the questionnaires table in the magic database with a name matching the argument, ensuring authentication and authorization for root and admin roles.
 .arguments
+   name:string
 
-// Ensuring user is authenticated to invoke endpoint.
-auth.ticket.verify:guest
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Retrieving currently authenticated user.
-auth.ticket.get
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/name
 
-// Verifying user doesn't have any cloudlets.
-data.connect:[generic|hub]
-   data.read
-      table:cloudlets
-      where
-         and
-            user.eq:x:@auth.ticket.get
-   if
-      exists:x:@data.read/*/*
-      .lambda
-         throw:You have to delete all cloudlets before you delete your account
-            public:true
-            status:400
-
-// Deleting user from magic database.
+// Opening up our database connection.
 data.connect:[generic|magic]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
    data.delete
-      table:users
+      database-type:sqlite
+      table:questionnaires
       where
          and
-            username.eq:x:@auth.ticket.get
 
-// Returning success to caller.
-return
-   result:success
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

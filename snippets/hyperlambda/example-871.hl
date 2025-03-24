@@ -1,38 +1,15 @@
-
-/*
- * Gets a company
- * 
- * Will return the company with the specified name.
- */
+// HTTP endpoint that selects users from database and returns as XML
 .arguments
-   query:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/query
-
-// Connecting to database.
-data.connect:[finovo|finovo]
-   database-type:pgsql
-
-   // Retrieving items.
+// Connect to the database and retrieve employee
+data.connect:company_database
    data.read
-      database-type:pgsql
-      table:basic
-      columns
-         org_number
-         company_name
-      where
-         and
-            legalgroup_code.eq:AB
-            company_name.ilike:x:@.arguments/*/query
-      limit:1
+      table:employees
+   response.headers.set
+      Content-Type:application/xml
 
-   // Checking we've got data.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         return
-            result:No results were found
+   // Converting lambda object to XML
+   lambda2xml:x:@data.read/*
 
-   // Returning result to caller.
-   return-nodes:x:@data.read/*/*
+   // Returning lambda object to caller
+   return:x:-

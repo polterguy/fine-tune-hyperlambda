@@ -1,8 +1,53 @@
 
-// Replace a substring that is not present (no change occurs).
-.input:foo bar
-strings.replace:x:@.input
-   .:baz
-   .:qux
+// Counts items from your items table in your shopping-cart-demo database.
+.arguments
 
-// Result: "foo bar" (unchanged)
+   // items table item_id column equality exact match filtering
+   items.item_id.eq:long
+
+   // items table product_id column equality exact match filtering
+   items.product_id.eq:long
+
+   // items table quantity column equality exact match filtering
+   items.quantity.eq:long
+
+   // items table session_id column wildcard filtering with SQL like '%' comparison
+   items.session_id.like:string
+
+   // items table session_id column equality exact match filtering
+   items.session_id.eq:string
+
+   // products table name column equality exact match filtering
+   product_id.name.eq:string
+
+   // products table name column wildcard filtering with SQL like '%' comparison
+   product_id.name.like:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:items
+         join:products
+            as:product_id
+            type:left
+            on
+               and
+                  items.product_id:product_id.product_id
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

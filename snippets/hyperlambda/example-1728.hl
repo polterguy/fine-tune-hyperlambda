@@ -1,51 +1,14 @@
 
-// Create one record in your comments table in your cms database
+// Hyperlambda endpoint returning all dynamic slots in the system.
+
+// Making sure endpoint does NOT accept arguments!
 .arguments
 
-   // post_id column value
-   post_id:long
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // user_id column value
-   user_id:long
+// Retrieving all system slots.
+slots.vocabulary
 
-   // content column value
-   content:string
-
-   // created_at column value
-   created_at:date
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
-
-// Opening up database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:comments
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   add:x:./*/sockets.signal
-      get-nodes:x:@auth.ticket.verify
-   set-name:x:./*/sockets.signal/*/auth.ticket.verify
-      .:roles
-   sockets.signal:cms.comments.post
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+// Returning results of the above to caller.
+return-nodes:x:@slots.vocabulary/*

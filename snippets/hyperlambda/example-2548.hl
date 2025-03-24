@@ -1,14 +1,36 @@
 
-// Hyperlambda script that demonstrate a try/catch/finally block with logging.
-try
+// Delete one record from your media table in your cms database
+.arguments
 
-   // Perform your unsafe operation here.
-   throw:Some error is thrown here
-.catch
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-   // If an exception is triggered, this lambda will be evaluated.
-   log.info:x:@.arguments/*/message
-.finally
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
 
-   // If an exception is triggered, this lambda will be evaluated.
-   log.info:Try finished evaluating
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:media
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.media.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

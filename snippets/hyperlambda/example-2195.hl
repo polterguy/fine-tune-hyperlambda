@@ -1,25 +1,20 @@
+// Search through a log file and extract all ISO-formatted dates from it
 
-// Retrieves the specified [username] and return information associated with the user.
-.arguments
-   username
-      type:string
-      mandatory:bool:true
-.icon:supervisor_account
+// Reading file's content as text.
+io.file.load:/var/logs/server.log
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
+// A temporary place to hold the extracted dates
+.dates
 
-// Opens up database connection.
-data.connect:[generic|magic]
+// Extracting ISO date strings using regex (e.g., 2023-12-31)
+strings.matches:x:@io.file.load
+   .:"\\b\\d{4}-\\d{2}-\\d{2}\\b"
 
-   // Inserting user into database.
-   data.read
-      table:users
-      columns
-         username
-         created
-      where
-         and
-            username.eq:x:@.arguments/*/username
-   yield
-      created:x:@data.read/*/*/created
+// Loop through the matches and add them to the list
+for-each:x:@strings.matches/*/match
+   unwrap:x:+/*/*
+   add:x:@.dates
+      .
+         .:x:@.dp/#
+
+// Notice, this Hyperlambda DOES NOT check if the file exists before it's trying to read it. This will result in an exception if the file doesn't exist

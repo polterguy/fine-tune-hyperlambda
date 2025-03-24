@@ -1,5 +1,31 @@
-// This example connects to the 'kingdom' database and retrieves the oldest castle age from the 'castles' table.
-// The result is returned as a single scalar value representing the age of the oldest castle.
 
-sqlite.connect:kingdom
-   sqlite.scalar:select min(age) from castles
+// Counts items from your roles table in your cms database
+.arguments
+
+   // Optional filtering arguments
+   roles.id.eq:long
+   roles.name.like:string
+   roles.name.eq:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:roles
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

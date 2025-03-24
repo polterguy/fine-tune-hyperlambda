@@ -1,16 +1,43 @@
 
-// Hyperlambda script to return a specified log item based on its ID.
-.arguments
-   id:string
+// Hyperlambda script to crawl a specified website generating training data for machine learning, with error handling.
+slots.create:magic.ai.crawl-site
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Creating a thread and invoking file doing the heavy lifting.
+   insert-before:x:./*/fork/0
+      get-nodes:x:@.arguments
+   fork
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/id
+      // Making sure exceptions does not leave thread.
+      try
 
-// Invoking slot responsible for returning item.
-log.get:x:@.arguments/*/id
+         // Invoking slot responsible for doing the actual crawling.
+         add:x:./*/signal
+            get-nodes:x:@.arguments/*
+         signal:magic.ai.crawl-site-on-thread
+      .catch
 
-// Returning result of above invocation to caller.
-return-nodes:x:-/*
+         // Oops ...!!
+         log.error:x:@.arguments/*/message
+            url:x:@.arguments/*/url
+
+         // Signaling frontend.
+         strings.concat
+            .:"Error - "
+            get-value:x:@.arguments/*/message
+         unwrap:x:+/*/args/*
+         sockets.signal:x:@.arguments/@.arguments/*/feedback-channel
+            roles:root
+            args
+               message:x:@strings.concat
+               type:error
+         sleep:100
+
+         // Checking if caller supplied [.onerror] handler.
+         if
+            exists:x:@.onerror
+            .lambda
+               add:x:+/+
+                  get-nodes:x:@.arguments/*
+               add:x:+
+                  get-nodes:x:@.arguments/@.arguments/*
+               invoke:x:@.onerror

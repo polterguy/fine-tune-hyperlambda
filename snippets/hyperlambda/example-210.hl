@@ -1,29 +1,20 @@
 
-// Create a Hyperlambda script for a CRUD delete endpoint that deletes one item from the users_roles table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
+// Deletes a single object of the specified type in NetSuite
 .arguments
-   role:string
-   user:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Mandatory argument declaring what type of object you want to delete.
+   type:string
 
-validators.mandatory:x:@.arguments/*/role
-validators.mandatory:x:@.arguments/*/user
+   // Mandatory argument being the id of the object you want to delete.
+   id:long
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-delete-record.hl
 
-   // Deleting item from database.
-   data.delete
-      table:users_roles
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returning result to caller.
+return-nodes:x:@execute-file/*

@@ -1,27 +1,88 @@
+
 /*
- * Submits ID and source to an identity verification API.
- * On success, returns the extracted user name and email address.
+ * Lists customers
+ * 
+ * Optionally apply limit, offset or filter as you see fit
  */
-
 .arguments
-   id:int
-   source:string:portal
 
-add:x:+/*/payload
-   get-nodes:x:@.arguments/*
-http.post:"https://identity.example.com/api/verify"
-   convert:true
-   payload
+   // Optional filtering argument allowing to filter items on name, no, address, phone, email, etc.
+   filter:string
 
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      yield
-         name:x:@http.post/*/content/*/name
-         email:x:@http.post/*/content/*/email
-return
-   error:Identity verification failed
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
+
+   // Optional offset into records of where to start returning items.
+   offset:long
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Getting limit value, defaulting to 10
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:10
+
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:No_
+            .:Name
+            .:Address
+            .:"Address 2"
+            .:City
+            .:Post Code
+            .:County
+            .:Contact
+            .:"Phone No_"
+            .:Mobile Phone No_
+            .:Customer Posting Group
+            .:Customer Price Group
+            .:"Salesperson Code"
+            .:Customer Disc_ Group
+            .:E-Mail
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Reading records.
+   mssql.read
+      table:addv_Clientes
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         or
+   
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.read/*

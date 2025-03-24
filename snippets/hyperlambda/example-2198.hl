@@ -1,6 +1,22 @@
 
-// Fetch a few film titles and release years using a raw SQL query
-data.connect:sakila
-   data.select:SELECT title, release_year FROM film LIMIT 3
+// Returns number of registrations for the last 14 days grouped by day.
 
-   // Executes the SQL directly on the database and returns up to 3 rows
+// No arguments are allowed
+.arguments
+
+// Making sure user is authorised to invoke endpoint.
+auth.ticket.verify:root, admin, guest
+config.get:"magic:databases:default"
+switch:x:@config.get
+   case:mysql
+   case:sqlite
+      strings.concat
+         .:/modules/hub/affiliates/db.overrides/
+         get-value:x:@config.get
+         .:.affiliate-transactions.get.hl
+      add:x:+
+         get-nodes:x:@.arguments/*
+      io.file.execute:x:@strings.concat
+      return-nodes:x:-/*
+   default
+      throw:Unsupport database type for Hub

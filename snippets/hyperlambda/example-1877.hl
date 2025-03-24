@@ -1,77 +1,11 @@
 
-/*
- * Workflow that registers a new user in the system.
- *
- * Registers the specified [username] as a new user with [password] as password,
- * and [name] and [email] as extra fields. The action will associate the user with the [role] role.
- *
- * The workflow does not return anything but will throw an exception if it does not succeed.
- */
+// Hyperlambda endpoint to transform specified markdown into HTML and return the HTML content.
 .arguments
-   username:string
-   password:string
-   name:string
-   email:string
-   role:string
+   markdown:string
 
-/*
- * Throws an exception unless the specified [username] is available to use as the username
- * for a new user.
- */
-execute:magic.workflows.actions.execute
-   name:username-available
-   filename:/modules/registration/workflows/actions/username-available.hl
-   arguments
-      username:x:@.arguments/*/username
-      throw:bool:true
+// Transforming Markdown to HTML.
+markdown2html:x:@.arguments/*/markdown
 
-/*
- * Registers the specified [username] as a user in the system, with the specified [password].
- *
- * Notice, [password] will be hashed using blowfish hashing by the users-create action.
- */
-execute:magic.workflows.actions.execute
-   name:users-create
-   filename:/modules/registration/workflows/actions/users-create.hl
-   arguments
-      username:x:@.arguments/*/username
-      password:x:@.arguments/*/password
-
-/*
- * Associates the specified [username] with the specified [extra] fields.
- *
- * [name] and [email] are special system extra fields in Magic and handled accordingly.
- */
-execute:magic.workflows.actions.execute
-   name:extras-upsert
-   filename:/modules/registration/workflows/actions/extras-upsert.hl
-   arguments
-      username:x:@.arguments/*/username
-      extra
-         name:x:@.arguments/*/name
-         email:x:@.arguments/*/email
-
-/*
- * Checking if we've got a [role] argument, and only if we do, we associate
- * the user with the specified [role].
- */
-if
-   and
-      exists:x:@.arguments/*/role
-      not-null:x:@.arguments/*/role
-      neq:x:@.arguments/*/role
-         .:
-   .lambda
-
-      /*
-       * Associates the specified [username] with the specified [roles] role.
-       *
-       * The [role] specified during invocation of action becomes the role we associate the user with.
-       */
-      execute:magic.workflows.actions.execute
-         name:roles-add
-         filename:/modules/registration/workflows/actions/roles-add.hl
-         arguments
-            username:x:@.arguments/*/username
-            roles
-               .:x:@.arguments/*/role
+// Returning resulting HTML to caller.
+yield
+   html:x:@markdown2html

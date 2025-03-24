@@ -1,49 +1,62 @@
 
-// Returns a grouped chart image to caller. Values is a mandatory comma separated list of values.
-.arguments:*
+// Lists all indexes in some SQL Server table.
+slots.create:magic.db.mssql.indexes
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/legend
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
 
-// Creating our individual bars.
-.bars
-for-each:x:@.arguments/*
-   get-name:x:@.dp/#
+   // Opens up our connection
+   .connection:[information_schema]
    if
-      not
-         strings.starts-with:x:@get-name
-            .:legend
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
       .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mssql.connect:x:@.connection
 
-         // Adding primary node for bar.
-         set-name:x:+/*/*
-            get-value:x:@get-name
-         add:x:@.bars
+      // Dynamically creating our SQL.
+      strings.split:x:@.arguments/*/table
+         .:.
+      strings.concat
+         .:"\nselect IndexName = ind.name, ColumnName = col.name from sys.indexes ind \n  inner join sys.index_columns ic on ind.object_id = ic.object_id and ind.index_id = ic.index_id \n  inner join sys.columns col on ic.object_id = col.object_id and ic.column_id = col.column_id \n  inner join sys.tables t on ind.object_id = t.object_id \nwhere\n  ind.is_primary_key = 0 \n  and ind.is_unique = 0 \n  and ind.is_unique_constraint = 0 \n  and t.is_ms_shipped = 0 \n  and t.name = '"
+         get-value:x:@strings.split/0/-
+         .:"'"
+      mssql.select:x:@strings.concat
+
+      /*
+       * Creating our return value, by projecting it into
+       * a generic form, that does not rely upon SQL Server's syntactic
+       * details.
+       */
+      for-each:x:@mssql.select/*
+         unwrap:x:+/*/*/*
+         add:x:@mssql.connect/*/return-nodes
             .
                .
-
-         // Adding values for individual cells.
-         add:x:@.bars/0/-
-            strings.split:x:@.dp/#
-               .:,
-
-// Creating our legend.
-add:x:../*/image.chart/*/legend
-   strings.split:x:@.arguments/*/legend
-      .:,
-
-// Parametrizing [image.chart] invocation.
-add:x:../*/image.chart/*/bars
-   get-nodes:x:@.bars/*
-image.chart:grouped
-   width:800
-   height:500
-   bars
-   legend
-
-// Applying correct HTTP header.
-response.headers.set
-   Content-Type:image/png
-
-// Returning chart to caller.
-return:x:@image.chart
+                  name:x:@.dp/#/*/IndexName
+                  columns
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/return-nodes/0/-/*/columns
+            .
+               .:x:@.dp/#/*/ColumnName
+      return-nodes

@@ -1,22 +1,24 @@
-// Create grouped chart
-image.chart:grouped
-   filename:/grouped-chart.png
-   width:600
-   height:300
-   bars
-      Spring
-         .:int:2
-         .:int:5
-         .:int:10
-      Summer
-         .:int:4
-         .:int:7
-         .:int:10
-      Autumn
-         .:int:2
-         .:int:5
-         .:int:4
-   legend
-      .:Phones
-      .:Computers
-      .:Tablets
+/*
+ * Returns all companies where the director is no longer active
+ */
+.arguments
+   director_id:long
+   limit:long
+   offset:long
+
+data.connect:[mssql|legacy_data]
+   database-type:mssql
+
+   data.select:@"
+select b.company_name, d.role_name, d.end_date
+   from directors d
+      join basic b on d.org_number = b.org_number
+   where d.director_id = @id and d.active = 0
+   limit @limit offset @offset"
+      database-type:mssql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   yield
+      inactive_roles:x:@data.select/*

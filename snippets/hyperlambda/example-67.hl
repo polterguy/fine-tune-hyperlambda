@@ -1,74 +1,31 @@
 
-// Slot responsible for hard deletion of an existing cloudlet.
-slots.create:hub.cloudlets.hard-delete
+// Delete one record from your Album table in your chinook database
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/cluster
-   validators.mandatory:x:@.arguments/*/name
+   // Primary key of record to delete, mandatory argument
+   AlbumId:long
 
-   // Invoking soft delete first.
-   add:x:+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+validators.mandatory:x:@.arguments/*/AlbumId
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
       get-nodes:x:@.arguments/*
-   signal:hub.cloudlets.delete
 
-   // Figuring out base URL of Kubernetes REST API.
-   .base-url
-   strings.concat
-      .:"magic:hub:"
-      get-value:x:@.arguments/*/cluster
-      .:":manager-url"
-   set-value:x:@.base-url
-      config.get:x:@strings.concat
-
-   // Figuring out Kubernetes namespace cloudlets exists in.
-   .namespace
-   set-value:x:@.namespace
-      config.get:"magic:hub:default-namespace"
-
-   // Retrieving token that's required to invoke Kubernetes REST API.
-   .token
-   strings.concat
-      .:"magic:hub:"
-      get-value:x:@.arguments/*/cluster
-      .:":token"
-   set-value:x:@.token
-      strings.concat
-         .:"Bearer "
-         config.get:x:@strings.concat/@strings.concat
-
-   // Invoking Web API responsible for deleting volume claim.
-   .url
-   set-value:x:@.url
-      strings.concat
-         get-value:x:@.base-url
-         .:/api/v1/namespaces/
-         get-value:x:@.namespace
-         .:/persistentvolumeclaims/
-         get-value:x:@.arguments/*/name
-   http.delete:x:@.url
-      headers
-         Authorization:x:@.token
-
-   // Sanity checking above invocation
-   if
-      not
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Album
+      where
          and
-            mte:x:@http.delete
-               .:int:200
-            lt:x:@http.delete
-               .:int:300
-      .lambda
 
-         // Oops, web API didn't return success
-         log.error:Kubernetes could not delete volume claim
-            status:x:@http.post
-            response:x:@http.post/*/content
-            cluster:x:@.arguments/*/cluster
-            name:x:@.arguments/*/name
-   else
-
-      // Logging the fact that we successfully deleted ingress.
-      log.debug:Kubernetes volume claim successfully deleted
-         cluster:x:@.arguments/*/cluster
-         name:x:@.arguments/*/name
-         response:x:@http.post/*/content
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

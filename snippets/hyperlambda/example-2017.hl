@@ -1,42 +1,112 @@
 
-// Searches through your training snippets using RAG / VSS search for the specified query
+// Count unique and distinct items from your media table in your cms database
 .arguments
-   _type:string
 
-   // Mandatory argument and the actual query to use when finding data from your RAG database.
-   query:string
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
 
-   // Optional argument and the number of tokens to return. The default value of not spcified is 4000.
-   max_tokens:int
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
 
-   // Optional argument being similarity distance between query and RAG records matched during search. Will default to 0.3 if not specified.
-   threshold:decimal
+   // All of these arguments are optional and becomes filtering conditions if supplied
+   media.id.mt:long
+   media.id.lt:long
+   media.id.mteq:long
+   media.id.lteq:long
+   media.id.neq:long
+   media.id.eq:long
+   media.post_id.mt:long
+   media.post_id.lt:long
+   media.post_id.mteq:long
+   media.post_id.lteq:long
+   media.post_id.neq:long
+   media.post_id.eq:long
+   media.file_path.like:string
+   media.file_path.mt:string
+   media.file_path.lt:string
+   media.file_path.mteq:string
+   media.file_path.lteq:string
+   media.file_path.neq:string
+   media.file_path.eq:string
+   media.file_type.like:string
+   media.file_type.mt:string
+   media.file_type.lt:string
+   media.file_type.mteq:string
+   media.file_type.lteq:string
+   media.file_type.neq:string
+   media.file_type.eq:string
+   media.created_at.mt:date
+   media.created_at.lt:date
+   media.created_at.mteq:date
+   media.created_at.lteq:date
+   media.created_at.neq:date
+   media.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:media.id
+   .:media.post_id
+   .:media.file_path
+   .:media.file_type
+   .:media.created_at
+   .:post_id.title
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/_type
-validators.mandatory:x:@.arguments/*/query
-
-// Applying defaults.
-validators.default:x:@.arguments
-   max_tokens:int:4000
-   threshold:decimal:0.3
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
 
 /*
- * Returns context for the specified [query] from the specified [_type],
- * and returns to caller.
- * 
- * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
- * tokens to return. [_type] is a machine learning type from your ml_types database table in
- * your magic database.
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
  */
-execute:magic.workflows.actions.execute
-   name:openai-context-from-database
-   filename:/modules/openai/workflows/actions/openai-context-from-database.hl
-   arguments
-      type:x:@.arguments/*/_type
-      query:x:@.arguments/*/query
-      max_tokens:x:@.arguments/*/max_tokens
-      threshold:x:@.arguments/*/threshold
+if
+   exists:x:@.arguments/*/operator
+   .lambda
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:media
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  media.post_id:post_id.id
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

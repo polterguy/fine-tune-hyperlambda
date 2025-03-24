@@ -1,55 +1,11 @@
 
-// Action that compiles the specified C# code and loads into the AppDomain
-.arguments
-   assembly-name
-      type:string
-      mandatory:bool:true
-      default:your-assembly-name.dll
-   recompile
-      type:bool
-      mandatory:bool:true
-      default:bool:true
-   references
-      type:array
-      mandatory:bool:true
-      default
-         .:netstandard
-         .:System.Runtime
-         .:System.ComponentModel
-         .:System.Private.CoreLib
-         .:magic.node
-         .:magic.node.extensions
-         .:magic.signals.contracts
-   code
-      type:csharp
-      mandatory:bool:true
-      default:"using System;\nusing magic.node;\nusing magic.node.extensions;\nusing magic.signals.contracts;\n\n[Slot(Name = \"get-employee-details\")]\npublic class Foo : ISlot\n{\n    public void Signal(ISignaler signaler, Node input)\n    {\n        switch (input.GetEx<string>().ToLower())\n        {\n            case \"john\":\n                input.Add(new Node(\"title\", \"cmo\"));\n                input.Add(new Node(\"phone\", \"92929292\"));\n                input.Add(new Node(\"email\", \"john@doe.come\"));\n                break;\n        }\n        input.Value = null;\n    }\n}"
-.icon:rocket_launch
+// Provide a Hyperlambda example where 'hr_db' is opened to get employee details.
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/code
-validators.mandatory:x:@.arguments/*/references
-validators.mandatory:x:@.arguments/*/assembly-name
-
-/*
- * We only compile C# code if it does not already exist in AppDomain,
- * unless caller explicitly specifies [recompile] as true.
- */
-system.plugin.list
-if
-   or
-      get-value:x:@.arguments/*/recompile
-      not-exists:x:"@system.plugin.list/*/\"={@.arguments/*/assembly-name}\""
-   .lambda
-
-      // Parametrizing [system.compile] invocation.
-      add:x:./*/system.compile
-         get-nodes:x:@.arguments/*/references
-         get-nodes:x:@.arguments/*/assembly-name
-         get-nodes:x:@.arguments/*/code
-
-      // Compiling C# code.
-      system.compile
-
-      // Loading assembly into AppDomain.
-      system.plugin.load:x:@system.compile
+// Opens "hr_db" and gets employee details.
+.result
+data.connect:hr_db
+   database-type:mssql
+   data.select:"select employee_id, name, department, hire_date from employees where status='active'"
+      database-type:mssql
+   add:x:@.result
+      get-nodes:x:@data.select/*

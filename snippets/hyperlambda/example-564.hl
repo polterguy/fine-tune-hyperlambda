@@ -1,30 +1,17 @@
 
-// Hyperlambda script to list all files in a specified folder, with an optional filter to match file names.
+// Returns the schema specifications for the specified type
 .arguments
-   folder:string
-   filter:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Mandatory argument declaring the type of object to retrieve the schema specification for.
+   type:string
 
-// Listing all files in specified folder.
-io.file.list:x:@.arguments/*/folder
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
 
-// Checking if we have a filter, and if so, only return files matching filter.
-if
-   exists:x:@.arguments/*/filter
-   .lambda
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-schema-spec.hl
 
-      // Filtering out files not matching filter condition.
-      for-each:x:@io.file.list/*
-         if
-            strings.contains:x:@.dp/#
-               get-value:x:@.arguments/*/filter
-            .lambda
-               add:x:@for-each/./*/return-nodes
-                  get-nodes:x:@.dp/#
-      return-nodes
-else
-
-   // Returning all files from above invocation to caller.
-   return-nodes:x:@io.file.list/*
+// Returning result to caller.
+return-nodes:x:@execute-file/*

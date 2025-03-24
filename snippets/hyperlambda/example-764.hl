@@ -1,13 +1,15 @@
 
-// Provide a Hyperlambda example where an email address is created from a username and domain.
+// Create a Hyperlambda endpoint that fetches recent orders from 'ecommerce_db' using PostgreSQL.
 
-// Hyperlambda file that creates an email address from a username and domain.
+// Endpoint accepts no arguments
 .arguments
-   username:string
-   domain:string
-strings.concat
-   get-value:x:@.arguments/*/username
-   .:@
-   get-value:x:@.arguments/*/domain
+
+.result
+data.connect:ecommerce_db
+   database-type:pgsql
+   data.select:"select order_id, user_id, total from orders where order_status='shipped' order by order_date desc limit 30"
+      database-type:pgsql
+   add:x:@.result
+      get-nodes:x:@data.select/*
 yield
-   email:x:@strings.concat
+   result:x:@.result/*

@@ -1,25 +1,43 @@
 
-// Read or list records from your comments table in your cms database
+// Hyperlambda script that reads or lists records from a specified table in a database with optional filtering arguments and a logical operator.
 .arguments
 
-   // Optional filtering args
-   comments.id.eq:long
-   comments.post_id.eq:long
-   comments.user_id.eq:long
-   comments.content.like:string
-   comments.content.eq:string
-   comments.created_at.eq:date
-   post_id.title.eq:string
-   post_id.title.like:string
-   user_id.username.eq:string
-   user_id.username.like:string
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
 
 // Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+data.connect:{database}
+   database-type:{database-type}
 
    // Parametrising our read invocation with filtering arguments.
    add:x:./*/data.read/*/where/*
@@ -27,30 +45,9 @@ data.connect:[generic|cms]
 
    // Reading data from database.
    data.read
-      database-type:sqlite
-      table:comments
-         join:posts
-            as:post_id
-            type:left
-            on
-               and
-                  comments.post_id:post_id.id
-         join:users
-            as:user_id
-            type:left
-            on
-               and
-                  comments.user_id:user_id.id
+      database-type:{database-type}
+      table:{table}
       columns
-         comments.id
-         comments.post_id
-         comments.user_id
-         comments.content
-         comments.created_at
-         post_id.title
-            as:post_id.title
-         user_id.username
-            as:user_id.username
       where
          and
 

@@ -1,14 +1,27 @@
-// Mark a specific order as shipped
-data.connect:shopDB
+// Creating new nodes based on conditions in [for-each]
+.car-parts
+   engine:available
+   wheel:out-of-stock
+   door:available
 
-   // Using CRUD update slot
-   data.update
-      table:orders
-      values
-         status:"shipped"
-      where
+.results
 
-         // Only update the order with ID 12345
-         and
-            order_id.eq:12345
-   // Without a WHERE clause, all orders would be updated!
+for-each:x:@.car-parts/*
+   get-name:x:@.dp/#
+   if
+      eq:x:@.dp/#
+         .:available
+      .lambda
+         unwrap:x:+/*/*/*/name
+         add:x:@.results
+            .
+               .
+                  name:x:@get-name
+                  status:checked
+   else
+      unwrap:x:+/*/*/*/name
+      add:x:@.results
+         .
+            .
+               name:x:@get-name
+               status:needs restocking

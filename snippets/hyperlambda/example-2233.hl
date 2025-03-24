@@ -1,32 +1,31 @@
 
-// CRUD / Create Hyperlambda that creates one record in your menus table in your cms database
-.arguments
+// Compiles C# code files required to wire up module correctly
 
-   // name column value
-   name:string
+// Assumes this file exists and is valid C# code (for .Net Core)
+io.file.load:/modules/netsuite/magic.startup/csharp/GenerateToken.cs.raw
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+// Compiling file into an assembly.
+system.compile
+   references
+      .:netstandard
+      .:System.Linq
+      .:System.Runtime
+      .:System.Net.Http
+      .:System.Private.Uri
+      .:System.ComponentModel
+      .:System.Private.CoreLib
+      .:System.Linq.Expressions
+      .:System.Security.Cryptography
+      .:Microsoft.IdentityModel.Tokens
+      .:System.IdentityModel.Tokens.Jwt
+      .:Microsoft.IdentityModel.Abstractions
+      .:Newtonsoft.Json
+      .:magic.node
+      .:magic.node.extensions
+      .:magic.signals.contracts
+      .:System.Net.Primitives
+   code:x:@io.file.load
+   assembly-name:dynamic.magic.lambda.netsuite.dll
 
-// Opening up database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:menus
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+// Loading assembly as plugin now that we've created it.
+system.plugin.load:x:@system.compile

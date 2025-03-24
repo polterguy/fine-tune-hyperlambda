@@ -1,25 +1,26 @@
 /*
- * Replaces placeholders {{name}} and {{confirmation_link}} in a registration email template.
- * Prepares a fully rendered message ready to be sent as email.
+ * Authenticates the user towards the cloudlet and returns a valid JWT Bearer token
+ * 
+ * Pass in username and password
  */
-.template:@"
-Hello {{name}},
+.arguments
+   username:string
+   password:string
 
-Thank you for registering at our site!
+/*
+ * Authenticates the user with the specified [username] and [password].
+ *
+ * Returns a JWT Bearer token that can be used for consecutive requests authorizing user according
+ * to his or her roles.
+ *
+ * Depends upon the 'auth' plugin that can be installed from plugins.
+ */
+execute:magic.workflows.actions.execute
+   name:authenticate
+   filename:/modules/auth/workflows/actions/authenticate.hl
+   arguments
+      username:x:@.arguments/*/username
+      password:x:@.arguments/*/password
 
-Click the link below to confirm your email:
-{{confirmation_link}}
-
-Regards,
-The Team"
-
-.final-message
-set-value:x:-
-   strings.replace:x:@.template
-      .:{{name}}
-      .:Sarah
-
-set-value:x:@.final-message
-   strings.replace:x:@.final-message
-      .:{{confirmation_link}}
-      .:"https://example.com/confirm?id=123"
+// Returns the result of your last action.
+return-nodes:x:@execute/*

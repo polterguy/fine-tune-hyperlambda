@@ -1,32 +1,193 @@
+
+// Returns all clients that are affiliated with the currently authenticated client.
+.arguments
+   limit:long
+   offset:long
+   from:date
+   to:date
+
+// Verifying user has access to endpoint.
+auth.ticket.verify:root, admin, guest
+
+// Retrieving currently authenticated user to parametrise invocation towards database.
+auth.ticket.get
+
+// Buffer for returning users to caller.
+.result
+
+// Affiliate percentage user has.
+.percent
+
+// Returning all usernames that are affiliated with currently authenticated client.
+data.connect:[generic|magic]
+
+   /*
+    * Retrieving affiliate percent for user.
+    * This is the commission the currently authenticated user gets
+    * from sales originating from users he made register in our platform.
+    */
+   data.read
+      table:users_extra
+      columns
+         value
+      where
+         and
+            type.eq:affiliate_percent
+            user.eq:x:@auth.ticket.get
+   if
+      not-exists:x:@data.read/*/*/value
+      .lambda
+
+         // Oops ...!!
+         log.error:User is not affiliate
+            username:x:@auth.ticket.get
+         throw:You are not an affiliate
+            public:true
+            status:400
+
+   // Setting [.percent] value such that we can calculate affiliate earnings.
+   convert:x:@data.read/*/*/value
+      type:decimal
+   set-value:x:@.percent
+      math.divide:x:@convert
+         .:decimal:100
+
+   /*
+    * Applying paging and invoking read slot to find all users
+    * affiliated with the currently authenticated user.
+    */
+   add:x:./*/data.read/[1,2]
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:users_extra
+         join:users
+            table:users
+            type:inner
+            on
+               and
+                  users.username.eq:users_extra.user
+      columns
+         users_extra.user
+         users.created
+      where
+         and
+            users_extra.type.eq:affiliate
+            users_extra.value.eq:x:@auth.ticket.get
+      order:users.created
+      direction:desc
+
+   // Adding usernames to return buffer.
+   for-each:x:@data.read/*
+
+      // Adding username to result.
+      add:x:@.result
+         get-nodes:x:@.dp/#
+
+      // Invoking read slot to retrieve name, email address and country of affiliated user.
+      data.read
+         table:users_extra
+         columns
+            value
+            type
+         where
+            and
+               or
+                  type.eq:email
+                  type.eq:name
+                  type.eq:country
+               user.eq:x:@.dp/#/*/user
+      unwrap:x:+/*/*
+      add:x:@.result/0/-
+         .
+            name:x:@data.read/*/*/type/=name/./*/value
+            email:x:@data.read/*/*/type/=email/./*/value
+            country:x:@data.read/*/*/type/=country/./*/value
+
+      // Checking if user confirmed his or her email address.
+      data.read
+         table:users_roles
+         columns
+            user
+         where
+            and
+               user.eq:x:@.dp/#/*/user
+               role.eq:guest
+      if
+         exists:x:@data.read/*/*
+         .lambda
+            add:x:@.result/0/-
+               .
+                  confirmed:bool:true
+      else
+         add:x:@.result/0/-
+            .
+               confirmed:bool:false
+
 /*
- * Sends a bold, energetic welcome email using HTML to users of the fitness tracker app.
+ * Returning sum and commission of transactions for each user
+ * retrieved in the above invocation, which becomes the commission
+ * on a per user basis the currently authenticated user earns.
  */
+data.connect:[generic|stripe]
 
-data.connect:[pgsql|fitpulse]
-   database-type:pgsql
+   // Looping through each username in affiliate list.
+   for-each:x:@.result/*
 
-   data.select:@"
-select name, email
-   from users
-   where created_at >= current_date - interval '1 day'"
-      database-type:pgsql
-
-   for-each:x:@data.select/*
-      strings.concat
-         .:"<div style='font-family:Arial;'><h1>Welcome, "
-         get-value:x:@.dp/#/*/name
-         .:"!</h1><p>Let’s get moving! 🚀 Start tracking your progress with <strong>FitPulse</strong> today.</p></div>"
-      unwrap:x:+/**
-      mail.smtp.send
-         message
-            to
+      // Checking if we've got [from] and [to] filters.
+      if
+         not-null:x:@.arguments/*/from
+         .lambda
+            add:x:@for-each/*/data.read/[0,1]/*/where/*/and
                .
-                  name:x:@.dp/#/*/name
-                  email:x:@.dp/#/*/email
-            from
+                  created.mteq:x:@.arguments/*/from
+      if
+         not-null:x:@.arguments/*/to
+         .lambda
+            add:x:@for-each/*/data.read/[0,1]/*/where/*/and
                .
-                  name:FitPulse Coach
-                  email:coach@fitpulse.app
-            subject:Let’s get fit with FitPulse!
-            entity:text/html
-               content:x:@strings.concat
+                  created.lteq:x:@.arguments/*/to
+
+      // Invoking read slot.
+      data.read
+         table:transactions
+         columns
+            sum(amount)
+               as:sum
+         where
+            and
+               username.eq:x:@.dp/#/*/user
+               type.eq:charge.succeeded
+         group
+            username
+
+      // Checking if above invocation returned a result.
+      if
+         exists:x:@data.read/*/*/sum
+         .lambda
+
+            // Adding sum.
+            add:x:@.dp/#
+               get-nodes:x:@data.read/*/*/sum
+
+            // Adding commission for affiliate.
+            math.multiply:x:@data.read/*/*/sum
+               get-value:x:@.percent
+            unwrap:x:+/*/*
+            add:x:@.dp/#
+               .
+                  commission:x:@math.multiply
+      else
+
+         // Adding zero sum.
+         add:x:@.dp/#
+            .
+               sum:long:0
+               commission:long:0
+
+// Applying some HTTP caching since endpoint is kind of expensive to invoke.
+response.headers.set
+   Cache-Control:private, max-age=3600
+
+// Returning result to caller.
+return-nodes:x:@.result/*

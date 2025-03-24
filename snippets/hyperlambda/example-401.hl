@@ -1,29 +1,30 @@
 
-// Write a Hyperlambda script to return the default database type the system is using and options for alternative database types.
+// Hyperlambda script to get an access token for NetSuite using a private key, account ID, certificate ID, and consumer key.
+.key
+set-value:x:@.key
+   io.file.load:/etc/netsuite/private-key.txt
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Account id
+.account-id
+set-value:x:@.account-id
+   config.get:"magic:netsuite:account-id"
+validators.mandatory:x:@.account-id
 
-// Retrieving database section from configuration.
-config.section:"magic:databases"
+// Certificate id
+.certificate-id
+set-value:x:@.certificate-id
+   config.get:"magic:netsuite:certificate-id"
+validators.mandatory:x:@.certificate-id
 
-// Adding default database type to return value.
-add:x:../*/return
-   get-nodes:x:@config.section/*/default
+// Consumer key
+.consumer-key
+set-value:x:@.consumer-key
+   config.get:"magic:netsuite:consumer-key"
+validators.mandatory:x:@.consumer-key
 
-/*
- * Iterating through each optional database type,
- * and making sure we return those too, making sure
- * we remove 'default' parts before iterating.
- */
-remove-nodes:x:@config.section/*/default
-for-each:x:@config.section/*
-   set-value:x:+/*/*
-      get-name:x:@.dp/#
-   add:x:../*/return/*/options
-      .
-         .
-
-// Returning result of above to caller.
-return
-   options
+// Invoking slot doing the heavy lifting.
+netsuite.get-access-token
+   private-key:x:@.key
+   account-id:x:@.account-id
+   certificate-id:x:@.certificate-id
+   consumer-key:x:@.consumer-key

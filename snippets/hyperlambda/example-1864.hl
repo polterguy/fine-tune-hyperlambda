@@ -1,16 +1,22 @@
 
-// Hyperlambda endpoint taking two decimal numbers, then multiplying these and returning the result
-.arguments
-   no1:decimal
-   no2:decimal
+// Use nested data.connect to interact with two databases in one snippet
+data.connect:MainDB
+   data.read
 
-// Making sure argument was given
-validators.mandatory:x:@.arguments/*/no1
-validators.mandatory:x:@.arguments/*/no2
+      // Query orders from MainDB
+      table:orders
 
-// Multiplying.
-math.multiply
-   get-value:x:@.arguments/*/no1
-   get-value:x:@.arguments/*/no2
-yield
-   result:x:@math.multiply
+   // Insert a log in LogsDB
+   data.connect:LogsDB
+
+      // This will use our second [data.connect] invocation
+      data.create
+         table:log_storage
+         values
+            message:Checked orders
+
+   // This will use our first connection
+   data.read
+
+      // Back to MainDB connection (still open) to re-query orders
+      table:orders

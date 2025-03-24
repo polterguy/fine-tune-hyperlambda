@@ -1,45 +1,62 @@
 
-// Create a dynamic slot that ensures the specified role exists, creating it if not, ensuring the user is authorized.
-slots.create:magic.auth.ensure-role
+// Scrapes the specified URL, and creates an image prompt from the content on the URL.
+.arguments
+   url:string
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/role
-   validators.mandatory:x:@.arguments/*/description
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
 
-   /*
-    * Ensures the [role] role exists.
-    * 
-    * Notice, in case system hasn't been setup yet, we'll need to silently
-    * catch all exceptions.
-    */
-   try
+// Returns [max_tokens] context from the specified [url].
+execute:magic.workflows.actions.execute
+   name:openai-context-from-url
+   filename:/modules/openai/workflows/actions/openai-context-from-url.hl
+   arguments
+      url:x:@.arguments/*/url
+      max_tokens:int:4000
 
-      // Connecting to Magic database.
-      data.connect:[generic|magic]
+/*
+ * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+ * [instruction] and [query].
+ * 
+ * Will use the default API key found from configurations.
+ * 
+ * [context] is additional data you can supply to OpenAI such that it responds using
+ * your data as its source for information. [instruction] is a system message allowing
+ * you to change how OpenAI responds.
+ */
+execute:magic.workflows.actions.execute
+   name:openai-query
+   filename:/modules/openai/workflows/actions/openai-query.hl
+   arguments
+      model:gpt-4-1106-preview
+      max_tokens:int:1500
+      context:x:--/execute/=openai-context-from-url/*/context
+      query:Create an image prompt from the information in the context that creates a high quality natural image for an article about the subject. DO NOT add text or infographics to the resulting image. Return ONLY the prompt required to create the image. Do not return explanations.
 
-         // Checking to see if [role] role exists.
-         data.read
-            table:roles
-            where
-               and
-                  name.eq:x:@.arguments/*/role
+/*
+ * Invokes OpenAI's image generation API with the specified [query] and [model].
+ * 
+ * Will use the default API key found from configurations.
+ */
+execute:magic.workflows.actions.execute
+   name:openai-image
+   filename:/modules/openai/workflows/actions/openai-image.hl
+   arguments
+      model:dall-e-3
+      size:1792x1024
+      style:vivid
+      query:x:--/execute/=openai-query/*/answer
 
-         // Checking result of above invocation.
-         if
-            not
-               exists:x:@data.read/*/*
-            .lambda
-
-               // We need to insert [role] role into Magic database.
-               data.create
-                  table:roles
-                  values
-                     name:x:@.arguments/*/role
-                     description:x:@.arguments/*/description
-   .catch
-
-      /*
-       * Silently catching here, to avoid application crash
-       * if system hasn't been setup yet.
-       */
-      .silent
+// Returns the result of your last action.
+return-nodes:x:@execute/*

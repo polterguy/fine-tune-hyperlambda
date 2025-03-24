@@ -1,18 +1,30 @@
 
-// Create a Hyperlambda script to count the number of Hyperlambda files and nodes in a specified folder.
-.folder:/
-.loc:int:0
-.files:int:0
-unwrap:x:+/*
-signal:magic.io.file.load-recursively
-   .:x:@.folder
-for-each:x:@signal/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-         hyper2lambda:x:@.dp/#/0
-         math.increment:x:@.loc
-            get-count:x:@hyper2lambda/**
-         math.increment:x:@.files
-remove-nodes:x:@signal/*
+// Hyperlambda script to list all files in a specified folder, with an optional filter to match file names.
+.arguments
+   folder:string
+   filter:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Listing all files in specified folder.
+io.file.list:x:@.arguments/*/folder
+
+// Checking if we have a filter, and if so, only return files matching filter.
+if
+   exists:x:@.arguments/*/filter
+   .lambda
+
+      // Filtering out files not matching filter condition.
+      for-each:x:@io.file.list/*
+         if
+            strings.contains:x:@.dp/#
+               get-value:x:@.arguments/*/filter
+            .lambda
+               add:x:@for-each/./*/return-nodes
+                  get-nodes:x:@.dp/#
+      return-nodes
+else
+
+   // Returning all files from above invocation to caller.
+   return-nodes:x:@io.file.list/*

@@ -1,75 +1,187 @@
 
-/*
- * Lists products
- * 
- * Optionally apply limit, offset or filter as you see fit
- */
+// Keyword density search from products table in shopify database.
 .arguments
 
-   // Optional filtering argument allowing to filter items on No_ and Description.
-   filter:string
+   // Mandatory query for records to search for
+   query:string
 
-   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   // Optional number of records to return, defaults to 10 if not specified. Pass in -1 to return all records
    limit:long
 
-   // Optional offset into records of where to start returning items.
+   // Optional offset into the dataset of where to start retrieving records
    offset:long
 
-// Making sure user is authorised to access the workflow.
-auth.ticket.verify:mnhc-admin
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
 
-// Getting limit value, defaulting to 50
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:50
+// Applying defaults.
+validators.default:x:@.arguments
+   limit:long:3
 
-// Getting offset value, defaulting to 0
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
+// Chopping up query into separate words.
+.words
+add:x:@.words
+   strings.split:x:@.arguments/*/query
+      .:" "
 
-// Opening up database connection.
-mssql.connect:[production|MNDG_LSC18-1]
+// To have our order function correctly working we need to ensure we're only using lower characters.
+for-each:x:@.words/*
 
-   // Checking if we're filtering items.
-   if
-      and
-         exists:x:@.arguments/*/filter
-         not-null:x:@.arguments/*/filter
-         neq:x:@.arguments/*/filter
-            .:
-      .lambda
+   // Sanity checking keyword to avoid SQL injection.
+   validators.regex:x:@.dp/#
+      regex:"^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]+$"
 
-         // Creating our filtering condition. To filter on additional columns, add these columns here.
-         .fields
-            .:No_
-            .:Description
-         for-each:x:@.fields/*
-            .condition
-               cond
-            set-name:x:@.condition/*
-               strings.concat
+   // Transform keyword to lower chars so SQLite's "replace" works as intended.
+   set-value:x:@.dp/#
+      strings.to-lower:x:@.dp/#
+
+// Columns to apply search logic to.
+.columns
+   .:title
+   .:body_html
+   .:vendor
+   .:product_type
+   .:handle
+   .:tags
+
+// Opening up our database connection.
+data.connect:[generic|shopify]
+   database-type:sqlite
+
+   // Dynamically building our SQL
+   .sql:select *, (
+
+   // Joining all relevant columns into one big "field"
+   .fields
+   for-each:x:@.columns/*
+      strings.concat
+         .:coalesce(
+         get-value:x:@.dp/#
+         .:", '')"
+      unwrap:x:+/*/*
+      add:x:@.fields
+         .
+            .:x:@strings.concat
+   set-value:x:@.fields
+      strings.join:x:@.fields/*
+         .:" || "
+   remove-nodes:x:@.fields/*
+
+   // (1) Calculating keyword_density
+   .no:int:0
+   for-each:x:@.words/*
+      if
+         eq:x:@.no
+            .:int:0
+         .lambda
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" (length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:"), '"
                   get-value:x:@.dp/#
-                  .:.like
-            set-value:x:@.condition/*
-               strings.concat
-                  .:%
-                  get-value:x:@.arguments/*/filter
-                  .:%
-            add:x:@mssql.connect/*/mssql.read/*/where/*/or
-               get-nodes:x:@.condition/*
+                  .:"', ''))) / length('"
+                  get-value:x:@.dp/#
+                  .:"')"
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + (length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:"), '"
+               get-value:x:@.dp/#
+               .:"', ''))) / length('"
+               get-value:x:@.dp/#
+               .:"')"
+      math.increment:x:@.no
 
-   // Reading records.
-   mssql.read
-      table:addv_Productos
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         or
-   
-   // Returning result of above invocation to caller.
-   return-nodes:x:@mssql.read/*
+   // Divide total occurrences by total length => "keyword_density"
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) * 1.0 / length(
+         get-value:x:@.fields
+         .:) as keyword_density, (
+
+   // (2) Calculating keyword_count as # of distinct keywords
+
+   // -> For each keyword, do CASE WHEN occurrences > 0 THEN 1 ELSE 0
+   .no:int:0
+   for-each:x:@.words/*
+      if
+         eq:x:@.no
+            .:int:0
+         .lambda
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" CASE WHEN ((length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:"), '"
+                  get-value:x:@.dp/#
+                  .:"', ''))) / length('"
+                  get-value:x:@.dp/#
+                  .:"')) > 0 THEN 1 ELSE 0 END"
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + CASE WHEN ((length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:"), '"
+               get-value:x:@.dp/#
+               .:"', ''))) / length('"
+               get-value:x:@.dp/#
+               .:"')) > 0 THEN 1 ELSE 0 END"
+      math.increment:x:@.no
+
+   // Close up our "keyword_count" expression
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" ) as keyword_count"
+
+   // Finishing main SELECT and WHERE
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" from products"
+         .:" where keyword_count > 0"
+
+   // IMPORTANT: Order by distinct keyword matches first, then keyword density
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" order by keyword_count desc, keyword_density desc limit "
+         get-value:x:@.arguments/*/limit
+
+   // Optional offset
+   if
+      exists:x:@.arguments/*/offset
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" offset "
+               get-value:x:@.arguments/*/offset
+
+   // Execute SQL
+   data.select:x:@.sql
+      database-type:sqlite
+
+   // Remove helper fields from final output
+   remove-nodes:x:@data.select/*/*/keyword_density
+   remove-nodes:x:@data.select/*/*/keyword_count
+
+   // Return
+   return-nodes:x:@data.select/*

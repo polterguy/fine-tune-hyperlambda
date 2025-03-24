@@ -1,14 +1,47 @@
-// Copies template field defaults into matching form inputs
-.template
-   fields
-      name:John Doe
-      age:int:40
-      email:john@example.com
-.form
-   name
-   age
-   email
-for-each:x:@.template/*/fields/*
-   get-name:x:@.dp/#
-   set-value:x:@.form/*/{@get-name}
+
+// Hyperlambda script that returns all workflows to the caller, ensuring the user is authorized.
+auth.ticket.verify:root
+
+// Buffer for all workflows in the system.
+.result
+
+// Retrieving all system workflows.
+add:x:@.result
+   io.file.list-recursively:/misc/workflows/workflows/
+
+// Retrieving all custom workflows.
+if
+   io.folder.exists:/etc/workflows/workflows/
+   .lambda
+      add:x:@.result
+         io.file.list-recursively:/etc/workflows/workflows/
+
+// Then iterating through each installed module, and retrieving all module workflows.
+io.folder.list:/modules/
+for-each:x:@io.folder.list/*
+   strings.concat
       get-value:x:@.dp/#
+      .:workflows/workflows/
+   if
+      io.folder.exists:x:@strings.concat
+      .lambda
+
+         // Module has custom actions.
+         add:x:@.result
+            io.file.list-recursively:x:@strings.concat
+
+// Filtering out everything not ending with '.hl'.
+for-each:x:@.result/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Returning workflows file to caller.
+         unwrap:x:+/*/*
+         add:x:../*/return
+            .
+               .:x:@.dp/#
+
+// Returning result to caller.
+return

@@ -1,14 +1,64 @@
-// The oracle decides whether a number is worthy.
 
-.verdict
-.number-of-trials:int:42
+// Hyperlambda workflow action to execute a SQL statement with specified 'database-type', 'connection-string', 'database', and 'sql'. Include optional 'params'. Validate mandatory fields and enums.
+.arguments
+   database-type
+      type:enum
+      mandatory:bool:true
+      values
+         .:sqlite
+         .:mssql
+         .:mysql
+         .:pgsql
+   connection-string
+      type:string
+      mandatory:bool:true
+   database
+      type:string
+      mandatory:bool:true
+   sql
+      type:sql
+      mandatory:bool:true
+   params
+      type:key-value
+      mandatory:bool:false
+.icon:backup
 
-if
-   gt
-      get-value:x:@.number-of-trials
-      .:int:40
-   .lambda
-      set-value:x:@.verdict
-         .:You are worthy!
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/sql
+validators.enum:x:@.arguments/*/database-type
+   .:sqlite
+   .:mssql
+   .:mysql
+   .:pgsql
 
-// If trials exceed 40, the verdict will be "You are worthy!".
+// Applying defaults.
+validators.default:x:@.arguments
+   connection-string:generic
+   database-type:sqlite
+   database:magic
+
+// Connection string to actually use as we connect.
+.connection-string
+
+// Caller supplied an explicit [connection-string] argument.
+set-value:x:@.connection-string
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connection-string
+      .:|
+      get-value:x:@.arguments/*/database
+      .:]
+
+// Connecting to database.
+data.connect:x:@.connection-string
+   database-type:x:@.arguments/*/database-type
+
+   // Parametrizing SQL.
+   add:x:./*/data.execute
+      get-nodes:x:@.arguments/*/params/*
+
+   // Executing SQL.
+   data.execute:x:@.arguments/*/sql
+      database-type:x:@.arguments/*/database-type
+   yield
+      affected:x:@data.execute

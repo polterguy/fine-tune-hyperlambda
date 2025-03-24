@@ -1,44 +1,44 @@
 
-/*
- * Returns Stripe customers.
- * 
- * [limit] and [starting_after] are optional arguments and [limit] is the number of customers
- * to return, while [starting_after] is from which record to start returning charges.
- * 
- * [email] is an optional case sensitive filter that emails must match.
- */
+// Create endpoint inserting one record into your products table in your shopping-cart-demo database.
 .arguments
-   limit:int
-   starting_after:string
-   email:string
 
-/*
- * Ensures user is authorized to access endpoint.
- * 
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+   // name column value
+   name:string
 
-/*
- * Retrieves charges from Stripe.
- * 
- * Will use your Stripe API token found from your settings as it's interacting
- * with the Stripe API.
- */
-execute:magic.workflows.actions.execute
-   name:stripe-customers-get
-   filename:/modules/stripe/workflows/actions/stripe-customers-get.hl
-   arguments
-      limit:x:@.arguments/*/limit
-      email:x:@.arguments/*/email
-      starting_after:x:@.arguments/*/starting_after
+   // description column value
+   description:string
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+   // sku column value
+   sku:string
+
+   // price column value
+   price:decimal
+
+   // image_url column value
+   image_url:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:products
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

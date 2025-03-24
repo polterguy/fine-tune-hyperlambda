@@ -1,126 +1,15 @@
-
-// Hyperlambda workflow action that creates a checkout session for a specified price ID using Stripe. The function should require mandatory arguments for username, price, success URL, and mode (either 'payment' or 'subscription'). It should validate these arguments and retrieve the Stripe API token. The function should check if the customer already exists in Stripe to avoid duplicates, and reuse existing customer objects if possible. It should then create a checkout session using Stripe's API and return the session ID and URL to the caller. Handle any errors by logging and throwing exceptions.
-.arguments
-   username
-      type:string
-      mandatory:bool:true
-   price
-      type:string
-      mandatory:bool:true
-   success_url
-      type:string
-      mandatory:bool:true
-   mode
-      type:string
-      mandatory:bool:true
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/price
-validators.mandatory:x:@.arguments/*/success_url
-validators.mandatory:x:@.arguments/*/mode
-validators.enum:x:@.arguments/*/mode
-   .:payment
-   .:subscription
-
-// Retrieving token to use for invocations towards Stripe.
-.token
-set-value:x:-
-   strings.concat
-      .:"Bearer "
-      config.get:"magic:stripe:token"
-
 /*
- * Checking is customer already exists in Stripe, at which point we reuse the same customer.
+ * This Hyperlambda snippet demonstrates iterating over each child of `.foo1` using `for-each`.
  * 
- * This avoids creating duplicate Stripe customer objects for each time the same user creates a
- * subscription, and will also reuse existing customer objects created manually in the Stripe dashboard.
+ * 1. The `.foo1` node has three children (`bar1`, `bar2`, `bar3`).
+ * 2. The `for-each` slot iterates over each child of `.foo1`.
+ * 3. The `foo2` slot is invoked for each child. Notice, this will throw an exception since there are no [foo2] slots in Hyperlambda
+ * 4. The expected execution count of `foo2` is 1, since the first iteration will throw an exception.
  */
-.url
-strings.concat
-   .:"email:'"
-   get-value:x:@.arguments/*/username
-   .:"'"
-strings.url-encode:x:@strings.concat
-set-value:x:@.url
-   strings.concat
-      .:"https://api.stripe.com/v1/customers/search?query="
-      get-value:x:@strings.url-encode
 
-// Invoking Stripe REST API to retrieve customers with the specified email, if any.
-http.get:x:@.url
-   headers
-      Authorization:x:@.token
-   convert:true
-
-// Sanity checking above invocation.
-if
-   mte
-      get-value:x:@http.get
-      .:int:400
-   .lambda
-
-      // Oops, something went wrong ...!!
-      lambda2hyper:x:@http.post
-      log.error:Something went wrong while invoking Stripe, could not list customers
-         result:x:@lambda2hyper
-         provider:Stripe
-      throw:Something went wrong while invoking Stripe, could not list customers
-         public:true
-         status:500
-
-/*
- * Checking if we've got an existing customer, at which point we reuse this customer
- * instead of creating a new one.
- */
-if
-   exists:x:@http.get/*/content/*/data/0/*/id
-   .lambda
-
-      // We already have this customer in our Stripe account.
-      unwrap:x:+/*/*
-      add:x:../*/http.post/*/payload
-         .
-            customer:x:@http.get/*/content/*/data/*/*/id
-else
-
-   // No existing customer in Stripe matching this email address.
-   unwrap:x:+/*/*
-   add:x:../*/http.post/*/payload
-      .
-         customer_email:x:@.arguments/*/username
-         client_reference_id:x:@.arguments/*/username
-
-// Invoking Stripe REST API to create a checkout session.
-http.post:"https://api.stripe.com/v1/checkout/sessions"
-   headers
-      Authorization:x:@.token
-      Content-Type:application/x-www-form-urlencoded
-   payload
-      line_items[0][price]:x:@.arguments/*/price
-      line_items[0][quantity]:int:1
-      automatic_tax[enabled]:bool:true
-      success_url:x:@.arguments/*/success_url
-      mode:x:@.arguments/*/mode
-   convert:true
-
-// Sanity checking above invocation.
-if
-   mte
-      get-value:x:@http.post
-      .:int:400
-   .lambda
-
-      // Oops, something went wrong ...!!
-      lambda2hyper:x:@http.post
-      log.error:Something went wrong while invoking Stripe, could not create checkout session
-         result:x:@lambda2hyper
-         provider:Stripe
-      throw:Something went wrong while invoking Stripe, could not create checkout session
-         public:true
-         status:500
-
-// Returning result to caller.
-yield
-   session:x:@http.post/*/content/*/id
-   url:x:@http.post/*/content/*/url
+.foo1
+   bar1
+   bar2
+   bar3
+for-each:x:../*/.foo1/*
+   foo2

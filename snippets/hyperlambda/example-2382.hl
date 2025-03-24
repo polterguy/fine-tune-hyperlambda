@@ -1,24 +1,37 @@
 /*
- * This example checks if a log file "/logs/errors.log" and its parent folder "/logs/" exist.
- * If the log file exists, it is deleted.
- * If the log file does not exist but the folder exists, it logs a message.
- * If neither exist, it creates the folder.
+ * Compiles a snippet of C# code down to a library,
+ * for then to dynamically load it as a plugin.
+ *
+ * This particular code creates a slot, but you can create any
+ * code you wish, and it doesn't have to be Hyperlambda related.
  */
-.result
-if
-   io.file.exists:/logs/errors.log
-   .lambda
-      io.file.delete:/logs/errors.log
-      set-value:x:@.result
-         .:Log file deleted.
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.signals.contracts
+   code:@"
 
-else-if
-   io.folder.exists:/logs/
-   .lambda
-      set-value:x:@.result
-         .:Log folder exists but no log file found.
+// Example C# code creating a Hyperlambda slot.
+using System;
+using magic.node;
+using magic.signals.contracts;
 
-else
-   io.folder.create:/logs/
-   set-value:x:@.result
-      .:Log folder did not exist, so it was created.
+// Our slot class.
+[Slot(Name = ""bar"")]
+public class Bar : ISlot
+{
+   public void Signal(ISignaler signaler, Node input)
+   {
+      input.Value = ""Hello from C#"";
+   }
+}"
+   assembly-name:bar.dll
+
+// Loading assembly now that we've created it.
+system.plugin.execute:x:@system.compile
+
+   // Invoking dynamically created C# slot.
+   bar

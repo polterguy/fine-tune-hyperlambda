@@ -1,28 +1,31 @@
-
-// Delete one record from your Categories table in your northwind database
+// Helper file to vectorize xplain training data.
 .arguments
+   vectorize:bool
 
-   // Primary key of record to delete, mandatory argument
-   CategoryID:long
+// Applying defaults.
+validators.default:x:@.arguments
+   vectorize:bool:true
 
-validators.mandatory:x:@.arguments/*/CategoryID
+// Logging invocation.
+log.info:Started vectorizing training snippets from xplain-kennisbank-plus-caos model
 
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
+// Buffer for type name.
+.type:xplain-kennisbank-plus-caos 
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+// Making sure we can handle exceptions.
+try
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:Categories
-      where
-         and
+   // Vectorising
+   if:x:@.arguments/*/vectorize
+      execute:magic.ai.vectorise
+         type:x:@.type
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+      // Logging.
+      log.info:Finished vectorizing training snippets from xplain-kennisbank-plus-caos model
+
+.catch
+
+   // Oops ...!!
+   log.error:Something went wrong as we tried to vectorize training snippets from xplain-kennisbank-plus-caos model
+      error:x:@.arguments/*/message
+      type:x:@.type

@@ -1,5 +1,32 @@
-/*
- * Example: Get the length of a numeric string.
- */
-// Returns 5
-strings.length:"12345"
+
+// Hyperlambda endpoint that counts items from your Categories table in your northwind database with optional filtering arguments
+.arguments
+   Categories.CategoryID.eq:long
+   Categories.CategoryName.like:string
+   Categories.CategoryName.eq:string
+   Categories.Description.like:string
+   Categories.Description.eq:string
+   Categories.Picture.like:string
+   Categories.Picture.eq:string
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Adding all arguments into [and] node ensuring filtering is applied
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Categories
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

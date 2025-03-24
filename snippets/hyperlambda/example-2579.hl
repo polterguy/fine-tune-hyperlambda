@@ -1,33 +1,53 @@
-// Search through a log file and extracting all emails from it
 
-// Making sure current Hyperlambda file and endpoint does NOT take any arguments
+// Searches for the specified [query] through your training snippets and returns [max_tokens] training snippets to caller.
 .arguments
+   _type:string
 
-// Read the log file
-if
-   io.file.exists:/var/logs/server.log
-   .lambda
+   // Mandatory argument and become an SQL LIKE condition records must match to be considered.
+   query:string
 
-      // Reading file's content as text.
-      io.file.load:/var/logs/server.log
+   // Optional argument being maximum number of tokens to return. Will default to 4000 if not specified.
+   max_tokens:int
 
-      // A temporary place to hold the extracted emails
-      .emails
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/_type
+validators.mandatory:x:@.arguments/*/query
 
-      // Extracting email addresses using regex
-      strings.matches:x:@io.file.load
-         .:"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z]{2,6}"
+// Applying defaults.
+validators.default:x:@.arguments
+   max_tokens:int:4000
 
-      // Loop through the matches and add them to the list
-      for-each:x:@strings.matches/*/match
-         unwrap:x:+/*/*
-         add:x:@.emails
-            .
-               .:x:@.dp/#
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-      // Returning the result to caller.
-      yield
-         emails:x:@.emails/*
-
-else
-   log.error:Log file not found
+   // Creating our filter string
+   .filter
+   set-value:x:@.filter
+      strings.concat
+         .:%
+         get-value:x:@.arguments/*/query
+         .:%
+   data.read
+      table:ml_training_snippets
+      columns
+         id
+         prompt
+         uri
+      where
+         or
+            prompt.like:x:@.filter
+            completion.like:x:@.filter
+   .cont:bool:true
+   while:x:@.cont
+      lambda2hyper:x:@data.read/*
+      if
+         lt
+            openai.tokenize:x:@lambda2hyper
+            convert:x:@.arguments/*/max_tokens
+               type:int
+         .lambda
+            set-value:x:@.cont
+               .:bool:false
+      else
+         remove-nodes:x:@data.read/0/-
+   return-nodes:x:@data.read/*

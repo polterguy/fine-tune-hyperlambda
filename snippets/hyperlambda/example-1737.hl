@@ -1,6 +1,63 @@
 
-// Set all inactive users to have NULL last_login
-data.connect:authDB
-   data.execute:UPDATE users SET last_login = NULL WHERE active = 0
+// Write a Hyperlambda script to create a system message from specified arguments, including URL, template, and instruction.
+.arguments
+   url:string
+   template:string
+   instruction:string
+   channel:string
 
-   // Executes the UPDATE; number of affected records returned
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/channel
+validators.mandatory:x:@.arguments/*/template
+validators.mandatory:x:@.arguments/*/instruction
+
+// Prepending scheme to URL unless explicitly specified.
+if
+   and
+      not
+         strings.starts-with:x:@.arguments/*/url
+            .:"http://"
+      not
+         strings.starts-with:x:@.arguments/*/url
+            .:"https://"
+   .lambda
+      set-value:x:@.arguments/*/url
+         strings.concat
+            .:"https://"
+            get-value:x:@.arguments/*/url
+
+// Sanity checking URL.
+validators.url:x:@.arguments/*/url
+
+// Doing heavy lifting on a background thread to avoid 60 second timeouts.
+insert-before:x:./*/fork/0
+   get-nodes:x:@.arguments
+fork
+   try
+
+      // Creating our system message.
+      execute:magic.ai.create-system-message
+         url:x:@.arguments/*/url
+         template:x:@.arguments/*/template
+         instruction:x:@.arguments/*/instruction
+
+      // Invoking frontend with message.
+      unwrap:x:+/*/*/message
+      sockets.signal:x:@.arguments/*/channel
+         roles:root
+         args
+            message:x:@execute
+   .catch
+
+      // Oops, signaling frontend that we experienced an error.
+      unwrap:x:+/*/*
+      sockets.signal:x:@.arguments/@.arguments/*/channel
+         roles:root
+         args
+            message:ERROR
+            extra:x:@.arguments/*/message
+
+// Returning result of invocation to caller.
+yield
+   result:success

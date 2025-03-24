@@ -1,32 +1,16 @@
-/*
- * Sends a welcome email with styled content to new users of the finance portal.
- */
 
-data.connect:[pgsql|finhub]
-   database-type:pgsql
+// Hyperlambda snippet that loops while [.progress] is not equal to 100.
 
-   data.select:@"
-select name, email
-   from customers
-   where created_at >= current_date - interval '1 day'"
-      database-type:pgsql
+// Loops while [.progress] is not equal to 100.
+.progress:int:0
+while
+   neq
+      get-value:x:@.progress
+      .:int:100
+   .lambda
 
-   for-each:x:@data.select/*
-      strings.concat
-         .:"<p>Hi <strong>"
-         get-value:x:@.dp/#/*/name
-         .:"</strong>,</p><p>Welcome to <em>FinHub</em> – your personal finance companion.</p>"
-      unwrap:x:+/**
-      mail.smtp.send
-         message
-            to
-               .
-                  name:x:@.dp/#/*/name
-                  email:x:@.dp/#/*/email
-            from
-               .
-                  name:FinHub Support
-                  email:support@finhub.io
-            subject:Your FinHub account is ready!
-            entity:text/html
-               content:x:@strings.concat
+      // Logging progress.
+      log.info:Processing...
+
+      // Increasing progress.
+      math.increment:x:@.progress

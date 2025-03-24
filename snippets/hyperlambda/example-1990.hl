@@ -1,62 +1,51 @@
 
-// Creates a contact in HubSpot
+// Update one record in your Artist table in your chinook database
 .arguments
-   email:string
-   firstname:string
-   lastname:string
-   phone:string
-   company:string
-   website:string
-   lifecyclestage:string
 
-// Sanity checking invoation.
-validators.mandatory:x:@.arguments/*/email
+   // ArtistId column value being primary key of record to update, mandatory argument
+   ArtistId:long
 
-// Retrieving token from configuration and verifying it exists.
-config.get:"magic:hubspot:token"
-if
-   or
-      eq:x:@config.get
-         .:
-      null:x:@config.get
-   .lambda
+   // Name column's new value
+   Name:string
 
-      // Oops ...!!
-      throw:No authorization token found in your configuration
-         public:bool:true
-         status:int:500
-.token
-set-value:x:@.token
-   strings.concat
-      .:"Bearer "
-      get-value:x:@config.get
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/ArtistId
 
-// Creating our contact in HubSpot.
-add:x:./*/http.post/*/payload/*/properties
-   get-nodes:x:@.arguments/*
-http.post:"https://api.hubapi.com/crm/v3/objects/contacts"
-   convert:true
-   headers
-      Authorization:x:@.token
-      Content-Type:application/json; charset=utf8
-   payload
-      properties
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
 
-// Verifying above invocation was a success.
-if
-   neq:x:@http.post
-      .:int:201
-   .lambda
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-      // Oops ...!!
-      lambda2hyper:x:@http.post
-      log.error:Could not create contact in HubSpot
-         message:x:@lambda2hyper
-      throw:Something went wrong as we tried to post a contact to HubSpot, check your log for details.
-         status:int:500
-         public:bool:true
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
 
-// Returning success to caller.
-yield
-   result:success
-   id:x:@http.post/*/content/*/id
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Artist
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

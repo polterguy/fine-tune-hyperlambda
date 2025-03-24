@@ -1,55 +1,30 @@
-// Extracting specific parts from a MIME message
 
-// Example raw MIME message
-.mime-data:@"MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary=""frontier""
+// Write a Hyperlambda script to return the initial questionnaire for a specified type.
+.arguments
+   type:string
 
---frontier
-Content-Type: text/plain
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
 
-This is the body of the message.
+// Opening up database connection.
+data.connect:[generic|magic]
 
---frontier
-Content-Type: application/octet-stream
-Content-Transfer-Encoding: base64
-Content-Disposition: attachment; filename=""report.pdf""
+   // Retrieving all questions from database.
+   data.select:"\nselect q.question, q.type, q.context, q.name\n\tfrom questions q\n\t\tinner join questionnaires qu on qu.name = q.questionnaire\n        inner join ml_types t on t.initial_questionnaire = qu.name\n\twhere t.type = @type\n   order by q.question_id"
+      type:x:@.arguments/*/type
 
-JVBERi0xLjUKJdDUxdgKNSAwIG9iago8PAovTGVuZ3RoIDEyNjUKL0ZpbHRlciAv
-RmxhdGVEZWNvZGUKPj4Kc3RyZWFtCnicY2RgYGJgYGBkYAACTiCuZxCw
+   // Retrieving main questionnaire from database.
+   data.select:"\nselect q.name, q.type, q.action\n   from questionnaires q\n      inner join ml_types t on t.initial_questionnaire = q.name\n   where t.type = @type"
+      type:x:@.arguments/*/type
 
---frontier
-Content-Type: image/jpeg
-Content-Transfer-Encoding: base64
-Content-Disposition: attachment; filename=""photo.jpg""
-
-/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgG
-BgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/
-
---frontier--"
-
-// Parse the MIME message
-mime.parse:x:@.mime-data
-
-// Extract the text body
-.message-body
-set-value:x:@.message-body
-   get-value:x:@mime.parse/*/entity/[0,1]/*/content
-
-// Extract information about the first attachment
-.first-attachment
-   disposition:x:@mime.parse/*/entity/[1,1]/*/headers/*/Content-Disposition
-   content:x:@mime.parse/*/entity/[1,1]/*/content
-   type:x:@mime.parse/*/entity/[1,1]
-
-// Evaluates all expressions inside of above [.first-attachment].
-unwrap:x:-/*
-
-// Count the number of attachments
-.attachment-count:int:0
-for-each:x:@mime.parse/*/entity
+   // Returning result to caller.
+   insert-before:x:./*/return/0
+      get-nodes:x:@data.connect/*/data.select/[1,2]/*/*
+   add:x:./*/return/*/questions
+      get-nodes:x:@data.connect/*/data.select/[0,1]/*
    if
-      not
-         eq:x:@.dp/#
-            .:text/plain
+      not-exists:x:@data.connect/*/return/*/questions/*
       .lambda
-         math.increment:x:@.attachment-count
+         remove-nodes:x:@data.connect/*/return/*/questions
+   return
+      questions

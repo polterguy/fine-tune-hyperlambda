@@ -1,17 +1,55 @@
 
-// Returns a single plan based on size.
+// Hyperlambda endpoint that counts items in the ml_requests table in the magic database, ensuring the user is authorized and handling optional filters.
 .arguments
-   size:string
+   filter:string
+   ml_requests.id.eq:long
+   ml_requests.created.eq:date
+   ml_requests.type.like:string
+   ml_requests.type.eq:string
+   ml_requests.prompt.like:string
+   ml_requests.prompt.eq:string
+   ml_requests.completion.like:string
+   ml_requests.completion.eq:string
+   ml_requests.finish_reason.like:string
+   ml_requests.finish_reason.eq:string
 
-// Returning correct price_reference according to size
-switch:x:@.arguments/*/size
-   case:small
-      return
-         price_reference:price_1OfS7kCoiv3SyDZGr1droJZF
-   case:large
-      return
-         price_reference:price_1OfS8NCoiv3SyDZGCyJh8X62
-   default
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-      // Oops ...!!
-      throw:I can only handle small and large size
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Checking if user provided a [filter]
+   if
+      exists:x:@.arguments/*/filter
+      .lambda
+
+         // Adding filter and removing it from arguments collection.
+         strings.concat
+            .:%
+            get-value:x:@.arguments/*/filter
+            .:%
+         unwrap:x:+/*/*/*
+         add:x:@data.connect/*/data.read/*/where/*/and
+            .
+               or
+                  ml_requests.prompt.like:x:@strings.concat
+                  ml_requests.user_id.eq:x:@.arguments/*/filter
+         remove-nodes:x:@.arguments/*/filter
+
+   // Adding all other arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      table:ml_requests
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

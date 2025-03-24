@@ -1,16 +1,21 @@
-// Partially update an item's price using HTTP PATCH with a custom header
-http.patch:"https://api.example.com/items/123"
-   headers
 
-      // specify JSON content type since custom header overrides defaults
-      Content-Type:application/json
+// Hyperlambda script to return true if OpenAI is configured and can be used.
+.arguments
 
-      // example of a custom header for authentication
-      X-API-Key:MY_API_KEY_ABC123
+// Making sure user has access to invoked endpoint.
+auth.ticket.verify:root
 
-   // attach query parameters instead of hardcoding them in URL
-   query
-      ID:5
+// Checking if configuration setting for OpenAI API key exists.
+config.get:"magic:openai:key"
+if
+   eq:x:@config.get
+      .
+   .lambda
 
-   // JSON snippet with the fields to update
-   payload:@"{""price"": 25.00}"
+      // No API key found for OpenAI
+      return
+         result:bool:false
+
+// OpenAI API key exists.
+return
+   result:bool:true

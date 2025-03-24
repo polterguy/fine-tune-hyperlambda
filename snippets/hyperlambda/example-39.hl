@@ -1,11 +1,19 @@
 
-// Generate a Hyperlambda snippet that retrieves product inventory from 'inventory_db'.
+// Hyperlambda endpoint taking arguments. This SQL query selects media types and their aggregate counts, ordering the results by count in descending order, filtered by a specified name pattern.
+.arguments
+   filter:string
 
-// Retrieves product inventory from "inventory_db".
-.result
-data.connect:inventory_db
-   database-type:mysql
-   data.select:select product_id, name, stock, price from products where stock > 0 order by stock asc
-      database-type:mysql
-   add:x:@.result
-      get-nodes:x:@data.select/*
+// Connecting to database.
+data.connect:chinook
+   database-type:sqlite
+
+   // Parametrizing [data.select].
+   add:x:./*/data.select
+      get-nodes:x:@.arguments/*
+
+   // Executing [data.select] slot with our SQL.
+   data.select:"\n/*\n * Selects media types and aggregate of counts, and orders by count descending.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect mt.Name, count(mt.MediaTypeId) as Amount \n  from MediaType mt\n    inner join Track t on mt.MediaTypeId = t.MediaTypeId\n  where mt.Name like @filter\n  group by mt.MediaTypeId\n  order by Amount desc;\n"
+      database-type:sqlite
+
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

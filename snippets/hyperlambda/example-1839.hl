@@ -1,38 +1,42 @@
 
-// Create one record in your Album table in your chinook database
+// Write a Hyperlambda script to unzip a specified file in its current folder, with an option to create a new folder.
 .arguments
+   file:string
+   create_folder:bool
 
-   // AlbumId column value
-   AlbumId:long
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Title column value
-   Title:string
+// Checking if we need to create folder with name and path of zip file.
+if:x:@.arguments/*/create_folder
+   strings.length:x:@.arguments/*/file
+   strings.substring:x:@.arguments/*/file
+      .:int:0
+      math.subtract:x:@strings.length
+         .:int:4
+   strings.concat
+      get-value:x:@strings.substring
+      .:/
+   unwrap:x:+/*/*
+   add:x:../*/io.file.unzip
+      .
+         folder:x:@strings.concat
+   if
+      not
+         io.folder.exists:x:@strings.concat
+      .lambda
 
-   // ArtistId column value
-   ArtistId:long
+         // Creating folder we're unzipping into.
+         io.folder.create:x:@strings.concat
+   else
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+      // Deleting folder and re-creating it to ensure it's empty.
+      io.folder.delete:x:@strings.concat
+      io.folder.create:x:@strings.concat
 
-// Opening up database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
+// Unzipping file.
+io.file.unzip:x:@.arguments/*/file
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:Album
-      return-id:bool:false
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      result:success
+// Returning success to caller.
+return-nodes
+   result:success

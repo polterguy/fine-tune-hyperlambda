@@ -1,41 +1,88 @@
 
-// CRUD / Create Hyperlambda that creates one record in your comments table in your cms database
+// Workflow action that searches for subscriptions associated with a customer's username in Stripe. The function should validate the username, retrieve the Stripe API token, and first find the customer by email. It should then construct a URL to retrieve subscriptions for that customer and make a GET request to the Stripe API. Handle any errors by logging and throwing exceptions, and return the subscription IDs to the caller.
 .arguments
+   username
+      type:string
+      mandatory:bool:true
+.icon:payment
 
-   // post_id column value
-   post_id:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
 
-   // user_id column value
-   user_id:long
+// Retrieving token to use for invocations towards Stripe.
+.token
+set-value:x:-
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
 
-   // content column value
-   content:string
+// First we need to find customer from username.
+.url
+strings.concat
+   .:"email:'"
+   get-value:x:@.arguments/*/username
+   .:"'"
+strings.url-encode:x:@strings.concat
+set-value:x:@.url
+   strings.concat
+      .:"https://api.stripe.com/v1/customers/search?query="
+      get-value:x:@strings.url-encode
 
-   // created_at column value
-   created_at:date
+// Invoking Stripe REST API to retrieve customer.
+http.get:x:@.url
+   headers
+      Authorization:x:@.token
+   convert:true
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.post
+      .:int:400
+   .lambda
 
-// Opening up database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe API to create subscription
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe API to create subscription
+         public:true
+         status:500
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
+// Creating our URL.
+set-value:x:@.url
+   strings.concat
+      .:"https://api.stripe.com/v1/subscriptions?customer="
+      strings.url-encode:x:@http.get/*/content/*/data/0/*/id
 
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:comments
-      return-id:bool:true
-      values
+// Invoking Stripe API.
+http.get:x:@.url
+   headers
+      Authorization:x:@.token
+   convert:true
 
-   // Returning the correct status code.
-   response.status.set:201
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.post
+      .:int:400
+   .lambda
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe API to create subscription
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe API to create subscription
+         public:true
+         status:500
+
+// Returning result to caller.
+for-each:x:@http.get/*/content/*/data/*
+   unwrap:x:+/*/*/*
+   add:x:../*/return
+      .
+         .
+            id:x:@.dp/#/*/id
+return

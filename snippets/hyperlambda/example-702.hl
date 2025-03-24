@@ -1,17 +1,98 @@
 
-// Hyperlambda endpoint that returns a specified file to caller as raw text. If the file doesn't exist it should throw a 404 exception.
-.arguments
-   file:string
-if
-   not
-      io.file.exists:x:@.arguments/*/file
-   .lambda
-      throw:File not found
-         status:int:404
-         public:bool:true
-io.file.load:x:@.arguments/*/file
-response.headers.set
-   Content-Type:text/plain
-return-value:x:@io.file.load
+// Slot responsible for configuring a new cloudlet.
+slots.create:hub.cloudlets.wait-for-ready
 
-// Save this file for instance as '/modules/YOUR_MODULE/load-file.get.hl', and pass in file as a QUERY parameter
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/token
+   validators.mandatory:x:@.arguments/*/name
+   validators.mandatory:x:@.arguments/*/namespace
+   validators.mandatory:x:@.arguments/*/url
+
+   // Doing some basic logging.
+   log.debug:Waiting for cloudlet to boot up and be ready on network
+      name:x:@.arguments/*/name
+      namespace:x:@.arguments/*/namespace
+
+   // Creating URL to invoke to check if cloudlet is available.
+   .url
+   set-value:x:-
+      strings.concat
+         get-value:x:@.arguments/*/url
+         .:/apis/apps/v1/namespaces/
+         get-value:x:@.arguments/*/namespace
+         .:/deployments/
+         get-value:x:@.arguments/*/name
+
+   // Informing user that we're waiting for cloudlet to boot and be ready.
+   sockets.signal:hub.cloudlets.create
+      users:x:@.arguments/*/username
+      args
+         status:Waiting for cloudlet to boot up and become available on network
+         finished:bool:false
+         error:bool:false
+
+   // Waiting for cloudlet to be ready, maximum wait time is 5 minutes before we give up.
+   .no:int:30
+   while
+      mt:x:@.no
+         .:int:0
+      .lambda
+
+         // Sleeping for 10 seconds.
+         sleep:10000
+
+         // Invoking HTTP REST API to check if cloudlet is ready.
+         http.get:x:@.url
+            headers
+               Authorization:x:@.arguments/*/token
+            convert:true
+
+         // Checking status of above invocation.
+         if
+            mte:x:@http.get/*/content/**/status/*/availableReplicas
+               .:long:1
+            .lambda
+
+               // Doing some basic logging
+               log.debug:Cloudlet is available and up running
+                  name:x:@.arguments/*/name
+                  namespace:x:@.arguments/*/namespace
+
+               // Cloudlet is active, and can be configured.
+               sockets.signal:hub.cloudlets.create
+                  users:x:@.arguments/*/username
+                  args
+                     status:Cloudlet is ready and up running
+                     finished:bool:false
+                     error:bool:false
+
+               // Returning early to abort the rest of our while loop.
+               return:bool:true
+
+         // Decrementing counter.
+         math.decrement:x:@.no
+
+         // Informing user that we're still waiting ...
+         sockets.signal:hub.cloudlets.create
+            users:x:@.arguments/*/username
+            args
+               status:Cloudlet is still not ready, please wait ...
+               finished:bool:false
+               error:bool:false
+
+   // Oops, cloudlet was not ready even though we waited for 5 minutes.
+   log.error:Cloudlet was not available after 5 minutes
+      url:x:@.arguments/*/url
+
+   // Informing user that something went wrong.
+   sockets.signal:hub.cloudlets.create
+      users:x:@.arguments/*/username
+      args
+         status:Cloudlet was not available due to internal error
+         finished:bool:false
+         error:bool:false
+
+   // Returning failure to caller.
+   throw:Cloudlet was not available within 10 minutes, hence we give up waiting for it
+      public:true
+      status:500

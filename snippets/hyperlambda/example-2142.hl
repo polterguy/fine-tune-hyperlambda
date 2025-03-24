@@ -1,69 +1,19 @@
 
-// Read endpoint with paging, sorting, filtering selecting records from your spice_urls table.
-.arguments
+// Hyperlambda snippet that handles division by zero using a try/catch/finally block.
 
-   // Number of records to return
-   limit:long
+// Handles division by zero inside a try/catch/finally block
+try
 
-   // Offset into the dataset of where to start retrieving records
-   offset:long
+   // Attempting division by zero
+   math.divide
+      .:int:10
+      .:int:0
+.catch
 
-   // What column to order by
-   order:string
+   // Logging the error
+   log.error:x:@.arguments/*/message
 
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
+.finally
 
-   // spice_urls table spice_url_id column equality exact match filtering
-   spice_urls.spice_url_id.eq:long
-
-   // spice_urls table url column wildcard filtering with SQL like '%' comparison
-   spice_urls.url.like:string
-
-   // spice_urls table url column equality exact match filtering
-   spice_urls.url.eq:string
-
-   // spice_urls table type column wildcard filtering with SQL like '%' comparison
-   spice_urls.type.like:string
-
-   // spice_urls table type column equality exact match filtering
-   spice_urls.type.eq:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up our database connection.
-data.connect:[generic|scraper]
-   database-type:sqlite
-
-   // Parametrising our read invocation with ordering arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-
-   // Parametrising our read invocation with paging arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:spice_urls
-      columns
-         spice_urls.spice_url_id
-         spice_urls.url
-         spice_urls.type
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+   // Final block executed after try/catch
+   log.info:Completed division attempt

@@ -1,46 +1,25 @@
 
-// Hyperlambda script for a CRUD update endpoint that updates an existing item in the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+// Returns [max_urls] matching specified query by searching DuckDuckGo.
 .arguments
-   name:string
-   description:string
+   query:string
+   max_urls:int
 
-// Mandatory argument!
-validators.mandatory:x:@.arguments/*/name
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Applying default values for optional arguments.
+validators.default:x:@.arguments
+   max_urls:int:10
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+// Converting to integer to make sure we've got the right type.
+set-value:x:@.arguments/*/max_urls
+   convert:x:@.arguments/*/max_urls
+      type:int
 
-   // Parametrising our invocation.
+// Retrieving context.
+execute:magic.http.duckduckgo-search
+   query:x:@.arguments/*/query
+   max:x:@.arguments/*/max_urls
 
-   // This adds all arguments EXCEPT the first argument into [values]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-
-   // This makes sure our first argument ([name]) is added into the [and] node
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      table:roles
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning success to caller.
-   response.status.set:202
-   yield
-      affected:x:@data.update
+// Returning result to caller.
+return-nodes:x:@execute/*

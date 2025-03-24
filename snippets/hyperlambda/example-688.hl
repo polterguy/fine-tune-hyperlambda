@@ -1,22 +1,17 @@
+// Define a DELETE endpoint that removes a user based on their unique ID.
 
-// Create a Hyperlambda script to retrieve all URLs from the sitemap of a specified website.
-.url:"https://ainiro.io"
+/*
+ * Save as '/modules/users/delete.delete.hl' for instance to expose it using the DELETE verb
+ */
+.arguments
+   id:int
 
-// will contain all URLs from website
-.urls
+auth.ticket.verify:admin
 
-// Retrieving main sitemap.
-strings.concat
-   get-value:x:@.url
-   .:/sitemap.xml
-http.get:x:@strings.concat
-xml2lambda:x:@http.get/*/content
-
-// Iterating through each URL referenced in main sitemap.
-for-each:x:"@xml2lambda/*/urlset/*/url/*/loc/*/\\#text"
-
-   // Getting XML from currently iterated sitemap subset.
-   unwrap:x:+/*/*
-   add:x:@.urls
-      .
-         .:x:@.dp/#
+data.connect:[generic|users]
+   data.delete
+      table:users
+      where
+         and
+            id.eq:x:@.arguments/*/id
+   return-nodes:x:@data.delete/*

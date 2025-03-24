@@ -1,24 +1,36 @@
-// The following code will execute a Hyperlambda file called 'greet-user.hl'
 
-// Executing file
-execute-file:/modules/my_module/greet-user.hl
-   name:Alice
-   age:int:30
+// Hyperlambda script that executes startup files, create the magic database, and apply default configuration settings.
+io.file.execute:/system/sql/magic.startup/mssql/magic.db.mssql.databases.hl
+io.file.execute:/system/sql/magic.startup/mysql/magic.db.mysql.databases.hl
+io.file.execute:/system/sql/magic.startup/pgsql/magic.db.pgsql.databases.hl
+io.file.execute:/system/sql/magic.startup/sqlite/magic.db.sqlite.databases.hl
 
-// Assumes a Hyperlambda file such as the following exists in '/modules/my_module/greet-user.hl'
-.arguments
-   name:string
-   age:int
+// Creating our magic database.
+io.file.execute:/system/ensure-magic-database.hl
 
-// Concatenating name and age into a greeting
-strings.concat
-   get-value:x:@.arguments/*/name
-   .:" is "
-   get-value:x:@.arguments/*/age
-   .:" years old."
+// Executing all magic.startup Hyperlambda files.
+io.file.list-recursively:/system/
+io.file.list-recursively:/modules/
+for-each:x:./*/io.file.list-recursively/*
 
-// Returning the greeting to caller.
-yield
-   greeting:x:@strings.concat
+   // Checking if file is a startup Hyperlambda file.
+   if
+      and
+         strings.contains:x:@.dp/#
+            .:/magic.startup/
+         strings.ends-with:x:@.dp/#
+            .:.hl
+      .lambda
 
-// When executed the above Hyperlambda file will return 'Alice is 30 years old.'
+         // Executing file.
+         strings.concat
+            .:"Executing startup file '"
+            get-value:x:@.dp/#
+            .:.
+         console.log:x:-
+         try
+            io.file.execute:x:@.dp/#
+         .catch
+            log.error:Error while executing startup file
+               exception:x:@.arguments/*/message
+               file:x:@.dp/#

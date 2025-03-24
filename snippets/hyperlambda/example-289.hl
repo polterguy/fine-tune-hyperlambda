@@ -1,23 +1,76 @@
 
-// Scrapes the specified URL and returns all hyperlinks found
-.arguments
+// Create a function to cancel a user's active subscriptions using Stripe. The function should retrieve the username, search for all subscriptions linked to the user, and cancel each one using the Stripe API. It should handle any errors during the cancellation process by logging them. Additionally, the function should update the user's roles in the database, excluding 'root' and 'guest', and retrieve extra user information like name and email. Finally, it should authenticate the user again to create a new JWT token reflecting the updated roles and return this token along with the extra information.
+.extra
 
-   // Mandatory argument and becomes the URL the function will scrape for hyperlinks to return.
-   url:string
+// Retrieving username.
+auth.ticket.get
 
-   // Optional argument that filters out any URLs not starting with the specified string.
-   starts_with:string
+/*
+ * Searches for subscriptions belonging to user.
+ * 
+ * Returns all subscriptions belonging to the specified user.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-subscription-search
+   filename:/modules/stripe/workflows/actions/stripe-subscription-search.hl
+   arguments
+      username:x:@auth.ticket.get
 
-   // Optional argument for how many URLs to return. If not specified the function will return all hyperlinks found.
-   max:int
+// Looping through all subscriptions belonging to user and canceling these.
+for-each:x:@execute/*
 
-// Parametrising our slot invocation.
-add:x:./*/signal
-   get-nodes:x:@.arguments/*
+   /*
+    * Deletes the existing Stripe subscription for the given [subscription_id].
+    * 
+    * Will use your Stripe API token found from your settings as it's interacting
+    * with the Stripe API.
+    */
+   try
+      execute:magic.workflows.actions.execute
+         name:stripe-subscription-delete
+         filename:/modules/stripe/workflows/actions/stripe-subscription-delete.hl
+         arguments
+            subscription_id:x:@.dp/#/*/id
+   .catch
+      log.error:x:@.arguments/*/message
 
-// Invoking slot doing the heavy lifting for us.
-signal:magic.http.html2markdown-links
+// Opening up database connection.
+data.connect:magic
 
-// Returning result to caller.
+   // Deleting all roles user belongs to except root and guest.
+   data.delete
+      table:users_roles
+      where
+         and
+            user.eq:x:@auth.ticket.get
+            role.neq:guest
+            role.neq:root
+
+   // Retrieving extra information.
+   data.connect:magic
+      data.read
+         table:users_extra
+         where
+            and
+               user.eq:x:@auth.ticket.get
+               or
+                  type.eq:name
+                  type.eq:email
+      for-each:x:@data.read/*
+         set-name:x:./*/add/*/*
+            get-value:x:@.dp/#/*/type
+         set-value:x:./*/add/*/*
+            get-value:x:@.dp/#/*/value
+         add:x:@.extra
+            .
+               .
+
+// Authenticating user again creating a new JWT token since roles have been updated.
+execute:magic.auth.authenticate
+   username:x:@auth.ticket.get
+   password-check:bool:false
+
+// Returning token and extra information to caller.
 yield
-   result:x:@signal
+   ticket:x:@execute/*/ticket
+   extra:x:@.extra/*

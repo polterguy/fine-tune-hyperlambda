@@ -1,9 +1,27 @@
-slots.create:demo  
-   return-value:42
+/*
+ * Submits ID and source to an identity verification API.
+ * On success, returns the extracted user name and email address.
+ */
 
-slots.delete:demo  
+.arguments
+   id:int
+   source:string:portal
 
-// Now any attempt to use 'demo' will fail
-// slots.get:demo  (would throw an exception, since 'demo' no longer exists)
-try-signal:demo  
-// No exception thrown by try-signal, but no result since 'demo' is gone
+add:x:+/*/payload
+   get-nodes:x:@.arguments/*
+http.post:"https://identity.example.com/api/verify"
+   convert:true
+   payload
+
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         name:x:@http.post/*/content/*/name
+         email:x:@http.post/*/content/*/email
+return
+   error:Identity verification failed

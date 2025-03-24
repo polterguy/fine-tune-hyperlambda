@@ -1,18 +1,22 @@
 
-// Create a Hyperlambda script to execute an existing task with a specified ID.
+// Hyperlambda script creating a new scheduled task according to specified arguments.
 .arguments
    id:string
+   description:string
+   hyperlambda:string
 
 // Ensures user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Executing task on a different thread in case it takes a lot of time to execute.
-insert-before:x:./*/fork/0
-   get-nodes:x:@.arguments
-fork
+// Converting Hyperlambda to lambda.
+hyper2lambda:x:@.arguments/*/hyperlambda
 
-   // Executing task.
-   tasks.execute:x:@.arguments/*/id
+// Creates task.
+add:x:../*/tasks.create/*/.lambda
+   get-nodes:x:@hyper2lambda/*
+tasks.create:x:@.arguments/*/id
+   description:x:@.arguments/*/description
+   .lambda
 
 // Returning success to caller.
 return

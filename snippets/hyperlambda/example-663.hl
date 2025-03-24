@@ -1,19 +1,28 @@
+/*
+ * Sends a multipart email with both HTML and plain text parts, where the 'to',
+ * 'subject', and 'body' are dynamically retrieved from other nodes. An attachment
+ * is also included, with the file path specified dynamically.
+ */
 
-// Hyperlambda snippet that handles database connection failures using a try/catch/finally block.
+.recipient-email:john.doe@example.com
+.email-subject:Dynamic Multipart Email
+.plain-text-body:This is the plain text version.
+.html-body:<html><body><p>This is the HTML version.</p></body></html>
+.attachment-path:/path/to/attachment.pdf
 
-// Handles database connection failures inside a try/catch/finally block
-try
-
-   // Attempting to connect to an invalid database
-   data.connect:invalid_database
-      database-type:mysql
-
-.catch
-
-   // Logging the error
-   log.error:x:@.arguments/*/message
-
-.finally
-
-   // Logging completion
-   log.info:Database connection attempt finished
+// [mail.smtp.send] requires us to use [unwrap].
+unwrap:x:+/**
+mail.smtp.send
+   message
+      to
+         // Alternative was of declaring both name and email in one node.
+         John Doe:x:@.recipient-email
+      subject:x:@.email-subject
+      entity:multipart/mixed
+         entity:multipart/alternative
+            entity:text/plain
+               content:x:@.plain-text-body
+            entity:text/html
+               content:x:@.html-body
+         entity:application/pdf
+            file-path:x:@.attachment-path

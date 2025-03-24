@@ -1,18 +1,28 @@
-/*
- * Iterates over values in .data/numbers and finds the maximum manually using comparison.
- */
-.data
-   numbers
-      .:int:25
-      .:int:78
-      .:int:42
-      .:int:91
-      .:int:66
-.max:int:0
-for-each:x:@.data/*/numbers/*
-   if
-      mt:x:@.dp/#
-         get-value:x:@.max
-      .lambda
-         set-value:x:@.max
-            get-value:x:@.dp/#
+
+// Create a Hyperlambda endpoint for a CRUD delete endpoint that deletes one record from the ml_requests table in the magic database with an ID matching the argument, ensuring authentication and authorization for root roles.
+.arguments
+   id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:ml_requests
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

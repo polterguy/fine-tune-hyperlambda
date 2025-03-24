@@ -1,77 +1,78 @@
 
-// Returns unique and distinct values from your Categories table in your northwind database
-.arguments
+// Invokes OpenAI with the specifiec arguments.
+slots.create:openai.invoke-chatgpt
 
-   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/model
+   validators.mandatory:x:@.arguments/*/max_tokens
+   validators.mandatory:x:@.arguments/*/query
+   validators.enum:x:@.arguments/*/model
+      .:gpt-4o
+      .:gpt-4o-mini
+      .:gpt-4o-2024-05-13
+      .:gpt-3.5-turbo
+      .:gpt-3.5-turbo-16k
+      .:gpt-3.5-turbo-1106
+      .:gpt-3.5-turbo-0125
+      .:gpt-4
+      .:gpt-4-1106-preview
+      .:o3-mini
+      .:gpt-4.5-preview
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
-
-   // Offset into the dataset of where to start retrieving records
-   offset:long
-
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Filtering args
-   Categories.CategoryID.eq:long
-   Categories.CategoryName.like:string
-   Categories.CategoryName.eq:string
-   Categories.Description.like:string
-   Categories.Description.eq:string
-   Categories.Picture.like:string
-   Categories.Picture.eq:string
-
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:Categories.CategoryID
-   .:Categories.CategoryName
-   .:Categories.Description
-   .:Categories.Picture
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
+   // Retrieving OpenAI API token from configuration settings.
+   .token
+   set-value:x:@.token
       strings.concat
-         .:distinct(
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+         .:"Bearer "
+         config.get:"magic:openai:key"
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
+   // Checking if caller provided an [instruction].
+   if
+      exists:x:@.arguments/*/instruction
+      .lambda
 
-   // Adding [limit] and [offset] arguments
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+         // Adding [instruction].
+         insert-before:x:../*/http.post/*/payload/*/messages/0
+            .
+               .
+                  role:system
+                  content:x:@.arguments/*/instruction
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Categories
-      columns
-         distinct_functor
-            as:.
-      where
+   // Invokes OpenAI.
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:x:@.arguments/*/model
+         max_tokens:x:@.arguments/*/max_tokens
+         temperature:decimal:0.3
+         messages
+            .
+               role:user
+               content:x:@.arguments/*/query
+
+   // Sanity checking above invocation.
+   if
+      not
          and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+         // Oops, error - Logging error and returning status 500 to caller.
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+         throw:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+
+   // Returning answer to caller.
+   return-value:x:@http.post/*/content/*/choices/0/*/message/*/content

@@ -1,38 +1,30 @@
-// Executing the following Hyperlambda results in the following
 
-// When executing the following Hyperlambda
-.folder:/system/
-.loc:int:0
-.files:int:0
-unwrap:x:+/*
-signal:magic.io.file.load-recursively
-   .:x:@.folder
-for-each:x:@signal/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-         hyper2lambda:x:@.dp/#/0
-         math.increment:x:@.loc
-            get-count:x:@hyper2lambda/**
-         math.increment:x:@.files
-remove-nodes:x:@signal/*
+// Hyperlambda script that creates a scheduled task that resets no_requests at the first day of the month, with conditions for SQLite.
+if
+   eq
+      config.get:"magic:databases:default"
+      .:sqlite
+   .lambda
 
-// We end up with this result
-.folder:/system/
-.loc:int:19696
-.files:int:292
-unwrap:x:+/*
-signal
-for-each:x:@signal/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-         hyper2lambda:x:@.dp/#/0
-         math.increment:x:@.loc
-            get-count:x:@hyper2lambda/**
-         math.increment:x:@.files
-remove-nodes:x:@signal/*
+      // Wrapping in try/catch in case task already exists.
+      try
 
-// Above you can see how executing Hyperlambda transforms the original node hierarchy, changing it, allowing us to store state in nodes
+         // Deleting old task if existing.
+         tasks.list:reset-no_requests
+         if
+            exists:x:@tasks.list/*
+            .lambda
+               tasks.delete:x:@tasks.list/0/*/id
+
+         // Creating task that periodically deletes old historical requests.
+         tasks.create:reset-no_requests
+            description:Resets no_requests at the first day of the month
+            repeats:**.01.01.01.01
+            .lambda
+               sqlite.connect:magic
+                  sqlite.execute:update ml_types set no_requests = 0
+               log.info:All machine learning models had their no_requests values reset
+      .catch
+
+         // Task already exists.
+         console.log:Task to reset no_requests already exists

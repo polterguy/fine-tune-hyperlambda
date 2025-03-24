@@ -1,28 +1,84 @@
 
-// Hyperlambda script to load a specified file and return it as 'application/octet-stream' with appropriate headers.
+// Hyperlambda action that exports columns from a specified database table. Include 'database-type', 'connection-string', 'database', 'table', and optional 'limit', 'offset', 'columns'. Validate mandatory fields and enums.
 .arguments
-   access_token:string
-   file:string
+   database-type
+      type:enum
+      mandatory:bool:true
+      default:sqlite
+      values
+         .:sqlite
+         .:mssql
+         .:mysql
+         .:pgsql
+   connection-string
+      type:string
+      mandatory:bool:true
+      default:generic
+   database
+      type:string
+      mandatory:bool:true
+   table
+      type:string
+      mandatory:bool:true
+   limit
+      type:int
+      mandatory:bool:false
+   offset
+      type:int
+      mandatory:bool:false
+   columns
+      type:array
+      mandatory:bool:false
+.icon:cloud_download
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/file
-validators.mandatory:x:@.arguments/*/access_token
+validators.mandatory:x:@.arguments/*/database-type
+validators.mandatory:x:@.arguments/*/connection-string
+validators.mandatory:x:@.arguments/*/database
+validators.mandatory:x:@.arguments/*/table
+validators.enum:x:@.arguments/*/database-type
+   .:sqlite
+   .:mssql
+   .:mysql
+   .:pgsql
+validators.default:x:@.arguments
+   limit:int:-1
 
-/*
- * Loading file and returning it, as text content to caller, making
- * sure we return the correct Content-Type in the process.
- */
-strings.split:x:@.arguments/*/file
-   .:/
-strings.concat
-   .:"attachment; filename=\""
-   get-value:x:@strings.split/0/-
-   .:"\""
-response.headers.set
-   Content-Type:application/octet-stream
-   Content-Disposition:x:@strings.concat
-   Access-Control-Expose-Headers:Content-Disposition
+// Connection string to actually use as we connect.
+.connection-string
 
-// This avoids loading the whole file into memory, instead it will stream the file's content directly back to the client.
-io.stream.open-file:x:@.arguments/*/file
-return:x:-
+// Caller supplied an explicit [connection-string] argument.
+set-value:x:@.connection-string
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connection-string
+      .:|
+      get-value:x:@.arguments/*/database
+      .:]
+
+// Connecting to database.
+data.connect:x:@.connection-string
+   database-type:x:@.arguments/*/database-type
+
+   // Parametrizing SQL.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+
+   // Checking if caller wants to only return specific columns.
+   if:x:@.arguments/*/columns/0
+      add:x:@data.connect/*/data.read
+         .
+            columns
+      for-each:x:@.arguments/*/columns/*
+         set-name:x:+/*/*
+            get-value:x:@.dp/#
+         add:x:@data.connect/*/data.read/*/columns
+            .
+               foo
+
+   // Executing SQL.
+   data.read:x:@.arguments/*/sql
+      database-type:x:@.arguments/*/database-type
+      table:x:@.arguments/*/table
+   return-nodes:x:@data.read/*

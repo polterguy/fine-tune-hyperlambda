@@ -1,48 +1,143 @@
 
-// A Hyperlambda endpoint for a CRUD update endpoint that updates one record in the ml_requests table in the magic database, filtering which item to update with ID and updating type, prompt, completion, and finish_reason fields, ensuring authentication and authorization for root roles.
-.arguments
-   id:long
-   type:string
-   prompt:string
-   completion:string
-   finish_reason:string
-   cached:int
+// Slot responsible for soft deletion of an existing cloudlet.
+slots.create:hub.cloudlets.delete
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/cluster
+   validators.mandatory:x:@.arguments/*/name
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Figuring out base URL of Kubernetes REST API.
+   .base-url
+   strings.concat
+      .:"magic:hub:"
+      get-value:x:@.arguments/*/cluster
+      .:":manager-url"
+   set-value:x:@.base-url
+      config.get:x:@strings.concat
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+   // Figuring out Kubernetes namespace cloudlets exists in.
+   .namespace
+   set-value:x:@.namespace
+      config.get:"magic:hub:default-namespace"
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
+   // Retrieving token that's required to invoke Kubernetes REST API.
+   .token
+   strings.concat
+      .:"magic:hub:"
+      get-value:x:@.arguments/*/cluster
+      .:":token"
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:x:@strings.concat/@strings.concat
 
-   // Invoking our update slot.
-   data.update
-      table:ml_requests
-      values
-      where
-         and
+   // Invoking Web API responsible for deleting deployment.
+   .url
+   set-value:x:@.url
+      strings.concat
+         get-value:x:@.base-url
+         .:/apis/apps/v1/namespaces/
+         get-value:x:@.namespace
+         .:/deployments/
+         get-value:x:@.arguments/*/name
+   http.delete:x:@.url
+      headers
+         Authorization:x:@.token
 
-   // Verifying record exists.
+   // Sanity checking above invocation
    if
-      eq
-         get-value:x:@data.update
-         .:int:0
+      not
+         and
+            mte:x:@http.delete
+               .:int:200
+            lt:x:@http.delete
+               .:int:300
       .lambda
-         response.status.set:404
-         return
-            result:Record not found
 
-   // Returning the correct status code.
-   response.status.set:202
+         // Oops, web API didn't return success
+         log.error:Kubernetes could not delete deployment
+            status:x:@http.post
+            response:x:@http.post/*/content
+            cluster:x:@.arguments/*/cluster
+            name:x:@.arguments/*/name
+   else
 
-   // Returning success to caller.
-   yield
-      affected:x:@data.update
+      // Logging the fact that we successfully deleted deployment.
+      log.debug:Kubernetes deployment successfully deleted
+         cluster:x:@.arguments/*/cluster
+         name:x:@.arguments/*/name
+         response:x:@http.post/*/content
+
+   // Invoking Web API responsible for deleting service.
+   .url
+   set-value:x:@.url
+      strings.concat
+         get-value:x:@.base-url
+         .:/api/v1/namespaces/
+         get-value:x:@.namespace
+         .:/services/
+         get-value:x:@.arguments/*/name
+   http.delete:x:@.url
+      headers
+         Authorization:x:@.token
+
+   // Sanity checking above invocation
+   if
+      not
+         and
+            mte:x:@http.delete
+               .:int:200
+            lt:x:@http.delete
+               .:int:300
+      .lambda
+
+         // Oops, web API didn't return success
+         log.error:Kubernetes could not delete service
+            status:x:@http.post
+            response:x:@http.post/*/content
+            cluster:x:@.arguments/*/cluster
+            name:x:@.arguments/*/name
+   else
+
+      // Logging the fact that we successfully deleted service.
+      log.debug:Kubernetes service successfully deleted
+         cluster:x:@.arguments/*/cluster
+         name:x:@.arguments/*/name
+         response:x:@http.post/*/content
+
+   // Invoking Web API responsible for deleting ingress.
+   .url
+   set-value:x:@.url
+      strings.concat
+         get-value:x:@.base-url
+         .:/apis/networking.k8s.io/v1/namespaces/
+         get-value:x:@.namespace
+         .:/ingresses/
+         get-value:x:@.arguments/*/name
+   http.delete:x:@.url
+      headers
+         Authorization:x:@.token
+
+   // Sanity checking above invocation
+   if
+      not
+         and
+            mte:x:@http.delete
+               .:int:200
+            lt:x:@http.delete
+               .:int:300
+      .lambda
+
+         // Oops, web API didn't return success
+         log.error:Kubernetes could not delete ingress
+            status:x:@http.post
+            response:x:@http.post/*/content
+            cluster:x:@.arguments/*/cluster
+            name:x:@.arguments/*/name
+   else
+
+      // Logging the fact that we successfully deleted ingress.
+      log.debug:Kubernetes ingress successfully deleted
+         cluster:x:@.arguments/*/cluster
+         name:x:@.arguments/*/name
+         response:x:@http.post/*/content

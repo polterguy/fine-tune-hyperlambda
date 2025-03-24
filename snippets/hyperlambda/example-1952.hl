@@ -1,63 +1,46 @@
 
-// Lists all indexes keys in some MySQL table.
-slots.create:magic.db.mysql.indexes
+// Workflow action returning true if the specified username is available.
+.arguments
+   username
+      type:string
+      mandatory:bool:true
+   throw
+      type:bool
+      mandatory:bool:false
+.icon:supervisor_account
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/database
-   validators.mandatory:x:@.arguments/*/table
+// Applying defaults.
+validators.default:x:@.arguments
+   throw:bool:false
 
-   // Opens up our connection
-   .connection:[information_schema]
+// Opens up database connection.
+data.connect:[generic|magic]
+
+   // Selecting user from database such that we can check if it exists or not.
+   data.read
+      table:users
+      columns
+         username
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   // Checks if above invocation returned anything.
    if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
+      exists:x:@data.read/*
       .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               get-value:x:@.arguments/*/database
-               .:]
+
+         // Checking if we should throw an exception instead of returning false.
+         if:x:@.arguments/*/throw
+            throw:User already exists
+               status:int:400
+               public:bool:true
+
+         // User exists, returning false to caller.
+         return
+            available:bool:false
    else
-      set-value:x:@.connection
-         strings.concat
-            .:[generic|
-            get-value:x:@.arguments/*/database
-            .:]
-   mysql.connect:x:@.connection
 
-      // Dynamically creating our SQL.
-      strings.concat
-         .:"show indexes from "
-         get-value:x:@.arguments/*/table
-      mysql.select:x:@strings.concat
-
-      /*
-       * Creating our return value, by projecting it into
-       * a generic form, that does not rely upon MySQL's syntactic
-       * details.
-       */
-      for-each:x:@mysql.select/*
-         if
-            neq:x:@.dp/#/*/Key_name
-               .:PRIMARY
-            .lambda
-               unwrap:x:+/*/*/*
-               add:x:@mysql.connect/*/return-nodes
-                  .
-                     .
-                        name:x:@.dp/#/*/Key_name
-                        columns
-               unwrap:x:+/*/*
-               add:x:@mysql.connect/*/return-nodes/0/-/*/columns
-                  .
-                     .:x:@.dp/#/*/Column_name
-      return-nodes
+      // User does not exist, returning true to caller.
+      return
+         available:bool:true

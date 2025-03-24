@@ -1,11 +1,40 @@
-// How to use [data.select] and have it return multiple result sets
 
-// ALWAYS open your database connection before trying to execute SQL
-data.connect:warehouse
+/*
+ * Returns parent company from specified org number.
+ * 
+ * Returns the company the specified org number is owned by.
+ */
+.arguments
+   org_number:string
 
-   // This executes the specified SQL
-   // This SQL contains a special character and must therefore be quoted using for instance double quotes
-   data.select:"select * from table1; select * from table2;"
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/org_number
+set-value:x:@.arguments/*/org_number
+   strings.replace-not-of:x:@.arguments/*/org_number
+      .:0123456789
+      .:
 
-      // We'll need this sinxce there are multiple select statements above.
-      multiple-result-sets:bool:true
+// Connecting to database.
+data.connect:[finovo|finovo]
+   database-type:pgsql
+
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:group_structure
+      columns
+         group_mother_orgnumber
+      where
+         and
+            org_number.eq:x:@.arguments/*/org_number
+      limit:-1
+
+   // Verifying the company has a parent company.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         return
+            result:"This company doesn't have any parent company"
+
+   // Returning result to caller.
+   return-nodes:x:@data.read/*

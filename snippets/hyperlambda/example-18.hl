@@ -1,33 +1,130 @@
 
-/*
- * Creates a new Stripe payment for the given [customer_id], using the
- * specified [payment_method_id], for the given [amount], in the given [currency].
- * 
- * Will use your Stripe API token found from your settings as it's interacting
- * with the Stripe API.
- */
+// Deletes a specified cloudlet and its associated subscription.
 .arguments
-   amount:int
+   id:long
 
-// ... more code here ...
+// Ensuring user is authorised to invoke endpoint.
+auth.ticket.verify:root, admin, account_manager
 
-// Executing action from Stripe plugin doing the heavy lifting ...
-execute:magic.workflows.actions.execute
-   name:stripe-payment-create
-   filename:/modules/stripe/workflows/actions/stripe-payment-create.hl
-   arguments
+// Sanity checking invocation
+validators.mandatory:x:@.arguments/*/id
 
-      // Will use the [customer_id] from a previous action
-      customer_id:x:--/execute/=stripe-customer-create/*/customer_id
+// Retrieving name of cloudlet.
+.name
+.username
+.cluster
+data.connect:[generic|hub]
+   data.read
+      table:cloudlets
+      columns
+         name
+         user
+         cluster
+      where
+         and
+            id.eq:x:@.arguments/*/id
 
-      // Will use the [payment_method_id] from a previous action
-      payment_method_id:x:--/execute/=stripe-payment-method-create/*/payment_method_id
-      amount:x:@.arguments/*/amount
-      currency:usd
-      description:Payment from Magic
-      metadata
+   // Making sure cloudlet exists
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Cloudlet does not exist
+            public:true
+            status:404
 
-         // Notice, since we're using [execute] we don't have to use [unwrap], since all expressions are automatically unwrapped when using [execute].
-         username:x:@.arguments/*/username
+   // Setting temporary values.
+   set-value:x:@.name
+      get-value:x:@data.read/*/*/name
+   set-value:x:@.username
+      get-value:x:@data.read/*/*/user
+   set-value:x:@.cluster
+      get-value:x:@data.read/*/*/cluster
 
-// This code depends upon the Stripe plugin being installed
+/*
+ * Checking if there exists a subscription for cloudlet,
+ * at which point we forward deletion to stripe module since the Stripe
+ * module will delete the cloudlet automatically through its callback sinks.
+ */
+data.connect:[generic|stripe]
+
+   // Checking if we can find subscription for cloudlet.
+   data.read
+      table:subscriptions
+      values
+         subscription
+      where
+         and
+            username.eq:x:@.username
+            meta.eq:x:@.name
+
+   // Checking if subscription exists for cloudlet.
+   if
+      exists:x:@data.read/*/*
+      .lambda
+
+         /*
+          * Deleting subscription information associated with cloudlet.
+          * Due to the way the Stripe module and HUB is connected, this will invoke
+          * Stripe callback sink, deleting the cloudlet after the subscription is deleted.
+          */
+         unwrap:x:+/*
+         io.file.execute:/modules/stripe/admin/subscriptions.delete.hl
+            subscription:x:@data.read/*/*/subscription
+            username:x:../*/.username
+
+         // Returning success to caller
+         return
+            affected:int:1
+            subscriptions_deleted:int:1
+   else
+
+      // No Stripe subscription associated with cloudlet, hence manually deleting it.
+      .name
+      set-value:x:@.name
+         strings.concat
+            get-value:x:../*/.name
+            .:-
+            get-value:x:@.username
+      unwrap:x:+/*
+      signal:hub.cloudlets.hard-delete
+         cluster:x:@.cluster
+         name:x:@.name
+
+      /*
+       * Checking if there exists scheduled tasks associated with the cloudlet,
+       * and if so deleting all tasks associated with cloudlet.
+       */
+      strings.concat
+         .:cloudlet-
+         get-value:x:@.name
+         .:-%
+      tasks.list:x:@strings.concat
+         limit:1000
+      for-each:x:@tasks.list/*
+         tasks.delete:x:@.dp/#/*/id
+
+      // Doing some basic logging.
+      get-count:x:@tasks.list/*
+      log.debug:Tasks associated with cloudlet has been deleted
+         name:x:@.name
+         user:x:@.username
+         no_tasks:x:@get-count
+
+      // Deleting item from database.
+      data.connect:[generic|hub]
+         data.delete
+            table:cloudlets
+            where
+               and
+                  name.eq:x:../*/.name
+                  user.eq:x:@.username
+
+         // Doing some basic logging
+         log.info:Cloudlet successfully destroyed
+            name:x:../*/.name
+            user:x:@.username
+
+         // Returning result of above invocation to caller.
+         unwrap:x:+/*
+         return
+            affected:x:@data.delete

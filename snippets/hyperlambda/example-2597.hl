@@ -1,7 +1,49 @@
-/*
- * Example: Extract with length exceeding string bounds (returns till end).
- */
-strings.substring:"Hello"
-   .:2
-   .:10
-// Result: "llo"
+
+// Creates default subscription templates
+if
+   not
+      io.folder.exists:/etc/stripe-subscription-templates/
+   .lambda
+
+      // Creating our data folder.
+      io.folder.create:/etc/stripe-subscription-templates/
+
+// Checking if file with templates exists, and if not, creating it.
+if
+   not
+      io.file.exists:/etc/stripe-subscription-templates/templates.hl
+   .lambda
+
+      // Default subscription plans for the system.
+      .default-templates
+         .
+            name:Basic
+            description:Basic subscription, gives you up to 50 queries per day.
+            price:29
+            currency:USD
+            period:month
+            role:basic
+            price_id:price_BASIC_PRICE_REFERENCE
+            max_messages:int:50
+         .
+            name:Professional
+            description:Professional subscription, gives you up to 150 queries per day.
+            price:79
+            currency:USD
+            period:month
+            role:professional
+            price_id:price_PROFESSIONAL_PRICE_REFERENCE
+            max_messages:int:150
+         .
+            name:Enterprise
+            description:Enterprise subscription, gives you up to 400 queries per day.
+            price:179
+            currency:USD
+            period:month
+            role:enterprise
+            price_id:price_ENTERPRISE_PRICE_REFERENCE
+            max_messages:int:400
+
+      // Creating our default file.
+      io.file.save:/etc/stripe-subscription-templates/templates.hl
+         lambda2hyper:x:@.default-templates/*

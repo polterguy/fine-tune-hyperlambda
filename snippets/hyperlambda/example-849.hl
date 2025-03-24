@@ -1,72 +1,195 @@
 
-// Hyperlambda workflow action taking [max_tokens] OpenAI API context tokens to search DuckDuckGo for the specified [query].
+/*
+ * Distinct Keyword Search from city table in sakila database.
+ * 
+ * This endpoint will return only records containing one or more of the keywords from the specified [query],
+ * with rows containing the most distinct matched keywords appearing first.
+ */
 .arguments
-   query
-      type:string
-      mandatory:bool:true
-   max_tokens
-      type:int
-      default:int:4000
-.icon:extension
 
-// Sanity checking invocation.
+   // Mandatory query for records to search for
+   query:string
+
+   // Optional number of records to return, defaults to 10 if not specified. Pass in -1 to return all records
+   limit:long
+
+   // Optional offset into the dataset of where to start retrieving records
+   offset:long
+
+// Make sure the user has provided a query.
 validators.mandatory:x:@.arguments/*/query
 
-// Applying default values for optional arguments.
+// Apply defaults if not specified.
 validators.default:x:@.arguments
-   max_tokens:int:4000
+   limit:long:10
 
-// Retrieving context.
-execute:magic.http.duckduckgo-and-scrape
-   query:x:@.arguments/*/query
-   max:int:10
+// Split the user's query into individual keywords, separated by spaces.
+.words
+add:x:@.words
+   strings.split:x:@.arguments/*/query
+      .:" "
 
-// Building our context return value.
-.context:
-while
-   and
-      exists:x:@execute/0/*/snippets/0
-      lt
-         openai.tokenize:x:@.context
-         convert:x:@.arguments/*/max_tokens
-            type:int
-   .lambda
+// Enforce lower characters for each keyword, and guard against SQL injection.
+.no:int:0
+for-each:x:@.words/*
+   set-value:x:@.dp/#
+      strings.to-lower:x:@.dp/#
 
-      // Temporary value.
-      .tmp
-      set-value:x:@.tmp
+// Specify which columns to search against.
+.columns
+   .:city
+
+// Connect to the specified database.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Start building our SQL.
+   .sql:select *, (
+
+   // 1) Dynamically create the full text by concatenating all columns we want to search.
+   .fields
+   for-each:x:@.columns/*
+      strings.concat
+         .:coalesce(
+         get-value:x:@.dp/#
+         .:", '')"
+      unwrap:x:+/*/*
+      add:x:@.fields
+         .
+            .:x:@strings.concat
+   set-value:x:@.fields
+      strings.join:x:@.fields/*
+         .:" || "
+   remove-nodes:x:@.fields/*
+
+   // 2) Keyword density calculation
+   .no:int:0
+   for-each:x:@.words/*
+
+      // Adding SQL parameter.
+      set-name:x:+/+/*/*
          strings.concat
-            get-value:x:@.context
-            .:"\n\n"
-            get-value:x:@execute/0/*/snippets/0/*/prompt
-            .:"\n\n"
-            get-value:x:@execute/0/*/snippets/0/*/completion
+            .:@p
+            get-value:x:@.no
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/data.select
+         .
+            .:x:@.dp/#
+
+      // Modifying our SQL.
       if
-         lt
-            openai.tokenize:x:@.tmp
-            convert:x:@.arguments/*/max_tokens
-               type:int
+         eq:x:@.no
+            .:int:0
          .lambda
 
-            // Still below [max_tokes].
-            set-value:x:@.context
-               get-value:x:@.tmp
+            // First keyword => no leading plus
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" (length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:), @p
+                  get-value:x:@.no
+                  .:", ''))) / length(@p"
+                  get-value:x:@.no
+                  .:)
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + (length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)
+      math.increment:x:@.no
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) * 1.0 / length(
+         get-value:x:@.fields
+         .:) as keyword_density, (
 
-      // Removing top snippet.
-      remove-nodes:x:@execute/0/*/snippets/0
+   // 3) Distinct keyword count => For each keyword, 1 if present, 0 if not.
+   .no:int:0
+   for-each:x:@.words/*
       if
-         not-exists:x:@execute/0/*/snippets/0
+         eq:x:@.no
+            .:int:0
          .lambda
 
-            // TODO: Add reference URL here.
+            // First keyword => no leading plus
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" CASE WHEN ((length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:), @p
+                  get-value:x:@.no
+                  .:", ''))) / length(@p"
+                  get-value:x:@.no
+                  .:)) > 0 THEN 1 ELSE 0 END
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + CASE WHEN ((length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)) > 0 THEN 1 ELSE 0 END
+      math.increment:x:@.no
 
-            // Removing currently iterated URL.
-            remove-nodes:x:@execute/0
+   // Finalize "keyword_count".
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) as keyword_count
 
-// Trimming result.
-set-value:x:@.context
-   strings.trim:x:@.context
+   // 4) Finish SELECT + WHERE
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" from "
+         .:city
+         .:" where keyword_count > 0"
 
-// Returning result to caller.
-yield
-   context:x:@.context
+   // 5) Order by distinct keyword_count (higher means more distinct keywords), then keyword_density.
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" order by keyword_count desc, keyword_density desc limit "
+         get-value:x:@.arguments/*/limit
+
+   // (Optional) offset => pagination
+   if
+      exists:x:@.arguments/*/offset
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" offset "
+               get-value:x:@.arguments/*/offset
+
+   // Execute the SQL
+   data.select:x:@.sql
+      database-type:sqlite
+
+   // Remove helper fields if you don't want them in your final JSON
+   remove-nodes:x:@data.select/*/*/keyword_density
+   remove-nodes:x:@data.select/*/*/keyword_count
+
+   // Return the final result set
+   return-nodes:x:@data.select/*

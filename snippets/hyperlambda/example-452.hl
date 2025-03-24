@@ -1,9 +1,28 @@
+/*
+ * Sends an email to customers with expired subscriptions.
+ */
 
-// Create a task that executes on two specific dates, in addition to repeating every 3 hours and 5 seconds
-tasks.create:foo-bar-task-3
-   due:date:"2025-01-01T23:59:27.000"
-   repeats:5.seconds
-   repeats:3.hours
-   due:date:"2030-01-01T23:59:27.000"
-   .lambda
-      log.info:Executing foo-bar-task-2
+data.connect:[pgsql|billing]
+   database-type:pgsql
+
+   data.select:@"
+select name, email
+   from subscriptions
+   where status = 'expired'"
+      database-type:pgsql
+
+   for-each:x:@data.select/*
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            from
+               .
+                  name:Billing Team
+                  email:billing@yourcompany.com
+            subject:Your Subscription Has Expired
+            entity:text/plain
+               content:Hi, your subscription has expired. Please renew to continue using our services.

@@ -1,28 +1,40 @@
 
-// Hyperlambda script for a CRUD delete endpoint that deletes one item from the users_extra table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
-.arguments
-   type:string
-   user:string
+// Hyperlambda script that returns all dynamic HTTP endpoints in the system with their associated verbs and roles, caching the results for efficiency.
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-validators.mandatory:x:@.arguments/*/type
-validators.mandatory:x:@.arguments/*/user
+// Declares how many seconds the operation should be cached.
+.cache-seconds:int:300
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+/*
+ * Invokes [endpoints.list], making sure we cache the results, since it's a
+ * fairly expensive operation.
+ */
+cache.try-get:magic.auth.endpoints
+   expiration:x:@.cache-seconds
+   .lambda
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+      // Cache miss, retrieving endpoints, and returning to caller.
+      .result
+      endpoints.list
+      for-each:x:@endpoints.list/*
+         if
+            exists:x:@.dp/#/*/auth/*
+            .lambda
+               add:x:+/*/*
+                  get-nodes:x:@.dp/#/*/auth/*
+               add:x:@if/+/+/*/*
+                  .
+                     auth
+         unwrap:x:+/*/*/*
+         add:x:@.result
+            .
+               .
+                  path:x:@.dp/#/*/path
+                  verb:x:@.dp/#/*/verb
+      lambda2hyper:x:@.result/*
+      return:x:-
 
-   // Deleting item from database.
-   data.delete
-      table:users_extra
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returning results of above invocation to caller.
+hyper2lambda:x:@cache.try-get
+add:x:../*/return
+   get-nodes:x:@hyper2lambda/*
+return

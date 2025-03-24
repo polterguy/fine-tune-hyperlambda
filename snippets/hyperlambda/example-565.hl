@@ -1,45 +1,25 @@
+/*
+ * Fetches companies where the director is involved, excluding their primary company
+ */
+.arguments
+   director_id:long
+   limit:long
+   offset:long
 
-// Sends the latest log items from the chatbot's history to the specified email address as an attachment in the form of a CSV file
-slots.create:utilities.history.send-email
+data.connect:[pg|corporate_network]
+   database-type:pgsql
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/email
-   validators.email:x:@.arguments/*/email
+   data.select:@"
+select d1.org_number, b.company_name, d1.role_name
+   from directors d1
+      inner join basic b on b.org_number = d1.org_number
+      inner join directors d2 on d1.director_nbr = d2.director_nbr
+   where d2.director_id = @id and d1.org_number != d2.org_number
+   limit @limit offset @offset"
+      database-type:pgsql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
 
-   // Basic logging.
-   log.info:Sending chatbot log to cloudlet owner
-      email:x:@.arguments/*/email
-
-   // Opening database connection.
-   data.connect:[generic|magic]
-
-      // Extracting items from ml_requests
-      data.read
-         table:ml_requests
-         columns
-            prompt
-            completion
-            created
-            type
-            finish_reason
-            user_id
-            session
-
-      // Converting records to CSV
-      lambda2csv:x:@data.read/*
-
-      // Sending CSV file to specified email address.
-      mail.smtp.send
-         message
-            to
-               .
-                  email:x:@.arguments/*/email
-                  name:Chatbot Admin
-            subject:Chatbot history log
-            entity:multipart/mixed
-               entity:text/plain
-                  content:Latest AINIRO.IO Chatbot requests
-               entity:text/csv
-                  headers
-                     Content-Disposition:"attachment; filename=\"log.csv\""
-                  content:x:@lambda2csv
+   yield
+      secondary_roles:x:@data.select/*

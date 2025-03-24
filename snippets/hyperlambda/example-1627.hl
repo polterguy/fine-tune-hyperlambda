@@ -1,13 +1,8 @@
 
-/*
- * Distinct Keyword Search from CustomerDemographics table in northwind database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
- */
+// Performs a distinct keyword search from the SubscriptionPlan table in the saas database, returning records containing one or more of the specified keywords.
 .arguments
 
-   // Mandatory query for records to search for
+   // Mandatory query for records to search for. This will be split by SP characters (' '), and snippets having many of these keywords will be returned first.
    query:string
 
    // Optional number of records to return, defaults to 10 if not specified. Pass in -1 to return all records
@@ -15,6 +10,9 @@
 
    // Optional offset into the dataset of where to start retrieving records
    offset:long
+
+// Type of endpoint
+.type:crud-search
 
 // Make sure the user has provided a query.
 validators.mandatory:x:@.arguments/*/query
@@ -37,11 +35,11 @@ for-each:x:@.words/*
 
 // Specify which columns to search against.
 .columns
-   .:CustomerTypeID
-   .:CustomerDesc
+   .:PlanName
+   .:Features
 
 // Connect to the specified database.
-data.connect:[generic|northwind]
+data.connect:[generic|saas]
    database-type:sqlite
 
    // Start building our SQL.
@@ -164,7 +162,7 @@ data.connect:[generic|northwind]
       strings.concat:x:@.sql
          get-value:x:@.sql
          .:" from "
-         .:CustomerDemographics
+         .:SubscriptionPlan
          .:" where keyword_count > 0"
 
    // 5) Order by distinct keyword_count (higher means more distinct keywords), then keyword_density.
