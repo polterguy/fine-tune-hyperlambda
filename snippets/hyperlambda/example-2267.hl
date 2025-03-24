@@ -1,14 +1,34 @@
 
-// Create a new RSA key pair and encrypt a message using its public key before finally decrypting it
-crypto.rsa.create-key
-   key-size:int:2048
+// Delete one record from your PlaylistTrack table in your chinook database.
+.arguments
 
-// Encrypt a message using RSA public key
-.message
-   content:Secret Message
-crypto.rsa.encrypt:x:@.message/*/content
-   public-key:x:@crypto.rsa.create-key/*/public
+   // Primary key of record to delete, mandatory argument
+   PlaylistId:long
 
-// Decrypting message we encrypted above
-crypto.rsa.decrypt:x:-
-   private-key:x:@crypto.rsa.create-key/*/private
+   // Primary key of record to delete, mandatory argument
+   TrackId:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/PlaylistId
+validators.mandatory:x:@.arguments/*/TrackId
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:PlaylistTrack
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

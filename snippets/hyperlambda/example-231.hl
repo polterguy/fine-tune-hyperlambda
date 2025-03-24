@@ -1,14 +1,44 @@
 
-// Hyperlambda snippet demonstrating multiple [fork] calls with different delays.
+// Workflow action removing the specified [extra] field(s) from the specified [username].
+.arguments
+   username
+      type:string
+      mandatory:bool:true
+   extra
+      type:array
+      mandatory:bool:true
+.icon:supervisor_account
 
-// Demonstrates multiple [fork] calls with different delays.
-fork
-   sleep:700
-   log.info:Executed after 700ms
-fork
-   sleep:1500
-   log.info:Executed after 1500ms
-fork
-   sleep:300
-   log.info:Executed after 300ms
-log.info:Main execution continues...
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/extra
+
+// Connecting to database.
+data.connect:[generic|magic]
+
+   // Verifying user exists.
+   data.read
+      table:users
+      columns
+         username
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   // Verifying above invocation returned something.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+
+         // Oops ...!!
+         throw:No such user
+            username:x:@.arguments/*/username
+
+   // Removing extra fields from user.
+   for-each:x:@.arguments/*/extra/*
+      data.delete
+         table:users_extra
+         where
+            and
+               user.eq:x:@.arguments/*/username
+               type.eq:x:@.dp/#

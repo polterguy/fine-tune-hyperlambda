@@ -1,5 +1,48 @@
+/*
+ * Returns employees belonging to a specified department
+ */
+.arguments
+   filter:string
+   limit:long
+   offset:long
 
-// Hyperlambda script to add nodes into a specified destination's children collection.
-add:x:@.destination
-   .
-      foo:bar
+auth.ticket.verify:hr-admin
+
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:50
+
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+mssql.connect:[hr|PEOPLE_DB]
+
+   mssql.read
+      table:Employees
+         as:e
+         join:Departments
+            as:d
+            type:left
+            on
+               and
+                  e.DepartmentId.eq:d.Id
+      columns
+         d.Name
+            as:Department
+         count(*)
+            as:EmployeeCount
+         avg(e.Salary)
+            as:AvgSalary
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         and
+            d.Name.eq:x:@.arguments/*/filter
+      group
+         d.Name
+   return-nodes:x:@mssql.read/*

@@ -1,56 +1,11 @@
+// Returns a comma separated list of programming languages using return-value
+slots.create:get.languages
+   .lang
+      .:Python
+      .:JavaScript
+      .:Go
+   strings.join:x:-/*
+      .:,
+   return-value:x:-
 
-// Slot responsible for accepting a subscription payment
-slots.create:stripe.subscriptions.accepted.templates
-
-   // Sanity check invocation.
-   validators.mandatory:x:@.arguments/*/username
-   validators.mandatory:x:@.arguments/*/price
-
-   // Figuring out what role to add user to, which depends upon the price.
-   .role
-   io.file.load:/etc/stripe-subscription-templates/templates.hl
-   hyper2lambda:x:@io.file.load
-   set-value:x:@.role
-      get-value:x:"@hyper2lambda/*/*/price_id/\"={@.arguments/*/price}\"/./*/role"
-
-   // Buffer for extra information.
-   .extra
-
-   // Connecting to database to update user.
-   data.connect:magic
-
-      // Adding user to role.
-      data.create
-         table:users_roles
-         values
-            user:x:@.arguments/*/username
-            role:x:@.role
-
-      // Retrieving extra information.
-      data.connect:magic
-         data.read
-            table:users_extra
-            where
-               and
-                  user.eq:x:@.arguments/*/username
-                  or
-                     type.eq:name
-                     type.eq:email
-         for-each:x:@data.read/*
-            set-name:x:./*/add/*/*
-               get-value:x:@.dp/#/*/type
-            set-value:x:./*/add/*/*
-               get-value:x:@.dp/#/*/value
-            add:x:@.extra
-               .
-                  .
-
-   // Authenticating user again creating a new JWT token since roles have been updated.
-   execute:magic.auth.authenticate
-      username:x:@.arguments/*/username
-      password-check:bool:false
-
-   // Returning token and extra information to caller.
-   yield
-      ticket:x:@execute/*/ticket
-      extra:x:@.extra/*
+execute:get.languages

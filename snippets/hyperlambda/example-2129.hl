@@ -1,13 +1,23 @@
 
-// Generate a Hyperlambda snippet that invokes an HTTP GET endpoint to fetch a user's email.
+// Scrapes the specified URL and returns all hyperlinks found
+.arguments
 
-// Invokes an HTTP GET endpoint to fetch a user's email.
-http.get:"https://jsonplaceholder.typicode.com/users/1"
+   // Mandatory argument and becomes the URL the function will scrape for hyperlinks to return.
+   url:string
 
-   // Ensures response is automatically converted from JSON to lambda.
-   convert:true
+   // Optional argument that filters out any URLs not starting with the specified string.
+   starts_with:string
 
-// Sets [.email] to the user's email
-.email
-set-value:x:@.email
-   get-value:x:@http.get/*/content/*/email
+   // Optional argument for how many URLs to return. If not specified the function will return all hyperlinks found.
+   max:int
+
+// Parametrising our slot invocation.
+add:x:./*/signal
+   get-nodes:x:@.arguments/*
+
+// Invoking slot doing the heavy lifting for us.
+signal:magic.http.html2markdown-links
+
+// Returning result to caller.
+yield
+   result:x:@signal

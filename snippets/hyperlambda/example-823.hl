@@ -1,48 +1,16 @@
+/*
+ * Save this file as `/modules/auth/endpoints/register.hl`
+ * This exposes an HTTP POST endpoint at `/auth/register`
+ *
+ * Requires `email` to be present and match a valid email regex.
+ */
 
-// Updates one record in your CustomerDemographics table in your northwind database
 .arguments
+   email
 
-   // CustomerTypeID column value being primary key of record to update, mandatory argument
-   CustomerTypeID:string
+validators.mandatory:x:@.arguments/*/email
+validators.regex:x:@.arguments/*/email
+   .:^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$
 
-   // CustomerDesc column's new value
-   CustomerDesc:string
-
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/CustomerTypeID
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      database-type:sqlite
-      table:CustomerDemographics
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+yield
+   result:Email is valid

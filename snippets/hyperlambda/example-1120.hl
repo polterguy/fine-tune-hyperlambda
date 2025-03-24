@@ -1,5 +1,48 @@
-/*
- * Example: Convert an uppercase string to lowercase.
- */
-// Result: "hello"
-strings.to-lower:HELLO
+
+// Write a Hyperlambda script to return a specified CSS file to the caller.
+.arguments
+   file:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
+
+// Checking if custom CSS file exists.
+.result
+strings.concat
+   .:/etc/system/openai/css/search/
+   get-value:x:@.arguments/*/file
+   .:.css
+if
+   io.file.exists:x:@strings.concat
+   .lambda
+
+      // Custom template file.
+      set-value:x:@.result
+         io.file.load:x:@strings.concat
+else
+
+   // Checking if system CSS file exists.
+   strings.concat
+      .:/system/openai/front.files/search/
+      get-value:x:@.arguments/*/file
+      .:.css
+   if
+      io.file.exists:x:@strings.concat
+      .lambda
+
+         // Generic template file.
+         set-value:x:@.result
+            io.file.load:x:@strings.concat
+   else
+
+      // Oops, no such file exists.
+      throw:No such AI chat template file exists
+         public:bool:true
+         status:400
+
+// Making sure we return correct Content-Type to caller, and applying some cache.
+response.headers.set
+   Content-Type:text/css
+
+// Returning result to caller.
+return:x:@.result

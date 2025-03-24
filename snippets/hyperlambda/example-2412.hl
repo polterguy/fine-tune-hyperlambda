@@ -1,32 +1,20 @@
+// Connects to sakila with database transactions
+data.connect:sakila
+   data.transaction.create
+      data.execute:delete from film_actor
 
-// Create a Hyperlambda script to schedule a task with a specified ID for execution according to specified parameters.
-.arguments
-   id:string
-   due:date
-   repeats:string
+      /*
+       * If you uncomment the line below the
+       * transaction will be committed, resulting
+       * in that everything from your film_actor
+       * table will be deleted.
+       */
+      //data.transaction.commit
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+data.connect:sakila
 
-/*
- * Adds either a [repeats] or [due] argument to invocation below,
- * depending upon what argument was supplied by caller.
- */
-if
-   not
-      eq
-         get-value:x:@.arguments/*/repeats
-         .
-   .lambda
-      add:x:../*/tasks.schedule
-         get-nodes:x:@.arguments/*/repeats
-else
-   add:x:../*/tasks.schedule
-      get-nodes:x:@.arguments/*/due
-
-// Performs actual scheduling of task.
-tasks.schedule:x:@.arguments/*/id
-
-// Returns success to caller.
-return-nodes
-   result:success
+   /*
+    * Notice, this still returns 5462 items, since
+    * transaction was implicitly rolled back above.
+    */
+   data.scalar:select count(*) from film_actor

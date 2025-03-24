@@ -1,64 +1,33 @@
 
-// Deletes the specified forreign key from your database.
+// Create a Hyperlambda script for a CRUD create endpoint that inserts one record into the questions table in the magic database, taking question and questionnaire, ensuring authentication and authorization for root and admin roles.
 .arguments
-   databaseType:string
-   connectionString:string
-   databaseName:string
-   tableName:string
-   fkName:string
-   generate:bool
+   question:string
+   questionnaire:string
+   type:string
+   name:string
 
-// Ensures user is authorized to access endpoint.
+// Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/connectionString
-validators.mandatory:x:@.arguments/*/databaseName
-validators.mandatory:x:@.arguments/*/tableName
-validators.mandatory:x:@.arguments/*/fkName
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:pgsql
-   .:mssql
+// Opening up database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
 
-// SQL that executes to modify DDL.
-.sql
-set-value:x:@.sql
-   strings.concat
-      .:"alter table "
-      get-value:x:@.arguments/*/tableName
-      .:" drop constraint "
-      get-value:x:@.arguments/*/fkName
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-// Checking if caller only wants to generate SQL statement.
-if:x:@.arguments/*/generate
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:questions
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
    unwrap:x:+/*
    return
-      sql:x:@.sql
-
-// Creating our database connection.
-strings.concat
-   .:[
-   get-value:x:@.arguments/*/connectionString
-   .:|
-   get-value:x:@.arguments/*/databaseName
-   .:]
-data.connect:x:-
-   database-type:x:@.arguments/*/databaseType
-   data.execute:x:@.sql
-      database-type:x:@.arguments/*/databaseType
-
-// Flushing database cache.
-strings.concat
-   .:magic.sql.databases.
-   get-value:x:@.arguments/*/databaseType
-   :.
-   get-value:x:@.arguments/*/connectionString
-cache.set:x:-
-
-// Returning result to caller.
-unwrap:x:+/*
-return
-   result:success
-   sql:x:@.sql
+      id:x:@data.create

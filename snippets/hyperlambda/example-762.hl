@@ -1,46 +1,9 @@
+// Defines a custom slot that enforces 'admin' role before continuing.
 
-// Hyperlambda script for a CRUD update endpoint that updates an existing item in the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
-.arguments
-   name:string
-   description:string
+slots.create:admin.only.action
+   auth.ticket.verify:admin
 
-// Mandatory argument!
-validators.mandatory:x:@.arguments/*/name
+   // Admin-only logic executed here ...
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our invocation.
-
-   // This adds all arguments EXCEPT the first argument into [values]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-
-   // This makes sure our first argument ([name]) is added into the [and] node
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      table:roles
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning success to caller.
-   response.status.set:202
-   yield
-      affected:x:@data.update
+// Usage:
+execute:admin.only.action

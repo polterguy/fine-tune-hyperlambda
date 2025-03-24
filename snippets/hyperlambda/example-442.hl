@@ -1,48 +1,30 @@
 
-// Write a Hyperlambda script to return a specified CSS file to the caller.
+// Hyperlambda file that deletes one record from your actor table in your sakila database with authorization. Responds with endpoint or Hyperlambda file syntax.
 .arguments
-   file:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/file
+   // Primary key of record to delete, mandatory argument
+   actor_id:long
 
-// Checking if custom CSS file exists.
-.result
-strings.concat
-   .:/etc/system/openai/css/search/
-   get-value:x:@.arguments/*/file
-   .:.css
-if
-   io.file.exists:x:@strings.concat
-   .lambda
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/actor_id
 
-      // Custom template file.
-      set-value:x:@.result
-         io.file.load:x:@strings.concat
-else
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
 
-   // Checking if system CSS file exists.
-   strings.concat
-      .:/system/openai/front.files/search/
-      get-value:x:@.arguments/*/file
-      .:.css
-   if
-      io.file.exists:x:@strings.concat
-      .lambda
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-         // Generic template file.
-         set-value:x:@.result
-            io.file.load:x:@strings.concat
-   else
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:actor
+      where
+         and
 
-      // Oops, no such file exists.
-      throw:No such AI chat template file exists
-         public:bool:true
-         status:400
-
-// Making sure we return correct Content-Type to caller, and applying some cache.
-response.headers.set
-   Content-Type:text/css
-
-// Returning result to caller.
-return:x:@.result
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

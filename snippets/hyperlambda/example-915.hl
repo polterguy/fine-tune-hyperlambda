@@ -1,26 +1,44 @@
-/*
- * This file defines a list of supported document types for an application.
- *
- * The node `.document.types` contains an ordered collection of strings representing
- * the types of documents that users are allowed to upload or generate through the system.
- *
- * Each item is a string node (`.`) and represents a MIME-type friendly label.
- * 
- * This structure can be used with:
- *   - UI dropdowns for document filtering or selection
- *   - Validation logic to restrict uploads
- *   - Business rules around formatting or processing
- * 
- * Example usage in logic:
- *   - Looping with [for-each] to validate allowed extensions
- *   - Populating form elements with options
- *   - Checking content-type of files being uploaded
- */
 
-.document.types
-   .:PDF Document
-   .:Word Document
-   .:Excel Spreadsheet
-   .:Image File
-   .:Text File
-   .:Markdown File
+/*
+ * Returns Stripe customers.
+ * 
+ * [limit] and [starting_after] are optional arguments and [limit] is the number of customers
+ * to return, while [starting_after] is from which record to start returning charges.
+ * 
+ * [email] is an optional case sensitive filter that emails must match.
+ */
+.arguments
+   limit:int
+   starting_after:string
+   email:string
+
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
+
+/*
+ * Retrieves charges from Stripe.
+ * 
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-customers-get
+   filename:/modules/stripe/workflows/actions/stripe-customers-get.hl
+   arguments
+      limit:x:@.arguments/*/limit
+      email:x:@.arguments/*/email
+      starting_after:x:@.arguments/*/starting_after
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

@@ -1,28 +1,53 @@
 
-// Hyperlambda script to load a specified file and return it as 'application/octet-stream' with appropriate headers.
+// Searches for the specified [query] through your training snippets and returns [max_tokens] training snippets to caller.
 .arguments
-   access_token:string
-   file:string
+   _type:string
+
+   // Mandatory argument and become an SQL LIKE condition records must match to be considered.
+   query:string
+
+   // Optional argument being maximum number of tokens to return. Will default to 4000 if not specified.
+   max_tokens:int
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/file
-validators.mandatory:x:@.arguments/*/access_token
+validators.mandatory:x:@.arguments/*/_type
+validators.mandatory:x:@.arguments/*/query
 
-/*
- * Loading file and returning it, as text content to caller, making
- * sure we return the correct Content-Type in the process.
- */
-strings.split:x:@.arguments/*/file
-   .:/
-strings.concat
-   .:"attachment; filename=\""
-   get-value:x:@strings.split/0/-
-   .:"\""
-response.headers.set
-   Content-Type:application/octet-stream
-   Content-Disposition:x:@strings.concat
-   Access-Control-Expose-Headers:Content-Disposition
+// Applying defaults.
+validators.default:x:@.arguments
+   max_tokens:int:4000
 
-// This avoids loading the whole file into memory, instead it will stream the file's content directly back to the client.
-io.stream.open-file:x:@.arguments/*/file
-return:x:-
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Creating our filter string
+   .filter
+   set-value:x:@.filter
+      strings.concat
+         .:%
+         get-value:x:@.arguments/*/query
+         .:%
+   data.read
+      table:ml_training_snippets
+      columns
+         id
+         prompt
+         uri
+      where
+         or
+            prompt.like:x:@.filter
+            completion.like:x:@.filter
+   .cont:bool:true
+   while:x:@.cont
+      lambda2hyper:x:@data.read/*
+      if
+         lt
+            openai.tokenize:x:@lambda2hyper
+            convert:x:@.arguments/*/max_tokens
+               type:int
+         .lambda
+            set-value:x:@.cont
+               .:bool:false
+      else
+         remove-nodes:x:@data.read/0/-
+   return-nodes:x:@data.read/*

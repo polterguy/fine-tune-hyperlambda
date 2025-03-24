@@ -1,91 +1,119 @@
+/*
+ * Lists all products from NetSuite
+ * 
+ * Returns id, itemid, displayname, description, and unitprice from products in your NetSuite account.
+ */
+.arguments
 
-// Returns number of registrations for the last 14 days grouped by day.
-auth.ticket.get
+   // Optionally how many rows to maximumly return. Defaults to 25 unless specified.
+   limit:long
 
-// Storing commission for later.
-.percent
+   // Optional ID of product from where to start returning rows. Defaults to nothing.
+   from:string
 
-// Ensuring user is an affiliate
-data.connect:[generic|magic]
+   // Optional filtering argument the displayname must match. For instance 'xyz' here will match products with displaynames of 'xyz_1' and 'entity-2-xyz_2'.
+   filter:string
 
-   /*
-    * Retrieving affiliate percent for user.
-    * Notice, if user doesn't have an affiliate percent, user ir
-    * not an affiliate.
-    */
-   data.read
-      table:users_extra
-      columns
-         value
-      where
-         and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
+   // Mandatory argument for subsidiary ID to retrieve products for.
+   subsidiaryid:string
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/subsidiaryid
 
-   // Storing percentage for later.
-   convert:x:@data.read/*/*/value
-      type:decimal
-   set-value:x:@.percent
-      math.divide:x:@convert
-         .:decimal:100
+// Checking if caller supplied -1 as limit.
+if
+   or
+      and
+         exists:x:@.arguments/*/limit
+         not-null:x:@.arguments/*/limit
+         eq
+            convert:x:@.arguments/*/limit
+               type:long
+            .:long:-1
+      mt
+         convert:x:@.arguments/*/limit
+            type:long
+         .:long:25
+   .lambda
 
-// Connecting to Stripe database.
-data.connect:[generic|stripe]
+      // Defaulting limit to 25 to avoid returning too many records.
+      set-value:x:@.arguments/*/limit
+         .:long:25
+      add:x:../*/return-nodes
+         .
+            warning:We can only retrieve a maximum of 25 products at the same time, ask for more products to see more products.
 
-   // Retrieving transactions from database.
-   data.select:"\nselect strftime('%Y-%m-%d', datetime(t.created)) as date, sum(amount) as amount\n   from transactions t\n      where date(t.created, '+42 day') > CURRENT_TIMESTAMP and\n         t.affiliate = @affiliate and\n         t.type = 'charge.succeeded'\n   group by date\n   order by date asc"
-      @affiliate:x:@auth.ticket.get
+// Dynamically creating our query.
+.q
+set-value:x:@.q
+   strings.concat
+      .:@"SELECT
+   i.id,
+   i.itemid,
+   i.subsidiary,
+   i.displayname,
+   i.description,
+   p.unitprice
+FROM item i
+LEFT JOIN pricing p ON p.item = i.id
+WHERE p.pricelevel = '1'"
 
-   // Looping through all days the last 6 weeks.
-   .buffer
-   .cur
-   set-value:x:@.cur
-      math.subtract
-         date.now
-         time
-            days:42
-   while
-      lt:x:@.cur
-         date.now
-      .lambda
-         date.format:x:@.cur
-            format:yyyy-MM-dd
-         if
-            exists:x:@data.select/*/*/date/={@date.format}
-            .lambda
-               set-value:x:@data.select/*/*/date/={@date.format}/./*/amount
-                  math.multiply:x:@data.select/*/*/date/={@date.format}/./*/amount
-                     get-value:x:@.percent
-               get-nodes:x:@data.select/*/*/date/={@date.format}/.
-               add:x:@.buffer
-                  get-nodes:x:@data.select/*/*/date/={@date.format}/.
-         else
-            unwrap:x:+/*/*/*
-            add:x:@.buffer
-               .
-                  .
-                     date:x:@date.format
-                     amount:int:0
+// Checking if we've got a subsidiaryid filter.
+set-value:x:@.q
+   strings.concat
+      get-value:x:@.q
+      .:" AND i.subsidiary = '"
+      get-value:x:@.arguments/*/subsidiaryid
+      .:"'"
 
-         // Decrementing current day.
-         set-value:x:@.cur
-            math.add:x:@.cur
-               time
-                  days:1
+// Checking if we're doing paging.
+if
+   exists:x:@.arguments/*/from
+   .lambda
+      set-value:x:@.q
+         strings.concat
+            get-value:x:@.q
+            .:" AND id > "
+            get-value:x:@.arguments/*/from
 
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:public, max-age=3600
+// Checking if we're doing filtering.
+if
+   exists:x:@.arguments/*/filter
+   .lambda
+      set-value:x:@.q
+         strings.concat
+            get-value:x:@.q
+            .:" AND UPPER(i.description) LIKE UPPER('%"
+            get-value:x:@.arguments/*/filter
+            .:"%')"
 
-   // Returning result to caller.
-   return-nodes:x:@.buffer/*
+// Adding limit.
+set-value:x:@.q
+   strings.concat
+      get-value:x:@.q
+      .:" ORDER BY i.id FETCH FIRST "
+      get-first-value
+         get-value:x:@.arguments/*/limit
+         .:long:25
+      .:" ROWS ONLY"
+
+// Logging the generated query for debugging.
+log.info:x:@.q
+
+// Forwarding heavy lifting to core file.
+execute-file:/modules/netsuite/workflows/workflows/netsuite-query.hl
+   q:x:@.q
+
+// Handling empty results.
+if
+   not
+      exists:x:@execute-file/*
+   .lambda
+      add:x:../*/return-nodes
+         .
+            message:No products found for the specified subsidiary.
+
+// Returning result to caller.
+add:x:../*/return-nodes
+   get-nodes:x:@execute-file/*
+return-nodes

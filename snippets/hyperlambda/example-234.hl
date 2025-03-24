@@ -1,22 +1,49 @@
-// Find all nodes having a name of 'foo', extract their values, and concatenates into string builder
-.data
-   foo:Hello
-      bar
-   hello
-      howdy
-         foo:" world. "
-      some-node
-         some-other-node
-            foo:"This is cool"
 
-// Creating a string builder
-strings.builder
+// Count unique and distinct items from your CustomerDemographics table in your northwind database
+.arguments
 
-   // Looping through all nodes from above with a name of 'foo'
-   for-each:x:@.data/**/foo
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
 
-      // Appending to current string builder (created above)
-      strings.builder.append:x:@.dp/#
+   // Optional filtering args
+   CustomerDemographics.CustomerTypeID.like:string
+   CustomerDemographics.CustomerTypeID.eq:string
+   CustomerDemographics.CustomerDesc.like:string
+   CustomerDemographics.CustomerDesc.eq:string
 
-// After execution, the above [strings.builder] node's value will be "Hello world. This is cool"
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
 
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:CustomerDemographics.CustomerTypeID
+   .:CustomerDemographics.CustomerDesc
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:CustomerDemographics
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

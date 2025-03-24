@@ -1,67 +1,234 @@
 
-// Count unique and distinct items from your media table in your cms database
+// Imports pages, and optionally blogs from a WordPress account using the WP API.
 .arguments
+   url:string
+   type:string
+   username:string
+   password:string
+   vectorize:bool
+   blogs:bool
 
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
 
-   // Optional filtering args
-   media.id.eq:long
-   media.post_id.eq:long
-   media.file_path.like:string
-   media.file_path.eq:string
-   media.file_type.like:string
-   media.file_type.eq:string
-   media.created_at.eq:date
-   post_id.title.eq:string
-   post_id.title.like:string
+// Defaulting vectorize.
+validators.default:x:@.arguments
+   vectorize:bool:false
+   blogs:bool:false
 
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
+// Normalizing URL.
+set-value:x:@.arguments/*/url
+   strings.trim-end:x:@.arguments/*/url
+      .:/
 
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:media.id
-   .:media.post_id
-   .:media.file_path
-   .:media.file_type
-   .:media.created_at
-   .:post_id.title
+// Making sure we log and trap exceptions
+try
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
-
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
+   // Creating our basic auth token to invoke API.
+   .key
+   strings.concat
+      get-value:x:@.arguments/*/username
+      .:":"
+      get-value:x:@.arguments/*/password
+   strings.url-encode:x:-
+   convert:x:-
+      type:base64
+   set-value:x:@.key
       strings.concat
-         .:"count(distinct "
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+         .:"Basic "
+         get-value:x:@convert
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+   // First we retrieve pages.
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:media
-         join:posts
-            as:post_id
-            type:left
-            on
-               and
-                  media.post_id:post_id.id
-      columns
-         distinct_functor
-            as:count
-      where
+   // Creating our URL to retrieve pages.
+   .pages
+   set-value:x:@.pages
+      strings.concat
+         get-value:x:@.arguments/*/url
+         .:/wp-json/wp/v2/pages?per_page=100
+
+   // Basic logging.
+   log.info:Deleting training snippets to prepare for import using WordPress API
+      url:x:@.arguments/*/url
+      type:x:@.arguments/*/type
+
+   // Deleting existing WP imported ml_training_snippets for model.
+   data.connect:[generic|magic]
+      data.execute:"delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type and meta = 'wordpress-import')"
+         @type:x:@.arguments/*/type
+      data.delete
+         table:ml_training_snippets
+         where
+            and
+               type.eq:x:@.arguments/*/type
+               meta.eq:wordpress-import
+
+   // Basic logging.
+   log.info:Retrieving pages from WordPress
+      url:x:@.arguments/*/url
+      type:x:@.arguments/*/type
+
+   // Retrieving pages.
+   http.get:x:@.pages
+      convert:true
+      headers
+         User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+         Authorization:x:@.key
+
+   // Sanity checking HTTP request.
+   if
+      not
          and
+            mte:x:@http.get
+               .:int:200
+            lt:x:@http.get
+               .:int:300
+      .lambda
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+         // Oops ...!!
+         lambda2hyper:x:@http.get
+         log.error:Something went wrong while invoking WordPress to fetch pages
+            result:x:@lambda2hyper
+         throw:Something went wrong while invoking WordPress to fetch pages, check your log for details.
+
+   // Opening up database connection.
+   data.connect:[generic|magic]
+
+      // Iterating through each page.
+      for-each:x:@http.get/*/content/*
+
+         // Some pages don't have content, such as the blog landing page, etc.
+         if
+            and
+               not-null:x:@.dp/#/*/content/*/rendered
+               neq:x:@.dp/#/*/content/*/rendered
+                  .:
+               not-null:x:@.dp/#/*/title/*/rendered
+               neq:x:@.dp/#/*/title/*/rendered
+                  .:
+            .lambda
+
+               // Removing irrelevant elementor stuff and transforming to Markdown.
+               strings.regex-replace:x:@.dp/#/*/content/*/rendered
+                  .:"\\[[^\\]]*\\]"
+                  .:
+               html2markdown:x:-
+                  url:x:@.arguments/*/url
+               html-decode:x:@.dp/#/*/title/*/rendered
+
+               // Inserting page into database as snippet.
+               data.create
+                  table:ml_training_snippets
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@html-decode
+                     completion:x:@html2markdown
+                     meta:wordpress-import
+                     uri:x:@.dp/#/*/link
+
+   /*
+    * Then we retrieve blogs.
+    * 
+    * Notice, we only do this if caller explicitly told us he wanted blogs.
+    */
+   if:x:@.arguments/*/blogs
+
+      // Basic logging.
+      log.info:Retrieving posts from WordPress
+         url:x:@.arguments/*/url
+         type:x:@.arguments/*/type
+
+      // Creating our URL to retrieve blogs.
+      .posts
+      set-value:x:@.posts
+         strings.concat
+            get-value:x:@.arguments/*/url
+            .:/wp-json/wp/v2/posts?per_page=100
+
+      // Retrieving pages.
+      http.get:x:@.posts
+         convert:true
+         headers
+            User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36
+            Authorization:x:@.key
+
+      // Sanity checking HTTP request.
+      if
+         not
+            and
+               mte:x:@http.get
+                  .:int:200
+               lt:x:@http.get
+                  .:int:300
+         .lambda
+
+            // Oops ...!!
+            lambda2hyper:x:@http.get
+            log.error:Something went wrong while invoking WordPress to fetch posts
+               result:x:@lambda2hyper
+            throw:Something went wrong while invoking WordPress to fetch posts, check your log for details.
+
+      // Opening up database connection.
+      data.connect:[generic|magic]
+
+         // Iterating through each page.
+         for-each:x:@http.get/*/content/*
+
+            // Some pages don't have content, such as the blog landing page, etc.
+            if
+               and
+                  not-null:x:@.dp/#/*/content/*/rendered
+                  neq:x:@.dp/#/*/content/*/rendered
+                     .:
+                  not-null:x:@.dp/#/*/title/*/rendered
+                  neq:x:@.dp/#/*/title/*/rendered
+                     .:
+               .lambda
+
+                  // Removing irrelevant elementor stuff and transforming to Markdown.
+                  strings.regex-replace:x:@.dp/#/*/content/*/rendered
+                     .:"\\[[^\\]]*\\]"
+                     .:
+                  html2markdown:x:-
+                     url:x:@.arguments/*/url
+                  html-decode:x:@.dp/#/*/title/*/rendered
+
+                  // Inserting page into database as snippet.
+                  data.create
+                     table:ml_training_snippets
+                     values
+                        type:x:@.arguments/*/type
+                        prompt:x:@html-decode
+                        completion:x:@html2markdown
+                        meta:wordpress-import
+                        uri:x:@.dp/#/*/link
+
+   // Basic logging.
+   log.info:Done importing from WordPress
+      url:x:@.arguments/*/url
+      type:x:@.arguments/*/type
+
+   // Checking if we should vectorize model or not.
+   if:x:@.arguments/*/vectorize
+
+      // Basic logging.
+      log.info:Started vectorizing model after WordPress import
+         type:x:@.arguments/*/type
+
+      // Vectorizing model.
+      execute:magic.ai.vectorise
+         type:x:@.arguments/*/type
+
+      // Basic logging.
+      log.info:Done vectorizing model after WordPress import
+         type:x:@.arguments/*/type
+.catch
+
+   // Oops ...!!
+   log.error:Something went wrong as we tried to import products from WordPress
+      url:x:@.arguments/*/url
+      type:x:@.arguments/*/type
+      error:x:@.arguments/*/message

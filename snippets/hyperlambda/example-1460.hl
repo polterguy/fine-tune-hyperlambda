@@ -1,13 +1,79 @@
-// [eq] returns false if values are not equal or types differ
-.a:5
-.b:int:5
-eq
-   get-value:x:@.a
-   get-value:x:@.b
 
-// Result after execution
-.a:5
-.b:int:5
-eq:bool:false
-   get-value:5
-   get-value:int:5
+// Hyperlambda action to execute a SQL CRUD Delete operation with specified 'database-type', 'connection-string', 'database', 'table', and optional 'and' or 'or' filters. Validate mandatory fields and enums.
+.arguments
+   database-type
+      type:enum
+      mandatory:bool:true
+      values
+         .:sqlite
+         .:mssql
+         .:mysql
+         .:pgsql
+   connection-string
+      type:string
+      mandatory:bool:true
+   database
+      type:string
+      mandatory:bool:true
+   table
+      type:string
+      mandatory:bool:true
+   and
+      type:key-value
+      mandatory:bool:false
+   or
+      type:key-value
+      mandatory:bool:false
+.icon:cloud_download
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/table
+validators.enum:x:@.arguments/*/database-type
+   .:sqlite
+   .:mssql
+   .:mysql
+   .:pgsql
+
+// Applying defaults.
+validators.default:x:@.arguments
+   connection-string:generic
+   database-type:sqlite
+   database:magic
+
+// Ensuring user provided either [or] or [and] and not both.
+if
+   and
+      exists:x:@.arguments/*/or/*
+      exists:x:@.arguments/*/and/*
+   .lambda
+      throw:Provide either [or] or [and] to sql-read action, and not both
+         public:bool:true
+         status:500
+
+// Connection string to actually use as we connect.
+.connection-string
+
+// Caller supplied an explicit [connection-string] argument.
+set-value:x:@.connection-string
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connection-string
+      .:|
+      get-value:x:@.arguments/*/database
+      .:]
+
+// Connecting to database.
+data.connect:x:@.connection-string
+   database-type:x:@.arguments/*/database-type
+
+   // Adding [or] or [and] arguments.
+   add:x:@data.connect/*/data.delete/*/where
+      get-nodes:x:@.arguments/*/or
+      get-nodes:x:@.arguments/*/and
+
+   // Executing SQL.
+   data.delete:x:@.arguments/*/sql
+      database-type:x:@.arguments/*/database-type
+      table:x:@.arguments/*/table
+      where
+   return-nodes:x:@data.delete

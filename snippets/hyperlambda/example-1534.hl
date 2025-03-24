@@ -1,14 +1,40 @@
 
-// Hyperlambda endpoint returning the OpenAI API key to the caller.
+// Deletes one record from your category table in your sakila database without authorization. Log invocation.
 .arguments
 
-// Making sure user has access to invoked endpoint.
-auth.ticket.verify:root
+   // Primary key of record to delete, mandatory argument
+   category_id:long
 
-// Reading OpenAI API key from configuration.
-config.get:"magic:openai:key"
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.category entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/category_id
 
-// Returning key to caller.
-unwrap:x:+/*
-return
-   result:x:@config.get
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:category
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:sakila.category.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

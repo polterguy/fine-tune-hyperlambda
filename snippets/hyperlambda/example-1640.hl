@@ -1,140 +1,24 @@
+/*
+ * The following code compiles the "/etc/foo.cs" file and saves it as an assembly
+ * in "/etc/foo.dll".
+ */
+io.file.load:/etc/foo.cs
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Console
+      .:System.Private.Uri
+      .:System.ComponentModel
+      .:System.Private.CoreLib
+      .:System.Net.Primitives
+      .:magic.node
+      .:magic.node.extensions
+      .:magic.library
+      .:magic.signals.contracts
+   code:x:@io.file.load
+   assembly-name:foo.dll
 
-// Search for flights using SERP API. Allows users to search for airline flights with various parameters.
-.arguments
-
-   // Mandatory argument being the 3 letter code for what airport to leave from.
-   departure_id:string
-
-   // Mandatory argument being the 3 letter code for what airport to arrive at.
-   arrival_id:string
-
-   // Mandatory argument being what date to fly.
-   outbound_date:string
-
-   // Optional argument being what date to fly. If type is 1 implying roundtrip, this argument becomes mandatory.
-   return_date:string
-
-   // Type of flight. Legal values are 1 or 2. 1 implies roundtrip, and if specified the return_date becomes mandatory. 2 implies one way.
-   type:int
-
-   // What class to travel. Legal values are 1, 2, 3 and 4. 1 implies economy, 2 implies premium economy, 3 implies business and 4 implies first class.
-   travel_class:int
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/departure_id
-validators.mandatory:x:@.arguments/*/arrival_id
-validators.mandatory:x:@.arguments/*/outbound_date
-
-// Retrieving SERP API's API key and making sure we've got one.
-.api-key
-set-value:x:@.api-key
-   config.get:"magic:serp-api:api_key"
-if
-   or
-      null:x:@.api-key
-      eq:x:@.api-key
-         .:
-   .lambda
-
-      // Oops ...!!
-      throw:Could not find a SERP API key to use for fetching hotels.
-
-// Creating our URL.
-.url
-set-value:x:@.url
-   strings.concat
-      .:"https://serpapi.com/search.json?engine=google_flights&api_key="
-      get-value:x:@.api-key
-      .:&departure_id=
-      get-value:x:@.arguments/*/departure_id
-      .:&arrival_id=
-      get-value:x:@.arguments/*/arrival_id
-      .:&outbound_date=
-      get-value:x:@.arguments/*/outbound_date
-
-// Checking if we've got a return_date argument.
-if
-   and
-      exists:x:@.arguments/*/return_date
-      not-null:x:@.arguments/*/return_date
-      neq:x:@.arguments/*/return_date
-         .:
-   .lambda
-
-      // Concatenating query to URL.
-      set-value:x:@.url
-         strings.concat
-            get-value:x:@.url
-            .:&return_date=
-            get-value:x:@.arguments/*/return_date
-
-// Checking if we've got a type argument.
-if
-   and
-      exists:x:@.arguments/*/type
-      not-null:x:@.arguments/*/type
-      neq:x:@.arguments/*/type
-         .:
-   .lambda
-
-      // Concatenating query to URL.
-      set-value:x:@.url
-         strings.concat
-            get-value:x:@.url
-            .:&type=
-            strings.url-encode:x:@.arguments/*/type
-
-// Checking if we've got a travel_class argument.
-if
-   and
-      exists:x:@.arguments/*/travel_class
-      not-null:x:@.arguments/*/travel_class
-      neq:x:@.arguments/*/travel_class
-         .:
-   .lambda
-
-      // Concatenating query to URL.
-      set-value:x:@.url
-         strings.concat
-            get-value:x:@.url
-            .:&travel_class=
-            strings.url-encode:x:@.arguments/*/travel_class
-
-// Retrieving result.
-http.get:x:@.url
-   convert:true
-
-// Sanity checking result of above invocation.
-if
-   not
-      and
-         mte:x:@http.get
-            .:int:200
-         lt:x:@http.get
-            .:int:300
-   .lambda
-
-      // Oops ...!!
-      lambda2hyper:x:../*
-      log.info:x:-
-      throw:Something went wrong while invoking SERP API
-
-// Iterating through result, making sure we return the result to caller.
-for-each:x:@http.get/*/content/*/best_flights/*/*/flights/*/[0,5]
-   unwrap:x:+/*/*/*
-   add:x:../*/return-nodes/*/flights
-      .
-         .
-            from:x:@.dp/#/*/departure_airport/*/name
-            departure:x:@.dp/#/*/departure_airport/*/time
-            to:x:@.dp/#/*/arrival_airport/*/name
-            arrival:x:@.dp/#/*/arrival_airport/*/time
-            airplane:x:@.dp/#/*/airplane
-            airline:x:@.dp/#/*/airline
-            travel_class:x:@.dp/#/*/travel_class
-            flight_number:x:@.dp/#/*/flight_number
-
-// Returning result to caller.
-unwrap:x:+/*
-return-nodes
-   flights
+// Saving our compiled CLR assembly to '/etc/foo.dll'.
+io.file.save.binary:/etc/foo.dll
+   get-value:x:@system.compile

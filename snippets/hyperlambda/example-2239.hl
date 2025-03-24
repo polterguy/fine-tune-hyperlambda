@@ -1,41 +1,30 @@
 
-// CRUD / Create Hyperlambda that creates one record in your media table in your cms database
+// CRUD delete endpoint that deletes one record from your InvoiceLine table in your chinook database.
 .arguments
 
-   // post_id column value
-   post_id:long
-
-   // file_path column value
-   file_path:string
-
-   // file_type column value
-   file_type:string
-
-   // created_at column value
-   created_at:date
+   // Primary key of record to delete, mandatory argument
+   InvoiceLineId:long
 
 // Verifying user is authorized to access endpoint.
 auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/InvoiceLineId
 
-// Opening up database connection.
-data.connect:[generic|cms]
+// Opening up our database connection.
+data.connect:[generic|chinook]
    database-type:sqlite
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
       get-nodes:x:@.arguments/*
 
-   // Creating our record.
-   data.create
+   // Deleting item from database.
+   data.delete
       database-type:sqlite
-      table:media
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
+      table:InvoiceLine
+      where
+         and
 
    // Returning result of above invocation to caller.
    unwrap:x:+/*
    return
-      id:x:@data.create
+      affected:x:@data.delete

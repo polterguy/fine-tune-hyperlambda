@@ -1,39 +1,63 @@
+// This snippet demonstrates conditional logic and basic arithmetic operations
 
-/*
- * Default global exception handler, invoked if no other overrides exists
- * at the module level.
- *
- * If you want to create a custom exception handler
- * for a specific module, you can do so by creating a file called "exceptions.hl"
- * inside a folder in your module.
- */
-log.error:x:@.arguments/*/message
-   url:x:@.arguments/*/path
-   exception:x:@.arguments/*/stack
+// It calculates whether numbers are even or odd and categorizes them
 
-/*
- * Notice, unless the [public] argument exists, and is true,
- * we return a "generic" error to caller to make sure we don't
- * disclose any security information originating from exceptions.
- */
-if
-   or
-      auth.ticket.in-role:root
-      and
-         exists:x:@.arguments/*/public
-         or
-            get-value:x:@.arguments/*/public
-            convert:x:@.arguments/*/public
-               type:bool
-   .lambda
+// Our collection of numbers to analyze
+.numbers
+   num1:int:42
+   num2:int:17
+   num3:int:100
+   num4:int:33
+   num5:int:64
 
-      // Exception message is supposed to propagate to client.
-      set-value:x:../*/return/*/message
-         get-value:x:@.arguments/*/message
+// Create containers for even and odd numbers
+.even-numbers
+.odd-numbers
 
-// Parametrizing return invocation.
-add:x:+
-   get-nodes:x:@.arguments/*/status
-   get-nodes:x:@.arguments/*/field
-return
-   message:Guru meditation, come back when Universe is in order!
+// Iterate through each number and categorize
+for-each:x:@.numbers/*
+   
+   // Check result and categorize accordingly
+   math.modulo:x:@.dp/#
+      .:int:2
+   if
+      eq:x:@math.modulo
+         .:int:0
+      .lambda
+      
+         // Number is even
+         unwrap:x:+/*/*
+         add:x:@.even-numbers
+            .
+               number:x:@.current
+
+         // Log the even number
+         log.info:Found even number
+
+   else
+      
+      // Number is odd
+      unwrap:x:+/*/*
+      add:x:@.odd-numbers
+         .
+            number:x:@.current
+      
+      // Log the odd number
+      log.info:Found odd number
+
+// Calculate totals
+.even-count:int:0
+.odd-count:int:0
+
+for-each:x:@.even-numbers/*
+   math.increment:x:@.even-count
+
+for-each:x:@.odd-numbers/*
+   math.increment:x:@.odd-count
+
+// Log summary
+log.info:Number categorization complete
+log.info:Even count
+   count:x:@.even-count
+log.info:Odd count
+   count:x:@.odd-count

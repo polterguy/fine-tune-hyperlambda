@@ -1,49 +1,32 @@
-
 /*
- * Counts usage of slots in our training material
- * 
- * Returns all slots, and how many times each slot is mentioned in training material
+ * Sends a welcome message to users who joined the fitness app in the last 24 hours.
  */
-.arguments
 
-// Used as buffer to hold result.
-.result
+data.connect:[pgsql|fittrack]
+   database-type:pgsql
 
-// Fetching vocabulary of server.
-vocabulary
+   data.select:@"
+select name, email
+   from users
+   where created_at >= current_date - interval '1 day'"
+      database-type:pgsql
 
-// Iterating through each slot
-for-each:x:@vocabulary/*
-
-   // Executing file that actually counts how many instances we can find of slot.
-   execute-file:/modules/fine-tune-hyperlambda/api/hyperlambda-search-count.get.hl
-      query:x:@.dp/#
-
-   // Adding result of above invocation to [.result] folder.
-   set-name:x:+/+/*/*
-      get-value:x:@.dp/#
-   unwrap:x:+/*/*
-   add:x:@.result
-      .
-         .:x:@execute-file/*/count
-
-// Sorting result.
-sort:x:@.result/*
-   if
-      lt:x:@.lhs/#
-         get-value:x:@.rhs/#
-      .lambda
-         set-value:x:@.result
-            .:int:-1
-   else-if
-      mt:x:@.lhs/#
-         get-value:x:@.rhs/#
-      .lambda
-         set-value:x:@.result
-            .:int:1
-   else
-      set-value:x:@.result
-         .:int:0
-
-// Returning result to caller.
-return-nodes:x:@sort/*
+   for-each:x:@data.select/*
+      strings.concat
+         .:"Hi "
+         get-value:x:@.dp/#/*/name
+         .:", welcome to FitTrack! Ready to crush your goals?"
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            from
+               .
+                  name:FitTrack Coach
+                  email:coach@fittrack.app
+            subject:Welcome to FitTrack!
+            entity:text/plain
+               content:x:@strings.concat

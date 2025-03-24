@@ -1,17 +1,17 @@
+// Hyperlambda HTTP endpoint with filtering and paging that allows me to return contacts from my crm database
+.arguments
+   limit:int
+   offset:int
+   filter:string
 
-// Changes the value of all nodes having a name of [foo]
-.data
-   foo
-      bar
-   hello
-      howdy
-         foo
-      some-node
-         some-other-node
-            foo
-
-// ** expression yields ALL descendants
-set-value:x:@.data/**/foo
-   .:touched
-
-// After execution, all above nodes having the name of 'foo' will have their values changed
+// Connect to the CRM database and read contacts with filtering and paging.
+data.connect:[generic|crm]
+   data.read
+      table:contacts
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+      where
+         or
+            first_name.like:x:@.arguments/*/filter
+            last_name.like:x:@.arguments/*/filter
+   return-nodes:x:@data.read/*

@@ -1,53 +1,32 @@
 
-// Searches for the specified [query] through your training snippets and returns [max_tokens] training snippets to caller.
+// Delete one record from your Genre table in your chinook database.
 .arguments
-   _type:string
 
-   // Mandatory argument and become an SQL LIKE condition records must match to be considered.
-   query:string
+   // Primary key of record to delete, mandatory argument
+   GenreId:long
 
-   // Optional argument being maximum number of tokens to return. Will default to 4000 if not specified.
-   max_tokens:int
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,basic
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/_type
-validators.mandatory:x:@.arguments/*/query
-
-// Applying defaults.
-validators.default:x:@.arguments
-   max_tokens:int:4000
+// Making sure primary key was supplied so we don't delete ALL records.
+validators.mandatory:x:@.arguments/*/GenreId
 
 // Opening up our database connection.
-data.connect:[generic|magic]
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-   // Creating our filter string
-   .filter
-   set-value:x:@.filter
-      strings.concat
-         .:%
-         get-value:x:@.arguments/*/query
-         .:%
-   data.read
-      table:ml_training_snippets
-      columns
-         id
-         prompt
-         uri
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Genre
       where
-         or
-            prompt.like:x:@.filter
-            completion.like:x:@.filter
-   .cont:bool:true
-   while:x:@.cont
-      lambda2hyper:x:@data.read/*
-      if
-         lt
-            openai.tokenize:x:@lambda2hyper
-            convert:x:@.arguments/*/max_tokens
-               type:int
-         .lambda
-            set-value:x:@.cont
-               .:bool:false
-      else
-         remove-nodes:x:@data.read/0/-
-   return-nodes:x:@data.read/*
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

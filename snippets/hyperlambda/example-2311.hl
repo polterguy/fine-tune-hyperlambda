@@ -1,16 +1,14 @@
-// Using [switch] to evaluate a car part status and set a corresponding message
-.status:in-stock
-.message
-switch:x:@.status
 
-   case:in-stock
-      set-value:x:@.message
-         .:Car part is in stock
+// Hyperlambda endpoint taking arguments. The SQL query retrieves distinct customer details who have purchased tracks from the "Rock" genre.
+.arguments
 
-   case:out-of-stock
-      set-value:x:@.message
-         .:Car part is out of stock
+// Connecting to database.
+data.connect:chinook
+   database-type:sqlite
 
-   default
-      set-value:x:@.message
-         .:Unknown status
+   // Executing [data.select] slot with our SQL.
+   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name = \"Rock\"\n  order by c.Email\n"
+      database-type:sqlite
+
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

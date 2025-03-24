@@ -1,30 +1,27 @@
 
-// Hyperlambda file that deletes one record from your actor table in your sakila database with authorization. Responds with endpoint or Hyperlambda file syntax.
+// Hyperlambda file and endpoint that changes the password of the currently authenticated user, ensuring the user is authorized.
 .arguments
+   password:string
 
-   // Primary key of record to delete, mandatory argument
-   actor_id:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/password
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-validators.mandatory:x:@.arguments/*/actor_id
+// Making sure password is at least 12 characters in length
+validators.string:x:@.arguments/*/password
+   min:12
 
-// Opening up our database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+/*
+ * Invokes the slot that does the heavy lifting, and updates the user's current password.
+ * 
+ * This slot will change the password of the currently logged in user.
+ */
+unwrap:x:+/*
+signal:magic.auth.change-password
+   password:x:@.arguments/*/password
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:actor
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returns success to caller.
+return-nodes
+   result:success

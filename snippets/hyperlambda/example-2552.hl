@@ -1,52 +1,27 @@
 
-// Counts clients that are affiliated with the currently authenticated client.
-.arguments
+// Hyperlambda snippet that executes [.lambda] if at least one condition is met.
 
-// Verifying user has access to endpoint.
-auth.ticket.verify:root, admin, guest
+// Executes [.lambda] if at least one condition is met.
+.output
+.numA:int:6
+.numB:int:12
+if
+   or
 
-// Retrieving currently authenticated user to parametrise invocation towards database.
-auth.ticket.get
+      // Less than check
+      lt:x:@.numA
+         .:int:7
 
-// Counting users affiliated with currently authenticated user.
-data.connect:[generic|magic]
+      // Greater than check
+      mt:x:@.numB
+         .:int:11
+   .lambda
 
-   // Retrieving affiliate percent for user.
-   data.read
-      table:users_extra
-      columns
-         value
-      where
-         and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
+      // Setting [.output] to true
+      set-value:x:@.output
+         .:bool:true
+else
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
-
-   // Invoking read slot to count users affiliated with currently authenticated user.
-   data.read
-      table:users_extra
-      columns
-         count(*)
-            as:count
-      where
-         and
-            type.eq:affiliate
-            value.eq:x:@auth.ticket.get
-
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:private, max-age=3600
-
-   // Returning result to caller.
-   unwrap:x:+/*
-   return
-      count:x:@data.read/*/*/count
+   // Setting [.output] to false
+   set-value:x:@.output
+      .:bool:false

@@ -1,31 +1,27 @@
 
-// Delete one record from your Customer table in your chinook database
-.arguments
+// Hyperlambda example where [.lambda] runs when all conditions evaluate to true.
 
-   // Primary key of record to delete, mandatory argument
-   CustomerId:long
+// Runs [.lambda] if all conditions evaluate to true.
+.state
+.check1:int:2
+.check2:int:8
+if
+   and
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+      // First condition: Less than
+      lt:x:@.check1
+         .:int:3
 
-// Making sure we do not delete ALL records in table!
-validators.mandatory:x:@.arguments/*/CustomerId
+      // Second condition: More than
+      mt:x:@.check2
+         .:int:7
+   .lambda
 
-// Opening up our database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
+      // Updating [.state] to true
+      set-value:x:@.state
+         .:bool:true
+else
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:Customer
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   yield
-      affected:x:@data.delete
+   // Updating [.state] to false
+   set-value:x:@.state
+      .:bool:false

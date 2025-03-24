@@ -1,43 +1,23 @@
 
-// Updates an existing item in your clusters table in your [generic|hub] database according to the specified arguments.
+// Returns objects of the specified type to caller
 .arguments
-   id:string
-   country:string
-   name:string
-   enabled:bool
 
-// Only root users can execute endpoint
-auth.ticket.verify:root
+   // Type of objects you want to retrieve. Mandatory.
+   type:string
 
-// Verifying user is authorized to access endpoint.
-validators.mandatory:x:@.arguments/*/id
+   // Optional maximum number of objects to return. Defaults to 10 if not specified.
+   limit:long
 
-// Opening up our database connection.
-data.connect:[generic|hub]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
+   // Optional offset of where to start retrieving objects.
+   from:long
 
-   // Invoking our update slot.
-   data.update
-      table:clusters
-      values
-      where
-         and
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
 
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-get-records.hl
 
-   // Returning success to caller.
-   response.status.set:202
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+// Returning result to caller.
+return-nodes:x:@execute-file/*

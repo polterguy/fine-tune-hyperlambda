@@ -1,37 +1,27 @@
 
-// Returns Stripe customers.
+// Write a Hyperlambda script to log lines of code (LOC) generated, including the type and name of the code.
 .arguments
-   limit:int
-   starting_after:string
-   email:string
+   loc:int
+   type:string
+   name:string
 
-/*
- * Ensures user is authorized to access endpoint.
- * 
- * If you don't supply a list of [roles] this action only verifies the user is authenticated,
- * and does not care about what roles the user belongs to.
- */
-execute:magic.workflows.actions.execute
-   name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
-   arguments
-      roles
-         .:root
-         .:gpt
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/loc
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/name
+validators.enum:x:@.arguments/*/type
+   .:backend
+   .:frontend
 
-/*
- * Retrieves charges from Stripe.
- * 
- * Will use your Stripe API token found from your settings as it's interacting
- * with the Stripe API.
- */
-execute:magic.workflows.actions.execute
-   name:stripe-customers-get
-   filename:/modules/stripe/workflows/actions/stripe-customers-get.hl
-   arguments
-      limit:x:@.arguments/*/limit
-      email:x:@.arguments/*/email
-      starting_after:x:@.arguments/*/starting_after
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+// Creating a log entry with LOC that was generated.
+log.info:LOC generated
+   loc:x:@.arguments/*/loc
+   type:x:@.arguments/*/type
+   name:x:@.arguments/*/name
+
+// Returning success to caller.
+return
+   result:success

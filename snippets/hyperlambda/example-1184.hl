@@ -1,11 +1,23 @@
 
-// Hyperlambda endpoint to transform specified markdown into HTML and return the HTML content.
+// Hyperlambda script creating a new scheduled task according to specified arguments.
 .arguments
-   markdown:string
+   id:string
+   description:string
+   hyperlambda:string
 
-// Transforming Markdown to HTML.
-markdown2html:x:@.arguments/*/markdown
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Returning resulting HTML to caller.
-yield
-   html:x:@markdown2html
+// Converting Hyperlambda to lambda.
+hyper2lambda:x:@.arguments/*/hyperlambda
+
+// Creates task.
+add:x:../*/tasks.create/*/.lambda
+   get-nodes:x:@hyper2lambda/*
+tasks.create:x:@.arguments/*/id
+   description:x:@.arguments/*/description
+   .lambda
+
+// Returning success to caller.
+return
+   result:success

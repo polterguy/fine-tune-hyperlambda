@@ -1,36 +1,28 @@
-
-// Create a Hyperlambda action to validate a reCAPTCHA token with an optional 'threshold'. Only validate if the user is not in the 'root' role. Default 'threshold' to 0.3.
-.arguments
-   recaptcha_token:string
-   threshold:decimal
-
 /*
- * Checking if backend is configured to use reCAPTCHA, and if so, making sure we ensure the frontend supplied
- * a [recaptcha_token], and invoking slot responsible for verifying reCAPTCHA value.
- * 
- * Notice, we do not enforce reCAPTCHA logic if user is authenticated as root.
- * This makes it easier to debug our endpoint, completely bypassing the reCAPTCHA logic if user is root.
+ * Sends a multipart email with both HTML and plain text parts, where the 'to',
+ * 'subject', and 'body' are dynamically retrieved from other nodes. An attachment
+ * is also included, with the file path specified dynamically.
  */
-auth.ticket.get
-config.get:"magic:auth:recaptcha:key"
-if
-   and
-      not-null:x:@config.get
-      neq:x:@config.get
-         .:
-      not-exists:x:@auth.ticket.get/*/roles/*/=root
-   .lambda
 
-      // [recaptcha_token] is a mandatory field.
-      validators.mandatory:x:@.arguments/*/recaptcha_token
+.recipient-email:john.doe@example.com
+.email-subject:Dynamic Multipart Email
+.plain-text-body:This is the plain text version.
+.html-body:<html><body><p>This is the HTML version.</p></body></html>
+.attachment-path:/path/to/attachment.pdf
 
-      // Defaulting [threshold] if not given to 0.3.
-      validators.default:x:@.arguments
-         threshold:decimal:0.3
-
-      // Retrieving secret and invoking slot responsible for verifying reCAPTCHA value.
-      config.get:"magic:auth:recaptcha:secret"
-      validators.recaptcha:x:@.arguments/*/recaptcha_token
-         min:x:@.arguments/*/threshold
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
+// [mail.smtp.send] requires us to use [unwrap].
+unwrap:x:+/**
+mail.smtp.send
+   message
+      to
+         // Alternative was of declaring both name and email in one node.
+         John Doe:x:@.recipient-email
+      subject:x:@.email-subject
+      entity:multipart/mixed
+         entity:multipart/alternative
+            entity:text/plain
+               content:x:@.plain-text-body
+            entity:text/html
+               content:x:@.html-body
+         entity:application/pdf
+            file-path:x:@.attachment-path

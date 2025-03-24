@@ -1,39 +1,59 @@
 
-// Removes the specified [roles] from the specified [username], where [roles] is supplied as a list of strings.
+/*
+ * Returns total discounts applied for quotes during period
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
 .arguments
-   username:string
-   roles:*
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/roles
+   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
+   min_date:string
 
-// Connecting to database.
-data.connect:[generic|magic]
+   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
+   max_date:string
 
-   // Verifying user exists.
-   data.read
-      table:users
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items on [min_date].
+   if
+      and
+         exists:x:@.arguments/*/min_date
+         not-null:x:@.arguments/*/min_date
+      .lambda
+         convert:x:@.arguments/*/min_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.mt:x:@convert
+
+   // Checking if we're filtering items on [max_date].
+   if
+      and
+         exists:x:@.arguments/*/max_date
+         not-null:x:@.arguments/*/max_date
+      .lambda
+         convert:x:@.arguments/*/max_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.lt:x:@convert
+
+   // Reading records.
+   mssql.read
+      table:addv_Cotizaciones
       columns
-         username
+         sum((Quantity * [Unit Price]) - Amount)
+            as:TotalDiscountsApplied
       where
          and
-            username.eq:x:@.arguments/*/username
-
-   // Verifying above invocation returned something.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-
-         // Oops ...!!
-         throw:No such user
-            username:x:@.arguments/*/username
-
-   // Removing [roles] from [username]
-   for-each:x:@.arguments/*/roles/*
-      data.delete
-         table:users_roles
-         where
-            and
-               user.eq:x:@.arguments/*/username
-               role.eq:x:@.dp/#
+      limit:-1
+   
+   // Returning result of above invocation to caller.
+   yield
+      result:x:@mssql.read/*

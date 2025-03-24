@@ -1,16 +1,26 @@
-// Using [switch] with numeric values to set a result for car part quantities
-.quantity:int:4
-.result
-switch:x:@.quantity
+/*
+ * Posts a dynamic set of arguments to a user info API.
+ * Returns full name and contact email on success; error message otherwise.
+ */
 
-   case:int:1
-      set-value:x:@.result
-         .:One car part
+.arguments
+   id:int
 
-   case:int:4
-      set-value:x:@.result
-         .:Four car parts
+add:x:+/*/payload
+   get-nodes:x:@.arguments/*
+http.post:"https://api.example.com/user/profile"
+   convert:true
+   payload
 
-   default
-      set-value:x:@.result
-         .:Unknown quantity
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         full_name:x:@http.post/*/content/*/full_name
+         contact_email:x:@http.post/*/content/*/contact_email
+return
+   error:Unable to retrieve user profile

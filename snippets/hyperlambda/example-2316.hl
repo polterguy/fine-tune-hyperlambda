@@ -1,47 +1,26 @@
 
-// KPI file for accounts that was created each day the last 14 days
-.name:New accounts
-.description:New accounts per day the last 14 days
-.enabled:bool:false
-.type:line
-.lambda
-   .now
-   set-value:x:-
-      math.subtract
-         date.now
-         time
-            days:13
-   data.connect:[generic|robo-crm]
-      while
-         lt:x:@.now
-            date.now
-         .lambda
-            .max
-            set-value:x:@.max
-               math.add:x:@.now
-                  time
-                     days:1
-            date.format:x:@.now
-               format:yyyy-MM-dd
-            date.format:x:@.max
-               format:yyyy-MM-dd
-            data.read
-               table:accounts
-               columns
-                  count(*)
-                     as:name
-               where
-                  and
-                     created.mt:x:@date.format/@date.format
-                     created.lt:x:@date.format
-            unwrap:x:+/*/*/*
-            add:x:../*/return
-               .
-                  .
-                     name:x:@date.format/@date.format
-                     value:x:@data.read/*/*
-            set-value:x:@.now
-               math.add:x:@.now
-                  time
-                     days:1
-   return
+// Retrieves all URLs from sitemap on specified website.
+.url:"https://ainiro.io"
+
+// will contain all URLs from website
+.urls
+
+// Retrieving main sitemap.
+strings.concat
+   get-value:x:@.url
+   .:"/sitemap.xml"
+http.get:x:@strings.concat
+xml2lambda:x:@http.get/*/content
+
+// Iterating through each URL referenced in main sitemap.
+for-each:x:@xml2lambda/*/sitemapindex/*/sitemap/*/loc/*/\#text
+
+   // Getting XML from currently iterated sitemap subset.
+   unwrap:x:+/*/*
+   http.get:x:@.dp/#
+   xml2lambda:x:@http.get/*/content
+   for-each:x:@xml2lambda/*/urlset/*/url/*/loc/*/\#text
+      unwrap:x:+/*/*
+      add:x:@.urls
+         .
+            .:x:@.dp/#

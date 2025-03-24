@@ -1,21 +1,32 @@
 
-// Hyperlambda script to return true if OpenAI is configured and can be used.
+// Hyperlambda script to schedule a task with a specified ID for execution according to specified parameters.
 .arguments
+   id:string
+   due:date
+   repeats:string
 
-// Making sure user has access to invoked endpoint.
+// Ensures user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Checking if configuration setting for OpenAI API key exists.
-config.get:"magic:openai:key"
+/*
+ * Adds either a [repeats] or [due] argument to invocation below,
+ * depending upon what argument was supplied by caller.
+ */
 if
-   eq:x:@config.get
-      .
+   not
+      eq
+         get-value:x:@.arguments/*/repeats
+         .
    .lambda
+      add:x:../*/tasks.schedule
+         get-nodes:x:@.arguments/*/repeats
+else
+   add:x:../*/tasks.schedule
+      get-nodes:x:@.arguments/*/due
 
-      // No API key found for OpenAI
-      return
-         result:bool:false
+// Performs actual scheduling of task.
+tasks.schedule:x:@.arguments/*/id
 
-// OpenAI API key exists.
-return
-   result:bool:true
+// Returns success to caller.
+return-nodes
+   result:success

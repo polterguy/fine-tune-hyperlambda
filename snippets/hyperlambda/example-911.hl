@@ -1,26 +1,35 @@
-/*
- * Lists companies where a director is involved, filtered by revenue
- */
+
+// Delete one record from your Employee table in your chinook database.
 .arguments
-   director_id:long
-   min_revenue:long
-   limit:long
-   offset:long
 
-data.connect:[pg|finance_data]
-   database-type:pgsql
+   // Primary key of record to delete, mandatory argument
+   EmployeeId:long
 
-   data.select:@"
-select b.company_name, b.revenue, d.role_name
-   from directors d
-      join basic b on b.org_number = d.org_number
-   where d.director_id = @id and b.revenue >= @min
-   limit @limit offset @offset"
-      database-type:pgsql
-      @id:x:@.arguments/*/director_id
-      @min:x:@.arguments/*/min_revenue
-      @limit:x:@.arguments/*/limit
-      @offset:x:@.arguments/*/offset
+validators.mandatory:x:@.arguments/*/EmployeeId
 
-   yield
-      profitable_roles:x:@data.select/*
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Employee
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:chinook.employee.delete
+      args
+      roles:enterprise,guest
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,126 +1,13 @@
-
-// Helper file to import xplain training data from API.
-.arguments
-   vectorize:bool
-
-// Applying defaults.
-validators.default:x:@.arguments
-   vectorize:bool:true
-
-// Logging invocation.
-log.info:Started deleting training snippets from xplain API in xplain-kennisbank-plus-caos model
-
-// API key.
-.api-key:REDACTED
-
-// Buffer for root URL of documents
-.root-url:"https://pro.2xplain.nl"
-
-// Buffer for type name.
-.type:xplain-kennisbank-plus-caos
-
-.update-count:int:0
-
-// Making sure we can handle exceptions.
-try
-
-   // List modules.
-   http.get:"https://kb-api.2xplain.nl/modules"
-      convert:true
-      headers
-         X-API-Key:x:@.api-key
-
-   // Sanity checking above invocation.
-   if
-      and
-         not-null:x:@http.get
-         mte:x:@http.get
-            .:int:200
-         lt:x:@http.get
-            .:int:300
-      .lambda
-
-         // Looping through modules returned above.
-         for-each:x:@http.get/*/content/*
-
-            // Figuring out which snippets to delete.
-            .deleted
-            set-value:x:@.deleted
-               strings.concat
-                  .:"https://kb-api.2xplain.nl/menu/deleted/"
-                  get-value:x:@.dp/#/*/id
-            http.get:x:@.deleted
-               convert:true
-               headers
-                  X-API-Key:x:@.api-key
-            if
-               and
-                  mte:x:@http.get
-                     .:int:200
-                  lt:x:@http.get
-                     .:int:300
-               .lambda
-
-                  // Above HTTP invocation succeeded.
-                  for-each:x:@http.get/*/content/*
-
-                     // Verifying we've got an actual snippet before we try to delete anything.
-                     if
-                        and
-                           exists:x:@.dp/#/*/documentId
-                           not-null:x:@.dp/#/*/documentId
-                           neq:x:@.dp/#/*/documentId
-                              .:
-                           exists:x:@.dp/#/*/prompt
-                           not-null:x:@.dp/#/*/prompt
-                           neq:x:@.dp/#/*/prompt
-                              .:
-                        .lambda
-
-                           strings.concat
-                              .:%docId=
-                              get-value:x:@.dp/#/*/documentId
-                           data.connect:magic
-                              data.execute:delete from ml_training_snippets where type = @type and prompt = @prompt
-                                 @type:x:@.type
-                                 @prompt:x:@.dp/#/*/prompt
-                           math.increment:x:@.update-count
-
-            else
-
-               // Oops ...!!
-               log.error:Could not fetch deleted documents from 2Xplain API.
-                  url:x:@.deleted
-
-
-   // Logging.
-   log.info:Finished deleting training snippets from xplain API in xplain-kennisbank-plus-caos
-      updated:x:@.update-count
-
-   // Vectorising
-   if
-      and
-         get-value:x:@.arguments/*/vectorize
-         mt:x:@.update-count
-            .:int:0
-      .lambda
-
-         // We've got stuff to vectorise.
-         log.info:Started vectorising training data after deleting snippets from xplain-kennisbank-plus-caos
-         execute:magic.ai.vectorise
-            type:x:@.type
-            .onafter
-
-               // Cleanups ...
-               data.connect:magic
-                  data.execute:delete from vss_ml_training_snippets where rowid not in (select id as rowid from ml_training_snippets)
-
-               // Logging.
-               log.info:Finished vectorising training data after deleting snippets from xplain-kennisbank-plus-caos
-
-.catch
-
-   // Oops ...!!
-   log.error:Something went wrong as we tried to deleting snippets from xplain-kennisbank-plus-caos
-      error:x:@.arguments/*/message
-      type:x:@.type
+// This example connects to the 'ocean' database and reads records from the 'creatures' table.
+sqlite.connect:ocean
+   sqlite.read
+      table:creatures
+      columns
+         species
+         habitat
+      where
+         and
+            habitat:Coral Reef
+      order:species
+      direction:asc
+      limit:int:10

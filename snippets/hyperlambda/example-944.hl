@@ -1,10 +1,23 @@
-// When creating a Hyperlambda file we're supposed to execute, it's CRUCIAL we add an [.arguments] node at the top of the file
-.arguments
-   name:string
-strings.concat
-   .:"Hello "
-   get-value:x:@.arguments/*/name
 
-// Returns greeting, notice [yield] will automatically [unwrap] expression references inside of itself
-yield
-   greeting:x:@strings.concat
+// Create a Hyperlambda script that returns the setup status of the system, ensuring the user is authorized.
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Checking if JWT secret has been changed.
+config.get:"magic:auth:secret"
+if
+   or
+      null:x:@config.get
+      lt
+         strings.length:x:@config.get
+         .:int:50
+   .lambda
+
+      // System has not been setup.
+      return
+         result:bool:false
+
+// Returns results of above invocations to caller.
+return
+   result:bool:true

@@ -1,55 +1,149 @@
 
-// Lists all foreign keys in the specified SQLite table.
-slots.create:magic.db.sqlite.foreign_keys
+// Create a Hyperlambda script for a CRUD read endpoint with paging, sorting, and filtering that selects records from the ml_types table in the magic database, ensuring authentication and authorization for root roles.
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   ml_types.type.like:string
+   ml_types.type.eq:string
+   ml_types.model.like:string
+   ml_types.model.eq:string
+   ml_types.max_tokens.eq:long
+   ml_types.max_request_tokens.eq:long
+   ml_types.max_context_tokens.eq:long
+   ml_types.temperature.eq:double
+   ml_types.base_url.like:string
+   ml_types.base_url.eq:string
+   ml_types.contact_us.like:string
+   ml_types.contact_us.eq:string
+   ml_types.lead_email.like:string
+   ml_types.lead_email.eq:string
+   ml_types.api_key.like:string
+   ml_types.api_key.eq:string
+   ml_types.twilio_account_sid.like:string
+   ml_types.twilio_account_sid.eq:string
+   ml_types.system_message.like:string
+   ml_types.system_message.eq:string
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/database
-   validators.mandatory:x:@.arguments/*/table
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify
 
-   // Opens up our connection
-   .connection:
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      table:ml_types
+      columns
+         ml_types.type
+         ml_types.model
+         ml_types.max_tokens
+         ml_types.max_request_tokens
+         ml_types.max_context_tokens
+         ml_types.temperature
+         ml_types.recaptcha
+         ml_types.auth
+         ml_types.supervised
+         ml_types.cached
+         ml_types.prefix
+         ml_types.use_embeddings
+         ml_types.threshold
+         ml_types.vector_model
+         ml_types.greeting
+         ml_types.base_url
+         ml_types.contact_us
+         ml_types.lead_email
+         ml_types.api_key
+         ml_types.twilio_account_id
+         ml_types.twilio_account_sid
+         ml_types.webhook_incoming
+         ml_types.webhook_outgoing
+         ml_types.webhook_incoming_url
+         ml_types.initial_questionnaire
+         ml_types.webhook_outgoing_url
+         ml_types.system_message
+         ml_types.no_requests
+         ml_types.max_requests
+         ml_types.search_postfix
+         ml_types.conversation_starters
+         ml_types.max_function_invocations
+         ml_types.max_session_items
+         ml_types.completion_slot
+      where
+         and
+
+   // Filtering out models not accessible to currently authenticated user.
+   .models
+   auth.ticket.get
    if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
+      not-null:x:@auth.ticket.get
       .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               get-value:x:@.arguments/*/database
-               .:]
-   else
-      set-value:x:@.connection
-         strings.concat
-            .:[generic|
-            get-value:x:@.arguments/*/database
-            .:]
-   sqlite.connect:x:@.connection
-      strings.concat
-         .:"pragma foreign_key_list('"
-         get-value:x:@.arguments/*/table
-         .:"')"
-      sqlite.select:x:@strings.concat
 
-      /*
-       * Creating our return value, by projecting it into
-       * a generic form, that does not rely upon SQLite's syntactic
-       * details.
-       */
-      for-each:x:@sqlite.select/*
-         unwrap:x:+/*/*/*
-         add:x:../*/return-nodes
-            .
-               .
-                  column:x:@.dp/#/*/from
-                  foreign_table:x:@.dp/#/*/table
-                  foreign_column:x:@.dp/#/*/to
-   return-nodes
+         // User is authenticated, only adding models user have access to.
+         for-each:x:@data.read/*
+
+            // Checking if model does not require auth at all.
+            if
+               or
+                  exists:x:@auth.ticket.get/*/roles/*/=root
+                  null:x:@.dp/#/*/auth
+                  eq:x:@.dp/#/*/auth
+                     .:
+               .lambda
+
+                  // Model does not require auth at all, all users have access.
+                  add:x:@.models
+                     get-nodes:x:@.dp/#
+            else
+
+               // Model has auth requirements, making sure user belongs to at least one of the roles.
+               strings.split:x:@.dp/#/*/auth
+                  .:,
+               for-each:x:@strings.split/*
+                  strings.trim:x:@.dp/#
+                     .:" \t"
+                  if
+                     and
+                        exists:x:@auth.ticket.get/*/roles/*/={@strings.trim}
+                        not-exists:x:"@.models/*/*/type/\"={@for-each/@.dp/#/*/type}\""
+                     .lambda
+
+                        // User belongs to at least one role that's allowed access to model.
+                        add:x:@.models
+                           get-nodes:x:@for-each/@.dp/#
+   else
+
+      // User is not authenticated, filtering out all models with auth requirements.
+      for-each:x:@data.read/*
+         if
+            or
+               null:x:@.dp/#/*/auth
+               eq:x:@.dp/#/*/auth
+                  .:
+            .lambda
+
+               // Model have no auth requirements.
+               add:x:@.models
+                  get-nodes:x:@.dp/#
+
+   // Returning result of above filter invocation to caller.
+   return-nodes:x:@.models/*

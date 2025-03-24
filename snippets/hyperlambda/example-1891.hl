@@ -1,28 +1,42 @@
-// Create hyperlambda that allows me to generate the fibonacci series up to 100
-.fibonacci_return
-.a:int:0
-.b:int:1
-while
-   lt
-      get-value:x:@.b
-      .:int:100
-   .lambda
-      // Compute next Fibonacci number
-      .next.int
-      set-value:x:@.next.int
-         math.add
-            get-value:x:@.a
-            get-value:x:@.b
-      if
-         lt
-            get-value:x:@.b
-            .:int:100
-         .lambda
-            unwrap:x:+/*/*
-            add:x:../*/.fibonacci_return
-               .
-                  .:x:@.next.int
-      set-value:x:@.a
-         get-value:x:@.b
-      set-value:x:@.b
-         get-value:x:@.next.int
+
+// Returns all cloudlets in the system using Hyperlambda workflow actions.
+.arguments
+   name:string
+   limit:int
+   offset:int
+
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
+
+/*
+ * Returns the username of the currently authenticated user,
+ * or null if user isn't authenticated.
+ */
+execute:magic.workflows.actions.execute
+   name:username-get
+   filename:/misc/workflows/actions/security/username-get.hl
+   arguments
+
+// Returns all cloudlets in the system.
+execute:magic.workflows.actions.execute
+   name:hub-cloudlets-get
+   filename:/modules/hub/workflows/actions/hub-cloudlets-get.hl
+   arguments
+      username:x:--/execute/=username-get/*/username
+      name:x:@.arguments/*/name
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

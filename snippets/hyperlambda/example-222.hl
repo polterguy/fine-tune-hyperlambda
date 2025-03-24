@@ -1,26 +1,29 @@
 
-// Hyperlambda script for a CRUD delete endpoint that deletes one item from the users table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
-.arguments
-   username:string
+// Write a Hyperlambda script to return the default database type the system is using and options for alternative database types.
 
-// Verifying user is authorized to access endpoint.
+// Ensures user is authorized to access endpoint.
 auth.ticket.verify:root
-validators.mandatory:x:@.arguments/*/username
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+// Retrieving database section from configuration.
+config.section:"magic:databases"
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+// Adding default database type to return value.
+add:x:../*/return
+   get-nodes:x:@config.section/*/default
 
-   // Deleting item from database.
-   data.delete
-      table:users
-      where
-         and
+/*
+ * Iterating through each optional database type,
+ * and making sure we return those too, making sure
+ * we remove 'default' parts before iterating.
+ */
+remove-nodes:x:@config.section/*/default
+for-each:x:@config.section/*
+   set-value:x:+/*/*
+      get-name:x:@.dp/#
+   add:x:../*/return/*/options
+      .
+         .
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returning result of above to caller.
+return
+   options

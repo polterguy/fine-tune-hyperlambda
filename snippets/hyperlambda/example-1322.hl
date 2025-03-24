@@ -1,4 +1,23 @@
-// This example hashes a string using SHA1 and returns the hash in raw byte format.
-.data:Hyperlambda rocks
-crypto.hash.sha1:x:@.data
-   format:raw
+// Dynamic slot that sends a user registration payload and handles failure gracefully
+slots.create:register-user
+   .register.status
+   http.post:"https://api.example.com/users/register"
+      convert:true
+      payload
+         username:alice
+         email:alice@example.com
+         password:Secure123!
+   if
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+      .lambda
+         set-value:x:@.register.status
+            .:Registration successful
+   else
+      set-value:x:@.register.status
+         .:Registration failed
+   yield
+      status:x:@.register.status

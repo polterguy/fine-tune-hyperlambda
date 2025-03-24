@@ -1,62 +1,22 @@
+/*
+ * Save this file as `/modules/code-cleaner/endpoints/standardize-vars.hl`
+ * This exposes an HTTP POST endpoint at `/code-cleaner/standardize-vars`
+ *
+ * This endpoint reads the file path from the [filename] argument and performs
+ * variable name replacements based on `what` and `with` values in the same argument list.
+ * The updated file content is returned.
+ */
 
-// Hyperlambda script that creates a user and inserts it into the magic database with specified username, password, and roles, ensuring password is securely hashed.
-slots.create:magic.auth.create-user
+.arguments
+   filename:string
 
-   // Hashing password if we should.
-   .password
-   if
-      get-value:x:@.arguments/*/is_hashed
-      .lambda
-
-         // Password is already hashed.
-         set-value:x:@.password
-            get-value:x:@.arguments/*/password
-   else
-
-      // Password is not hashed, hashing it.
-      set-value:x:@.password
-         crypto.password.hash:x:@.arguments/*/password
-
-   // Opening up a database connection to magic.
-   data.connect:magic
-
-      // Inserting user.
-      data.create
-         table:users
-         values
-            username:x:@.arguments/*/username
-            password:x:@.password
-
-      // Inserting all roles.
-      for-each:x:@.arguments/*/roles/*
-
-         // Then inserting into users_roles an association between user and role.
-         data.create
-            table:users_roles
-            values
-               role:x:@.dp/#
-               user:x:@.arguments/*/username
-
-      // Inserting optionally supplied extra information.
-      if
-         exists:x:@.arguments/*/extra/*
-         .lambda
-
-            // Looping through each extra child specified.
-            for-each:x:@.arguments/*/extra/*
-
-               // Temporary variables.
-               .type
-               .value
-               set-value:x:@.type
-                  get-name:x:@.dp/#
-               set-value:x:@.value
-                  get-value:x:@.dp/#
-
-               // Then inserting into users_extra an association between user and extra value.
-               data.create
-                  table:users_extra
-                  values
-                     user:x:@.arguments/*/username
-                     type:x:@.type
-                     value:x:@.value
+.result
+set-value:x:-
+   io.file.load:x:@.arguments/*/filename
+for-each:x:@.arguments/*
+   set-value:x:@.result
+      strings.replace:x:@.result
+         get-value:x:@.dp/#/*/what
+         get-value:x:@.dp/#/*/with
+yield
+   result:x:@.result

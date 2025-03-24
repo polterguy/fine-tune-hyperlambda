@@ -1,31 +1,21 @@
-// Search through a log file and extract all URLs from it
 
-// Read the log file
+// Fallback else block when prior if/else-if conditions are false
+.value:int:3
+.result
 if
-   io.file.exists:/var/logs/server.log
+   eq
+      get-value:x:@.value
+      .:int:1
    .lambda
-
-      // Reading file's content as text.
-      io.file.load:/var/logs/server.log
-
-      // A temporary place to hold the extracted URLs
-      .urls
-
-      // Extracting URLs using regex
-      strings.matches:x:@io.file.load
-         .:"https?://[\\w\\.-]+(?:\\.[\\w\\.-]+)+(?:[/\\w\\._~:?#[\\]@!$&'()*+,;=-]*)?"
-
-      // Loop through the matches and add them to the list
-      for-each:x:@strings.matches/*/match
-         unwrap:x:+/*/*
-         add:x:@.urls
-            .
-               .:x:@.dp/#
-
-      // Log the summary
-      lambda2hyper:x:@.urls/*
-      log.info:Extracted URLs from file
-         emails:x:@lambda2hyper
-
+      set-value:x:@.result
+         .:One
+else-if
+   eq
+      get-value:x:@.value
+      .:int:2
+   .lambda
+      set-value:x:@.result
+         .:Two
 else
-   log.error:Log file not found
+   set-value:x:@.result
+      .:Other

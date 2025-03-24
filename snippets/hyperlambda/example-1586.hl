@@ -1,8 +1,48 @@
-// This example connects to the 'music_store' database and inserts a new album record into the 'albums' table.
-sqlite.connect:music_store
-   sqlite.create
-      table:albums
+
+// Updates one record in your CustomerDemographics table in your northwind database
+.arguments
+
+   // CustomerTypeID column value being primary key of record to update, mandatory argument
+   CustomerTypeID:string
+
+   // CustomerDesc column's new value
+   CustomerDesc:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/CustomerTypeID
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:CustomerDemographics
       values
-         album_name:Abbey Road
-         artist:The Beatles
-         release_year:int:1969
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

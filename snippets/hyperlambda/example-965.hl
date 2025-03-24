@@ -1,55 +1,37 @@
 
-// Counts items from your cloudlets table in your [generic|hub] database according to the specified arguments.
+// Counts items from your spice_urls table in your scraper database.
 .arguments
 
-   // What operator to use between your conditions, result in 'OR' or 'AND' being used for your SQL conditions.
-   operator:string
+   // Optional spice_urls table spice_url_id column equality exact match filtering
+   spice_urls.spice_url_id.eq:long
 
-   // Optional filtering arguments.
-   cloudlets.id.eq:long
-   cloudlets.created.eq:date
-   cloudlets.name.like:string
-   cloudlets.name.eq:string
-   cloudlets.plan.like:string
-   cloudlets.plan.eq:string
-   cloudlets.cluster.like:string
-   cloudlets.cluster.eq:string
-   cloudlets.user.like:string
-   cloudlets.user.eq:string
+   // Optional spice_urls table url column wildcard filtering with SQL like '%' comparison
+   spice_urls.url.like:string
+
+   // Optional spice_urls table url column equality exact match filtering
+   spice_urls.url.eq:string
+
+   // Optional spice_urls table type column wildcard filtering with SQL like '%' comparison
+   spice_urls.type.like:string
+
+   // Optional spice_urls table type column equality exact match filtering
+   spice_urls.type.eq:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
-
-/*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
- */
-if
-   exists:x:@.arguments/*/operator
-   .lambda
-
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/*
-         get-value:x:@.arguments/*/operator
+auth.ticket.verify:root,admin
 
 // Opening up our database connection.
-data.connect:[generic|hub]
+data.connect:[generic|scraper]
+   database-type:sqlite
 
-   // Parametrising our read invocation.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/operator
-   remove-nodes:x:@.arguments/*/operator
+   // Adding all arguments specified to our 'WHERE' SQL parts
    add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 
    // Reading data from database.
    data.read
-      table:cloudlets
+      database-type:sqlite
+      table:spice_urls
       columns
          count(*)
             as:count

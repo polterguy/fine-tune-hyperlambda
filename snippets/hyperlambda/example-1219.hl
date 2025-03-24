@@ -1,167 +1,49 @@
 
-// Hyperlambda script that verifies an OpenID Connect JWT token and returns a valid application JWT token, handling nonce and issuer verification.
-.arguments
-   token:string
+// Returns a grouped chart image to caller
+.arguments:*
 
-/*
- * Verifying token.
- * 
- * Notice, this will throw an exception if token is not valid.
- */
-auth.token.verify
-   token:x:@.arguments/*/token
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/legend
 
-// Verifying nonce from token to avoid replay attacks.
-cache.get:x:@auth.token.verify/*/nonce
-if
-   neq:x:@cache.get
-      get-value:x:@auth.token.verify/*/issuer
-   .lambda
-
-      // Oops ...!!
-      throw:Nonce is not valid!
-         status:int:400
-         public:bool:true
-
-// Removing nonce from cache to avoid replay attacks.
-cache.set:x:@auth.token.verify/*/nonce
-
-// Verifying issuer is active.
-.active:bool:false
-execute-file:/system/auth/openid-providers.get.hl
-   createNonce:bool:false
-for-each:x:@execute-file/*
+// Creating our individual bars.
+.bars
+for-each:x:@.arguments/*
+   get-name:x:@.dp/#
    if
-      eq:x:@.dp/#/*/issuer
-         get-value:x:@auth.token.verify/*/issuer
-      .lambda
-         set-value:x:@.active
-            .:bool:true
-if
-   eq:x:@.issuer
-      .:bool:false
-   .lambda
-
-      // Oops ...!
-      throw:Not a recognized OpenID provider
-         status:400
-         public:bool:true
-
-// Buffer for extra information.
-.extra
-
-// External OpenID provider has been verified, now we need to check to see if user exists in local database.
-data.connect:magic
-
-   // Checking if user exists.
-   data.read
-      table:users
-      where
-         and
-            username.eq:x:@auth.token.verify/*/email
-   if
-      exists:x:@data.read/*
+      not
+         strings.starts-with:x:@get-name
+            .:legend
       .lambda
 
-         /*
-          * User has been previously created.
-          * 
-          * Invoking [magic.auth.authenticate] that does the heavy lifting, and creates our JWT token,
-          * making sure we return that token to caller.
-          * 
-          * Notice, we ignore the password!
-          */
-         execute:magic.auth.authenticate
-            password-check:bool:false
-            username:x:@auth.token.verify/*/email
-
-         // Retrieving extra information.
-         data.connect:magic
-            data.read
-               table:users_extra
-               where
-                  and
-                     user.eq:x:@auth.token.verify/*/email
-                     or
-                        type.eq:name
-                        type.eq:email
-            for-each:x:@data.read/*
-               set-name:x:./*/add/*/*
-                  get-value:x:@.dp/#/*/type
-               set-value:x:./*/add/*/*
-                  get-value:x:@.dp/#/*/value
-               add:x:@.extra
-                  .
-                     .
-
-         // Returns the authentication JWT ticket created above to caller.
-         yield
-            ticket:x:@execute/*/ticket
-            extra:x:@.extra/*
-
-   // First time login, creating a new user with username being email address.
-   data.create
-      table:users
-      values
-         username:x:@auth.token.verify/*/email
-         password:openid-connect
-
-   // Associating user with "guest" role.
-   data.create
-      table:users_roles
-      values
-         user:x:@auth.token.verify/*/email
-         role:guest
-
-   // Storing email as extra field.
-   data.create
-      table:users_extra
-      values
-         user:x:@auth.token.verify/*/email
-         type:email
-         value:x:@auth.token.verify/*/email
-
-   // Checking to see if we've got a name value, and if we do we associate it with the user we create.
-   if
-      exists:x:@auth.token.verify/*/name
-      .lambda
-
-         // We've got name, storing it.
-         data.create
-            table:users_extra
-            values
-               user:x:@auth.token.verify/*/email
-               type:name
-               value:x:@auth.token.verify/*/name
-
-   // Retrieving extra information.
-   data.connect:magic
-      data.read
-         table:users_extra
-         where
-            and
-               user.eq:x:@auth.token.verify/*/email
-               or
-                  type.eq:name
-                  type.eq:email
-      for-each:x:@data.read/*
-         set-name:x:./*/add/*/*
-            get-value:x:@.dp/#/*/type
-         set-value:x:./*/add/*/*
-            get-value:x:@.dp/#/*/value
-         add:x:@.extra
+         // Adding primary node for bar.
+         set-name:x:+/*/*
+            get-value:x:@get-name
+         add:x:@.bars
             .
                .
 
-/*
- * Invoking [magic.auth.authenticate] that does the heavy lifting, and creates our JWT token,
- * making sure we return that token to caller.
- */
-execute:magic.auth.authenticate
-   username:x:@auth.token.verify/*/email
-   password-check:bool:false
+         // Adding values for individual cells.
+         add:x:@.bars/0/-
+            strings.split:x:@.dp/#
+               .:,
 
-// Returns the authentication JWT ticket created above to caller.
-yield
-   ticket:x:@execute/*/ticket
-   extra:x:@.extra/*
+// Creating our legend.
+add:x:../*/image.chart/*/legend
+   strings.split:x:@.arguments/*/legend
+      .:,
+
+// Parametrizing [image.chart] invocation.
+add:x:../*/image.chart/*/bars
+   get-nodes:x:@.bars/*
+image.chart:grouped
+   width:800
+   height:500
+   bars
+   legend
+
+// Applying correct HTTP header.
+response.headers.set
+   Content-Type:image/png
+
+// Returning chart to caller.
+return:x:@image.chart

@@ -1,36 +1,52 @@
 
-// Delete one record from your comments table in your cms database
-.arguments
+// Create Hyperlambda that creates or updates a default OpenAI machine learning model in the database. Include model details like 'model', 'max_tokens', 'temperature', etc. Handle exceptions with logging.
+try
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+   // Connecting to Magic database.
+   data.connect:[generic|magic]
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-validators.mandatory:x:@.arguments/*/id
+      // Checking if default model has already been created.
+      data.read
+         table:ml_types
+         where
+            and
+               type.eq:default
+      if
+         not-exists:x:@data.read/*/*
+         .lambda
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+            // Creating default generic model.
+            data.create
+               table:ml_types
+               values
+                  type:default
+                  model:gpt-4o
+                  max_tokens:int:12000
+                  max_context_tokens:int:12000
+                  max_request_tokens:int:12000
+                  temperature:decimal:0.3
+                  supervised:int:1
+                  cached:int:1
+                  auth:root
+                  greeting:Hi there, how can I help you?
+                  system_message:You are a helpful assistant. If I ask you to create code for me, then return only the code and no explanation without any Markdown or ``` characters. If I ask you to modify my existing code, then modify my last code according to my instructions and return the entire modified code back to me.
+      else
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+         // Updating existing type
+         data.update
+            table:ml_types
+            values
+               model:gpt-4o
+               max_tokens:int:12000
+               max_context_tokens:int:12000
+               max_request_tokens:int:12000
+               temperature:decimal:0.3
+               supervised:int:1
+            where
+               and
+                  type.eq:default
+.catch
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:comments
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.comments.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Doing some basic logging.
+   log.info:Something went wrong as we tried to create default type
+      message:x:@.arguments/*/message

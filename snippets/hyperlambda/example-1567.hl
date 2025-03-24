@@ -1,34 +1,55 @@
 
-// Creates an item in your clusters table in your [generic|hub] database according to the specified arguments.
+// Action associating the specified [username] with the specified [extra] fields.
 .arguments
-   id:string
-   country:string
-   name:string
-   enabled:bool
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   username
+      type:string
+      mandatory:bool:true
+   extra
+      type:key-value
+      mandatory:bool:true
+.icon:supervisor_account
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/id
-validators.mandatory:x:@.arguments/*/country
-validators.mandatory:x:@.arguments/*/name
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/extra
 
-// Opening up database connection.
-data.connect:[generic|hub]
+// Connecting to database.
+data.connect:[generic|magic]
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
+   // Verifying user exists.
+   data.read
+      table:users
+      columns
+         username
+      where
+         and
+            username.eq:x:@.arguments/*/username
 
-   // Creating our record.
-   data.create
-      table:clusters
-      return-id:bool:false
-      values
+   // Verifying above invocation returned something.
+   if
+      not-exists:x:@data.read/*
+      .lambda
 
-   // Returning result of above invoction to caller.
-   response.status.set:201
-   unwrap:x:+/*
-   return
-      result:success
+         // Oops ...!!
+         throw:No such user
+            username:x:@.arguments/*/username
+
+   // Adding extra fields to user.
+   for-each:x:@.arguments/*/extra/*
+      get-name:x:@.dp/#
+
+      // Deleting old value (if existing).
+      data.delete
+         table:users_extra
+         where
+            and
+               user.eq:x:@.arguments/*/username
+               type.eq:x:@get-name
+
+      // Inserting new value.
+      data.create
+         table:users_extra
+         values
+            user:x:@.arguments/*/username
+            type:x:@get-name
+            value:x:@.dp/#

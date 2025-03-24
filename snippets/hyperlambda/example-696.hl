@@ -1,41 +1,17 @@
-
-// CRUD / Create Hyperlambda that creates one record in your menu_items table in your cms database
-.arguments
-
-   // menu_id column value
-   menu_id:long
-
-   // title column value
-   title:string
-
-   // url column value
-   url:string
-
-   // position column value
-   position:long
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up database connection.
-data.connect:[generic|cms]
+/*
+ * This file opens a connection to the 'marketing' database and selects the top 10 records
+ * from the 'campaigns' table where the email contains 'mailchimp' and the 'company' field
+ * is Microsoft.
+ */
+data.connect:[generic|marketing]
    database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
+   data.read
       database-type:sqlite
-      table:menu_items
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+      table:campaigns
+      
+      // [data.read] slot will automatically convert the following argument to a long value
+      limit:10
+      where
+         and
+            email.like:%mailchimp%
+            company.eq:Microsoft

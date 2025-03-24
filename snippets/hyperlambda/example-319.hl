@@ -1,32 +1,22 @@
 /*
- * This Hyperlambda snippet accepts a file path and a target word as arguments.
- * It reads the content of the file, splits the content into words,
- * counts how many words are NOT equal to the specified word, and returns the count.
+ * Hyperlambda file taking arguments that invokes a dynamic slot with dynamic parameters.
  */
-
 .arguments
-   file-path:string
-   word:string
+   slot:string
 
-// Load the text file's content
-io.file.load:x:@.arguments/*/file-path
+   // * implies argument is not type checked, and anything goes. Useful for sending in lists and key/value key pairs
+   params:*
 
-// Split the content into words based on spaces
-strings.split:x:@io.file.load
-   .:' '
+validators.mandatory:x:@.arguments/*/slot
 
-// Initialize counter
-.counter:int:0
+// Forwards all arguments to [invoke].
+add:x:./*/invoke
+   get-nodes:x:@.arguments/*/params/*
 
-// Iterate through each word and compare to target
-for-each:x:@strings.split/*
-   if
-      not
-         eq:x:@.dp/#
-            .:x:@.arguments/*/word
-      .lambda
-         math.increment:x:@.counter
+// Invoke the slot dynamically
+invoke:x:@.arguments/*/slot
 
-// Return the result
-yield
-   word-count:x:@.counter
+// Returning result
+add:x:./*/return
+   get-nodes:x:@invoke/*
+return

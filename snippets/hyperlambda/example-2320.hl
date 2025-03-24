@@ -1,49 +1,243 @@
 
-// Verifies user is allowed to create a demo account.
-slots.create:hub.user.can-create-demo-account
+// Creates a Hyperlambda slot that scrapes the specified URL and returns all hyperlinks as Markdown to the caller, with optional filtering, ensuring the user is authorized.
+slots.create:magic.http.html2markdown-links
 
    // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/username
-   validators.mandatory:x:@.arguments/*/plan
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
+   validators.integer:x:@.arguments/*/max
+      min:1
+      max:200
+   validators.url:x:@.arguments/*/starts_with
 
-   // Verifying user belongs to one of the roles that are allowed to create demo clodlets.
-   try
-      auth.ticket.verify:root, admin, partner
-   .catch
-
-      // Letting user know that he is not allowed to create demo cloudlets.
-      sockets.signal:hub.cloudlets.create
-         users:x:@auth.ticket.get
-         args
-            status:Only partners can create demo cloudlets. To test AINIRO send en email to team@ainiro.io
-            finished:bool:false
-            error:bool:true
-      log.error:User tried to create demo cloudlets when not allowed
-         user:x:@.arguments/*/username
-         plan:x:@.arguments/*/plan
-      throw:Only partners can create demo cloudlets
-         public:true
-         status:403
-
-   // Checking if user alread have a demo cloudlet.
-   data.scalar:select count(*) from cloudlets where user = @user and plan = @plan
-      user:x:@.arguments/*/username
-      plan:x:@.arguments/*/plan
+   // Converting [max] to integer if existing.
    if
-      neq:x:@data.scalar
-         .:long:0
+      and
+         exists:x:@.arguments/*/max
+         not-null:x:@.arguments/*/max
       .lambda
+         set-value:x:@.arguments/*/max
+            convert:x:@.arguments/*/max
+               type:int
 
-         // Letting user know that he already has a demo account of specified type.
-         sockets.signal:hub.cloudlets.create
-            users:x:@auth.ticket.get
-            args
-               status:You already have one demo account of the specified type
-               finished:bool:false
-               error:bool:true
-         log.error:User tried to create multiple demo cloudlets
-            user:x:@.arguments/*/username
-            plan:x:@.arguments/*/plan
-         throw:We only allow one demo cloudlet of each type for each user
-            public:true
-            status:403
+   // Figuring out base URL of document, defaulting to primary URL we're getting.
+   .base
+   strings.split:x:@.arguments/*/url
+      .:"://"
+   strings.split:x:@strings.split/1
+      .:/
+   set-value:x:@.base
+      strings.concat
+         get-value:x:@strings.split/@strings.split/0
+         .:"://"
+         get-value:x:@strings.split/0
+
+   // Fetching raw HTML.
+   add:x:./*/signal
+      get-nodes:x:@.arguments/*/url
+   signal:magic.http.get-with-cache
+
+   // Transforming HTML to lambda object and finds all hyperlinks in document.
+   .markdown:
+   html2lambda:x:@signal
+   for-each:x:@html2lambda/*/html/*/body/**/a
+
+      // Making sure we're not past any specified [max] argument.
+      if
+         or
+            not-exists:x:@.arguments/*/max
+            mt:x:@.arguments/*/max
+               .:int:0
+         .lambda
+
+            // Figuring out URL.
+            .url
+            set-value:x:@.url
+               get-value:x:"@.dp/#/*/\\@href"
+
+            // Making sure we turn URL into an absolute URL.
+            if
+               strings.starts-with:x:@.url
+                  .://
+               .lambda
+
+                  // URL starts with "//", and we only need to add scheme to it.
+                  strings.split:x:@.base
+                     .:"://"
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@strings.split/0
+                        .:":"
+                        get-value:x:@.url
+            else-if
+               strings.starts-with:x:@.url
+                  .:/
+               .lambda
+
+                  // URL starts with only one "/" and we need to prefix it with base URL.
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        get-value:x:@.url
+            else-if
+               and
+                  not
+                     strings.starts-with:x:@.url
+                        .:"https://"
+                  not
+                     strings.starts-with:x:@.url
+                        .:"http://"
+               .lambda
+
+                  // URL does not start with scheme or "/", hence adding scheme and slash to it.
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        .:/
+                        get-value:x:"@.dp/#/*/\\@href"
+
+            // [else] ==> URL is absolute URL.
+
+            /*
+             * Checking if caller provided a [starts_with] or [class] filter,
+             * and if so, verify we've got a match for currently iterated URL.
+             */
+            if
+               and
+                  or
+                     not-exists:x:@.arguments/*/starts_with
+                     strings.starts-with:x:@.url
+                        get-value:x:@.arguments/*/starts_with
+                  or
+                     not-exists:x:@.arguments/*/class
+                     strings.contains:x:"@.dp/#/*/\\@class"
+                        get-value:x:@.arguments/*/class
+               .lambda
+
+                  // Figuring out anchor text.
+                  .anchor:
+                  for-each:x:"@.dp/#/**/\\#text"
+                     set-value:x:@.anchor
+                        strings.concat
+                           get-value:x:@.anchor
+                           .:" "
+                           get-value:x:@.dp/#
+
+                  // Trimming anchor and removing redundant spacing characters.
+                  set-value:x:@.anchor
+                     strings.trim:x:@.anchor
+                        .:" \t\n"
+                  set-value:x:@.anchor
+                     strings.replace:x:@.anchor
+                        .:"  "
+                        .:" "
+                  set-value:x:@.anchor
+                     strings.replace:x:@.anchor
+                        .:"\r"
+                        .:" "
+                  set-value:x:@.anchor
+                     strings.replace:x:@.anchor
+                        .:"\n"
+                        .:" "
+
+                  /*
+                   * Now we know both anchor text and URL,
+                   * however before we can proceed we verify that
+                   * anchor text actually exists.
+                   */
+                  if
+                     and
+                        not-null:x:@.anchor
+                        neq:x:@.anchor
+                           .:
+                        not
+                           strings.contains:x:@.url
+                              .:#
+                     .lambda
+
+                        /*
+                         * Now checking if caller provided a [query] parameter, at which point
+                         * we assume the URL we're looking for is masked inside that query parameter,
+                         * and not being the URL itself.
+                         * 
+                         * This might be true for DuckDuckGo for instance, that directs you to a redirect
+                         * service, instead of giving you the direct link.
+                         */
+                        if
+                           exists:x:@.arguments/*/query
+                           .lambda
+
+                              // Caller provided [query] argument.
+                              strings.split:x:@.url
+                                 .:?
+                              if
+                                 mt
+                                    get-count:x:@strings.split/*
+                                    .:int:1
+                                 .lambda
+
+                                    // URL has query parameters, splitting all query parameters.
+                                    strings.split:x:@strings.split/1
+                                       .:&
+
+                                    // Used to track if we find query parameter.
+                                    .found:bool:false
+
+                                    // Finding the correct query parameter.
+                                    for-each:x:@strings.split/*
+
+                                       // Checking if currently iterated query parameter is the correct query parameter.
+                                       if
+                                          strings.starts-with:x:@.dp/#
+                                             strings.concat
+                                                get-value:x:@.arguments/*/query
+                                                .:=
+                                          .lambda
+
+                                             // This is our query parameter.
+                                             set-value:x:@.found
+                                                .:bool:true
+                                             strings.split:x:@.dp/#
+                                                .:=
+                                             set-value:x:@.url
+                                                strings.url-decode:x:@strings.split/1
+
+                                    /*
+                                     * Verifying we found query parameter in URL, and if not,
+                                     * ignoring currently iterated link.
+                                     */
+                                    if
+                                       not
+                                          get-value:x:@.found
+                                       .lambda
+
+                                          // Query parameter wasn't found.
+                                          set-value:x:@.url
+                              else
+
+                                 // No query parameters in URL at all.
+                                 set-value:x:@.url
+
+                        // Adding currently iterated URL to [.markdown] if we have a valid URL.
+                        if
+                           not-null:x:@.url
+                           .lambda
+
+                              // Decrementing [max] to prevent overflow.
+                              math.decrement:x:@.arguments/*/max
+
+                              // Concatenating currently iterated URL to Markdown result.
+                              set-value:x:@.markdown
+                                 strings.concat
+                                    get-value:x:@.markdown
+                                    .:* [
+                                    get-value:x:@.anchor
+                                    .:](
+                                    get-value:x:@.url
+                                    .:)
+                                    .:"\n"
+
+   // Done, returning Markdown to caller.
+   strings.trim:x:@.markdown
+      .:"\n\t "
+   return:x:-

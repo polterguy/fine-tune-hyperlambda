@@ -1,33 +1,32 @@
-/*
- * Hyperlambda file that can be executed with arguments.
- * Prepares a password reset email by replacing the {{user}} and {{reset_link}} placeholders.
- */
+
+// Creates one record in your CustomerDemographics table in your northwind database
 .arguments
-   user:string
-   reset_link:string
-.email-template:@"
-Hi {{user}},
 
-We received a request to reset your password.
+   // CustomerTypeID column value
+   CustomerTypeID:string
 
-Click the link below to proceed:
-{{reset_link}}
+   // CustomerDesc column value
+   CustomerDesc:string
 
-If you didn't request this, please ignore this message.
+// Opening up database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
 
-Thanks,
-Support Team"
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-.reset-email
-set-value:x:@.reset-email
-   strings.replace:x:@.email-template
-      .:{{user}}
-      get-value:x:@.arguments/*/user
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:CustomerDemographics
+      return-id:bool:false
+      values
 
-set-value:x:@.reset-email
-   strings.replace:x:@.reset-email
-      .:{{reset_link}}
-      get-value:x:@.arguments/*/reset_link
+   // Returning the correct status code.
+   response.status.set:201
 
-yield
-   email:x:@.reset-email
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      result:success

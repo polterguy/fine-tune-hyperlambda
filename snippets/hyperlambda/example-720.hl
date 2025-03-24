@@ -1,79 +1,76 @@
 
-// Hyperlambda action to execute a SQL CRUD Delete operation with specified 'database-type', 'connection-string', 'database', 'table', and optional 'and' or 'or' filters. Validate mandatory fields and enums.
+/*
+ * Lists sales
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
 .arguments
-   database-type
-      type:enum
-      mandatory:bool:true
-      values
-         .:sqlite
-         .:mssql
-         .:mysql
-         .:pgsql
-   connection-string
-      type:string
-      mandatory:bool:true
-   database
-      type:string
-      mandatory:bool:true
-   table
-      type:string
-      mandatory:bool:true
-   and
-      type:key-value
-      mandatory:bool:false
-   or
-      type:key-value
-      mandatory:bool:false
-.icon:cloud_download
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/table
-validators.enum:x:@.arguments/*/database-type
-   .:sqlite
-   .:mssql
-   .:mysql
-   .:pgsql
+   // Optional filtering argument allowing to filter items on No_ and Description
+   filter:string
 
-// Applying defaults.
-validators.default:x:@.arguments
-   connection-string:generic
-   database-type:sqlite
-   database:magic
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
 
-// Ensuring user provided either [or] or [and] and not both.
-if
-   and
-      exists:x:@.arguments/*/or/*
-      exists:x:@.arguments/*/and/*
-   .lambda
-      throw:Provide either [or] or [and] to sql-read action, and not both
-         public:bool:true
-         status:500
+   // Optional offset into records of where to start returning items.
+   offset:long
 
-// Connection string to actually use as we connect.
-.connection-string
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
 
-// Caller supplied an explicit [connection-string] argument.
-set-value:x:@.connection-string
-   strings.concat
-      .:[
-      get-value:x:@.arguments/*/connection-string
-      .:|
-      get-value:x:@.arguments/*/database
-      .:]
+// Getting limit value, defaulting to 10
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:10
 
-// Connecting to database.
-data.connect:x:@.connection-string
-   database-type:x:@.arguments/*/database-type
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
 
-   // Adding [or] or [and] arguments.
-   add:x:@data.connect/*/data.delete/*/where
-      get-nodes:x:@.arguments/*/or
-      get-nodes:x:@.arguments/*/and
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
 
-   // Executing SQL.
-   data.delete:x:@.arguments/*/sql
-      database-type:x:@.arguments/*/database-type
-      table:x:@.arguments/*/table
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:No_
+            .:Description
+            .:Source No_
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Reading records.
+   mssql.read
+      table:avwVentasDet
+      limit:x:@.limit
+      offset:x:@.offset
       where
-   return-nodes:x:@data.delete
+         or
+   
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.read/*

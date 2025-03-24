@@ -1,50 +1,91 @@
 
-// Hyperlambda endpoint that exports all leads from training requests and returns them as a CSV file, ensuring the user is authorized.
+// Workflow action that returns all cloudlets in the system.
 .arguments
-   type:string
+   username
+      type:string
+      mandatory:bool:false
+   name
+      type:string
+      mandatory:bool:false
+   limit
+      type:int
+      mandatory:bool:false
+   offset
+      type:int
+      mandatory:bool:false
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Applying defaults
+validators.default:x:@.arguments
+   limit:int:5
+   offset:int:0
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+// Connecting to database.
+data.connect:[generic|hub]
 
-   // Parametrising our read invocation with filtering arguments.
+   /*
+    * Checking if caller provided a [username] argument,
+    * and if so, applying it to [where].
+    */
    if
-      exists:x:@.arguments/*/type
+      and
+         exists:x:@.arguments/*/username
+         not-null:x:@.arguments/*/username
       .lambda
+
+         // Adding [user.eq] filter criteria to [data.read].
          unwrap:x:+/*/*
          add:x:@data.connect/*/data.read/*/where/*/and
             .
-               type.eq:x:@.arguments/*/type
+               user.eq:x:@.arguments/*/username
 
-   // Invoking our read slot.
+   /*
+    * Checking if caller provided a [name] argument,
+    * and if so, applying it to [where].
+    */
+   if
+      and
+         exists:x:@.arguments/*/name
+         not-null:x:@.arguments/*/name
+      .lambda
+
+         // Adding [user.eq] filter criteria to [data.read].
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/data.read/*/where/*/and
+            .
+               name.eq:x:@.arguments/*/name
+
+   // Removing [where] if there are no conditions.
+   if
+      not-exists:x:@data.connect/*/data.read/*/where/*/and/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.read/*/where
+
+   // Adding [limit] and [offset]
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+
+   // Reading records.
    data.read
-      table:ml_requests
+      table:cloudlets
       columns
-         prompt
-            as:lead
+         created
+         name
+         user
+         plan
+         "('https://' || name || '-' || user || '.' || cluster)"
+            as:login
       where
          and
-            finish_reason.eq:lead
-      limit:-1
+      order:created
+      direction:desc
 
-   // Verifying records exists.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         response.status.set:404
-         return
-            result:No records found
+   // Iterating through above result to change it to dashboard login link.
+   for-each:x:@data.read/*
+      set-value:x:@.dp/#/*/login
+         strings.concat
+            .:"https://dashboard.ainiro.io?backend="
+            strings.url-encode:x:@.dp/#/*/login
 
-   // Converting result to CSV.
-   lambda2csv:x:@data.read/*
-
-   // Applying correct HTTP header.
-   response.headers.set
-      Content-Type:text/csv
-      Access-Control-Expose-Headers:Content-Disposition
-      Content-Disposition:"attachment; filename=\"leads.csv\""
-
-   // Returning content to caller.
-   return:x:@lambda2csv
+   // Returning result of above invocation back to caller.
+   return-nodes:x:@data.read/*

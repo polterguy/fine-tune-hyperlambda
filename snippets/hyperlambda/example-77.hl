@@ -1,102 +1,44 @@
+// Submits feedback and handles all common HTTP status codes using [switch] and [throw] with correct value syntax
 
-// Hyperlambda workflow action that retrieves customer charges from Stripe using the Stripe API token. The function should accept optional arguments for limit, email, and starting_after, applying a default limit of 10 if not specified. It should construct the appropriate URL for the Stripe API and make a GET request. If the request fails, it should log an error and throw an exception. The function should process the retrieved data, converting balances to decimals and Unix timestamps to UTC dates, and return the results to the caller.
 .arguments
-   limit
-      type:int
-      mandatory:bool:false
-   email
-      type:string
-      mandatory:bool:false
-   starting_after
-      type:string
-      mandatory:bool:false
-.icon:payment
 
-// Applying defaults.
-validators.default:x:@.arguments
-   limit:int:10
+// Final feedback submission result
+.feedback.status
 
-// Retrieving token to use for invocations towards Stripe.
-.token
-set-value:x:-
-   strings.concat
-      .:"Bearer "
-      config.get:"magic:stripe:token"
-
-// Creating URL.
-.url
-for-each:x:@.arguments/*
-   if
-      not-null:x:@.dp/#
-      .lambda
-         if
-            null:x:@.url
-            .lambda
-               set-value:x:@.url
-                  .:"https://api.stripe.com/v1/customers?"
-         else
-            set-value:x:@.url
-               strings.concat
-                  get-value:x:@.url
-                  .:&
-         set-value:x:@.url
-            strings.concat
-               get-value:x:@.url
-               get-name:x:@.dp/#
-               .:=
-               get-value:x:@.dp/#
-
-// Invoking Stripe REST API.
-http.get:x:@.url
+// Send HTTP POST to feedback API
+http.post:"https://api.feedbackly.io/v1/submit"
    convert:true
-   headers
-      Authorization:x:@.token
+   payload
+      name:Sarah Lee
+      email:sarah.lee@example.com
+      message:This platform is fantastic!
 
-// Sanity checking above invocation.
-if
-   mte
-      get-value:x:@http.get
-      .:int:400
-   .lambda
+// Branch based on HTTP status code
+switch:x:@http.post
 
-      // Oops, something went wrong ...!!
-      lambda2hyper:x:@http.post
-      log.error:Something went wrong while invoking Stripe, could not retrieve charges
-         result:x:@lambda2hyper
-         provider:Stripe
-      throw:Something went wrong while invoking Stripe, could not retrieves charges
-         public:true
-         status:500
+   case:int:200
+      set-value:x:@.feedback.status
+         .:Feedback submitted successfully
 
-// Parametrising our [return] invocation.
-for-each:x:@http.get/*/content/*/data/*
+   case:int:400
+      throw:400 Bad Request – Please check your input data
 
-   // Buffer for currently iterated item.
-   .tmp
-      .
-         id:x:@.dp/#/*/id
-         balance:x:@.dp/#/*/balance
-         created:x:@.dp/#/*/created
-         email:x:@.dp/#/*/email
-         name:x:@.dp/#/*/name
-         metadata:x:@.dp/#/*/metadata/*
+   case:int:401
+      throw:401 Unauthorized – You must log in to submit feedback
 
-   // Forward evaluating all above expressions.
-   unwrap:x:@.tmp/*/*
-      apply-lists:true
+   case:int:403
+      throw:403 Forbidden – You don’t have permission to perform this action
 
-   // Converting amount to decimal and dividing by 100.
-   set-value:x:@.tmp/*/*/balance
-      math.divide
-         convert:x:@.tmp/*/*/balance
-            type:decimal
-         .:int:100
+   case:int:404
+      throw:404 Not Found – The feedback endpoint does not exist
 
-   // Converting Unix time to UTC date.
-   set-value:x:@.tmp/*/*/created
-      date.from-unix:x:@.tmp/*/*/created
-   add:x:../*/return
-      get-nodes:x:@.tmp/*
+   case:int:500
+      throw:500 Internal Server Error – Please try again later
 
-// Returning result of above invocation to caller.
-return
+   default
+      set-value:x:@.feedback.status
+         .:Unhandled response – unknown status code
+
+// Return the result
+yield
+   result:x:@.feedback.status

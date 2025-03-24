@@ -1,35 +1,38 @@
+// Executing the following Hyperlambda results in the following
 
-// Deletes the user's account entirely on server.
-.arguments
-
-// Ensuring user is authenticated to invoke endpoint.
-auth.ticket.verify:guest
-
-// Retrieving currently authenticated user.
-auth.ticket.get
-
-// Verifying user doesn't have any cloudlets.
-data.connect:[generic|hub]
-   data.read
-      table:cloudlets
-      where
-         and
-            user.eq:x:@auth.ticket.get
+// When executing the following Hyperlambda
+.folder:/system/
+.loc:int:0
+.files:int:0
+unwrap:x:+/*
+signal:magic.io.file.load-recursively
+   .:x:@.folder
+for-each:x:@signal/*
    if
-      exists:x:@data.read/*/*
+      strings.ends-with:x:@.dp/#
+         .:.hl
       .lambda
-         throw:You have to delete all cloudlets before you delete your account
-            public:true
-            status:400
+         hyper2lambda:x:@.dp/#/0
+         math.increment:x:@.loc
+            get-count:x:@hyper2lambda/**
+         math.increment:x:@.files
+remove-nodes:x:@signal/*
 
-// Deleting user from magic database.
-data.connect:[generic|magic]
-   data.delete
-      table:users
-      where
-         and
-            username.eq:x:@auth.ticket.get
+// We end up with this result
+.folder:/system/
+.loc:int:19696
+.files:int:292
+unwrap:x:+/*
+signal
+for-each:x:@signal/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+         hyper2lambda:x:@.dp/#/0
+         math.increment:x:@.loc
+            get-count:x:@hyper2lambda/**
+         math.increment:x:@.files
+remove-nodes:x:@signal/*
 
-// Returning success to caller.
-return
-   result:success
+// Above you can see how executing Hyperlambda transforms the original node hierarchy, changing it, allowing us to store state in nodes

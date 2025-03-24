@@ -1,32 +1,29 @@
 
-// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the ml_types table in the magic database with a type matching the argument, ensuring authentication and authorization for root roles.
+// Returns all companies that the specified director is associated with
 .arguments
-   type:string
+   director_id:long
+   limit:long
+   offset:long
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Opening database connection.
+data.connect:[finovo|finovo]
+   database-type:pgsql
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/type
+   // Reading from directors.
+   data.select:"\nselect d1.org_number, b.company_name, d1.role_name\n   from directors d1\n      inner join basic b on b.org_number = d1.org_number\n      inner join directors d2 on d1.director_nbr = d2.director_nbr\n   where d2.director_id = @id and d1.org_number != d2.org_number\n   limit @limit offset @offset"
+      database-type:pgsql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+   if
+      mte
+         get-count:x:@data.select/*
+         .:int:10
+      .lambda
 
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Deleting referenced rows in vss_ml_training_snippets
-   data.execute:"delete from vss_ml_training_snippets where rowid in\n   (select id as rowid from ml_training_snippets where type = @type)"
-      type:x:@.arguments/*/type
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      table:ml_types
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+         // Making sure we inform caller that there might exist additional companies.
+         add:x:@data.connect/*/yield
+            .
+               notice:The director is probably associated with more companies
+   yield
+      companies:x:@data.select/*

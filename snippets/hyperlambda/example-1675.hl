@@ -1,30 +1,26 @@
-
-// Hyperlambda endpoint that deletes a specified cache item, ensuring the user is authorized, and handles both single and multiple cache item deletions.
+/*
+ * Returns all active companies the specified director is part of
+ * 
+ * director_id is required
+ */
 .arguments
-   id:string
+   director_id:long
+   limit:long
+   offset:long
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+data.connect:[mssql|director_db]
+   database-type:mssql
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/id
+   data.select:@"
+select d.org_number, b.company_name, d.role_name
+   from directors d
+      inner join basic b on d.org_number = b.org_number
+   where d.director_id = @id and d.active = 1
+   limit @limit offset @offset"
+      database-type:mssql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
 
-// Checking if caller wants to delete multiple cache items simultaneously.
-if
-   strings.ends-with:x:@.arguments/*/id
-      .:*
-   .lambda
-
-      // Deletes all cache items starting with specified string.
-      strings.split:x:@.arguments/*/id
-         .:*
-      cache.clear
-         filter:x:@strings.split/0
-else
-
-   // Deletes a single cache item.
-   cache.set:x:@.arguments/*/id
-
-// Returning success to caller.
-return
-   result:success
+   yield
+      companies:x:@data.select/*

@@ -1,32 +1,16 @@
 
-// Hyperlambda script for a CRUD create endpoint that inserts one record into the ml_requests table in the magic database, taking type, prompt, completion, and finish_reason, ensuring authentication and authorization for root roles.
-.arguments
-   type:string
-   prompt:string
-   completion:string
-   finish_reason:string
-   cached:int
+// Hyperlambda snippet that checks every second while [.time_left] is above 0.
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Checks every second while [.time_left] is above 0.
+.time_left:int:5
+while
+   gt
+      get-value:x:@.time_left
+      .:int:0
+   .lambda
 
-// Opening up database connection.
-data.connect:[generic|magic]
+      // Logging remaining time.
+      log.info:Time remaining
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      table:ml_requests
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+      // Decrement time.
+      math.decrement:x:@.time_left

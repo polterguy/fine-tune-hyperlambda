@@ -1,64 +1,32 @@
 
-// Lists all foreign keys in the specified SQLite table.
-slots.create:magic.db.sqlite.indexes
+// Delete one record from your CustomerCustomerDemo table in your northwind database
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/database
-   validators.mandatory:x:@.arguments/*/table
+   // Primary key of record to delete, mandatory argument
+   CustomerID:string
 
-   // Opens up our connection
-   .connection:
-   if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
-      .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               get-value:x:@.arguments/*/database
-               .:]
-   else
-      set-value:x:@.connection
-         strings.concat
-            .:[generic|
-            get-value:x:@.arguments/*/database
-            .:]
-   sqlite.connect:x:@.connection
-      strings.concat
-         .:"select * from sqlite_master where type = 'index' and tbl_name='"
-         get-value:x:@.arguments/*/table
-         .:"'"
-      sqlite.select:x:@strings.concat
+   // Primary key of record to delete, mandatory argument
+   CustomerTypeID:string
 
-      /*
-       * Creating our return value, by projecting it into
-       * a generic form, that does not rely upon MySQL's syntactic
-       * details.
-       */
-      for-each:x:@sqlite.select/*
-         unwrap:x:+/*/*/*
-         add:x:../*/return-nodes
-            .
-               .
-                  name:x:@.dp/#/*/name
-                  columns
-         strings.concat
-            .:"pragma index_info('"
-            get-value:x:@.dp/#/*/name
-            .:"')"
-         sqlite.select:x:@strings.concat
-         for-each:x:@sqlite.select/*
-            unwrap:x:+/*/*
-            add:x:../*/return-nodes/0/-/*/columns
-               .
-                  .:x:@.dp/#/*/name
-   return-nodes
+validators.mandatory:x:@.arguments/*/CustomerID
+validators.mandatory:x:@.arguments/*/CustomerTypeID
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:CustomerCustomerDemo
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

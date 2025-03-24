@@ -1,48 +1,162 @@
 
-// A Hyperlambda endpoint for a CRUD update endpoint that updates one record in the ml_requests table in the magic database, filtering which item to update with ID and updating type, prompt, completion, and finish_reason fields, ensuring authentication and authorization for root roles.
+/*
+ * Lists quotations
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
 .arguments
-   id:long
-   type:string
-   prompt:string
-   completion:string
-   finish_reason:string
-   cached:int
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
+   // Optional filtering argument allowing to filter items on No_, Description, etc.
+   filter:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+   // Optional offset into records of where to start returning items.
+   offset:long
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
+   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
+   min_date:string
 
-   // Invoking our update slot.
-   data.update
-      table:ml_requests
-      values
+   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
+   max_date:string
+
+   // Optional column to order records.
+   order:string
+
+   // Optional sort direction, can be either 'ASC' or 'DESC'. Defaults to 'ASC' unless specified.
+   direction:string
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Applying default value to sorting.
+validators.default:x:@.arguments
+   order:Document Date
+   direction:DESC
+
+// Getting limit value, defaulting to 300
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:300
+
+// Making sure limit is never more than 10
+if
+   or
+      eq:x:@.limit
+         .:long:-1
+      mt:x:@.limit
+         .:long:10
+   .lambda
+      set-value:x:@.limit
+         .:long:10
+
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:"No_"
+            .:"Location Code"
+            .:"Sell-to Customer No_"
+            .:"Bill-to Customer No_"
+            .:"Bill-to Name"
+            .:"Bill-to Address"
+            .:"Bill-to Address 2"
+            .:"Bill-to City"
+            .:"Bill-to Contact"
+            .:"Sell-to E-Mail"
+            .:"Document Date"
+            .:"Payment Terms Code"
+            .:"Salesperson Code"
+            .:"Assigned User ID"
+            .:"Item Category Code"
+            .:"Item_No"
+            .:"Description"
+            .:"Unit of Measure"
+            .:"Quantity"
+            .:"Unit Price"
+            .:"Amount"
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Checking if we're filtering items on [min_date].
+   if
+      and
+         exists:x:@.arguments/*/min_date
+         not-null:x:@.arguments/*/min_date
+      .lambda
+         convert:x:@.arguments/*/min_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.mt:x:@convert
+
+   // Checking if we're filtering items on [max_date].
+   if
+      and
+         exists:x:@.arguments/*/max_date
+         not-null:x:@.arguments/*/max_date
+      .lambda
+         convert:x:@.arguments/*/max_date
+            type:date
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+            .
+               Document Date.lt:x:@convert
+
+   // Reading records.
+   mssql.read
+      table:addv_Cotizaciones
+      limit:x:@.limit
+      offset:x:@.offset
       where
+         or
          and
+      order:x:@.arguments/*/order
+      direction:x:@.arguments/*/direction
 
-   // Verifying record exists.
+   // Making sure we warn LLM in case there are more than max items returned.
    if
       eq
-         get-value:x:@data.update
-         .:int:0
+         get-count:x:@mssql.read/*
+         get-value:x:@.arguments/*/limit
       .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
+         add:x:../*/mssql.connect/*/yield
+            .
+               notice:"There might be more records but the system can only retrieve a maximum of 10 records at the time. Please inform the user that you can show him the next set of records if required."
+   
+   // Returning result of above invocation to caller.
    yield
-      affected:x:@data.update
+      result:x:@mssql.read/*

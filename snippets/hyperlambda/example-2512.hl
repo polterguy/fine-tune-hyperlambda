@@ -1,35 +1,51 @@
 
-// Read or list records from your pages table in your cms database
+/*
+ * Creates training data and inserts into fine-tuning database such that it can be exported later.
+ * 
+ * If this function returns nothing, we are done, and we have generated training data for every single Hyperlambda file in your cloudlet.
+ */
 .arguments
-   pages.id.eq:long
-   pages.title.like:string
-   pages.title.eq:string
-   pages.content.like:string
-   pages.content.eq:string
-   pages.created_at.eq:date
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+   // Mandatory argument being file number to generate training data for. When listing Hyperlambda files, this will generate training data for the nth file listed, allowing us to loop for as long as have have additional files, incrementing the file-no argument for each iteration.
+   file-no:int
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+// By making the Hyperlambda file public we can use it as an AI function.
+.type:public
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
+// Listing files recursively.
+io.file.list-recursively:/
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:pages
-      columns
-         pages.id
-         pages.title
-         pages.content
-         pages.created_at
-      where
-         and
+// Pruning out everything but Hyperlambda files.
+.file
+for-each:x:@io.file.list-recursively/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.file
+            .
+               .:x:@.dp/#
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+// Checking if we've dealt with all files.
+if
+   mt
+      get-value:x:@.arguments/*/file-no
+      get-count:x:@.file/*
+   .lambda
+      return
+         result:There are no more files, you have handled all files.
+
+// Loading nth file.
+.hyperlambda
+strings.concat
+   .:@.file/
+   get-value:x:@.arguments/*/file-no
+set-x:x:+
+   convert:x:@strings.concat
+      type:x
+io.file.load
+
+// Returning Hyperlambda file to caller.
+yield
+   hyperlambda:x:@io.file.load

@@ -1,8 +1,33 @@
-// CRUD endpoint that selects items from your DATABASE_NAME and TABLE_NAME.
-data.connect:DATABASE_NAME
-   database-type:sqlite
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:TABLE_NAME
+/*
+ * Creates a new Stripe payment for the given [customer_id], using the
+ * specified [payment_method_id], for the given [amount], in the given [currency].
+ * 
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+.arguments
+   amount:int
+
+// ... more code here ...
+
+// Executing action from Stripe plugin doing the heavy lifting ...
+execute:magic.workflows.actions.execute
+   name:stripe-payment-create
+   filename:/modules/stripe/workflows/actions/stripe-payment-create.hl
+   arguments
+
+      // Will use the [customer_id] from a previous action
+      customer_id:x:--/execute/=stripe-customer-create/*/customer_id
+
+      // Will use the [payment_method_id] from a previous action
+      payment_method_id:x:--/execute/=stripe-payment-method-create/*/payment_method_id
+      amount:x:@.arguments/*/amount
+      currency:usd
+      description:Payment from Magic
+      metadata
+
+         // Notice, since we're using [execute] we don't have to use [unwrap], since all expressions are automatically unwrapped when using [execute].
+         username:x:@.arguments/*/username
+
+// This code depends upon the Stripe plugin being installed

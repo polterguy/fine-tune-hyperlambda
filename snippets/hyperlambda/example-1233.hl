@@ -1,9 +1,47 @@
-// This code connects to the 'cinema' database and updates the showtime of a movie (ID 404) in the 'showtimes' table.
-pgsql.connect:cinema
-   pgsql.update
-      table:showtimes
-      values
-         time:"time:18:30:00"
-      where
-         and
-            movie_id:int:404
+
+// Hyperlambda script that returns all workflows to the caller, ensuring the user is authorized.
+auth.ticket.verify:root
+
+// Buffer for all workflows in the system.
+.result
+
+// Retrieving all system workflows.
+add:x:@.result
+   io.file.list-recursively:/misc/workflows/workflows/
+
+// Retrieving all custom workflows.
+if
+   io.folder.exists:/etc/workflows/workflows/
+   .lambda
+      add:x:@.result
+         io.file.list-recursively:/etc/workflows/workflows/
+
+// Then iterating through each installed module, and retrieving all module workflows.
+io.folder.list:/modules/
+for-each:x:@io.folder.list/*
+   strings.concat
+      get-value:x:@.dp/#
+      .:workflows/workflows/
+   if
+      io.folder.exists:x:@strings.concat
+      .lambda
+
+         // Module has custom actions.
+         add:x:@.result
+            io.file.list-recursively:x:@strings.concat
+
+// Filtering out everything not ending with '.hl'.
+for-each:x:@.result/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Returning workflows file to caller.
+         unwrap:x:+/*/*
+         add:x:../*/return
+            .
+               .:x:@.dp/#
+
+// Returning result to caller.
+return

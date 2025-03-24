@@ -1,32 +1,63 @@
-/*
- * Sends a styled HTML welcome email to new users of the productivity app.
- */
 
-data.connect:[pgsql|taskflow]
-   database-type:pgsql
+// Update endpoint updating one record in your products table in your shopping-cart-demo database.
+.arguments
 
-   data.select:@"
-select name, email
-   from users
-   where created_at >= current_date - interval '1 day'"
-      database-type:pgsql
+   // product_id column value being primary key of record to update
+   product_id:long
 
-   for-each:x:@data.select/*
-      strings.concat
-         .:"<h2>Hello "
-         get-value:x:@.dp/#/*/name
-         .:"!</h2><p>Thanks for joining <strong>TaskFlow</strong>. Start organizing your life today!</p>"
-      unwrap:x:+/**
-      mail.smtp.send
-         message
-            to
-               .
-                  name:x:@.dp/#/*/name
-                  email:x:@.dp/#/*/email
-            from
-               .
-                  name:TaskFlow Team
-                  email:welcome@taskflow.com
-            subject:Welcome to TaskFlow!
-            entity:text/html
-               content:x:@strings.concat
+   // name column's new value
+   name:string
+
+   // description column's new value
+   description:string
+
+   // sku column's new value
+   sku:string
+
+   // price column's new value
+   price:decimal
+
+   // image_url column's new value
+   image_url:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/product_id
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:products
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

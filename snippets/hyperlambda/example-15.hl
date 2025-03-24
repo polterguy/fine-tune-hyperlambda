@@ -1,23 +1,57 @@
 
-// Scrapes the specified URL and returns all hyperlinks found
+// Compiles the specified C# file and loads the resulting assembly into the AppDomain
 .arguments
+   assembly-name
+      type:string
+      mandatory:bool:true
+      default:your-assembly-name.dll
+   recompile
+      type:bool
+      mandatory:bool:true
+      default:bool:true
+   references
+      type:array
+      mandatory:bool:true
+      default
+         .:netstandard
+         .:System.Runtime
+         .:System.ComponentModel
+         .:System.Private.CoreLib
+         .:magic.node
+         .:magic.node.extensions
+         .:magic.signals.contracts
+   file
+      type:string
+      mandatory:bool:true
+.icon:rocket_launch
 
-   // Mandatory argument and becomes the URL the function will scrape for hyperlinks to return.
-   url:string
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/references
+validators.mandatory:x:@.arguments/*/assembly-name
 
-   // Optional argument that filters out any URLs not starting with the specified string.
-   starts_with:string
+/*
+ * We only compile C# file if the assembly does not already exist in AppDomain,
+ * unless caller explicitly specifies [recompile] as true.
+ */
+system.plugin.list
+if
+   or
+      get-value:x:@.arguments/*/recompile
+      not-exists:x:"@system.plugin.list/*/\"={@.arguments/*/assembly-name}\""
+   .lambda
 
-   // Optional argument for how many URLs to return. If not specified the function will return all hyperlinks found.
-   max:int
+      // Parametrizing [system.compile] invocation.
+      add:x:./*/system.compile
+         get-nodes:x:@.arguments/*/references
+         get-nodes:x:@.arguments/*/assembly-name
 
-// Parametrising our slot invocation.
-add:x:./*/signal
-   get-nodes:x:@.arguments/*
+      // Loading file.
+      load-file:x:@.arguments/*/file
 
-// Invoking slot doing the heavy lifting for us.
-signal:magic.http.html2markdown-links
+      // Compiling C# code.
+      system.compile
+         code:x:@load-file
 
-// Returning result to caller.
-yield
-   result:x:@signal
+      // Loading assembly into AppDomain.
+      system.plugin.load:x:@system.compile

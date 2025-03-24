@@ -1,44 +1,37 @@
+// Build the dynamic JSON payload
+.payload
+   api_key:sk_test_51H9...
+   scope:all
 
-// Sends the user a warning email informing them that their cloudlet is about to be destroyed 5 days from now.
-slots.create:hub.emails.user.warn-destruction-of-cloudlet
+// Create headers for content-type and custom request ID
+.headers
+   Content-Type:application/json
+   X-Request-ID:api-call-002
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/username
-   validators.mandatory:x:@.arguments/*/cloudlet
+// Make the HTTP POST request
+add:x:./*/http.post/*/headers
+   get-nodes:x:@.headers/*
+add:x:./*/http.post/*/payload
+   get-nodes:x:@.payload/*
+http.post:"https://api.example.com/token/validate"
+   headers
+   payload
+   convert:true
 
-   // Retrieving frontend URL.
-   .url
-   set-value:x:@.url
-      config.get:"magic:hub:frontend-url"
+// Verify 2xx response
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      .token-status
+      set-value:x:@.token-status
+         get-value:x:@http.post/*/content/*/status
 
-   // Retrieving user's name and email address.
-   .email
-   .name
-   data.connect:[generic|magic]
-      data.read
-         table:users_extra
-         values
-            type
-            name
-         where
-            and
-               user.eq:x:@.arguments/*/username
-               or
-                  type.eq:email
-                  type.eq:name
-      set-value:x:@.email
-         get-value:x:@data.read/*/*/type/=email/./*/value
-      set-value:x:@.name
-         get-value:x:@data.read/*/*/type/=name/./*/value
-
-   // Sending user his warning email.
-   unwrap:x:+/**
-   signal:magic.emails.send
-      subject:[Important] - Your AINIRO cloudlet is scheduled for destruction!
-      template-file:/modules/hub/magic.startup/templates/cloudlet-to-be-destroyed.html
-      substitutes
-         url:x:@.url
-         cloudlet:x:@.arguments/*/cloudlet
-      mime-type:text/html
-      email:x:@.email
-      name:x:@.name
+      .plan-type
+      set-value:x:@.plan-type
+         get-value:x:@http.post/*/content/*/plan
+else
+   throw:Token validation failed

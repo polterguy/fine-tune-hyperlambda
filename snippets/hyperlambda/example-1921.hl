@@ -1,8 +1,31 @@
-/*
- * Example: Extract entire string by using its full length.
- */
-.subject:"Test"
-strings.substring:x:@.subject
-   .:0
-   .:4
-// Result: "Test"
+
+// Counts items from your roles table in your cms database
+.arguments
+
+   // Optional filtering arguments
+   roles.id.eq:long
+   roles.name.like:string
+   roles.name.eq:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:roles
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

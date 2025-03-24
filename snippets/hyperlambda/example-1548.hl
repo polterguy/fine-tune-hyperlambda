@@ -1,16 +1,25 @@
-// Attempt to delete records, then roll back the transaction to abort changes
-data.connect:shopDB
-   data.transaction.create
-      data.delete
-         table:temp_data
-         where
-            and
-               created_at.lt:date:"2020-01-01T00:00:00"
-      /*
-       * Suppose a condition triggers an abort here.
-       * Roll back the transaction to cancel the deletion.
-       */
 
-      // Abort transaction: all deletions are undone
-      data.transaction.rollback
-// After rollback, no changes from the transaction are applied to the database
+// Retrieves the specified [username] and return information associated with the user.
+.arguments
+   username
+      type:string
+      mandatory:bool:true
+.icon:supervisor_account
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
+
+// Opens up database connection.
+data.connect:[generic|magic]
+
+   // Inserting user into database.
+   data.read
+      table:users
+      columns
+         username
+         created
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   yield
+      created:x:@data.read/*/*/created

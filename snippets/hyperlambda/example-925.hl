@@ -1,37 +1,73 @@
-/*
- * Sends an engineering-only update to relevant staff
- */
 
-.company
-   staff
-      .
-         name:Oliver Blake
-         department:Engineering
-         email:oliver@acme.com
-      .
-         name:Luna Wright
-         department:Marketing
-         email:luna@acme.com
-      .
-         name:Emma Rivera
-         department:Engineering
-         email:emma@acme.com
-for-each:x:@.company/*/staff/*
+// Create a Hyperlambda script that returns all workflow snippets to the caller, ensuring the user is authorized.
+auth.ticket.verify:root
+
+// Buffer for all snippets in the system.
+.result
+
+// Retrieving all system snippets.
+add:x:@.result
+   io.file.list-recursively:/misc/workflows/snippets/
+
+// Retrieving all custom snippets.
+if
+   io.folder.exists:/etc/workflows/snippets/
+   .lambda
+      add:x:@.result
+         io.file.list-recursively:/etc/workflows/snippets/
+
+// Then iterating through each installed module, and retrieving all module snippets.
+io.folder.list:/modules/
+for-each:x:@io.folder.list/*
+   strings.concat
+      get-value:x:@.dp/#
+      .:workflows/snippets/
    if
-      eq:x:@.dp/#/*/department
-         .:Engineering
+      io.folder.exists:x:@strings.concat
       .lambda
-         unwrap:x:+/**
-         mail.smtp.send
-            message
-               to
+
+         // Module has custom snippets.
+         insert-before:x:@.result/0
+            io.file.list-recursively:x:@strings.concat
+
+// Filtering out everything not ending with '.hl'.
+for-each:x:@.result/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Loading file to add meta data.
+         load-file:x:@.dp/#
+         hyper2lambda:x:-
+            comments:true
+         if
+            eq
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.lambda/@.lambda/0/-/*/*
                   .
-                     name:x:@.dp/#/name
-                     email:x:@.dp/#/email
-               from
-                  .
-                     name:CTO Office
-                     email:cto@acme.com
-               subject:Engineering Standup Reminder
-               entity:text/html
-                  content:Reminder: Daily standup at 09:30 in the Engineering Teams channel.
+                     description:x:@hyper2lambda/0
+                     content:x:@load-file
+
+         // Creating a name for snippet by using filename.
+         strings.split:x:@.dp/#
+            .:/
+         strings.split:x:-/0/-
+            .:.
+         remove-nodes:x:@strings.split/0/-
+         strings.join:x:@strings.split/0
+            .:.
+
+         // Returning result to caller.
+         unwrap:x:+/*/*/*
+         add:x:../*/return
+            .
+               .
+                  name:x:@strings.join
+                  filename:x:@.dp/#
+
+// Returning result to caller.
+return

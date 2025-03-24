@@ -1,5 +1,30 @@
-// counts nodes
-.data
-   foo1
-   foo2
-get-count:x:@.data/*
+
+// Read or list records from your roles table in your cms database
+.arguments
+   roles.id.eq:long
+   roles.name.like:string
+   roles.name.eq:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:roles
+      columns
+         roles.id
+         roles.name
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

@@ -1,62 +1,45 @@
 
-// Returns minimum, maximum, average or sum from your CustomerDemographics table in your northwind database
-.arguments
+// Create a dynamic slot that ensures the specified role exists, creating it if not, ensuring the user is authorized.
+slots.create:magic.auth.ensure-role
 
-   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
-   aggregate_function:string
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/role
+   validators.mandatory:x:@.arguments/*/description
 
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
-   aggregate_column:string
+   /*
+    * Ensures the [role] role exists.
+    * 
+    * Notice, in case system hasn't been setup yet, we'll need to silently
+    * catch all exceptions.
+    */
+   try
 
-   // Filtering
-   CustomerDemographics.CustomerTypeID.like:string
-   CustomerDemographics.CustomerTypeID.eq:string
-   CustomerDemographics.CustomerDesc.like:string
-   CustomerDemographics.CustomerDesc.eq:string
+      // Connecting to Magic database.
+      data.connect:[generic|magic]
 
-// Sanity checking mandatory arguments.
-validators.mandatory:x:@.arguments/*/aggregate_function
-validators.mandatory:x:@.arguments/*/aggregate_column
+         // Checking to see if [role] role exists.
+         data.read
+            table:roles
+            where
+               and
+                  name.eq:x:@.arguments/*/role
 
-// Sanity checking name of aggregate function.
-validators.enum:x:@.arguments/*/aggregate_function
-   .:min
-   .:max
-   .:sum
-   .:avg
+         // Checking result of above invocation.
+         if
+            not
+               exists:x:@data.read/*/*
+            .lambda
 
-// Sanity checking agggregate column name.
-validators.enum:x:@.arguments/*/aggregate_column
-   .:CustomerDemographics.CustomerTypeID
-   .:CustomerDemographics.CustomerDesc
+               // We need to insert [role] role into Magic database.
+               data.create
+                  table:roles
+                  values
+                     name:x:@.arguments/*/role
+                     description:x:@.arguments/*/description
+   .catch
 
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Making sure we're using correct aggregate function.
-   set-name:x:./*/data.read/*/columns/*/aggregate_functor
-      strings.concat
-         get-value:x:@.arguments/*/aggregate_function
-         .:(
-         get-value:x:@.arguments/*/aggregate_column
-         .:)
-
-   // Removing aggregate arguments to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/[0,2]
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:CustomerDemographics
-      columns
-         aggregate_functor
-            as:result
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+      /*
+       * Silently catching here, to avoid application crash
+       * if system hasn't been setup yet.
+       */
+      .silent

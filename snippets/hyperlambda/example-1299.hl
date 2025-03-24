@@ -1,11 +1,24 @@
 
-// Provide a Hyperlambda example where 'hr_db' is opened to get employee details.
+// Write a Hyperlambda script to list all connection strings in your installation for a specified database type.
+.arguments
+   databaseType:string
 
-// Opens "hr_db" and gets employee details.
-.result
-data.connect:hr_db
-   database-type:mssql
-   data.select:"select employee_id, name, department, hire_date from employees where status='active'"
-      database-type:mssql
-   add:x:@.result
-      get-nodes:x:@data.select/*
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:pgsql
+   .:mssql
+   .:sqlite
+
+// Retrieves all connection strings according to database type specified.
+strings.concat
+   .:"magic:databases:"
+   get-value:x:@.arguments/*/databaseType
+config.section:x:-
+add:x:+
+   get-nodes:x:@config.section/*
+return

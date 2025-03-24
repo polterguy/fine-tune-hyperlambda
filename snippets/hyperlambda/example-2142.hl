@@ -1,48 +1,23 @@
-/*
- * Returns enrollment records for a specific course
- */
 
-.arguments
-   filter:string
-   limit:long
-   offset:long
+// Create a function that returns all clusters in the system.
 
-auth.ticket.verify:lms-manager
+// Adding 30 seconds of public caching to avoid DOS attacks from exhausting server.
+response.headers.set
+   Cache-Control:public, max-age=30
 
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:15
+// Opening up our database connection.
+data.connect:[generic|hub]
 
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
-
-mssql.connect:[training|LMS_Enrollments]
-
-   mssql.read
-      table:Enrollments
-         as:e
-         join:Courses
-            as:c
-            type:left
-            on
-               and
-                  e.CourseId.eq:c.Id
+   // Reading data from database.
+   data.read
+      table:clusters
       columns
-         c.CourseName
-         count(*)
-            as:EnrollmentCount
-         sum(e.CreditsEarned)
-            as:TotalCredits
-      limit:x:@.limit
-      offset:x:@.offset
+         id
+         country
+         name
       where
          and
-            c.CourseName.eq:x:@.arguments/*/filter
-      group
-         c.CourseName
-   return-nodes:x:@mssql.read/*
+            enabled.eq:bool:true
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

@@ -1,40 +1,15 @@
+// How can I create a loop that increments a value until it's 5?
+.no:int:0
 
-// Delete one record from your media table in your cms database
-.arguments
+// will contain 5 nodes afterwards
+.results
 
-   // Primary key of record to delete, mandatory argument
-   id:long
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-validators.mandatory:x:@.arguments/*/id
-
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:media
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   add:x:./*/sockets.signal
-      get-nodes:x:@auth.ticket.verify
-   set-name:x:./*/sockets.signal/*/auth.ticket.verify
-      .:roles
-   sockets.signal:cms.media.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+while
+   lt
+      get-value:x:@.no
+      .:int:5
+   .lambda
+      add:x:@.results
+         .
+            .:Iteration
+      math.increment:x:@.no

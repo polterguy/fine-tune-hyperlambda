@@ -1,50 +1,21 @@
 
-// Create a Hyperlambda script for an endpoint that counts items from the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+// Tracks an order in Shopify.
 .arguments
-   operator:string
-   name.eq:string
-   name.like:string
-   description.like:string
+   order:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+// Retrieving secret and shop.
+.secret
+set-value:x:@.secret
+   config.get:"magic:shopify:secret"
+.shop
+set-value:x:@.shop
+   config.get:"magic:shopify:shop"
 
-// Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
+// Invoking slot to do the heavy work.
+execute:shopify.orders.track
+   secret:x:@.secret
+   shop:x:@.shop
+   order_no:x:@.arguments/*/order
 
-/*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
- */
-if
-   exists:x:@.arguments/*/operator
-   .lambda
-
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/0
-         get-value:x:@.arguments/*/operator
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our read invocation.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/operator
-   remove-nodes:x:@.arguments/*/operator
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      table:roles
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+// Returns the result of your last action.
+return-nodes:x:@execute/*

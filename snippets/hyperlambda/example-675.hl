@@ -1,75 +1,29 @@
 
-// Returns balance information for affiliate.
-auth.ticket.get
+// Write a Hyperlambda script to upload a specified backup file.
+.arguments
+   file:*
+.accept:multipart/form-data
 
-// Affiliate percent calculated below.
-.percent
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Ensuring user is an affiliate
-data.connect:[generic|magic]
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+validators.regex:x:@.arguments/*/file/*/name
+   regex:"\\.db$"
 
-   /*
-    * Retrieving affiliate percent for user.
-    * Notice, if user doesn't have an affiliate percent, user is
-    * not an affiliate.
-    */
-   data.read
-      table:users_extra
-      columns
-         value
-      where
-         and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
+// Saves the file to the specified folder.
+.full-path
+set-value:x:@.full-path
+   strings.concat
+      .:/data/
+      get-value:x:@.arguments/*/file/*/name
+io.stream.save-file:x:@.full-path
+   get-value:x:@.arguments/*/file/*/stream
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
-
-   // Calculating ratio and storing.
-   convert:x:@data.read/*/*/value
-      type:decimal
-   set-value:x:@.percent
-      math.divide:x:@convert
-         .:decimal:100
-
-// Connecting to database.
-data.connect:[generic|stripe]
-
-   // Buffer to hold return values.
-   .balance
-      received
-      accepted
-      withdrawals
-
-   // Retrieving all received amounts from database.
-   set-value:x:@.balance/*/received
-      math.multiply
-         data.scalar:"select coalesce(sum(amount), 0) as sum from transactions\n   where affiliate = @affiliate and\n      type = 'charge.succeeded'"
-            @affiliate:x:@auth.ticket.get
-         get-value:x:@.percent
-
-   // Retrieving all accepted amounts from database.
-   set-value:x:@.balance/*/accepted
-      math.multiply
-         data.scalar:"select coalesce(sum(amount), 0) as sum from transactions t\n   where affiliate = @affiliate and\n      created <= curdate() - interval 1 month and\n      type = 'charge.succeeded' and not exists(\n         select * from transactions t2\n            where t2.type = 'charge.refunded' and\n               t2.invoice = t.invoice and t2.invoice is not null)"
-            @affiliate:x:@auth.ticket.get
-         get-value:x:@.percent
-
-   // Retrieving all withdrawals from database.
-   set-value:x:@.balance/*/withdrawals
-      data.scalar:"select coalesce(sum(amount), 0) as sum from transactions t\n   where affiliate = @affiliate and type = 'withdrawal'"
-         @affiliate:x:@auth.ticket.get
-
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:private, max-age=3600
-
-   // Returning result to caller.
-   return-nodes:x:@.balance/*
+// Flushing SQLite, and returning success to caller.
+sqlite.connections.flush
+return
+   result:success

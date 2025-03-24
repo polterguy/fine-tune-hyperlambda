@@ -1,23 +1,63 @@
 
-// Search the web
-.arguments
+// Lists all indexes keys in some MySQL table.
+slots.create:magic.db.mysql.indexes
 
-   // Mandatory argument being the actual query to submit to DuckDuckGo.
-   query:string
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
 
-   // Optional argument being the maximum number of tokens to return.
-   max_tokens:int
+   // Opens up our connection
+   .connection:[information_schema]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mysql.connect:x:@.connection
 
-// Public endpoints can also be used as AI functions
-.type:public
+      // Dynamically creating our SQL.
+      strings.concat
+         .:"show indexes from "
+         get-value:x:@.arguments/*/table
+      mysql.select:x:@strings.concat
 
-// Returns [max_tokens] context for the specified [query] by searching DuckDuckGo.
-execute:magic.workflows.actions.execute
-   name:openai-context-from-search
-   filename:/modules/openai/workflows/actions/openai-context-from-search.hl
-   arguments
-      query:x:@.arguments/*/query
-      max_tokens:x:@.arguments/*/max_tokens
-
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+      /*
+       * Creating our return value, by projecting it into
+       * a generic form, that does not rely upon MySQL's syntactic
+       * details.
+       */
+      for-each:x:@mysql.select/*
+         if
+            neq:x:@.dp/#/*/Key_name
+               .:PRIMARY
+            .lambda
+               unwrap:x:+/*/*/*
+               add:x:@mysql.connect/*/return-nodes
+                  .
+                     .
+                        name:x:@.dp/#/*/Key_name
+                        columns
+               unwrap:x:+/*/*
+               add:x:@mysql.connect/*/return-nodes/0/-/*/columns
+                  .
+                     .:x:@.dp/#/*/Column_name
+      return-nodes

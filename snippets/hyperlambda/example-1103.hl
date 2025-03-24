@@ -1,187 +1,76 @@
 
-// Keyword density search from products table in shopify database.
-.arguments
+// Create a function to cancel a user's active subscriptions using Stripe. The function should retrieve the username, search for all subscriptions linked to the user, and cancel each one using the Stripe API. It should handle any errors during the cancellation process by logging them. Additionally, the function should update the user's roles in the database, excluding 'root' and 'guest', and retrieve extra user information like name and email. Finally, it should authenticate the user again to create a new JWT token reflecting the updated roles and return this token along with the extra information.
+.extra
 
-   // Mandatory query for records to search for
-   query:string
+// Retrieving username.
+auth.ticket.get
 
-   // Optional number of records to return, defaults to 10 if not specified. Pass in -1 to return all records
-   limit:long
+/*
+ * Searches for subscriptions belonging to user.
+ * 
+ * Returns all subscriptions belonging to the specified user.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-subscription-search
+   filename:/modules/stripe/workflows/actions/stripe-subscription-search.hl
+   arguments
+      username:x:@auth.ticket.get
 
-   // Optional offset into the dataset of where to start retrieving records
-   offset:long
+// Looping through all subscriptions belonging to user and canceling these.
+for-each:x:@execute/*
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/query
+   /*
+    * Deletes the existing Stripe subscription for the given [subscription_id].
+    * 
+    * Will use your Stripe API token found from your settings as it's interacting
+    * with the Stripe API.
+    */
+   try
+      execute:magic.workflows.actions.execute
+         name:stripe-subscription-delete
+         filename:/modules/stripe/workflows/actions/stripe-subscription-delete.hl
+         arguments
+            subscription_id:x:@.dp/#/*/id
+   .catch
+      log.error:x:@.arguments/*/message
 
-// Applying defaults.
-validators.default:x:@.arguments
-   limit:long:3
+// Opening up database connection.
+data.connect:magic
 
-// Chopping up query into separate words.
-.words
-add:x:@.words
-   strings.split:x:@.arguments/*/query
-      .:" "
+   // Deleting all roles user belongs to except root and guest.
+   data.delete
+      table:users_roles
+      where
+         and
+            user.eq:x:@auth.ticket.get
+            role.neq:guest
+            role.neq:root
 
-// To have our order function correctly working we need to ensure we're only using lower characters.
-for-each:x:@.words/*
+   // Retrieving extra information.
+   data.connect:magic
+      data.read
+         table:users_extra
+         where
+            and
+               user.eq:x:@auth.ticket.get
+               or
+                  type.eq:name
+                  type.eq:email
+      for-each:x:@data.read/*
+         set-name:x:./*/add/*/*
+            get-value:x:@.dp/#/*/type
+         set-value:x:./*/add/*/*
+            get-value:x:@.dp/#/*/value
+         add:x:@.extra
+            .
+               .
 
-   // Sanity checking keyword to avoid SQL injection.
-   validators.regex:x:@.dp/#
-      regex:"^[a-zA-Z0-9!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]+$"
+// Authenticating user again creating a new JWT token since roles have been updated.
+execute:magic.auth.authenticate
+   username:x:@auth.ticket.get
+   password-check:bool:false
 
-   // Transform keyword to lower chars so SQLite's "replace" works as intended.
-   set-value:x:@.dp/#
-      strings.to-lower:x:@.dp/#
-
-// Columns to apply search logic to.
-.columns
-   .:title
-   .:body_html
-   .:vendor
-   .:product_type
-   .:handle
-   .:tags
-
-// Opening up our database connection.
-data.connect:[generic|shopify]
-   database-type:sqlite
-
-   // Dynamically building our SQL
-   .sql:select *, (
-
-   // Joining all relevant columns into one big "field"
-   .fields
-   for-each:x:@.columns/*
-      strings.concat
-         .:coalesce(
-         get-value:x:@.dp/#
-         .:", '')"
-      unwrap:x:+/*/*
-      add:x:@.fields
-         .
-            .:x:@strings.concat
-   set-value:x:@.fields
-      strings.join:x:@.fields/*
-         .:" || "
-   remove-nodes:x:@.fields/*
-
-   // (1) Calculating keyword_density
-   .no:int:0
-   for-each:x:@.words/*
-      if
-         eq:x:@.no
-            .:int:0
-         .lambda
-            set-value:x:@.sql
-               strings.concat:x:@.sql
-                  get-value:x:@.sql
-                  .:" (length("
-                  get-value:x:@.fields
-                  .:) - length(replace(lower(
-                  get-value:x:@.fields
-                  .:"), '"
-                  get-value:x:@.dp/#
-                  .:"', ''))) / length('"
-                  get-value:x:@.dp/#
-                  .:"')"
-      else
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" + (length("
-               get-value:x:@.fields
-               .:) - length(replace(lower(
-               get-value:x:@.fields
-               .:"), '"
-               get-value:x:@.dp/#
-               .:"', ''))) / length('"
-               get-value:x:@.dp/#
-               .:"')"
-      math.increment:x:@.no
-
-   // Divide total occurrences by total length => "keyword_density"
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:) * 1.0 / length(
-         get-value:x:@.fields
-         .:) as keyword_density, (
-
-   // (2) Calculating keyword_count as # of distinct keywords
-
-   // -> For each keyword, do CASE WHEN occurrences > 0 THEN 1 ELSE 0
-   .no:int:0
-   for-each:x:@.words/*
-      if
-         eq:x:@.no
-            .:int:0
-         .lambda
-            set-value:x:@.sql
-               strings.concat:x:@.sql
-                  get-value:x:@.sql
-                  .:" CASE WHEN ((length("
-                  get-value:x:@.fields
-                  .:) - length(replace(lower(
-                  get-value:x:@.fields
-                  .:"), '"
-                  get-value:x:@.dp/#
-                  .:"', ''))) / length('"
-                  get-value:x:@.dp/#
-                  .:"')) > 0 THEN 1 ELSE 0 END"
-      else
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" + CASE WHEN ((length("
-               get-value:x:@.fields
-               .:) - length(replace(lower(
-               get-value:x:@.fields
-               .:"), '"
-               get-value:x:@.dp/#
-               .:"', ''))) / length('"
-               get-value:x:@.dp/#
-               .:"')) > 0 THEN 1 ELSE 0 END"
-      math.increment:x:@.no
-
-   // Close up our "keyword_count" expression
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:" ) as keyword_count"
-
-   // Finishing main SELECT and WHERE
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:" from products"
-         .:" where keyword_count > 0"
-
-   // IMPORTANT: Order by distinct keyword matches first, then keyword density
-   set-value:x:@.sql
-      strings.concat:x:@.sql
-         get-value:x:@.sql
-         .:" order by keyword_count desc, keyword_density desc limit "
-         get-value:x:@.arguments/*/limit
-
-   // Optional offset
-   if
-      exists:x:@.arguments/*/offset
-      .lambda
-         set-value:x:@.sql
-            strings.concat:x:@.sql
-               get-value:x:@.sql
-               .:" offset "
-               get-value:x:@.arguments/*/offset
-
-   // Execute SQL
-   data.select:x:@.sql
-      database-type:sqlite
-
-   // Remove helper fields from final output
-   remove-nodes:x:@data.select/*/*/keyword_density
-   remove-nodes:x:@data.select/*/*/keyword_count
-
-   // Return
-   return-nodes:x:@data.select/*
+// Returning token and extra information to caller.
+yield
+   ticket:x:@execute/*/ticket
+   extra:x:@.extra/*

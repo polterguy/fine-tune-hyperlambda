@@ -1,13 +1,26 @@
+// Hyperlambda HTTP endpoint with filtering and paging that allows me to return contacts from my crm database where filter is optional and paging is mandatory
+.arguments
+   limit:int
+   offset:int
+   filter:string
 
-// Hyperlambda snippet that retrieves access logs from the security database and access_logs table.
+// Adding filter argument if given.
+if
+   exists:x:@.arguments/*/filter
+   .lambda
 
-// Retrieves access logs from the security database and access_logs table.
-data.connect:security_db
+      unwrap:x:+/*/*
+      add:x:../*/data.connect/*/data.read/*/where/*/or
+         .
+            first_name.like:x:@.arguments/*/filter
+            last_name.like:x:@.arguments/*/filter
 
-   // PostgreSQL database used.
-   database-type:pgsql
-
-   // Querying access logs without sorting or limiting.
+// Connect to the CRM database and read contacts with optional filtering and mandatory paging.
+data.connect:[generic|crm]
    data.read
-      database-type:pgsql
-      table:access_logs
+      table:contacts
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+      where
+         or
+   return-nodes:x:@data.read/*

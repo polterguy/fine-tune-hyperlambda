@@ -1,45 +1,45 @@
 
-// Create one record in your category table in your sakila database without authorization. Log invocation.
+// Counts items from your Customers table in your northwind database
 .arguments
+   Customers.CustomerID.like:string
+   Customers.CustomerID.eq:string
+   Customers.CompanyName.like:string
+   Customers.CompanyName.eq:string
+   Customers.ContactName.like:string
+   Customers.ContactName.eq:string
+   Customers.ContactTitle.like:string
+   Customers.ContactTitle.eq:string
+   Customers.Address.like:string
+   Customers.Address.eq:string
+   Customers.City.like:string
+   Customers.City.eq:string
+   Customers.Region.like:string
+   Customers.Region.eq:string
+   Customers.PostalCode.like:string
+   Customers.PostalCode.eq:string
+   Customers.Country.like:string
+   Customers.Country.eq:string
+   Customers.Phone.like:string
+   Customers.Phone.eq:string
+   Customers.Fax.like:string
+   Customers.Fax.eq:string
 
-   // name column value
-   name:string
-
-   // last_update column value
-   last_update:date
-
-// Logging invocation.
-auth.ticket.get
-lambda2hyper:x:@.arguments/*
-log.info:sakila.category entry created
-   username:x:@auth.ticket.get
-   arguments:x:@lambda2hyper
-
-// Opening up database connection.
-data.connect:[generic|sakila]
+// Opening up our database connection.
+data.connect:[generic|northwind]
    database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
+   add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 
-   // Creating our record.
-   data.create
+   // Reading data from database.
+   data.read
       database-type:sqlite
-      table:category
-      return-id:bool:true
-      values
+      table:Customers
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
 
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:sakila.category.post
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

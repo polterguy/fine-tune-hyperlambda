@@ -1,82 +1,42 @@
 
-// Add the specified foreign key to the specified table.
+// Create one record in your Genre table in your chinook database.
 .arguments
-   databaseType:string
-   connectionString:string
-   databaseName:string
-   tableName:string
-   columnName:string
-   foreignTable:string
-   foreignField:string
-   generate:bool
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // GenreId column value
+   GenreId:long
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/connectionString
-validators.mandatory:x:@.arguments/*/databaseName
-validators.mandatory:x:@.arguments/*/tableName
-validators.mandatory:x:@.arguments/*/columnName
-validators.mandatory:x:@.arguments/*/foreignTable
-validators.mandatory:x:@.arguments/*/foreignField
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:pgsql
-   .:mssql
+   // Name column value
+   Name:string
 
-// SQL that executes to modify table.
-.sql
-set-value:x:@.sql
-   strings.concat
-      .:"alter table "
-      get-value:x:@.arguments/*/tableName
-      .:" add constraint "
-      get-value:x:@.arguments/*/tableName
-      .:_
-      get-value:x:@.arguments/*/columnName
-      .:_
-      get-value:x:@.arguments/*/foreignTable
-      .:_
-      get-value:x:@.arguments/*/foreignField
-      .:_fky
-      .:" foreign key ("
-      get-value:x:@.arguments/*/columnName
-      .:") references "
-      get-value:x:@.arguments/*/foreignTable
-      .:" ("
-      get-value:x:@.arguments/*/foreignField
-      .:);
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:partner
 
-// Checking if caller only wants to generate SQL statement.
-if:x:@.arguments/*/generate
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:chinook.Genre entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Genre
+      return-id:bool:false
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
    unwrap:x:+/*
    return
-      sql:x:@.sql
-
-// Creating our database connection and executing SQL.
-strings.concat
-   .:[
-   get-value:x:@.arguments/*/connectionString
-   .:|
-   get-value:x:@.arguments/*/databaseName
-   .:]
-data.connect:x:-
-   database-type:x:@.arguments/*/databaseType
-   data.execute:x:@.sql
-      database-type:x:@.arguments/*/databaseType
-
-// Flushing database cache.
-strings.concat
-   .:magic.sql.databases.
-   get-value:x:@.arguments/*/databaseType
-   :.
-   get-value:x:@.arguments/*/connectionString
-cache.set:x:-
-
-// Returning result to caller.
-unwrap:x:+/*
-return
-   result:success
-   sql:x:@.sql
+      result:success

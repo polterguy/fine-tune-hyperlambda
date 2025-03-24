@@ -1,11 +1,23 @@
-// How to validate if a SaaS subscription is active and paid?
-.isActive:bool:true
-.isPaid:bool:true
-.subscriptionStatus
-if
-   and
-      get-value:x:@.isActive
-      get-value:x:@.isPaid
-   .lambda
-      set-value:x:@.subscriptionStatus
-         .:Subscription valid
+
+// Returns all clusters in system.
+
+// Adding 30 seconds of public caching to avoid DOS attacks from exhausting server.
+response.headers.set
+   Cache-Control:public, max-age=30
+
+// Opening up our database connection.
+data.connect:[generic|hub]
+
+   // Reading data from database.
+   data.read
+      table:clusters
+      columns
+         id
+         country
+         name
+      where
+         and
+            enabled.eq:bool:true
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

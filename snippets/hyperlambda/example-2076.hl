@@ -1,29 +1,61 @@
 
-// Write a Hyperlambda script to return the default database type the system is using and options for alternative database types.
+// Dynamic Hyperlambda slot that imports a list of training snippets, using prompt and completion, with optional URI, filename, and type.
+slots.create:magic.ai.import-snippets
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Connecting to database.
+   data.connect:[generic|magic]
 
-// Retrieving database section from configuration.
-config.section:"magic:databases"
+      // Looping through each record specified in [snippets] collection.
+      for-each:x:@.arguments/*/snippets/*
 
-// Adding default database type to return value.
-add:x:../*/return
-   get-nodes:x:@config.section/*/default
+         // Verifying prompt is not null.
+         if:x:@.dp/#/*/prompt
 
-/*
- * Iterating through each optional database type,
- * and making sure we return those too, making sure
- * we remove 'default' parts before iterating.
- */
-remove-nodes:x:@config.section/*/default
-for-each:x:@config.section/*
-   set-value:x:+/*/*
-      get-name:x:@.dp/#
-   add:x:../*/return/*/options
-      .
-         .
+            // Verifying user can create more snippets.
+            add:x:+
+               get-nodes:x:@.arguments/*/type
+            try-signal:magic.ai.can-create-snippet
 
-// Returning result of above to caller.
-return
-   options
+            // Creating a unique URI based upon the prompt unless the file contains a URI.
+            .uri
+            set-value:x:@.uri
+               get-first-value
+                  get-value:x:@.dp/#/*/uri
+                  .:
+
+            // Using type from arguments unless file contains a type declaration.
+            .type
+            if
+               and
+                  exists:x:@.arguments/*/type
+                  not-null:x:@.arguments/*/type
+                  neq:x:@.arguments/*/type
+                     .:
+               .lambda
+                  set-value:x:@.type
+                     get-value:x:@.arguments/*/type
+            else-if
+               exists:x:@.dp/#/*/type
+               .lambda
+                  set-value:x:@.type
+                     get-value:x:@.dp/#/*/type
+            else
+               set-value:x:@.type
+                  .:default
+
+            // Checking if we've got a filename value.
+            if
+               exists:x:@.dp/#/*/filename
+               .lambda
+                  add:x:@for-each/*/data.create/*/values
+                     get-nodes:x:@.dp/#/*/filename
+
+            // Inserting into database.
+            data.create
+               table:ml_training_snippets
+               values
+                  type:x:@.type
+                  uri:x:@.uri
+                  prompt:x:@.dp/#/*/prompt
+                  completion:x:@.dp/#/*/completion
+                  meta:imported

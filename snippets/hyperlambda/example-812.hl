@@ -1,162 +1,120 @@
 
-/*
- * Lists quotations
- * 
- * Optionally apply limit, offset or filter as you see fit
- */
+// Workflow action invoking OpenAI's chat API with the specified [model], [max_tokens], [context], [instruction] and [query].
 .arguments
+   model
+      type:string
+      mandatory:bool:true
+      default:gpt-4-1106-preview
+      values
+         .:gpt-4o
+         .:gpt-4o-mini
+         .:gpt-4o-2024-05-13
+         .:gpt-3.5-turbo
+         .:gpt-3.5-turbo-16k
+         .:gpt-3.5-turbo-1106
+         .:gpt-3.5-turbo-0125
+         .:gpt-4
+         .:gpt-4-1106-preview
+         .:03-mini
+         .:gpt-4.5-preview
+   max_tokens
+      type:int
+      mandatory:bool:true
+      default:int:1500
+   context
+      type:textarea
+      mandatory:bool:false
+   instruction
+      type:textarea
+      mandatory:bool:false
+   query
+      type:textarea
+      mandatory:bool:true
+.icon:chat_bubble
 
-   // Optional filtering argument allowing to filter items on No_, Description, etc.
-   filter:string
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/model
+validators.mandatory:x:@.arguments/*/query
+validators.mandatory:x:@.arguments/*/max_tokens
 
-   // Optional maximum number of records to return. Defaults to 10 if not specified.
-   limit:long
+// Retrieving OpenAI API token from configuration settings.
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:openai:key"
 
-   // Optional offset into records of where to start returning items.
-   offset:long
-
-   // Optional minimum date. ISO formatted as follows "yyyy-MM-dd"
-   min_date:string
-
-   // Optional maximum date. ISO formatted as follows "yyyy-MM-dd"
-   max_date:string
-
-   // Optional column to order records.
-   order:string
-
-   // Optional sort direction, can be either 'ASC' or 'DESC'. Defaults to 'ASC' unless specified.
-   direction:string
-
-// Making sure user is authorised to access the workflow.
-auth.ticket.verify:mnhc-admin
-
-// Applying default value to sorting.
-validators.default:x:@.arguments
-   order:Document Date
-   direction:DESC
-
-// Getting limit value, defaulting to 300
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:300
-
-// Making sure limit is never more than 10
+// Checking if caller provided a [context].
 if
-   or
-      eq:x:@.limit
-         .:long:-1
-      mt:x:@.limit
-         .:long:10
+   exists:x:@.arguments/*/context
    .lambda
-      set-value:x:@.limit
-         .:long:10
 
-// Getting offset value, defaulting to 0
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
-
-// Opening up database connection.
-mssql.connect:[production|MNDG_LSC18-1]
-
-   // Checking if we're filtering items.
-   if
-      and
-         exists:x:@.arguments/*/filter
-         not-null:x:@.arguments/*/filter
-         neq:x:@.arguments/*/filter
-            .:
-      .lambda
-
-         // Creating our filtering condition. To filter on additional columns, add these columns here.
-         .fields
-            .:"No_"
-            .:"Location Code"
-            .:"Sell-to Customer No_"
-            .:"Bill-to Customer No_"
-            .:"Bill-to Name"
-            .:"Bill-to Address"
-            .:"Bill-to Address 2"
-            .:"Bill-to City"
-            .:"Bill-to Contact"
-            .:"Sell-to E-Mail"
-            .:"Document Date"
-            .:"Payment Terms Code"
-            .:"Salesperson Code"
-            .:"Assigned User ID"
-            .:"Item Category Code"
-            .:"Item_No"
-            .:"Description"
-            .:"Unit of Measure"
-            .:"Quantity"
-            .:"Unit Price"
-            .:"Amount"
-         for-each:x:@.fields/*
-            .condition
-               cond
-            set-name:x:@.condition/*
-               strings.concat
-                  get-value:x:@.dp/#
-                  .:.like
-            set-value:x:@.condition/*
-               strings.concat
-                  .:%
-                  get-value:x:@.arguments/*/filter
-                  .:%
-            add:x:@mssql.connect/*/mssql.read/*/where/*/or
-               get-nodes:x:@.condition/*
-
-   // Checking if we're filtering items on [min_date].
-   if
-      and
-         exists:x:@.arguments/*/min_date
-         not-null:x:@.arguments/*/min_date
-      .lambda
-         convert:x:@.arguments/*/min_date
-            type:date
-         unwrap:x:+/*/*
-         add:x:@mssql.connect/*/mssql.read/*/where/*/and
+      // Adding [context].
+      insert-before:x:../*/http.post/*/payload/*/messages/0
+         .
             .
-               Document Date.mt:x:@convert
+               role:user
+               content:x:@.arguments/*/context
 
-   // Checking if we're filtering items on [max_date].
-   if
+// Checking if caller provided an [instruction].
+if
+   exists:x:@.arguments/*/instruction
+   .lambda
+
+      // Adding [instruction].
+      insert-before:x:../*/http.post/*/payload/*/messages/0
+         .
+            .
+               role:system
+               content:x:@.arguments/*/instruction
+
+// Checking if model is o3 something, at which point we'll have to change [max_tokens] to [max_completion_tokens]
+if
+   strings.starts-with:x:@.arguments/*/model
+      .:o3-
+   .lambda
+
+      // Changing name of argument.
+      set-name:x:../*/http.post/*/payload/*/max_tokens
+         .:max_completion_tokens
+      remove-nodes:x:../*/http.post/*/payload/*/temperature
+
+// Invokes OpenAI.
+http.post:"https://api.openai.com/v1/chat/completions"
+   convert:bool:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json
+   payload
+      model:x:@.arguments/*/model
+      max_tokens:x:@.arguments/*/max_tokens
+      temperature:decimal:0.3
+      messages
+         .
+            role:user
+            content:x:@.arguments/*/query
+
+// Sanity checking above invocation.
+if
+   not
       and
-         exists:x:@.arguments/*/max_date
-         not-null:x:@.arguments/*/max_date
-      .lambda
-         convert:x:@.arguments/*/max_date
-            type:date
-         unwrap:x:+/*/*
-         add:x:@mssql.connect/*/mssql.read/*/where/*/and
-            .
-               Document Date.lt:x:@convert
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
 
-   // Reading records.
-   mssql.read
-      table:addv_Cotizaciones
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         or
-         and
-      order:x:@.arguments/*/order
-      direction:x:@.arguments/*/direction
+      // Oops, error - Logging error and returning status 500 to caller.
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      throw:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
 
-   // Making sure we warn LLM in case there are more than max items returned.
-   if
-      eq
-         get-count:x:@mssql.read/*
-         get-value:x:@.arguments/*/limit
-      .lambda
-         add:x:../*/mssql.connect/*/yield
-            .
-               notice:"There might be more records but the system can only retrieve a maximum of 10 records at the time. Please inform the user that you can show him the next set of records if required."
-   
-   // Returning result of above invocation to caller.
-   yield
-      result:x:@mssql.read/*
+// Returning answer to caller.
+yield
+   answer:x:@http.post/*/content/*/choices/0/*/message/*/content

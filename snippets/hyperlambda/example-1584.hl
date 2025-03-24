@@ -1,15 +1,50 @@
 
-// Generate a Hyperlambda snippet that counts users in the 'auth_db' database from the 'users' table.
+// Associates the specified [username] with the specified [roles] roles. This is a workflow action
+.arguments
+   username
+      type:string
+      mandatory:bool:true
+   roles
+      type:array
+      mandatory:bool:true
+.icon:supervisor_account
 
-// Counts users in the "auth_db" database from the "users" table.
-data.connect:auth_db
-   database-type:mysql
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/roles
 
-   // Counting total users.
+// Connecting to database.
+data.connect:[generic|magic]
+
+   // Verifying user exists.
    data.read
-      database-type:mysql
       table:users
       columns
-         count(*)
-            as:count
-      limit:long:1
+         username
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   // Verifying above invocation returned something.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+
+         // Oops ...!!
+         throw:No such user
+            username:x:@.arguments/*/username
+
+   // Removing all roles user is already associated with.
+   data.delete
+      table:users_roles
+      where
+         and
+            user.eq:x:@.arguments/*/username
+
+   // Associating user with specified [roles].
+   for-each:x:@.arguments/*/roles/*
+      data.create
+         table:users_roles
+         values
+            user:x:@.arguments/*/username
+            role:x:@.dp/#

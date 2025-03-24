@@ -1,62 +1,31 @@
 
-// Hyperlambda script to invoke an HTTP DELETE endpoint with specified URL and query parameters.
-.arguments
+// Write a Hyperlambda script to install a specified module by executing all magic.startup Hyperlambda files inside it.
+slots.create:magic.modules.install-module
 
-// URL of endpoint.
-.url:URL
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/module
 
-// Exchanging dynamic parts of URL.
-.args
-for-each:x:@.arguments/*
-   .tmp
-   set-value:x:@.tmp
-      strings.concat
-         .:{
-         get-name:x:@.dp/#
-         .:}
-   if
-      strings.contains:x:@.url
-         get-value:x:@.tmp
-      .lambda
+   /*
+    * Loops through all files recursively from within the module's
+    * "magic.startup" folder.
+    */
+   strings.concat
+      .:/modules/
+      get-value:x:@.arguments/*/module
+      .:/
 
-         // Replacing dynamic parts of URL.
-         set-value:x:@.url
-            strings.replace:x:@.url
-               get-value:x:@.tmp
-               get-value:x:@.dp/#
-   else
+   // Executing all magic.startup Hyperlambda files inside module.
+   io.file.list-recursively:x:@strings.concat
+   for-each:x:@io.file.list-recursively/*
 
-      // Not a dynamic argument.
-      add:x:@.args
-         get-nodes:x:@.dp/#
+      // Checking if file is a startup Hyperlambda file.
+      if
+         and
+            strings.contains:x:@.dp/#
+               .:/magic.startup/
+            strings.ends-with:x:@.dp/#
+               .:.hl
+         .lambda
 
-// Parametrising invocation.
-add:x:../*/http.delete/*/query
-   get-nodes:x:@.args/*
-
-// Invoking HTTP endpoint.
-http.delete:x:@.url
-   convert:true
-   query
-
-// Making sure invocation was a success.
-if
-   and
-      not
-         mte:x:@http.delete
-            .:int:200
-      not
-         lt:x:@http.delete
-            .:int:300
-   .lambda
-
-      // Oops ...!!
-      lambda2hyper:x:@http.delete
-      throw:Could not invoke 3rd party HTTP endpoint
-         status:int:500
-         public:bool:true
-         url:x:@.url
-         response:x:@lambda2hyper
-
-// Returning result to caller.
-return-nodes:x:@http.delete/*/content/*
+            // Executing file.
+            io.file.execute:x:@.dp/#

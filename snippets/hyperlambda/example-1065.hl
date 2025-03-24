@@ -1,2 +1,377 @@
-// Validate value of [.arg] is a valid email address
-validators.email:x:@.arg
+
+// Write a Hyperlambda script to unzip and import a ZIP file as machine learning training data.
+slots.create:magic.ai.import-zip-file
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/file
+   validators.mandatory:x:@.arguments/*/file/*/name
+   validators.mandatory:x:@.arguments/*/file/*/stream
+
+   // Verifying our OpenAI temp folder exists.
+   if
+      not
+         io.folder.exists:/etc/system/openai/temp/
+      .lambda
+
+         // Creating folder.
+         io.folder.create:/etc/system/openai/temp/
+   else
+
+      // Emptying folder, first deleting all files.
+      io.file.list:/etc/system/openai/temp/
+      for-each:x:@io.file.list/*
+
+         // Making sure we keep README.md file around
+         if
+            neq:x:@.dp/#
+               .:/etc/system/openai/temp/README.md
+            .lambda
+
+               // Deleting file.
+               io.file.delete:x:@.dp/#
+
+      // Then deleting all folders.
+      io.folder.list:/etc/system/openai/temp/
+      for-each:x:@io.folder.list/*
+         io.folder.delete:x:@.dp/#
+
+   // Saving file and unzipping it.
+   .filename
+   set-value:x:@.filename
+      strings.concat
+         .:/etc/system/openai/temp/
+         get-value:x:@.arguments/*/file/*/name
+   io.stream.save-file:x:@.filename
+      get-value:x:@.arguments/*/file/*/stream
+
+   /*
+    * This might take a LOT of time, so we create a thread to do the heavy lifting,
+    * such that we can return immediately.
+    * 
+    * Notice, this just forwards our arguments to our [fork] invocation.
+    */
+   insert-before:x:./*/fork/0
+      get-nodes:x:@.arguments
+      get-nodes:x:@.filename
+   fork
+
+      // Making sure exceptions never leaves thread.
+      try
+
+         // Retrieving OpenAI token required to invoke ChatGPT.
+         .token
+         set-value:x:@.token
+            strings.concat
+               .:"Bearer "
+               config.get:"magic:openai:key"
+
+         // Unzipping file.
+         io.file.unzip:x:@.filename
+
+         // Deleting ZIP file to preserve space.
+         io.file.delete:x:@.filename
+
+         // Recursively listing all files in folder.
+         io.file.list-recursively:/etc/system/openai/temp/
+
+         // Looping through each file to generate training data from it.
+         for-each:x:@io.file.list-recursively/*
+
+            // If true we'll handle file, otherwise we'll ignore it.
+            .handle:bool:false
+
+            // Meta buffer used to hold general information about file.
+            .file-meta:
+
+            // Checking file extension and treating accordingly.
+            strings.split:x:@.dp/#
+               .:.
+            switch:x:@strings.split/0/-
+
+               // C# file.
+               case:cs
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"File type: VB.NET"
+
+               // VB.NET file.
+               case:vb
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: VB.NET"
+
+               // Python file.
+               case:py
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: Python"
+
+               // Ruby file.
+               case:rb
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: Ruby"
+
+               // JavaScript file.
+               case:js
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: JavaScript"
+
+               // JavaScript file.
+               case:ts
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: TypeScript"
+
+               // Text file.
+               case:txt
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:Text file
+
+               // CSS file.
+               case:css
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:CSS file
+
+               // HTML file.
+               case:html
+               case:htm
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:HTML file
+
+               // SASS file.
+               case:sass
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:SASS file
+
+               // SASS file.
+               case:scss
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:SCSS file
+
+               // SQL file.
+               case:sql
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:SQL file
+
+               // Markdown file.
+               case:md
+
+                  // Notice, ignoring primary README file that simply describes the folder
+                  if
+                     neq:x:@.dp/#
+                        .:/etc/system/openai/temp/README.md
+                     .lambda
+
+                        // Markdown file caller is interested in.
+                        set-value:x:@.handle
+                           .:bool:true
+                        set-value:x:@.file-meta
+                           strings.concat
+                              get-value:x:@.file-meta
+                              .:Markdown file
+
+               // File is not handled, ignoring it.
+               default
+
+                  // Signaling frontend.
+                  strings.concat
+                     .:"File: "
+                     get-value:x:@.dp/#
+                     .:" is ignored"
+                  unwrap:x:+/*/*/message
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:x:@strings.concat
+                        type:info
+
+            // Checking if we should handle the file.
+            if:x:@.handle
+
+               // Making sure we store file path.
+               set-value:x:@.file-meta
+                  strings.concat
+                     get-value:x:@.file-meta
+                     .:" - Filename: "
+                     get-value:x:@.dp/#
+
+               // Loading file.
+               .content
+               set-value:x:@.content
+                  io.file.load:x:@.dp/#
+
+               // Buffer used to hold all training snippets resulting from file.
+               .snippets
+
+               // Making sure file's content is less than 8K in token count.
+               if
+                  and
+                     exists:x:@.arguments/*/massage
+                     neq:x:@.arguments/*/massage
+                        .
+                     neq:x:@.arguments/*/massage
+                        .:
+                     lt
+                        openai.tokenize:x:@.content
+                        .:int:15000
+                  .lambda
+
+                     // Signaling frontend.
+                     strings.concat
+                        .:"Creating summary for file: "
+                        get-value:x:@.dp/#
+                     unwrap:x:+/*/*/message
+                     sockets.signal:x:@.arguments/*/feedback-channel
+                        args
+                           message:x:@strings.concat
+                           type:info
+
+                     /*
+                      * File should be massaged by ChatGPT.
+                      * Invoking OpenAI using 16K model to allow for handling huge files.
+                      */
+                     http.post:"https://api.openai.com/v1/chat/completions"
+                        headers
+                           Authorization:x:@.token
+                           Content-Type:application/json
+                        payload
+                           model:gpt-3.5-turbo-1106
+                           max_tokens:int:2000
+                           temperature:decimal:0.5
+                           messages
+                              .
+                                 role:system
+                                 content:x:@.arguments/*/massage
+                              .
+                                 role:system
+                                 content:x:@.content
+                        convert:true
+
+                     // Verifying above invocation was a success, and if not, inserting file as is.
+                     if
+                        and
+                           mte:x:@http.post
+                              .:int:200
+                           lt:x:@http.post
+                              .:int:300
+                        .lambda
+
+                           // Creating training snippet from result.
+                           unwrap:x:+/*/*/*
+                           add:x:@.snippets
+                              .
+                                 .
+                                    prompt:x:@http.post/*/content/*/choices/0/*/message/*/content
+                                    completion:x:@.content
+                     else
+
+                        // Invocation was a failure.
+                        strings.concat
+                           .:"Could not create summary for file: "
+                           get-value:x:@.dp/#
+                        unwrap:x:+/*/*/message
+                        sockets.signal:x:@.arguments/*/feedback-channel
+                           args
+                              message:x:@strings.concat
+                              type:warning
+                        unwrap:x:+/*/*/*
+                        add:x:@.snippets
+                           .
+                              .
+                                 prompt:x:@.file-meta
+                                 completion:x:@.content
+               else
+
+                  /*
+                   * File is too large to use ChatGPT to create a structure out of it,
+                   * or caller doesn't wants us to massage its content.
+                   */
+                  unwrap:x:+/*/*/*
+                  add:x:@.snippets
+                     .
+                        .
+                           prompt:x:@.file-meta
+                           completion:x:@.content
+
+               // Inserting training snippets generated above into our database.
+               data.connect:[generic|magic]
+
+                  // Looping through each training snippet generated by above invocation.
+                  for-each:x:@.snippets/*
+
+                     // Inserting training snippet into our database.
+                     data.create
+                        table:ml_training_snippets
+                        values
+                           type:x:@.arguments/*/type
+                           prompt:x:@.dp/#/*/prompt
+                           completion:x:@.dp/#/*/completion
+                           filename:x:@.dp/@.dp/#
+                           cached:int:0
+
+         // Signaling frontend.
+         strings.concat
+            .:"Done importing "
+            get-count:x:@.snippets/*
+            .:" training snippets, now vectorising model"
+         unwrap:x:+/*/*/message
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:done_crawling
+      .catch
+
+         // Oops!!
+         log.error:x:@.arguments/*/message
+         sockets.signal:x:@.arguments/@.arguments/*/feedback-channel
+            roles:root
+            args
+               message:Something went wrong as we tried to import your file.
+               type:error
+
+   // Returning success to caller.
+   return
+      result:pending

@@ -1,15 +1,38 @@
 
-// Moves all default KPI widgets into etc folder during installation/startup
-if
-   not
-      io.folder.exists:/etc/robo-crm/kpi/
-   .lambda
+// CRUD endpoint - Create one record in your actor table in your sakila database with authorization
+.arguments
 
-      // Creating folder.
-      io.folder.create:/etc/robo-crm/kpi/
+   // Optional first_name column value
+   first_name:string
 
-      // Copying files.
-      io.file.list:/modules/robo-crm/magic.startup/kpi/
-      for-each:x:@io.file.list/*
-         io.file.copy:x:@.dp/#
-            .:/etc/robo-crm/kpi/
+   // Optional last_name column value
+   last_name:string
+
+   // Optional last_update column value
+   last_update:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:actor
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

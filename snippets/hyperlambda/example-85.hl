@@ -1,25 +1,25 @@
+// Fetches a random dog image from Dog CEO API and handles basic HTTP status codes
 
-// Hyperlambda script that deletes all existing vectors for a specified model.
 .arguments
-   type:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Where we store the result of the request
+.dog.result
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
+http.get:"https://dog.ceo/api/breeds/image/random"
+   convert:true
 
-// Connecting to database.
-data.connect:[generic|magic]
+switch:x:@http.get
 
-   // Deleting VSS data.
-   data.execute:delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type)
-      @type:x:@.arguments/*/type
+   case:int:200
+      set-value:x:@.dog.result
+         get-value:x:@http.get/*/content/*/message
 
-   // Deleting embeddings.
-   data.execute:update ml_training_snippets set embedding = null where type = @type
-      @type:x:@.arguments/*/type
+   case:int:404
+      throw:404 Not Found – Dog image endpoint is unavailable
 
-// Returning success to caller.
-return
-   result:success
+   default
+      set-value:x:@.dog.result
+         .:Failed to fetch dog image
+
+yield
+   result:x:@.dog.result

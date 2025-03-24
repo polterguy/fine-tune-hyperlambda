@@ -1,30 +1,30 @@
 
-// Hyperlambda endpoint that takes two arguments, calculates the modulo, and then returns true if it's 0, otherwise false
+// Delete one record from your Genre table in your chinook database.
 .arguments
-   arg1:int
-   arg2:int
-.accept:application/json
 
-// Sanity checking invocation
-validators.mandatory:x:@.arguments/*/arg1
-validators.mandatory:x:@.arguments/*/arg2
+   // Primary key of record to delete, mandatory argument
+   GenreId:long
 
-// Calculating modulo
-math.modulo
-   get-value:x:@.arguments/*/arg1
-   get-value:x:@.arguments/*/arg2
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,basic
+validators.mandatory:x:@.arguments/*/GenreId
 
-// Checking if modulo result is 0
-if
-   eq:x:@math.modulo
-      .:int:0
-   .lambda
-      set-value:x:../*/return/*/result
-         .:bool:true
-else
-   set-value:x:../*/return/*/result
-      .:bool:false
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-// Returning result to caller
-return
-   result
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Genre
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

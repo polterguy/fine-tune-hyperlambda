@@ -1,18 +1,27 @@
 
-// Write a Hyperlambda snippet that checks if [.state] does not match Open and executes [.lambda].
+// Creates an impersonation token that can be used to pay for a cloudlet on behalf of another user.
 
-// Checks if [.state] does not match Open and executes [.lambda].
-.state:Open
-if
+// Endpoint CANNOT be given any arguments, and if user invokes with query parameters, the endpoint will throw an exception
+.arguments
 
-   // Executes only if state is not Open.
-   neq:x:@.state
-      .:Open
-   .lambda
+// Ensuring user is authorised to invoke endpoint.
+auth.ticket.verify:root, guest
 
-      // Runs if [.state] is different.
-      log.info:[.state] is NOT Open
-else
+// Retrieving currently authenticated user's username.
+auth.ticket.get
 
-   // Runs if [.state] is exactly Open.
-   log.info:[.state] is Open
+// Creates an impersonation JWT ticket that does not expire before 12 months from now.
+math.add
+   date.now
+   time
+      days:365
+auth.ticket.create
+   username:x:@auth.ticket.get
+   expires:x:@math.add
+   roles
+      .:impersonated
+
+// Returns ticket to caller.
+unwrap:x:+/*
+return
+   ticket:x:@auth.ticket.create

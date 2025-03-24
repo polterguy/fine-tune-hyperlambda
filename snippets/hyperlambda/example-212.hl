@@ -1,42 +1,20 @@
+// Converts from XML to lambda
+.xml:@"<customers>
+   <customer>
+      <name>John Doe</name>
+      <email>john@doe.com</email>
+   </customer>
+</customers>"
+xml2lambda:x:-
 
-// Delete one record from your post_tags table in your cms database
-.arguments
+/*
+Result:
+xml2lambda
+   customers
+      customer
+         name
+            #text:John Doe
+         email
+            #text:john@doe.com
 
-   // Primary key of record to delete, mandatory argument
-   post_id:long
-
-   // Primary key of record to delete, mandatory argument
-   tag_id:long
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-
-// Making sure both arguments was supplied
-validators.mandatory:x:@.arguments/*/post_id
-validators.mandatory:x:@.arguments/*/tag_id
-
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:post_tags
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.post_tags.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+ */

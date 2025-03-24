@@ -1,10 +1,5 @@
 
-/*
- * Distinct Keyword Search from city table in sakila database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
- */
+// Hyperlambda endpoint for a distinct keyword search from a specified table in a database, returning records containing keywords from a query, with rows containing the most distinct matched keywords appearing first.
 .arguments
 
    // Mandatory query for records to search for
@@ -37,11 +32,10 @@ for-each:x:@.words/*
 
 // Specify which columns to search against.
 .columns
-   .:city
 
 // Connect to the specified database.
-data.connect:[generic|sakila]
-   database-type:sqlite
+data.connect:{database}
+   database-type:{database-type}
 
    // Start building our SQL.
    .sql:select *, (
@@ -163,7 +157,7 @@ data.connect:[generic|sakila]
       strings.concat:x:@.sql
          get-value:x:@.sql
          .:" from "
-         .:city
+         .:{table}
          .:" where keyword_count > 0"
 
    // 5) Order by distinct keyword_count (higher means more distinct keywords), then keyword_density.
@@ -185,7 +179,7 @@ data.connect:[generic|sakila]
 
    // Execute the SQL
    data.select:x:@.sql
-      database-type:sqlite
+      database-type:{database-type}
 
    // Remove helper fields if you don't want them in your final JSON
    remove-nodes:x:@data.select/*/*/keyword_density

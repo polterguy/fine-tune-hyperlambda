@@ -1,20 +1,52 @@
-// Traverse node hierarchy and look for nodes with a name starting with 'n'. Then change their values to 'visited'.
-.result
-.data
-   n1:howdy
-      n2:nope!
-   some-node-1
-      n3:" world"
-         is-not-considered
 
-            // Considered since it starts with 'n' character
-            nanna:". "
-            n4:old-value
-for-each:x:@.data/**
-   get-name:x:@.dp/#
-   if
-      strings.starts-with:x:@get-name
-         .:n
-      .lambda
-         set-value:x:@.dp/#
-            .:visited
+// Hyperlambda endpoint calculating given Hyperlambda code and return the results, handling exceptions with public error messages.
+.arguments
+   hyperlambda:string
+   args:*
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+/*
+ * To be able to return intelligent error messages to caller,
+ * we catch all exceptions, and returns the exception message
+ * publicly back to caller.
+ */
+try
+
+   /*
+    * Transforms the specified [hyperlambda] to a lambda object,
+    * making sure we correctly set the root node for the execution
+    * in the process. This looks a bit cheezy, but to make sure
+    * the root node for the execution object is the node containing
+    * the Hyperlambda as children, it is necessary.
+    * 
+    * It basically "unties" the execution object from the rest of this
+    * particular file, preventing caller to interfer with the file itself,
+    * as a consequence of his Hyperlambda.
+    */
+   .x:node:""
+   hyper2lambda:x:@.arguments/*/hyperlambda
+   remove-nodes:x:@hyper2lambda/*/.arguments/*
+   add:x:@hyper2lambda/*/.arguments
+      get-nodes:x:@.arguments/*/args/*
+   add:x:@.x/#
+      get-nodes:x:@hyper2lambda/*
+
+   // Evaluating Hyperlambda, now with the correct root node.
+   eval:x:@.x/#
+
+   // Returning the results of the evaluation to caller.
+   lambda2hyper:x:@.x/#/*
+   unwrap:x:+/*
+   return-nodes
+      result:x:@lambda2hyper
+.catch
+
+   /*
+    * Throwing a new exception, wrapping message,
+    * this time as a publicly visible exception.
+    */
+   throw:x:@.arguments/*/message
+      status:400
+      public:true

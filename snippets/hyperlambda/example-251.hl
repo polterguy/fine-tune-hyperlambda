@@ -1,32 +1,48 @@
 
-// Counts items from your plugins table in your cms database
+// Create a Hyperlambda action to hash a specified input using an optional algorithm (default is SHA 256). Validate the algorithm and return the hash result.
 .arguments
-   plugins.id.eq:long
-   plugins.name.like:string
-   plugins.name.eq:string
-   plugins.description.like:string
-   plugins.description.eq:string
-   plugins.is_active.eq:long
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+   // Notice, this is action syntax
+   input
+      type:string
+      mandatory:bool:true
+   algorithm
+      type:enum
+      mandatory:bool:false
+      values
+         .:sha1
+         .:md5
+         .:sha256
+         .:sha384
+         .:sha512
+.icon:settings
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/algorithm
+   .:sha1
+   .:md5
+   .:sha256
+   .:sha384
+   .:sha512
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:plugins
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
+// Checking if caller wants to override the default hashing algorithm.
+if
+   and
+      exists:x:@.arguments/*/algorithm
+      not-null:x:@.arguments/*/algorithm
+      neq:x:@.arguments/*/algorithm
+         .:
+   .lambda
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+      // Overriding hashing algorithm by changing name of slot we invoke below.
+      set-name:x:../*/crypto.hash
+         strings.concat
+            .:crypto.hash.
+            get-value:x:@.arguments/*/algorithm
+
+// Hashing string.
+crypto.hash:x:@.arguments/*/input
+
+// Returning result to caller.
+yield
+   result:x:./-

@@ -1,64 +1,15 @@
+/*
+ * Invalid: This expression tries to access `settings` directly after `@.config`
+ * without using a `*` iterator in between, which is required to traverse children.
+ *
+ * This expression will NOT find the [settings] nodes since it is not using a children iterator
+ * between the `@.config` iterator and the `settings` iterator.
+ */
 
-// Write a Hyperlambda script to delete a specified foreign key from your database.
-.arguments
-   databaseType:string
-   connectionString:string
-   databaseName:string
-   tableName:string
-   fkName:string
-   generate:bool
+.config
+   settings
+      theme:dark
+get-value:x:@.config/settings
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/connectionString
-validators.mandatory:x:@.arguments/*/databaseName
-validators.mandatory:x:@.arguments/*/tableName
-validators.mandatory:x:@.arguments/*/fkName
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:pgsql
-   .:mssql
-
-// SQL that executes to modify DDL.
-.sql
-set-value:x:@.sql
-   strings.concat
-      .:"alter table "
-      get-value:x:@.arguments/*/tableName
-      .:" drop constraint "
-      get-value:x:@.arguments/*/fkName
-
-// Checking if caller only wants to generate SQL statement.
-if:x:@.arguments/*/generate
-   unwrap:x:+/*
-   return
-      sql:x:@.sql
-
-// Creating our database connection.
-strings.concat
-   .:[
-   get-value:x:@.arguments/*/connectionString
-   .:|
-   get-value:x:@.arguments/*/databaseName
-   .:]
-data.connect:x:-
-   database-type:x:@.arguments/*/databaseType
-   data.execute:x:@.sql
-      database-type:x:@.arguments/*/databaseType
-
-// Flushing database cache.
-strings.concat
-   .:magic.sql.databases.
-   get-value:x:@.arguments/*/databaseType
-   :.
-   get-value:x:@.arguments/*/connectionString
-cache.set:x:-
-
-// Returning result to caller.
-unwrap:x:+/*
-return
-   result:success
-   sql:x:@.sql
+// Correct expression would be
+:x:@.config/*/settings

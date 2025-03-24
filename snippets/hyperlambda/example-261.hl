@@ -1,18 +1,78 @@
-/*
- * Create a POST endpoint that inserts a new contact record into the CRM system.
- * It expects `name` and `email` as input arguments in the body of the request.
- */
 
-// Save this file as e.g. '/modules/contacts/add.post.hl' to create an HTTP POST endpoint.
+// Create a Hyperlambda script that returns all workflow actions to the caller, ensuring the user is authorized.
+auth.ticket.verify:root
 
-.arguments
-   name:string
-   email:string
+// Buffer for all actions in the system.
+.result
 
-data.connect:[generic|crm]
-   data.create
-      table:contacts
-      values
-         name:x:@.arguments/*/name
-         email:x:@.arguments/*/email
-   return-nodes:x:@data.create/*
+// Retrieving all system actions.
+add:x:@.result
+   io.file.list-recursively:/misc/workflows/actions/
+
+// Retrieving all custom actions.
+if
+   io.folder.exists:/etc/workflows/actions/
+   .lambda
+      add:x:@.result
+         io.file.list-recursively:/etc/workflows/actions/
+
+// Then iterating through each installed module, and retrieving all module actions.
+io.folder.list:/modules/
+for-each:x:@io.folder.list/*
+   strings.concat
+      get-value:x:@.dp/#
+      .:workflows/actions/
+   if
+      io.folder.exists:x:@strings.concat
+      .lambda
+
+         // Module has custom actions.
+         insert-before:x:@.result/0
+            io.file.list-recursively:x:@strings.concat
+
+// Filtering out everything not ending with '.hl'.
+for-each:x:@.result/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Loading file to add meta data.
+         load-file:x:@.dp/#
+         hyper2lambda:x:-
+            comments:true
+         if
+            eq
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.lambda/@.lambda/0/-/*/*
+                  .
+                     description:x:@hyper2lambda/0
+
+         // Decorating return value.
+         unwrap:x:+/*/*
+         add:x:@.lambda/0/-/*/*
+            .
+               icon:x:@hyper2lambda/*/.icon
+
+         // Creating a name for action by using filename.
+         strings.split:x:@.dp/#
+            .:/
+         strings.split:x:-/0/-
+            .:.
+         remove-nodes:x:@strings.split/0/-
+         strings.join:x:@strings.split/0
+            .:.
+
+         // Returning result to caller.
+         unwrap:x:+/*/*/*
+         add:x:../*/return
+            .
+               .
+                  name:x:@strings.join
+                  filename:x:@.dp/#
+
+// Returning result to caller.
+return

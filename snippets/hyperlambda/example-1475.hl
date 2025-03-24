@@ -1,6 +1,499 @@
+
 /*
- * Retrieves the `startDate` from an event object referenced by entries in a calendar.
- * The `event` node in `.calendar/*` contains a reference to another node structure.
- * The expression dereferences it and selects its `startDate` child.
+ * Lists clients API endpoint
+ * 
+ * Optionally apply filtering, start date, end date, client ID, columns, or limit.
+ * By default this function will sort by created date descending, but this can be changed as you see fit.
  */
-.calendar-start:x:@.calendar/*/event/#/*/startDate
+.arguments
+
+   // Optional argument allowing you to filter on items. 
+   filter:string
+
+   // Optional argument being the start date for records to match. Must be supplied in ISO standard, including time, for instance "2024-01-01T13:45:00"
+   start_date:string
+
+   // Optional argument being the end date for records to match. Must be supplied in ISO standard, including time, for instance "2024-01-01T13:45:00"
+   end_date:string
+
+   // Optional client number of one specific client to return data for.
+   client_id:string
+
+   // Optional comma separated list of columns to return. Defaults to the most important columns.
+   columns:string
+
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
+
+   // Optional offset into records of where to start returning items.
+   offset:long
+
+   // Optional column to order records.
+   order:string
+
+   // Optional sort direction, can be either 'ASC' or 'DESC'. Defaults to 'ASC' unless specified.
+   direction:string
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Applying default value to sorting.
+validators.default:x:@.arguments
+   order:T1.[LSC Date Created]
+   direction:ASC
+   limit:long:10
+   offset:long:0
+
+// Sanity checking order argument if specified.
+validators.enum:x:@.arguments/*/order
+   .:T0.No_
+   .:T0.Name
+   .:T1.[LSC Date Created]
+   .:T1.[LSC Created by User]
+   .:ContactType
+   .:T3.[Segment No_]
+   .:T3.[Subsegment No_]
+   .:T3.[Value No_]
+   .:T0.[Address]
+   .:T0.[Address 2]
+   .:T0.[City]
+   .:T0.[Contact]
+   .:T0.[Phone No_]
+   .:T0.[Telex No_]
+   .:T0.[Document Sending Profile]
+   .:T0.[Ship-to Code]
+   .:T0.[Our Account No_]
+   .:T0.[Territory Code]
+   .:T0.[Global Dimension 1 Code]
+   .:T0.[Global Dimension 2 Code]
+   .:T0.[Chain Name]
+   .:[Budgeted Amount]
+   .:T0.[Credit Limit (LCY)]
+   .:T0.[Customer Posting Group]
+   .:T0.[Currency Code]
+   .:T0.[Customer Price Group]
+   .:T0.[Payment Terms Code]
+   .:[Fin_ Charge Terms Code]
+   .:[Salesperson Code]
+   .:[Shipment Method Code]
+   .:[Shipping Agent Code]
+   .:[Place of Export]
+   .:T0.[Invoice Disc_ Code]
+   .:T0.[Customer Disc_ Group]
+   .:T0.[Country_Region Code]
+   .:[Collection Method]
+   .:[Amount]
+   .:T0.[Blocked]
+   .:[Invoice Copies]
+   .:T0.[Last Statement No_]
+   .:[Print Statements]
+   .:T0.[Bill-to Customer No_]
+   .:T0.[Priority]
+   .:T0.[Payment Method Code]
+   .:T0.[Last Modified Date Time]
+   .:T0.[Last Date Modified]
+   .:[Application Method]
+   .:[Prices Including VAT]
+   .:T0.[Location Code]
+   .:T0.[VAT Registration No_]
+   .:[Combine Shipments]
+   .:T0.[Gen_ Bus_ Posting Group]
+   .:[GLN]
+   .:T0.[Post Code]
+   .:T0.[County]
+   .:[EORI Number]
+   .:[Use GLN in Electronic Document]
+   .:T0.[E-Mail]
+   .:T0.[Home Page]
+   .:[Reminder Terms Code]
+   .:T0.[No_ Series]
+   .:[Tax Area Code]
+   .:[Tax Liable]
+   .:T0.[VAT Bus_ Posting Group]
+   .:T0.[Reserve]
+   .:T0.[Block Payment Tolerance]
+   .:[IC Partner Code]
+   .:[Prepayment _]
+   .:[Partner Type]
+   .:T0.[Privacy Blocked]
+   .:[Disable Search by Name]
+   .:[Preferred Bank Account Code]
+   .:[Cash Flow Payment Terms Code]
+   .:[Primary Contact No_]
+   .:[Contact Type]
+   .:T0.[Mobile Phone No_]
+   .:[Responsibility Center]
+   .:[Shipping Advice]
+   .:[Shipping Time]
+   .:[Shipping Agent Service Code]
+   .:[Service Zone Code]
+   .:[Price Calculation Method]
+   .:T0.[Allow Line Disc_]
+   .:[Base Calendar Code]
+   .:[Copy Sell-to Addr_ to Qte From]
+   .:[Validate EU Vat Reg_ No_]
+   .:[Id]
+   .:[Currency Id]
+   .:[Payment Terms Id]
+   .:[Shipment Method Id]
+   .:[Payment Method Id]
+   .:[Tax Area ID]
+   .:[Contact ID]
+   .:[Contact Graph Id]
+   .:[UPS Zone]
+   .:[Tax Exemption No_]
+   .:[Bank Communication]
+   .:[Check Date Format]
+   .:[Check Date Separator]
+   .:T0.[RFC No_]
+   .:T0.[CURP No_]
+   .:[State Inscription]
+   .:T0.[Tax Identification Type]
+   .:[CFDI Purpose]
+   .:[CFDI Relation]
+validators.enum:x:@.arguments/*/direction
+   .:ASC
+   .:DESC
+
+// These are the columns we're supposed to return from database.
+.cols:
+if
+   and
+      exists:x:@.arguments/*/columns
+      not-null:x:@.arguments/*/columns
+   .lambda
+
+      // Figuring out which columns to select and sanity checking their names.
+      strings.split:x:@.arguments/*/columns
+         .:,
+      for-each:x:@strings.split/*
+         strings.trim:x:@.dp/#
+         validators.enum:x:-
+            .:T0.No_
+            .:T0.Name
+            .:T1.[LSC Date Created]
+            .:T1.[LSC Created by User]
+            .:ContactType
+            .:T3.[Segment No_]
+            .:T3.[Subsegment No_]
+            .:T3.[Value No_]
+            .:T0.[Address]
+            .:T0.[Address 2]
+            .:T0.[City]
+            .:T0.[Contact]
+            .:T0.[Phone No_]
+            .:T0.[Telex No_]
+            .:T0.[Document Sending Profile]
+            .:T0.[Ship-to Code]
+            .:T0.[Our Account No_]
+            .:T0.[Territory Code]
+            .:T0.[Global Dimension 1 Code]
+            .:T0.[Global Dimension 2 Code]
+            .:T0.[Chain Name]
+            .:[Budgeted Amount]
+            .:T0.[Credit Limit (LCY)]
+            .:T0.[Customer Posting Group]
+            .:T0.[Currency Code]
+            .:T0.[Customer Price Group]
+            .:T0.[Language Code]
+            .:[Statistics Group]
+            .:T0.[Payment Terms Code]
+            .:[Fin_ Charge Terms Code]
+            .:[Salesperson Code]
+            .:[Shipment Method Code]
+            .:[Shipping Agent Code]
+            .:[Place of Export]
+            .:T0.[Invoice Disc_ Code]
+            .:T0.[Customer Disc_ Group]
+            .:T0.[Country_Region Code]
+            .:[Collection Method]
+            .:[Amount]
+            .:T0.[Blocked]
+            .:[Invoice Copies]
+            .:T0.[Last Statement No_]
+            .:[Print Statements]
+            .:T0.[Bill-to Customer No_]
+            .:T0.[Priority]
+            .:T0.[Payment Method Code]
+            .:T0.[Last Modified Date Time]
+            .:T0.[Last Date Modified]
+            .:[Application Method]
+            .:[Prices Including VAT]
+            .:T0.[Location Code]
+            .:T0.[Fax No_]
+            .:T0.[Telex Answer Back]
+            .:T0.[VAT Registration No_]
+            .:[Combine Shipments]
+            .:T0.[Gen_ Bus_ Posting Group]
+            .:[Picture]
+            .:[GLN]
+            .:T0.[Post Code]
+            .:T0.[County]
+            .:[EORI Number]
+            .:[Use GLN in Electronic Document]
+            .:T0.[E-Mail]
+            .:T0.[Home Page]
+            .:[Reminder Terms Code]
+            .:T0.[No_ Series]
+            .:[Tax Area Code]
+            .:[Tax Liable]
+            .:T0.[VAT Bus_ Posting Group]
+            .:T0.[Reserve]
+            .:T0.[Block Payment Tolerance]
+            .:[IC Partner Code]
+            .:[Prepayment _]
+            .:[Partner Type]
+            .:[Image]
+            .:T0.[Privacy Blocked]
+            .:[Disable Search by Name]
+            .:[Preferred Bank Account Code]
+            .:[Cash Flow Payment Terms Code]
+            .:[Primary Contact No_]
+            .:[Contact Type]
+            .:T0.[Mobile Phone No_]
+            .:[Responsibility Center]
+            .:[Shipping Advice]
+            .:[Shipping Time]
+            .:[Shipping Agent Service Code]
+            .:[Service Zone Code]
+            .:[Price Calculation Method]
+            .:T0.[Allow Line Disc_]
+            .:[Base Calendar Code]
+            .:[Copy Sell-to Addr_ to Qte From]
+            .:[Validate EU Vat Reg_ No_]
+            .:[Id]
+            .:[Currency Id]
+            .:[Payment Terms Id]
+            .:[Shipment Method Id]
+            .:[Payment Method Id]
+            .:[Tax Area ID]
+            .:[Contact ID]
+            .:[Contact Graph Id]
+            .:[UPS Zone]
+            .:[Tax Exemption No_]
+            .:[Bank Communication]
+            .:[Check Date Format]
+            .:[Check Date Separator]
+            .:T0.[RFC No_]
+            .:T0.[CURP No_]
+            .:[State Inscription]
+            .:T0.[Tax Identification Type]
+            .:[CFDI Purpose]
+            .:[CFDI Relation]
+      set-value:x:@.cols
+         get-value:x:@.arguments/*/columns
+
+else
+   set-value:x:@.cols
+      .:T0.No_, T0.Name, T1.[LSC Date Created], T1.[LSC Created by User], ContactType, T0.[Address], T0.[City], T0.[Contact], T0.[Phone No_], T0.[Our Account No_], T0.[Territory Code], [Salesperson Code], [Amount], T0.[E-Mail], T0.[Home Page]
+
+// Getting limit value, defaulting to 10
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:10
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+   .sql:@"
+SELECT {columns}
+	  ,ISNULL((select Qt.[Order Date]  FROM [dbo].[MNDG$Sales Header$437dbf0e-84ff-417a-965d-ed2bb9650972] Qt
+       where   Qt.[Document Type] = 0    AND Qt.[No_] = (SELECT TOP 1 Fac.[Quote No_] FROM [dbo].[MNDG$Sales Invoice Header$437dbf0e-84ff-417a-965d-ed2bb9650972] Fac 
+	             where Fac.[Sell-to Customer No_] = T0.[No_] order by Fac.[Order Date] asc)),
+		(select TOP 1 Qtr.[Order Date]  FROM [dbo].[MNDG$Sales Header Archive$437dbf0e-84ff-417a-965d-ed2bb9650972] Qtr
+       where   Qtr.[Document Type] = 0    AND Qtr.[No_] = (SELECT TOP 1 Fac.[Quote No_] FROM [dbo].[MNDG$Sales Invoice Header$437dbf0e-84ff-417a-965d-ed2bb9650972] Fac 
+	             where Fac.[Sell-to Customer No_] = T0.[No_] order by Fac.[Order Date] asc) order by Qtr.[Version No_] DESC)) as Order_Date
+		
+	  , ISNULL((SELECT TOP 1 Fac.[Quote No_] FROM [dbo].[MNDG$Sales Invoice Header$437dbf0e-84ff-417a-965d-ed2bb9650972] Fac 
+	             where Fac.[Sell-to Customer No_] = T0.[No_] order by Fac.[Order Date] asc),'') AS First_Invoice_Quotation
+	  , ISNULL((SELECT TOP 1 Fac.[No_] FROM [dbo].[MNDG$Sales Invoice Header$437dbf0e-84ff-417a-965d-ed2bb9650972] Fac 
+	             where Fac.[Sell-to Customer No_] = T0.[No_] order by Fac.[Order Date] asc),'') AS First_Invoice
+	  , ISNULL((SELECT TOP 1 Fac.[Order Date] FROM [dbo].[MNDG$Sales Invoice Header$437dbf0e-84ff-417a-965d-ed2bb9650972] Fac 
+	             where Fac.[Sell-to Customer No_] = T0.[No_] order by Fac.[Order Date] asc),'') AS Quotation_Date
+
+  FROM [dbo].[MNDG$Customer$437dbf0e-84ff-417a-965d-ed2bb9650972] T0
+
+  Left Outer Join [dbo].[MNDG$Customer$5ecfc871-5d82-43f1-9c54-59685e82318d] T1 on T1.No_ = T0.No_
+  Left Outer Join [dbo].[MNDG$Customer$6c32c5df-ffaa-490f-a066-25a56a6dd61e] T2 on T2.No_ = T0.No_
+  Left Outer Join [dbo].[MNDG$Customer$88c9935b-5e96-4804-b105-5618aa274ae1] T3 on T3.No_ = T0.No_
+  Left Outer Join [dbo].[MNDG$Customer$b5a361c9-bac4-4628-ac2d-0294a2e947cb] T4 on T4.No_ = T0.No_"
+
+   // Appending columns we're returning.
+   set-value:x:@.sql
+      strings.replace:x:@.sql
+         .:{columns}
+         get-value:x:@.cols
+
+   // Used to track if we've added a criteria
+   .added-where:bool:false
+
+   // Formatting start date if specified.
+   if
+      and
+         exists:x:@.arguments/*/start_date
+         not-null:x:@.arguments/*/start_date
+      .lambda
+         convert:x:@.arguments/*/start_date
+            type:date
+         format:x:@convert
+            pattern:"{0:yyyyMMdd}"
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.select
+            .
+               @start_date:x:@format
+         if:x:@.added-where
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" AND T1.[LSC Date Created] > @start_date"
+         else
+            set-value:x:@.added-where
+               .:bool:true
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" WHERE T1.[LSC Date Created] > @start_date"
+            
+
+   // Formatting end date.
+   if
+      and
+         exists:x:@.arguments/*/end_date
+         not-null:x:@.arguments/*/end_date
+      .lambda
+         convert:x:@.arguments/*/end_date
+            type:date
+         format:x:@convert
+            pattern:"{0:yyyyMMdd}"
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.select
+            .
+               @end_date:x:@format
+         if:x:@.added-where
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" AND T1.[LSC Date Created] < @end_date"
+         else
+            set-value:x:@.added-where
+               .:bool:true
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" WHERE T1.[LSC Date Created] < @end_date"
+
+   // Checking if we're filtering on one specific client_id.
+   if
+      and
+         exists:x:@.arguments/*/client_id
+         not-null:x:@.arguments/*/client_id
+         neq:x:@.arguments/*/client_id
+            .:
+      .lambda
+
+         // Making sure we apply [client_id] as a condition.
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.select
+            .
+               @client_id:x:@.arguments/*/client_id
+
+         // Adding criteria to SQL.
+         if:x:@.added-where
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" AND T0.[No_] = @client_id"
+         else
+            set-value:x:@.added-where
+               .:bool:true
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" WHERE T0.[No_] = @client_id"
+
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Making sure filtering becomes an OR condition.
+         if:x:@.added-where
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" AND ("
+         else
+            set-value:x:@.added-where
+               .:bool:true
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" WHERE ("
+
+         // Making sure we apply % character to match correct records.
+         strings.concat
+            .:%
+            get-value:x:@.arguments/*/filter
+            .:%
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/mssql.select
+            .
+               @filter:x:@strings.concat
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:Name
+            .:Address
+            .:City
+            .:[Post Code]
+            .:[Phone No_]
+            .:[Mobile Phone No_]
+            .:[E-Mail]
+         .first:bool:true
+         for-each:x:@.fields/*
+            if:x:@.first
+               set-value:x:@.first
+                  .:bool:false
+               set-value:x:@.sql
+                  strings.concat
+                     get-value:x:@.sql
+                     get-value:x:@.dp/#
+                     .:" like @filter"
+            else
+               set-value:x:@.sql
+                  strings.concat
+                     get-value:x:@.sql
+                     .:" OR "
+                     get-value:x:@.dp/#
+                     .:" like @filter"
+
+         // Closing parantheses.
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:")"
+
+   // Making sure we order most recent items first.
+   set-value:x:@.sql
+      strings.concat
+         get-value:x:@.sql
+         .:" ORDER BY "
+         get-value:x:@.arguments/*/order
+         .:" "
+         get-value:x:@.arguments/*/direction
+         .:" OFFSET "
+         get-value:x:@.arguments/*/offset
+         .:" ROWS FETCH NEXT "
+         get-value:x:@.arguments/*/limit
+         .:" ROWS ONLY"
+
+   // Reading records.
+   mssql.select:x:@.sql
+   
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.select/*

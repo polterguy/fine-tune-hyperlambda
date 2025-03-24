@@ -1,88 +1,97 @@
 
-// Hyperlambda script to create a slot that avoids abuse of AI chatbot by limiting the number of chat requests per user per day.
-slots.create:magic.openai.chat-interceptor.avoid-abuse
+// Workflow action that generates a new Stripe payment method using card details and attach it to a specified customer ID. The function should validate all mandatory arguments, retrieve the Stripe API token, and make a POST request to create the payment method. It should then attach the payment method to the customer, handle any errors by logging and throwing exceptions, and return the payment method ID, brand, and last four digits to the caller.
+.arguments
+   customer_id
+      type:string
+      mandatory:bool:true
+   card_no
+      type:string
+      mandatory:bool:true
+   exp_year
+      type:int
+      mandatory:bool:true
+   exp_month
+      type:int
+      mandatory:bool:true
+   cvs
+      type:int
+      mandatory:bool:true
+.icon:payment
 
-   // Getting original IP address of request.
-   request.headers.get:cf-connecting-ip
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/customer_id
+validators.mandatory:x:@.arguments/*/card_no
+validators.mandatory:x:@.arguments/*/exp_month
+validators.mandatory:x:@.arguments/*/exp_year
+validators.mandatory:x:@.arguments/*/cvs
 
-   // Verifying we've actually got an IP address.
-   if
-      and
-         not-null:x:@request.headers.get
-         neq:x:@request.headers.get
-            .:
-      .lambda
+// Retrieving token to use for invocations towards Stripe.
+.token
+set-value:x:-
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
 
-         // Connecting to magic database.
-         data.connect:magic
+// Invoking Stripe REST API.
+http.post:"https://api.stripe.com/v1/payment_methods"
+   headers
+      Content-Type:application/x-www-form-urlencoded
+      Authorization:x:@.token
+   payload
+      card[number]:x:@.arguments/*/card_no
+      card[exp_month]:x:@.arguments/*/exp_month
+      card[exp_year]:x:@.arguments/*/exp_year
+      card[cvc]:x:@.arguments/*/cvs
+      type:card
+   convert:true
 
-            // Checking if IP address has been blocked previously.
-            data.read
-               table:ml_blocked_ips
-               where
-                  and
-                     ip_address.eq:x:@request.headers.get
-            if
-               exists:x:@data.read/*
-               .lambda
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.post
+      .:int:400
+   .lambda
 
-                  // IP address has been blocked.
-                  request.headers.list
-                  add:x:./*/log.info
-                     get-nodes:x:@request.headers.list/*
-                  log.info:Potential abuse, user has been permanently blocked
-                  throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
-                     public:bool:true
-                     status:int:401
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe, could not create payment method
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe, could not create payment method
+         public:true
+         status:500
 
-            // True if we should block IP address.
-            .block:bool:false
+// Attaching payment method to customer.
+strings.concat
+   .:"https://api.stripe.com/v1/payment_methods/"
+   get-value:x:@http.post/*/content/*/id
+   .:/attach
+http.post:x:@strings.concat
+   headers
+      Content-Type:application/x-www-form-urlencoded
+      Authorization:x:@.token
+   payload
+      customer:x:@.arguments/*/customer_id
+   convert:true
 
-            // Checking if cloudlet is configured for maximum number of requests per day per user.
-            config.get:"magic:openai:max-daily-requests"
-            if
-               and
-                  not-null:x:@config.get
-                  neq:x:@config.get
-                     .:
-               .lambda
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.post
+      .:int:400
+   .lambda
 
-                  // Cloudlet is configured to only answer the same user n times per day.
-                  .no
-                  set-value:x:@.no
-                     convert:x:@config.get
-                        type:int
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe API, could not attach payment method to customer
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe API, could not attach payment method to customer
+         public:true
+         status:500
 
-                  // Counting questions user has asked today.
-                  data.scalar:"select count(*) from ml_requests where user_id = @user and created >= date('now', '-1 day')"
-                     @user:x:@.arguments/*/user_id
-
-                  // Checking if user has exhausted his daily requests.
-                  if
-                     mt
-                        convert:x:@data.scalar
-                           type:int
-                        get-value:x:@.no
-                     .lambda
-
-                        // Blocking user.
-                        set-value:x:@.block
-                           .:bool:true
-
-            // Checking if we should block user.
-            if:x:@.block
-
-               // Blocking IP address.
-               data.create
-                  table:ml_blocked_ips
-                  values
-                     ip_address:x:@request.headers.get
-                     user_id:x:@.arguments/*/user_id
-
-               // Writing it into our log.
-               add:x:./*/log.info
-                  request.headers.list
-               log.info:IP address was permanently blocked
-               throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
-                  public:bool:true
-                  status:int:401
+// Returning payment method information to caller.
+yield
+   payment_method_id:x:@http.post/@http.post/*/content/*/id
+   payment_method_brand:x:@http.post/@http.post/*/content/*/card/*/brand
+   last4:x:@http.post/@http.post/*/content/*/card/*/last4

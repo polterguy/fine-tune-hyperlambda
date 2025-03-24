@@ -1,45 +1,85 @@
-/*
- * Slot that returns employees grouped by department name.
- */
 
-slots.create:hr.employees.by-department
+// Hyperlambda script to create a task that periodically crawls all models to add new pages, with error handling.
+tasks.list:ainiro-crawl-machine-learning-models
+if
+   exists:x:@tasks.list/*
+   .lambda
+      tasks.delete:ainiro-crawl-machine-learning-models
 
-   .limit
-   set-value:x:@.limit
-      get-first-value
-         get-value:x:@.arguments/*/limit
-         .:long:50
+// Creating task that crawls all models periodically.
+tasks.create:ainiro-crawl-machine-learning-models
+   description:Periodically crawls all models once every day to add new pages to model
+   repeats:24.hours
+   .lambda
 
-   .offset
-   set-value:x:@.offset
-      get-first-value
-         get-value:x:@.arguments/*/offset
-         .:long:0
+      // Basic logging.
+      log.info:Task to periodically crawl models about to be executed
 
-   mssql.connect:[hr|PEOPLE_DB]
+      // Connecting to database.
+      data.connect:[generic|magic]
 
-      mssql.read
-         table:Employees
-            as:e
-            join:Departments
-               as:d
-               type:left
-               on
-                  and
-                     e.DepartmentId.eq:d.Id
-         columns
-            d.Name
-               as:Department
-            count(*)
-               as:EmployeeCount
-            avg(e.Salary)
-               as:AvgSalary
-         limit:x:@.limit
-         offset:x:@.offset
-         where
-            and
-               d.Name.eq:x:@.arguments/*/filter
-         group
-            d.Name
+         // Finding all types with a [base_url].
+         data.read
+            table:ml_types
+            columns
+               type
+               base_url
+            where
+               and
+                  base_url.neq
+                  base_url.neq:
 
-      return-nodes:x:@mssql.read/*
+         // Looping through all types returned above.
+         for-each:x:@data.read/*
+
+            // Verifying URL is not null and not empty.
+            if
+               and
+                  not-null:x:@.dp/#/*/base_url
+                  neq:x:@.dp/#/*/base_url
+                     .:
+               .lambda
+
+                  // Making sure exceptions never leave thread.
+                  try
+
+                     // Verifying user can create more snippets.
+                     add:x:+
+                        get-nodes:x:@.dp/#/*/type
+                     try-signal:magic.ai.can-create-snippet
+
+                     // Doing some logging.
+                     log.info:Crawling website
+                        url:x:@.dp/#/*/base_url
+                        type:x:@.dp/#/*/type
+
+                     // Invoking slot doing the heavy lifting.
+                     unwrap:x:./*/signal/*
+                     unwrap:x:./*/signal/*/.onafter/**/type
+                     unwrap:x:./*/signal/*/.onafter/**/.type
+                     signal:magic.ai.crawl-site
+                        delay:int:2000
+                        threshold:int:150
+                        max:int:1250
+                        summarize:bool:true
+                        url:x:@.dp/#/*/base_url
+                        type:x:@.dp/#/*/type
+                        feedback-channel:non-existing
+                        .onafter
+                           signal:magic.ai.vectorise
+                              feedback-channel:non-existing
+                              type:x:@.dp/#/*/type
+                              .onafter
+
+                                 // Basic logging.
+                                 .type:x:@.dp/#/*/type
+                                 strings.concat
+                                    get-value:x:@.type
+                                    .:" successfully crawled"
+                                 log.info:x:-
+                  .catch
+
+                     // Logging.
+                     log.error:Could not crawl site
+                        error:x:@.arguments/*/message
+                        site:x:@.dp/#/*/base_url

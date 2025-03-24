@@ -1,9 +1,39 @@
-/*
- * Iterates through each line of the file and logs it.
- */
 
-io.file.load:/README.md
-strings.split:x:@io.file.load
-   .:\n
-for-each:x:@strings.split/*
-   log.info:x:@.dp/#
+// Create a Hyperlambda script for a CRUD create endpoint that inserts one record into the ml_training_snippets table in the magic database, taking type, pushed, uri, prompt, and completion, ensuring authentication and authorization for root roles.
+.arguments
+   pushed:long
+   uri:string
+   prompt:string
+   completion:string
+   meta:string
+   type:string
+   cached:int
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Verifying user can create more snippets.
+   add:x:+
+      get-nodes:x:@.arguments/*/type
+   try-signal:magic.ai.can-create-snippet
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:ml_training_snippets
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

@@ -1,2 +1,51 @@
-// This snippet defines a node with a byte (8-bit unsigned int) value.
-.flags:byte:255
+
+// Moves SQL scripts to the correct folder and creates the Chinook database file if it doesn't exist.
+
+// Listing all files in startup folder
+io.file.list:/modules/sqlite-chinook/magic.startup/
+
+// Looping through the result of above invocation
+for-each:x:-/*
+   strings.split:x:@.dp/#
+      .:/
+
+   // Making sure this is .sql file
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         strings.concat
+            .:/etc/sqlite/templates/
+            get-value:x:@strings.split/0/-
+         if
+            not
+               io.file.exists:x:@strings.concat
+            .lambda
+
+               // File doesn't exists, hence moving it.
+               io.file.move:x:@.dp/#
+                  .:/etc/sqlite/templates/
+               log.info:SQL script moved into etc folder
+                  filename:x:@.dp/#
+
+// Creates the chinook database file.
+if
+   not
+      io.file.exists:/data/chinook.db
+   .lambda
+
+      // Creating a default database file to store database in.
+      io.file.save:/data/chinook.db
+         .:
+      log.info:Chinook database file created
+         filename:/data/chinook.db
+
+      // Loads and executes the chinook.sql script.
+      io.file.load:/etc/sqlite/templates/chinook.sql
+      sqlite.connect:chinook
+         sqlite.execute:x:@io.file.load
+      log.info:The chinook database was successfully created
+         filename:/etc/sqlite/templates/chinook.sql
+
+      // Evicting cache item related to SQLite.
+      cache.set:magic.sql.databases.sqlite.generic

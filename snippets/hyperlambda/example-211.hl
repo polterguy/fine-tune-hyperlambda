@@ -1,33 +1,16 @@
-// Sends GET request to fetch user profile with dynamic Authorization header and handles common HTTP statuses
 
+// Write a Hyperlambda script to list all files in a specified folder recursively, with options to display hidden and system files.
 .arguments
+   folder:string
+   sys:bool
 
-// API token
-.token:Bearer xyz.abc.123
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Where result will be stored
-.profile.result
+// Listing all file in specified folder.
+io.file.list-recursively:x:@.arguments/*/folder
+   display-hidden:bool:true
+   display-system:x:@.arguments/*/sys
 
-http.get:"https://api.example.com/user/profile"
-   convert:true
-   headers
-      Authorization:x:@.token
-
-switch:x:@http.get
-
-   case:int:200
-      set-value:x:@.profile.result
-         get-value:x:@http.get/*/content/*/name
-
-   case:int:401
-      throw:401 Unauthorized – Invalid or missing token
-
-   case:int:404
-      throw:404 Not Found – User profile endpoint does not exist
-
-   default
-      set-value:x:@.profile.result
-         .:Unexpected error occurred
-
-yield
-   result:x:@.profile.result
+// Returning results of above invocation to caller.
+return-nodes:x:@io.file.list-recursively/*

@@ -1,4 +1,257 @@
-// [null] returns false if the target node exists and has a value
-.src1
-   foo:bar
-null:x:@.src1/*
+
+// Helper file to import training data from API.
+.arguments
+   vectorize:bool
+
+// Applying defaults.
+validators.default:x:@.arguments
+   vectorize:bool:true
+
+// Logging invocation.
+log.info:Started importing training snippets from API
+
+// API key.
+.api-key:REMOVED
+
+// Buffer for root URL of documents
+// TODO: EDIT THIS PART!!
+.root-url:"https://REDACTED.com"
+.update-count:int:0
+
+// Buffer for type name.
+.type:redacted-redacted-plus-caos
+
+// Threshold for import. Ensures we ignore small snippets.
+.threshold:int:100
+
+// Making sure we can handle exceptions.
+try
+
+   // List modules.
+   http.get:"https://api.REDACTED.com/modules"
+      convert:true
+      headers
+         X-API-Key:x:@.api-key
+
+   // Sanity checking above invocation.
+   if
+      and
+         not-null:x:@http.get
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+      .lambda
+
+         // Looping through modules returned above.
+         for-each:x:@http.get/*/content/*
+
+            // Name of module.
+            .module-name
+            set-value:x:@.module-name
+               get-value:x:@.dp/#/*/name
+
+            // Retrieving currently iterated module.
+            strings.concat
+               .:"https://api.REDACTED.com/menu/"
+               get-value:x:@.dp/#/*/id
+            http.get:x:@strings.concat
+               convert:true
+               headers
+                  X-API-Key:x:@.api-key
+
+            // Sanity checking above invocation.
+            if
+               and
+                  not-null:x:@http.get
+                  mte:x:@http.get
+                     .:int:200
+                  lt:x:@http.get
+                     .:int:300
+               .lambda
+
+                  // Looping through each section returned in above invocation.
+                  for-each:x:@http.get/*/content/*
+
+                     // Verifying currently iterated menu item has a [documentId].
+                     if
+                        not-null:x:@.dp/#/*/documentId
+                        .lambda
+
+                           // Name of menu item.
+                           .menu-item-name
+                           set-value:x:@.menu-item-name
+                              get-value:x:@.dp/#/*/name
+
+                           // Retrieving currently iterated document.
+                           strings.concat
+                              .:"https://api.REDACTED.com/pages/doc/"
+                              get-value:x:@.dp/#/*/documentId
+                           http.get:x:@strings.concat
+                              convert:true
+                              headers
+                                 X-API-Key:x:@.api-key
+
+                           // Sleeping for 100 milliseconds to avoid exhausting web server.
+                           sleep:100
+
+                           // Sanity checking above invocation.
+                           if
+                              and
+                                 not-null:x:@http.get
+                                 mte:x:@http.get
+                                    .:int:200
+                                 lt:x:@http.get
+                                    .:int:300
+                              .lambda
+
+                                 // Iterating through each document returned above.
+                                 for-each:x:@http.get/*/content/*
+
+                                    // Making sure we've got some actual content here.
+                                    if
+                                       and
+                                          not-null:x:@.dp/#/*/text
+                                          mt
+                                             strings.length:x:@.dp/#/*/text
+                                             .:int:50
+                                       .lambda
+
+                                          // Creating our URL.
+                                          .url
+                                          set-value:x:@.url
+                                             strings.concat
+                                                get-value:x:@.root-url
+                                                get-value:x:@.dp/#/*/url
+
+                                          // Retrieving content from document.
+                                          .html
+                                          set-value:x:@.html
+                                             strings.concat
+                                                .:<html><head><title>
+                                                get-value:x:@.module-name
+                                                .:" - "
+                                                get-value:x:@.menu-item-name
+                                                .:" - "
+                                                get-value:x:@.dp/#/*/title
+                                                .:</title></head><body><div>
+                                                get-value:x:@.dp/#/*/text
+                                                .:</div></body></html>
+                                          execute:magic.ai.html.extract
+                                             html:x:@.html
+                                             images:bool:true
+                                             lists:bool:true
+                                             main:bool:true
+                                             semantic:bool:false
+                                             url:x:@.url
+
+                                          // Sanity checking above.
+                                          if
+                                             exists:x:@execute/*/snippets/*
+                                             .lambda
+
+                                                // Connecting to magic database.
+                                                data.connect:magic
+
+                                                   // Looping through each snippet found in above invocation.
+                                                   for-each:x:@execute/*/snippets/*
+
+                                                      // Verifying snippet is valid.
+                                                      if
+                                                         and
+                                                            not-null:x:@.dp/#/*/completion
+                                                            or
+                                                               strings.starts-with:x:@.dp/#/*/completion
+                                                                  .:![
+                                                               mt
+                                                                  strings.length:x:@.dp/#/*/completion
+                                                                  get-value:x:@.threshold
+                                                         .lambda
+
+                                                            // Adding URL as reference into the completion itself.
+                                                            set-value:x:@.dp/#/*/completion
+                                                               strings.concat
+                                                                  get-value:x:@.dp/#/*/completion
+                                                                  .:"\r\n"
+                                                                  .:"\r\n"
+                                                                  .:"[Reference]("
+                                                                  get-value:x:@.url
+                                                                  .:)
+
+                                                            // Checking if document has been updated since we imported it the last time.
+                                                            data.select:"select id, strftime('%Y-%m-%dT%H:%M:%fZ', created) as created from ml_training_snippets where type = @type and uri = @uri and prompt = @prompt limit 1"
+                                                               @type:x:@.type
+                                                               @uri:x:@.url
+                                                               @prompt:x:@.dp/#/*/prompt
+                                                            if
+                                                               exists:x:@data.select/*
+                                                               .lambda
+
+                                                                  // Snippet exists, checking if it needs to be updated.
+                                                                  if
+                                                                     mt:x:@for-each/@.dp/#/*/lastChangedOn
+                                                                        convert:x:@data.select/0/*/created
+                                                                           type:date
+                                                                     .lambda
+
+                                                                        // Deleting old snippet.
+                                                                        data.delete
+                                                                           table:ml_training_snippets
+                                                                           where
+                                                                              and
+                                                                                 id.eq:x:@data.select/0/*/id
+
+                                                                        // Inserting updated snippet.
+                                                                        data.create
+                                                                           table:ml_training_snippets
+                                                                           values
+                                                                              prompt:x:@.dp/#/*/prompt
+                                                                              completion:x:@.dp/#/*/completion
+                                                                              type:x:@.type
+                                                                              uri:x:@.url
+                                                                              meta:api-import
+
+                                                                        // Incrementing updated counter.
+                                                                        math.increment:x:@.update-count
+
+                                                            else
+
+                                                               // Snippet doesn't exist, inserting as new snippet.
+                                                               data.create
+                                                                  table:ml_training_snippets
+                                                                  values
+                                                                     prompt:x:@.dp/#/*/prompt
+                                                                     completion:x:@.dp/#/*/completion
+                                                                     type:x:@.type
+                                                                     uri:x:@.url
+                                                                     meta:api-import
+
+                                                               // Incrementing updated counter.
+                                                               math.increment:x:@.update-count
+
+   // Logging.
+   log.info:Finished importing training snippets
+      updated:x:@.update-count
+
+   // Vectorising
+   if
+      and
+         get-value:x:@.arguments/*/vectorize
+         mt:x:@.update-count
+            .:int:0
+      .lambda
+
+         // We've got stuff to vectorise.
+         log.info:Started vectorising training data imported from API
+         execute:magic.ai.vectorise
+            type:x:@.type
+
+         // Logging.
+         log.info:Finished vectorising training data imported from API
+
+.catch
+
+   // Oops ...!!
+   log.error:Something went wrong as we tried to import products from API
+      error:x:@.arguments/*/message
+      type:x:@.type

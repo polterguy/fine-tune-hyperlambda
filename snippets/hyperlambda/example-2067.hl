@@ -1,16 +1,21 @@
 
-// Write a Hyperlambda script to list all files in a specified folder recursively, with options to display hidden and system files.
+// Hyperlambda endpoint that returns arguments the specified file can handle, ensuring the user is authorized.
 .arguments
-   folder:string
-   sys:bool
+   file:string
 
-// Ensures user is authorized to access endpoint.
+// Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Listing all file in specified folder.
-io.file.list-recursively:x:@.arguments/*/folder
-   display-hidden:bool:true
-   display-system:x:@.arguments/*/sys
+/*
+ * Loading action file and transforming Hyperlambda to lambda and making sure
+ * we return [.arguments] collection as [input].
+ * 
+ * This becomes our input arguments to our action.
+ */
+load-file:x:@.arguments/*/file
+hyper2lambda:x:@load-file
+add:x:./*/return
+   get-nodes:x:@hyper2lambda/*/.arguments/*
 
-// Returning results of above invocation to caller.
-return-nodes:x:@io.file.list-recursively/*
+// Returning arguments to caller.
+return

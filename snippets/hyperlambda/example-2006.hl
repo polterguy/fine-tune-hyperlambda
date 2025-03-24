@@ -1,8 +1,35 @@
-/*
- * Example: Allow letters and spaces only (remove punctuation by replacing with empty).
- */
-.phrase:"Hello, World!"
-strings.replace-not-of:x:@.phrase
-   .:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz "
-   .:""
-// Result: "Hello World" (comma and '!' removed)
+
+// Deletes the user's account entirely on server.
+.arguments
+
+// Ensuring user is authenticated to invoke endpoint.
+auth.ticket.verify:guest
+
+// Retrieving currently authenticated user.
+auth.ticket.get
+
+// Verifying user doesn't have any cloudlets.
+data.connect:[generic|hub]
+   data.read
+      table:cloudlets
+      where
+         and
+            user.eq:x:@auth.ticket.get
+   if
+      exists:x:@data.read/*/*
+      .lambda
+         throw:You have to delete all cloudlets before you delete your account
+            public:true
+            status:400
+
+// Deleting user from magic database.
+data.connect:[generic|magic]
+   data.delete
+      table:users
+      where
+         and
+            username.eq:x:@auth.ticket.get
+
+// Returning success to caller.
+return
+   result:success

@@ -1,20 +1,43 @@
-// Connects to sakila with database transactions
-data.connect:sakila
-   data.transaction.create
-      data.execute:delete from film_actor
 
-      /*
-       * If you uncomment the line below the
-       * transaction will be committed, resulting
-       * in that everything from your film_actor
-       * table will be deleted.
-       */
-      //data.transaction.commit
+// Hyperlambda endpoint for a CRUD update endpoint that updates an existing item in the users_extra table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   user:string
+   type:string
+   value:string
 
-data.connect:sakila
+// Verifying user is authorized to access endpoint.
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/user
+auth.ticket.verify:root
 
-   /*
-    * Notice, this still returns 5462 items, since
-    * transaction was implicitly rolled back above.
-    */
-   data.scalar:select count(*) from film_actor
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[2,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,2]
+
+   // Invoking our update slot.
+   data.update
+      table:users_extra
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning success to caller.
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

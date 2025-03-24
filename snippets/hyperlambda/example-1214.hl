@@ -1,30 +1,31 @@
 
-// Hyperlambda script to get an access token for NetSuite using a private key, account ID, certificate ID, and consumer key.
-.key
-set-value:x:@.key
-   io.file.load:/etc/netsuite/private-key.txt
+// Compiles C# code files required to wire up module correctly
 
-// Account id
-.account-id
-set-value:x:@.account-id
-   config.get:"magic:netsuite:account-id"
-validators.mandatory:x:@.account-id
+// Assumes this file exists and is valid C# code (for .Net Core)
+io.file.load:/modules/netsuite/magic.startup/csharp/GenerateToken.cs.raw
 
-// Certificate id
-.certificate-id
-set-value:x:@.certificate-id
-   config.get:"magic:netsuite:certificate-id"
-validators.mandatory:x:@.certificate-id
+// Compiling file into an assembly.
+system.compile
+   references
+      .:netstandard
+      .:System.Linq
+      .:System.Runtime
+      .:System.Net.Http
+      .:System.Private.Uri
+      .:System.ComponentModel
+      .:System.Private.CoreLib
+      .:System.Linq.Expressions
+      .:System.Security.Cryptography
+      .:Microsoft.IdentityModel.Tokens
+      .:System.IdentityModel.Tokens.Jwt
+      .:Microsoft.IdentityModel.Abstractions
+      .:Newtonsoft.Json
+      .:magic.node
+      .:magic.node.extensions
+      .:magic.signals.contracts
+      .:System.Net.Primitives
+   code:x:@io.file.load
+   assembly-name:dynamic.magic.lambda.netsuite.dll
 
-// Consumer key
-.consumer-key
-set-value:x:@.consumer-key
-   config.get:"magic:netsuite:consumer-key"
-validators.mandatory:x:@.consumer-key
-
-// Invoking slot doing the heavy lifting.
-netsuite.get-access-token
-   private-key:x:@.key
-   account-id:x:@.account-id
-   certificate-id:x:@.certificate-id
-   consumer-key:x:@.consumer-key
+// Loading assembly as plugin now that we've created it.
+system.plugin.load:x:@system.compile

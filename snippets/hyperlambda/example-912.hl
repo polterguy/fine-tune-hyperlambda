@@ -1,24 +1,37 @@
 /*
- * Lists director roles and company sectors (SQLite)
+ * Compiles a snippet of C# code down to a library,
+ * for then to dynamically load it as a plugin.
+ *
+ * This particular code creates a slot, but you can create any
+ * code you wish, and it doesn't have to be Hyperlambda related.
  */
-.arguments
-   director_id:long
-   limit:long
-   offset:long
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.signals.contracts
+   code:@"
 
-data.connect:[sqlite|company]
-   database-type:sqlite
+// Example C# code creating a Hyperlambda slot.
+using System;
+using magic.node;
+using magic.signals.contracts;
 
-   data.select:@"
-select b.company_name, b.sector, d.role_name
-   from directors d
-      join basic b on b.org_number = d.org_number
-   where d.director_id = @id
-   limit @limit offset @offset"
-      database-type:sqlite
-      @id:x:@.arguments/*/director_id
-      @limit:x:@.arguments/*/limit
-      @offset:x:@.arguments/*/offset
+// Our slot class.
+[Slot(Name = ""bar"")]
+public class Bar : ISlot
+{
+   public void Signal(ISignaler signaler, Node input)
+   {
+      input.Value = ""Hello from C#"";
+   }
+}"
+   assembly-name:bar.dll
 
-   yield
-      sector_roles:x:@data.select/*
+// Loading assembly now that we've created it.
+system.plugin.execute:x:@system.compile
+
+   // Invoking dynamically created C# slot.
+   bar

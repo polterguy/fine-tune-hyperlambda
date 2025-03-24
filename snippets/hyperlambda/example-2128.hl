@@ -1,92 +1,38 @@
-/*
- * Creates a new object in NetSuite of the specified [type].
- *
- * The [type] argument is mandatory and can be any type
- * that NetSuite supports, such as for instance:
- *
- * - account
- * - contact
- * - customer
- * - department
- * - deposit
- * - employee
- * - invoice
- * - etc ...
- *
- * The [object] argument is mandatory and contains a
- * key/value list of fields you wish to associate
- * with the object.
- */
-.arguments
+// Build the dynamic JSON payload
+.payload
+   email:user@example.com
+   pin:4321
+   source:mobile-app
 
-   // Mandatory argument declaring the type of entity we want to create.
-   type:string
+// Create headers for content-type and custom request ID
+.headers
+   Content-Type:application/json
+   X-Request-ID:abc-001-login
 
-   // Mandatory argument declaring the actual content of the new entity we want to create.
-   object:*
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
-validators.mandatory:x:@.arguments/*/object
-validators.mandatory:x:@.arguments/*/object/*
-
-/*
- * Returns an access token for NetSuite.
- *
- * Returns a JWT token that can be used to invoke NetSuite according
- * to your configuration settings.
- * Notice, this will read account-id, certificate-id, and consumer-key
- * from your configuration settings, in addition to assume your private
- * key exists in the file '/etc/netsuite/private-key.txt'.
- */
-execute:magic.workflows.actions.execute
-   name:netsuite-get-access-token
-   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
-   arguments
-
-// Creating our idempotency key to prevent replay attacks.
-guid.new
-
-// Creating invocation URL.
-.url
-set-value:x:@.url
-   strings.concat
-      .:"https://"
-      config.get:"magic:netsuite:account-id"
-      .:.suitetalk.api.netsuite.com/services/rest/record/v1
-      .:/
-      get-value:x:@.arguments/*/type
-
-// Parametrizing our payload.
+// Make the HTTP POST request
+add:x:./*/http.post/*/headers
+   get-value:x:@.headers/*
 add:x:./*/http.post/*/payload
-   get-nodes:x:@.arguments/*/object/*
-
-// Invoking our HTTP GET endpoint, now correctly parametrised.
-http.post:x:@.url
-   token:x:--/execute/=netsuite-get-access-token/*/access-token
+   get-value:x:@.payload/*
+http.post:"https://api.example.com/login/email"
    headers
-      X-NetSuite-Idempotency-Key:x:@guid.new
    payload
+   convert:true
 
-// Converts the result to a lambda object.
-json2lambda:x:@http.post/*/content
-
-// Sanity checking above invocation.
+// Verify response status is 2xx
 if
-   not
-      and
-         mte:x:@http.post
-            .:int:200
-         lt:x:@http.post
-            .:int:300
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
    .lambda
+      .user-name
+      set-value:x:@.user-name
+         get-value:x:@http.post/*/content/*/user-name
 
-      // Oops, error ...!!
-      lambda2hyper:x:@json2lambda
-      log.error:x:@lambda2hyper
-      throw:Could not create entity in NetSuite, check your log for details.
-
-// Returning our entity to caller.
-return:x:@json2lambda/*
-
-// Dependent upon NetSuite plugin being installed
+      .session-id
+      set-value:x:@.session-id
+         get-value:x:@http.post/*/content/*/session-id
+else
+   throw:Email login failed

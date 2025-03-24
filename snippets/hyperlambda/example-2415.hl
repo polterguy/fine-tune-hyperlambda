@@ -1,34 +1,31 @@
+// Search through a log file and extract all URLs from it
 
-// Creates an image
-.arguments
+// Read the log file
+if
+   io.file.exists:/var/logs/server.log
+   .lambda
 
-   // Mandatory and is the prompt used to generate the image.
-   prompt:string
+      // Reading file's content as text.
+      io.file.load:/var/logs/server.log
 
-   // Optional and will default to '1024x1024' if not specified. Legal are 1024x1024, 1792x1024, and 1024x1792.
-   size:string
+      // A temporary place to hold the extracted URLs
+      .urls
 
-   // Optional and will default to 'vivid' if not specified. Legal values are 'vivid' and 'natural'.
-   style:string
+      // Extracting URLs using regex
+      strings.matches:x:@io.file.load
+         .:"https?://[\\w\\.-]+(?:\\.[\\w\\.-]+)+(?:[/\\w\\._~:?#[\\]@!$&'()*+,;=-]*)?"
 
-// Applying defaults.
-validators.default:x:@.arguments
-   size:1792x1024
-   style:vivid
+      // Loop through the matches and add them to the list
+      for-each:x:@strings.matches/*/match
+         unwrap:x:+/*/*
+         add:x:@.urls
+            .
+               .:x:@.dp/#
 
-/*
- * Invokes OpenAI's image generation API with the specified [query] and [model].
- * 
- * Will use the default API key found from configurations.
- */
-execute:magic.workflows.actions.execute
-   name:openai-image-create
-   filename:/modules/openai/workflows/actions/openai-image-create.hl
-   arguments
-      model:dall-e-3
-      size:x:@.arguments/*/size
-      style:x:@.arguments/*/style
-      query:x:@.arguments/*/prompt
+      // Log the summary
+      lambda2hyper:x:@.urls/*
+      log.info:Extracted URLs from file
+         emails:x:@lambda2hyper
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+else
+   log.error:Log file not found

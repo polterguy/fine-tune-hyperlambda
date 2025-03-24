@@ -1,45 +1,20 @@
 
-// Create a dynamic slot that ensures the specified role exists, creating it if not, ensuring the user is authorized.
-slots.create:magic.auth.ensure-role
+// Deletes a single object of the specified type in NetSuite
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/role
-   validators.mandatory:x:@.arguments/*/description
+   // Mandatory argument declaring what type of object you want to delete.
+   type:string
 
-   /*
-    * Ensures the [role] role exists.
-    * 
-    * Notice, in case system hasn't been setup yet, we'll need to silently
-    * catch all exceptions.
-    */
-   try
+   // Mandatory argument being the id of the object you want to delete.
+   id:long
 
-      // Connecting to Magic database.
-      data.connect:[generic|magic]
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
 
-         // Checking to see if [role] role exists.
-         data.read
-            table:roles
-            where
-               and
-                  name.eq:x:@.arguments/*/role
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-delete-record.hl
 
-         // Checking result of above invocation.
-         if
-            not
-               exists:x:@data.read/*/*
-            .lambda
-
-               // We need to insert [role] role into Magic database.
-               data.create
-                  table:roles
-                  values
-                     name:x:@.arguments/*/role
-                     description:x:@.arguments/*/description
-   .catch
-
-      /*
-       * Silently catching here, to avoid application crash
-       * if system hasn't been setup yet.
-       */
-      .silent
+// Returning result to caller.
+return-nodes:x:@execute-file/*

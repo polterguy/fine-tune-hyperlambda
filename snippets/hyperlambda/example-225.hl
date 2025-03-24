@@ -1,67 +1,12 @@
-
-// Search for images using Google with a mandatory query parameter.
-.arguments
-
-   // Mandatory query to search for.
-   query:string
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/query
-
-// Retrieving SERP API's API key and making sure we've got one.
-.api-key
-set-value:x:@.api-key
-   config.get:"magic:serp-api:api_key"
-if
-   or
-      null:x:@.api-key
-      eq:x:@.api-key
-         .:
-   .lambda
-
-      // Oops ...!!
-      throw:Could not find a SERP API key to use for fetching hotels.
-
-// Creating our URL.
-.url
-set-value:x:@.url
-   strings.concat
-      .:"https://serpapi.com/search.json?engine=google_images&api_key="
-      get-value:x:@.api-key
-      .:&q=
-      strings.url-encode:x:@.arguments/*/query
-
-// Retrieving result.
-http.get:x:@.url
-   convert:true
-
-// Sanity checking result of above invocation.
-if
-   not
-      and
-         mte:x:@http.get
-            .:int:200
-         lt:x:@http.get
-            .:int:300
-   .lambda
-
-      // Oops ...!!
-      lambda2hyper:x:../*
-      log.info:x:-
-      throw:Something went wrong while invoking SERP API
-
-// Iterating through result, making sure we return the result to caller.
-for-each:x:@http.get/*/content/*/images_results/*/[0,10]
-   unwrap:x:+/*/*/*
-   add:x:../*/return-nodes/*/result
-      .
-         .
-            title:x:@.dp/#/*/title
-            link:x:@.dp/#/*/link
-            original:x:@.dp/#/*/original
-            source:x:@.dp/#/*/source
-
-// Returning result to caller.
-unwrap:x:+/*
-return-nodes
-   result
+/*
+ * Example: Split a string with consecutive delimiters (empty segments).
+ */
+strings.split:"one,,two"
+   .:,
+/*
+ * Resulting parts:
+ * .:one
+ * .:two
+ *
+ * Notice, empty strings are ignored
+ */

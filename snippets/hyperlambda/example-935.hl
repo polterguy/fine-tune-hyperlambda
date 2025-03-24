@@ -1,19 +1,51 @@
 
-// Hyperlambda endpoint taking arguments. The SQL query selects distinct email, first name, last name, and genre name of customers who listen to rock music from the Chinook database.\n\nThis SQL script is designed to retrieve a list of customers from the Chinook database who are associated with rock music. It performs a series of inner joins between the Customer, Invoice, InvoiceLine, Track, and Genre tables to filter and extract customer details based on the genre specified by the `@filter` parameter. The query ensures that only unique customer records are returned by using the `DISTINCT` keyword, and it orders the results by the customer's email address. This script is particularly useful for generating targeted marketing lists or analyzing customer preferences within the rock genre. The use of parameterization with `@filter` enhances security by preventing SQL injection attacks.\n\nAll arguments are mandatory.
+// Create one record in your comments table in your cms database
 .arguments
-   filter:string
 
-// Connecting to database.
-data.connect:chinook
+   // post_id column value
+   post_id:long
+
+   // user_id column value
+   user_id:long
+
+   // content column value
+   content:string
+
+   // created_at column value
+   created_at:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
+
+// Opening up database connection.
+data.connect:[generic|cms]
    database-type:sqlite
 
-   // Parametrizing [data.select].
-   add:x:./*/data.select
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
       get-nodes:x:@.arguments/*
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name like @filter\n  order by c.Email\n"
+   // Creating our record.
+   data.create
       database-type:sqlite
+      table:comments
+      return-id:bool:true
+      values
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:cms.comments.post
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

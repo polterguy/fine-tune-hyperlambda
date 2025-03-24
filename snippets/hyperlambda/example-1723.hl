@@ -1,11 +1,19 @@
-// HTTP endpoint that selects users from database and returns as YAML
-.arguments
 
-// Connect to the database and retrieve contacts
-data.connect:crm
-   data.read
-      table:contacts
-   response.headers.set
-      Content-Type:application/yaml
-   lambda2yaml:x:@data.read/*
-   return:x:@lambda2yaml
+// Hyperlambda endpoint taking arguments. The SQL query selects distinct email, first name, last name, and genre name of customers who listen to rock music from the Chinook database.\n\nThis SQL script is designed to retrieve a list of customers from the Chinook database who are associated with rock music. It performs a series of inner joins between the Customer, Invoice, InvoiceLine, Track, and Genre tables to filter and extract customer details based on the genre specified by the `@filter` parameter. The query ensures that only unique customer records are returned by using the `DISTINCT` keyword, and it orders the results by the customer's email address. This script is particularly useful for generating targeted marketing lists or analyzing customer preferences within the rock genre. The use of parameterization with `@filter` enhances security by preventing SQL injection attacks.\n\nAll arguments are mandatory.
+.arguments
+   filter:string
+
+// Connecting to database.
+data.connect:chinook
+   database-type:sqlite
+
+   // Parametrizing [data.select].
+   add:x:./*/data.select
+      get-nodes:x:@.arguments/*
+
+   // Executing [data.select] slot with our SQL.
+   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name like @filter\n  order by c.Email\n"
+      database-type:sqlite
+
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

@@ -1,22 +1,36 @@
-/*
- * Hyperlambda file taking arguments that invokes a dynamic slot with dynamic parameters.
- */
+
+// Delete one record from your menu_items table in your cms database
 .arguments
-   slot:string
 
-   // * implies argument is not type checked, and anything goes. Useful for sending in lists and key/value key pairs
-   params:*
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-validators.mandatory:x:@.arguments/*/slot
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
 
-// Forwards all arguments to [invoke].
-add:x:./*/invoke
-   get-nodes:x:@.arguments/*/params/*
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
 
-// Invoke the slot dynamically
-invoke:x:@.arguments/*/slot
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-// Returning result
-add:x:./*/return
-   get-nodes:x:@invoke/*
-return
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:menu_items
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.menu_items.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

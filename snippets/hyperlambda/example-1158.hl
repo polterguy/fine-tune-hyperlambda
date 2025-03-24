@@ -1,30 +1,18 @@
 
-// Delete one record from your Invoice table in your chinook database.
-.arguments
+// Write a Hyperlambda snippet that checks if [.state] does not match Open and executes [.lambda].
 
-   // Primary key of record to delete, mandatory argument
-   InvoiceId:long
+// Checks if [.state] does not match Open and executes [.lambda].
+.state:Open
+if
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-validators.mandatory:x:@.arguments/*/InvoiceId
+   // Executes only if state is not Open.
+   neq:x:@.state
+      .:Open
+   .lambda
 
-// Opening up our database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
+      // Runs if [.state] is different.
+      log.info:[.state] is NOT Open
+else
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:Invoice
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Runs if [.state] is exactly Open.
+   log.info:[.state] is Open

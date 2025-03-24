@@ -1,20 +1,101 @@
 
-// Returns a single object of the specified type to caller
+// Write a Hyperlambda script to create a migration script of specified SQL for a specified module.
 .arguments
+   databaseType:string
+   module:string
+   sql:string
 
-   // Mandatory argument declaring the type of object you want to retrieve.
-   type:string
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Mandatory argument being the id of the object you want to retrieve.
-   id:string
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/sql
+validators.mandatory:x:@.arguments/*/module
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:sqlite
+   .:mssql
+   .:pgsql
 
-// Ensuring user is authorized to invoking endpoint.
-auth.ticket.verify:netsuite
+// Ensuring folders exists.
+strings.concat
+   .:/modules/
+   get-value:x:@.arguments/*/module
+   .:/
+if
+   not
+      io.folder.exists:x:@strings.concat
+   .lambda
+      io.folder.create:x:@strings.concat
+strings.concat
+   .:/modules/
+   get-value:x:@.arguments/*/module
+   .:/magic.startup/
+if
+   not
+      io.folder.exists:x:@strings.concat
+   .lambda
+      io.folder.create:x:@strings.concat
+strings.concat
+   .:/modules/
+   get-value:x:@.arguments/*/module
+   .:/magic.startup/db-migrations/
+if
+   not
+      io.folder.exists:x:@strings.concat
+   .lambda
+      io.folder.create:x:@strings.concat
+strings.concat
+   .:/modules/
+   get-value:x:@.arguments/*/module
+   .:/magic.startup/db-migrations/
+   get-value:x:@.arguments/*/databaseType
+   .:/
+if
+   not
+      io.folder.exists:x:@strings.concat
+   .lambda
+      io.folder.create:x:@strings.concat
 
-// Forwarding heavy lifting to workflow file.
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/modules/netsuite/workflows/workflows/netsuite-get-record.hl
+// Figuring out filename for next migration script file.
+.no:int:1
+io.file.list:x:@strings.concat
+for-each:x:-/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         strings.split:x:@.dp/#
+            .:/
+         strings.split:x:-/0/-
+            .:-
+         convert:x:-/0
+            type:int
+         if
+            mte:x:@convert
+               get-value:x:@.no
+            .lambda
+               set-value:x:@.no
+                  math.add:x:@convert
+                     .:int:1
+
+// Figuring out complete filename for migration script file.
+strings.concat
+   .:/modules/
+   get-value:x:@.arguments/*/module
+   .:/magic.startup/db-migrations/
+   get-value:x:@.arguments/*/databaseType
+   .:/
+   format:x:@.no
+      pattern:"{0:D4}"
+   .:-migration-script.sql
+
+// Saving migration script.
+io.file.save:x:-
+   get-value:x:@.arguments/*/sql
 
 // Returning result to caller.
-return-nodes:x:@execute-file/*
+unwrap:x:+/*
+return
+   result:success

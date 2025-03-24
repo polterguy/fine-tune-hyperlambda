@@ -1,3 +1,44 @@
 
-// Generate a Hyperlambda snippet using a string wrapped in double quotes.
-.string2:foo
+// Sends the user a warning email informing them that their cloudlet is about to be destroyed 5 days from now.
+slots.create:hub.emails.user.warn-destruction-of-cloudlet
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/username
+   validators.mandatory:x:@.arguments/*/cloudlet
+
+   // Retrieving frontend URL.
+   .url
+   set-value:x:@.url
+      config.get:"magic:hub:frontend-url"
+
+   // Retrieving user's name and email address.
+   .email
+   .name
+   data.connect:[generic|magic]
+      data.read
+         table:users_extra
+         values
+            type
+            name
+         where
+            and
+               user.eq:x:@.arguments/*/username
+               or
+                  type.eq:email
+                  type.eq:name
+      set-value:x:@.email
+         get-value:x:@data.read/*/*/type/=email/./*/value
+      set-value:x:@.name
+         get-value:x:@data.read/*/*/type/=name/./*/value
+
+   // Sending user his warning email.
+   unwrap:x:+/**
+   signal:magic.emails.send
+      subject:[Important] - Your AINIRO cloudlet is scheduled for destruction!
+      template-file:/modules/hub/magic.startup/templates/cloudlet-to-be-destroyed.html
+      substitutes
+         url:x:@.url
+         cloudlet:x:@.arguments/*/cloudlet
+      mime-type:text/html
+      email:x:@.email
+      name:x:@.name

@@ -1,21 +1,40 @@
 
-// Hyperlambda snippet that updates a user's email in the 'auth_db' database within the 'users' table.
-
-// Updates a user's email in the "auth_db" database within the "users" table.
+// Delete one record from your comments table in your cms database
 .arguments
-   user_id:int
 
-data.connect:auth_db
-   database-type:pgsql
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-   // Updating the user's email and status.
-   data.update
-      database-type:pgsql
-      table:users
-      values
-         email:newuser@example.com
-         status:active
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:comments
       where
          and
-            user_id.eq:x:@.arguments/*/user_id
-   return:x:@data.update
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:cms.comments.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

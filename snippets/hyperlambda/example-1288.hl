@@ -1,26 +1,11 @@
 
-// Hyperlambda script for a CRUD create endpoint that creates an item in the users_roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
-.arguments
-   role:string
-   user:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Opening up database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      table:users_roles
-      return-id:bool:false
-      values
-
-   // Returning result of above invoction to caller.
-   response.status.set:201
-   return
-      result:success
+/*
+ * Runs during startup of Magic, and basically just ensures the module's database exists,
+ * and is updated by running migration scripts after attempting to create the database.
+ * 
+ * If the database doesn't exist, this script will create it by executing the "white-label.xxx.sql"
+ * SQL file where xxx is your currently default database type.
+ */
+signal:magic.modules.ensure-database
+   module:white-label
+   database:white-label

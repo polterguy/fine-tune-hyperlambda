@@ -1,10 +1,43 @@
-/*
- * Returns the minimum of three hardcoded integers.
- */
-.result
-math.min
-   .:int:42
-   .:int:17
-   .:int:29
-set-value:x:@.result
-   get-value:x:@math.min
+
+// Lists all foreign keys in some PostgreSQL table.
+slots.create:magic.db.pgsql.foreign_keys
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
+
+   // Opens up our connection
+   .connection:[postgres]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   pgsql.connect:x:@.connection
+
+      // Dynamically creating our SQL.
+      pgsql.select:"\nselect\n      kcu.column_name as column,\n      rel_kcu.table_name as foreign_table,\n      rel_kcu.column_name as foreign_column,\n      tco.constraint_name as name\nfrom information_schema.table_constraints tco\njoin information_schema.key_column_usage kcu\n          on tco.constraint_schema = kcu.constraint_schema\n          and tco.constraint_name = kcu.constraint_name\njoin information_schema.referential_constraints rco\n          on tco.constraint_schema = rco.constraint_schema\n          and tco.constraint_name = rco.constraint_name\njoin information_schema.key_column_usage rel_kcu\n          on rco.unique_constraint_schema = rel_kcu.constraint_schema\n          and rco.unique_constraint_name = rel_kcu.constraint_name\n          and kcu.ordinal_position = rel_kcu.ordinal_position\nwhere tco.constraint_type = 'FOREIGN KEY' and\n    kcu.table_name = @table and\n    kcu.table_catalog = @database\norder by kcu.column_name"
+         @table:x:@.arguments/*/table
+         @database:x:@.arguments/*/database
+
+      // Returning result to caller.
+      return-nodes:x:@pgsql.select/*

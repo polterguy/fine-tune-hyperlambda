@@ -1,49 +1,19 @@
 
-// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the ml_training_snippets table in the magic database with an ID matching the argument, ensuring authentication and authorization for root roles.
-.arguments
-   id:long
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our read invocation.
-   add:x:./*/data.read/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Checking if snippet has a filename value
+// I want to update my database and append " - OBSOLETE" for every 'content' column found in my 'system' database and its 'log_records' table. Primary key is 'id'. Do it manually, once for each record. Don't update all rows with one SQL.
+data.connect:system
    data.read
-      table:ml_training_snippets
+      table:log_records
       columns
-         filename
-      where
-         and
-   if
-      and
-         exists:x:@data.read/*
-         not-null:x:@data.read/*/*/filename
-         io.file.exists:x:@data.read/*/*/filename
-      .lambda
-         io.file.delete:x:@data.read/*/*/filename
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      table:ml_training_snippets
-      where
-         and
-   data.execute:delete from vss_ml_training_snippets where rowid = @id
-      id:x:@.arguments/*/id
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+         id
+         content
+   for-each:x:@data.select/*
+      strings.concat
+         get-value:x:@.dp/#/*/content
+         .:" - OBSOLETE"
+      data.update
+         table:log_records
+         values
+            content:x:@strings.concat
+         where
+            and
+               id:x:@.dp/#/*/id

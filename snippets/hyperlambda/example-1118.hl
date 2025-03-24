@@ -1,23 +1,55 @@
 
-// Creates a contact in HubSpot by executing helper Hyperlambda file
+// Withdraw endpoint allowing affiliates to request withdrawals of funds.
 .arguments
-   email:string
-   first_name:string
-   last_name:string
-   phone:string
-   company:string
-   website:string
-   lifecyclestage:string
+   amount:decimal
+   bank_name:string
+   account_name:string
+   iban:string
+   swift:string
+   bank_address:string
+   affiliate_address:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/email
+// Verifying user has access to endpoint.
+auth.ticket.verify:root, admin, guest
 
-// Forwarding request to our HTTP POST Hyperlambda file.
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/modules/hubspot/contacts.post.hl
+// Retrieving currently authenticated user to parametrise invocation towards database.
+auth.ticket.get
 
-// Returning whatever above invocation returned.
-add:x:./*/return
-   get-nodes:x:@execute-file/*
-return
+// Verifying user is an affiliate
+data.connect:[generic|magic]
+   data.read
+      table:users_extra
+      columns
+         value
+      where
+         and
+            type.eq:affiliate_percent
+            user.eq:x:@auth.ticket.get
+   if
+      not-exists:x:@data.read/*/*/value
+      .lambda
+
+         // Oops ...!!
+         log.error:User is not affiliate
+            username:x:@auth.ticket.get
+         throw:You are not an affiliate
+            public:true
+            status:400
+
+// Creating an email and sending to admin of system with data.
+unwrap:x:+/*/*
+add:x:@.arguments
+   .
+      username:x:@auth.ticket.get
+lambda2hyper:x:@.arguments/*
+
+// Sending email with withdrawal request to team@ainiro.io
+unwrap:x:+/**
+signal:magic.emails.send
+   subject:Affiliate withdrawal request
+   template-file:/modules/hub/magic.startup/templates/affiliate-withdrawal.txt
+   substitutes
+      content:x:@lambda2hyper
+   mime-type:text/plain
+   email:team@ainiro.io
+   name:Thomas Hansen

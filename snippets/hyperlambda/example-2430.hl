@@ -1,120 +1,203 @@
 
-// Create a Hyperlambda script that returns the arguments the specified Hyperlambda can handle, ensuring the user is authorized.
-.arguments
-   hyperlambda:string
-   path:string
+// Hyperlambda script creating a slot that chops up specified text into multiple training snippets and optionally use OpenAI to summarize or massage the content.
+slots.create:magic.ai.massage
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   /*
+    * Buffer for snippets since a single invocation might have more
+    * characters than whatever OpenAI can maximum tolerate.
+    */
+   .snippets
 
-// Checking if caller provided a [path] argument instead of a [hyperlambda] argument.
-if
-   and
-      not-exists:x:@.arguments/*/hyperlambda
-      exists:x:@.arguments/*/path
-      not-null:x:@.arguments/*/path
-   .lambda
+   // Retrieving max_context_tokens from type specified by caller.
+   .max_tokens
+   data.connect:[generic|magic]
+      data.scalar:select max_context_tokens from ml_types where type = @type
+         @type:x:@.arguments/*/type
 
-      // Loading file.
-      load-file:x:@.arguments/*/path
-      unwrap:x:+/*/*
-      add:x:@.arguments
-         .
-            hyperlambda:x:@load-file
+      // Making sure we never create training snippets larger than 80% of type's maximum context size.
+      set-value:x:@.max_tokens
+         math.divide
+            math.multiply
+               convert:x:@data.scalar
+                  type:int
+               .:int:80
+            .:int:100
 
-// Converting Hyperlambda to lambda.
-hyper2lambda:x:@.arguments/*/hyperlambda
-   comments:true
-
-// Verifying that file is possible to invoke, as in the file has an [.arguments] collection.
-if
-   and
-      exists:x:@.arguments/*/path
-      exists:x:@hyper2lambda/*/.arguments
-   .lambda
-
-      // Signaling to frontend that file has an [.arguments] collection.
-      add:x:../*/return-nodes
-         .
-            function:bool:true
-
-      /*
-       * Removing [session], [user-id] and [type], since these are
-       * dynamically added to the function invocation by the framework.
-       */
-      if
-         exists:x:@.arguments/*/path
-         .lambda
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_session
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_user-id
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_type
-else
-
-   // Signaling to frontend that file does not have an [.arguments] collection.
-   add:x:../*/return-nodes
-      .
-         function:bool:false
-
-/*
- * Iterating through each argument Hyperlambda can handle.
- * 
- * Notice, we ONLY return the first 100 arguments to avoid context overflow.
- */
-for-each:x:@hyper2lambda/*/.arguments/*/[0,100]
-   if
-      neq
-         get-name:x:@.dp/#
-         .:..
+   // Chopping up content into multiple snippets to avoid max_token overflow with OpenAI.
+   .current:
+   while
+      mt
+         strings.length:x:@.arguments/*/content
+         .:int:0
       .lambda
 
-         // Checking if user provided a [path], at which point we return more data.
+         // Creating a 500 character long sub-section from current content.
+         strings.substring:x:@.arguments/*/content
+            .:int:0
+            .:int:500
+
+         // Removing part we're currently handling.
          if
-            exists:x:@.arguments/*/path
+            mt
+               strings.length:x:@.arguments/*/content
+               .:int:500
             .lambda
 
-               // User provided a [path].
-               set-value:x:+/+/*/*/*/name
-                  get-name:x:@.dp/#
-               set-value:x:+/*/*/*/type
-                  get-value:x:@.dp/#
-               add:x:../*/return-nodes/*/args
-                  .
-                     .
-                        name
-                        type
-
-               // Checking if we've got an argument description / comment.
-               if
-                  eq
-                     get-name:x:@.dp/#/-
-                     .:..
-                  .lambda
-                     unwrap:x:+/*/*
-                     add:x:../*/return-nodes/*/args/0/-
-                        .
-                           description:x:@.dp/#/-
+               // Removing 500 first characters.
+               set-value:x:@.arguments/*/content
+                  strings.substring:x:@.arguments/*/content
+                     .:int:500
          else
 
-            // User provided [hyperlambda] argument.
-            set-name:x:+/+/*/*
-               get-name:x:@.dp/#
-            unwrap:x:+/*/*
-            add:x:../*/return-nodes/*/args
+            // There aren't 500 characters left, so we're just setting string to empty to escape [while].
+            set-value:x:@.arguments/*/content
+               .:
+
+         /*
+          * Checking if current string + above substring overflows [.max_tokens],
+          * at which point we create a new training snippet.
+          */
+         .tmp
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.current
+               get-value:x:@strings.substring
+         if
+            mt
+               openai.tokenize:x:@.tmp
+               get-value:x:@.max_tokens
+            .lambda
+
+               // Creating new training snippet.
+               unwrap:x:+/*/*/*
+               add:x:@.snippets
+                  .
+                     .
+                        content:x:@.current
+               set-value:x:@.tmp
+                  get-value:x:@strings.substring
+
+         // Updating [.current].
+         set-value:x:@.current
+            get-value:x:@.tmp
+
+   // Appending the remaining parts, if there are any.
+   if
+      neq:x:@.current
+         .:
+      .lambda
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
                .
-                  name:x:@.dp/#
+                  content:x:@.current
 
-// Fetching description if existing.
-.desc
-if
-   eq
-      get-name:x:@hyper2lambda/0
-      .:..
-   .lambda
-      set-value:x:@.desc
-         get-value:x:@hyper2lambda/0
+   // Checking if user wants to "massage" content.
+   if
+      or
+         not-exists:x:@.arguments/*/massage
+         null:x:@.arguments/*/massage
+         eq:x:@.arguments/*/massage
+            .:
+      .lambda
 
-// Returning arguments to caller, together with their type information.
-unwrap:x:+/*
-return-nodes
-   args
-   description:x:@.desc
+         // User wants to use content as is.
+         for-each:x:@.snippets/*
+
+            // Adding currently iterated snippet to return invocation.
+            unwrap:x:+/*/*/*
+            add:x:../*/return
+               .
+                  .
+                     prompt:x:@.arguments/*/prompt
+                     completion:x:@.dp/#/*/content
+   else
+
+      // Getting OpenAI API token from configuration.
+      .token
+      set-value:x:@.token
+         strings.concat
+            .:"Bearer "
+            config.get:"magic:openai:key"
+
+      /*
+       * User wants to use OpenAI to create for instance a summary
+       * from the content before creating training data.
+       * 
+       * The first line returned from OpenAI is assumed to be the prompt, all other lines
+       * will be treated as the completion.
+       * 
+       * Iterating through each snippet created above.
+       */
+      for-each:x:@.snippets/*
+
+         // Creating an HTTP POST request towards OpenAI to create structured data of the specified content.
+         .max-tokens
+         set-value:x:@.max-tokens
+            math.subtract
+               .:int:4000
+               openai.tokenize:x:@.dp/#/*/content
+         http.post:"https://api.openai.com/v1/chat/completions"
+            headers
+               Authorization:x:@.token
+               Content-Type:application/json
+            payload
+               model:gpt-3.5-turbo
+               max_tokens:x:@.max-tokens
+               temperature:decimal:0.8
+               messages
+                  .
+                     role:user
+                     content:x:@.arguments/*/massage
+                  .
+                     role:user
+                     content:x:@.dp/#/*/content
+            convert:true
+
+         // Sanity checking above invocation.
+         if
+            not
+               and
+                  mte:x:@http.post
+                     .:int:200
+                  lt:x:@http.post
+                     .:int:300
+            .lambda
+
+               // Oops, error - Logging error and returning status 500 to caller.
+               lambda2hyper:x:@http.post
+               log.error:Something went wrong while invoking OpenAI
+                  message:x:@http.post/*/content/*/error/*/message
+                  status:x:@http.post
+                  error:x:@lambda2hyper
+
+         // Creating our prompt.
+         .prompt
+         strings.split:x:@http.post/*/content/*/choices/0/*/message/*/content
+            .:"\n"
+         set-value:x:@.prompt
+            strings.trim:x:@strings.split/0
+         remove-nodes:x:@strings.split/0
+
+         // Trimming the rest.
+         for-each:x:@strings.split/*
+            set-value:x:@.dp/#
+               strings.trim:x:@.dp/#
+                  .:"\n \t"
+
+         // Creating our completion.
+         .completion
+         set-value:x:@.completion
+            strings.join:x:@strings.split/*
+               .:"\n\n"
+
+         // Adding currently iterated snippets to return invocation.
+         unwrap:x:+/*/*/*
+         add:x:../*/return
+            .
+               .
+                  prompt:x:@.prompt
+                  completion:x:@.completion
+
+   // Returning result of invocation to caller.
+   return

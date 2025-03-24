@@ -1,130 +1,36 @@
 
-// Create a Hyperlambda script that uses DuckDuckGo to search for a specified query and returns an optional maximum number of results to the caller, ensuring the user is authorized.
-slots.create:magic.http.duckduckgo-search
+// Returns parent company from specified org number
+.arguments
+   org_number:string
 
-   // Result we return to caller.
-   .result
-      result
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/org_number
+set-value:x:@.arguments/*/org_number
+   strings.replace-not-of:x:@.arguments/*/org_number
+      .:0123456789
+      .:
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/query
-   validators.integer:x:@.arguments/*/max
-      min:1
+// Connecting to database.
+data.connect:[finovo|finovo]
+   database-type:pgsql
 
-   // Creating our search URL.
-   .url
-   set-value:x:@.url
-      strings.concat
-         .:"https://html.duckduckgo.com/html/?q="
-         strings.url-encode:x:@.arguments/*/query
+   // Retrieving items.
+   data.read
+      database-type:pgsql
+      table:group_structure
+      columns
+         group_mother_orgnumber
+      where
+         and
+            org_number.eq:x:@.arguments/*/org_number
+      limit:-1
 
-   // Checking if caller provided a session argument, and if so, signaling client using web sockets.
+   // Verifying the company has a parent company.
    if
-      exists:x:@.arguments/*/session
+      not-exists:x:@data.read/*
       .lambda
-         strings.concat
-            .:"Invoking DuckDuckGo at: "
-            get-value:x:@.url
-         unwrap:x:+/**
-         sockets.signal:x:@.arguments/*/session
-            args
-               message:x:@strings.concat
-               type:system
+         return
+            result:"This company doesn't have any parent company"
 
-   // Invoking slot responsible for retrieving search results.
-   unwrap:x:+/*
-   signal:magic.http.get-with-cache
-      url:x:@.url
-
-   // Making sure we return refernce to caller.
-   unwrap:x:+/*/*
-   insert-before:x:@.result/0
-      .
-         reference:x:@.url
-
-   // Semantically traversing HTML for result.
-   html2lambda:x:@signal
-   for-each:x:"@html2lambda/*/html/*/body/**/a/*/\\@class/=result__a/."
-
-      // Making sure we're not past any specified [max] argument.
-      if
-         or
-            not-exists:x:@.arguments/*/max
-            mt:x:@.arguments/*/max
-               .:int:0
-         .lambda
-
-            // Not beyond [max] argument.
-            .cur
-            set-value:x:@.cur
-               strings.concat
-                  .:"http:"
-                  get-value:x:"@.dp/#/*/\\@href"
-
-            // Retrieving raw URL from QUERY parameters returned from DuckDuckGo.
-            strings.split:x:@.cur
-               .:?
-            if
-               mt
-                  get-count:x:@strings.split/*
-                  .:int:1
-               .lambda
-
-                  // URL has query parameters, splitting all query parameters.
-                  strings.split:x:@strings.split/1
-                     .:&
-
-                  // Used to track if we find query parameter.
-                  .found:bool:false
-
-                  // Finding the correct query parameter.
-                  for-each:x:@strings.split/*
-
-                     // Checking if currently iterated query parameter is the correct query parameter.
-                     if
-                        strings.starts-with:x:@.dp/#
-                           strings.concat
-                              .:uddg
-                              .:=
-                        .lambda
-
-                           // This is our query parameter.
-                           set-value:x:@.found
-                              .:bool:true
-                           strings.split:x:@.dp/#
-                              .:=
-                           set-value:x:@.cur
-                              strings.url-decode:x:@strings.split/1
-
-                  /*
-                   * Verifying we found query parameter in URL, and if not,
-                   * ignoring currently iterated link.
-                   */
-                  if
-                     not
-                        get-value:x:@.found
-                     .lambda
-
-                        // Query parameter wasn't found.
-                        set-value:x:@.url
-            else
-
-               // No query parameters in URL at all.
-               set-value:x:@.url
-
-            // Decrementing [max] argument.
-            math.decrement:x:@.arguments/*/max
-
-            // Adding currently iterated URL to [.result].
-            strings.join:x:"@.dp/#/././**/a/*/\\@class/=result__snippet/./**/\\#text"
-               .:
-            unwrap:x:+/*/*/*
-            add:x:@.result/*/result
-               .
-                  .
-                     url:x:@.cur
-                     title:x:"@.dp/#/*/\\#text"
-                     description:x:@strings.join
-
-   // Returing result to caller.
-   return-nodes:x:@.result/*
+   // Returning result to caller.
+   return-nodes:x:@data.read/*

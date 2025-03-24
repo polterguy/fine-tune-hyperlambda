@@ -1,17 +1,34 @@
-/* This Hyperlambda snippet checks if the user's age is 18 or older.
-   If true, it updates the [status] node with "Adult". Otherwise, it sets it to "Minor". */
 
-.user
-   name:John Doe
-   age:int:22
-.status
+// Lists all database in your MySQL instance.
+slots.create:magic.db.pgsql.databases
 
-if
-   mte:x:@.user/*/age
-      .:int:18
-   .lambda
-      set-value:x:@.status
-         .:Adult
-else
-   set-value:x:@.status
-      .:Minor
+   // Opens up our connection
+   .connection:[postgres]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               .:postgres]
+   pgsql.connect:x:@.connection
+
+      // Runs our query
+      pgsql.select:select datname from pg_database
+
+      // Renaming "Database" nodes.
+      set-name:x:@pgsql.select/*/*
+         .:db
+
+      // Returns the remaining databases to caller.
+      return-nodes:x:@pgsql.select/*

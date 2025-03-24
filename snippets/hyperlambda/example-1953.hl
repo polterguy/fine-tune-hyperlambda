@@ -1,47 +1,15 @@
 
-// KPI file for contacts created the last 30 days
-.name:New contacts
-.description:New contacts per day the last 30 days
-.enabled:bool:true
-.type:line
-.lambda
-   .now
-   set-value:x:-
-      math.subtract
-         date.now
-         time
-            days:29
-   data.connect:[generic|robo-crm]
-      while
-         lt:x:@.now
-            date.now
-         .lambda
-            .max
-            set-value:x:@.max
-               math.add:x:@.now
-                  time
-                     days:1
-            date.format:x:@.now
-               format:yyyy-MM-dd
-            date.format:x:@.max
-               format:yyyy-MM-dd
-            data.read
-               table:contacts
-               columns
-                  count(*)
-                     as:name
-               where
-                  and
-                     created.mt:x:@date.format/@date.format
-                     created.lt:x:@date.format
-            unwrap:x:+/*/*/*
-            add:x:../*/return
-               .
-                  .
-                     name:x:@date.format/@date.format
-                     value:x:@data.read/*/*
-            set-value:x:@.now
-               math.add:x:@.now
-                  time
-                     days:1
-   return
+// Hyperlambda script that refreshes the currently authenticated user's token and returns a new JWT token with a new expiration date, ensuring the user is authorized.
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify
+
+/*
+ * Invokes [auth.ticket.refresh] that does the heavy lifting, and creates our JWT token,
+ * making sure we return that token to caller.
+ */
+auth.ticket.refresh
+
+// Returns the authentication JWT ticket created above to caller.
+yield
+   ticket:x:@auth.ticket.refresh

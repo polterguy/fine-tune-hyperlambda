@@ -1,55 +1,40 @@
 
-// Action associating the specified [username] with the specified [extra] fields.
+// Delete one record from your media table in your cms database
 .arguments
-   username
-      type:string
-      mandatory:bool:true
-   extra
-      type:key-value
-      mandatory:bool:true
-.icon:supervisor_account
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/extra
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-// Connecting to database.
-data.connect:[generic|magic]
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
 
-   // Verifying user exists.
-   data.read
-      table:users
-      columns
-         username
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:media
       where
          and
-            username.eq:x:@.arguments/*/username
 
-   // Verifying above invocation returned something.
-   if
-      not-exists:x:@data.read/*
-      .lambda
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:cms.media.delete
+      args
 
-         // Oops ...!!
-         throw:No such user
-            username:x:@.arguments/*/username
-
-   // Adding extra fields to user.
-   for-each:x:@.arguments/*/extra/*
-      get-name:x:@.dp/#
-
-      // Deleting old value (if existing).
-      data.delete
-         table:users_extra
-         where
-            and
-               user.eq:x:@.arguments/*/username
-               type.eq:x:@get-name
-
-      // Inserting new value.
-      data.create
-         table:users_extra
-         values
-            user:x:@.arguments/*/username
-            type:x:@get-name
-            value:x:@.dp/#
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

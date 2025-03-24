@@ -1,6 +1,58 @@
-// This example connects to the 'ocean' database and retrieves the maximum depth from the 'creatures' table.
-// It uses the sqlite.scalar slot to execute a SQL query that finds the maximum value in the 'depth' column.
-// The result is returned as a single scalar value representing the maximum depth of creatures.
 
-sqlite.connect:ocean
-   sqlite.scalar:select max(depth) from creatures
+// Read or list records from your comments table in your cms database
+.arguments
+
+   // Optional filtering args
+   comments.id.eq:long
+   comments.post_id.eq:long
+   comments.user_id.eq:long
+   comments.content.like:string
+   comments.content.eq:string
+   comments.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
+   user_id.username.eq:string
+   user_id.username.like:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:comments
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  comments.post_id:post_id.id
+         join:users
+            as:user_id
+            type:left
+            on
+               and
+                  comments.user_id:user_id.id
+      columns
+         comments.id
+         comments.post_id
+         comments.user_id
+         comments.content
+         comments.created_at
+         post_id.title
+            as:post_id.title
+         user_id.username
+            as:user_id.username
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

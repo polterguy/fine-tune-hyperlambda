@@ -1,31 +1,30 @@
-// Helper file to vectorize xplain training data.
+
+// Delete one record from your Track table in your chinook database
 .arguments
-   vectorize:bool
 
-// Applying defaults.
-validators.default:x:@.arguments
-   vectorize:bool:true
+   // Primary key of record to delete, mandatory argument
+   TrackId:long
 
-// Logging invocation.
-log.info:Started vectorizing training snippets from xplain-kennisbank-plus-caos model
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/TrackId
 
-// Buffer for type name.
-.type:xplain-kennisbank-plus-caos 
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
 
-// Making sure we can handle exceptions.
-try
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-   // Vectorising
-   if:x:@.arguments/*/vectorize
-      execute:magic.ai.vectorise
-         type:x:@.type
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Track
+      where
+         and
 
-      // Logging.
-      log.info:Finished vectorizing training snippets from xplain-kennisbank-plus-caos model
-
-.catch
-
-   // Oops ...!!
-   log.error:Something went wrong as we tried to vectorize training snippets from xplain-kennisbank-plus-caos model
-      error:x:@.arguments/*/message
-      type:x:@.type
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

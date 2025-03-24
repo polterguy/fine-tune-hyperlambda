@@ -1,226 +1,140 @@
 
-// Dynamic slot listing all columns in some MySQL table.
-slots.create:magic.db.mysql.columns
+// Returns minimum, maximum, average or sum from your address table in your sakila database without authorization
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/database
-   validators.mandatory:x:@.arguments/*/table
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
 
-   // Opens up our connection
-   .connection:[information_schema]
-   if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
-      .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               get-value:x:@.arguments/*/database
-               .:]
-   else
-      set-value:x:@.connection
-         strings.concat
-            .:[generic|
-            get-value:x:@.arguments/*/database
-            .:]
-   mysql.connect:x:@.connection
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
 
-      // Making sure we support table names with special characters.
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   // Filtering
+   address.address_id.mt:long
+   address.address_id.lt:long
+   address.address_id.mteq:long
+   address.address_id.lteq:long
+   address.address_id.neq:long
+   address.address_id.eq:long
+   address.address.like:string
+   address.address.mt:string
+   address.address.lt:string
+   address.address.mteq:string
+   address.address.lteq:string
+   address.address.neq:string
+   address.address.eq:string
+   address.address2.like:string
+   address.address2.mt:string
+   address.address2.lt:string
+   address.address2.mteq:string
+   address.address2.lteq:string
+   address.address2.neq:string
+   address.address2.eq:string
+   address.district.like:string
+   address.district.mt:string
+   address.district.lt:string
+   address.district.mteq:string
+   address.district.lteq:string
+   address.district.neq:string
+   address.district.eq:string
+   address.city_id.mt:long
+   address.city_id.lt:long
+   address.city_id.mteq:long
+   address.city_id.lteq:long
+   address.city_id.neq:long
+   address.city_id.eq:long
+   address.postal_code.like:string
+   address.postal_code.mt:string
+   address.postal_code.lt:string
+   address.postal_code.mteq:string
+   address.postal_code.lteq:string
+   address.postal_code.neq:string
+   address.postal_code.eq:string
+   address.phone.like:string
+   address.phone.mt:string
+   address.phone.lt:string
+   address.phone.mteq:string
+   address.phone.lteq:string
+   address.phone.neq:string
+   address.phone.eq:string
+   address.last_update.mt:date
+   address.last_update.lt:date
+   address.last_update.mteq:date
+   address.last_update.lteq:date
+   address.last_update.neq:date
+   address.last_update.eq:date
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:address.address_id
+   .:address.address
+   .:address.address2
+   .:address.district
+   .:address.city_id
+   .:address.postal_code
+   .:address.phone
+   .:address.last_update
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
       strings.concat
-         .:"describe "
-         .:`
-         get-value:x:@.arguments/*/table
-         .:`
-      mysql.select:x:@strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
 
-      /*
-       * Creating our return value, by projecting it into
-       * a generic form, that does not rely upon MySQL's syntactic
-       * details.
-       */
-      for-each:x:@mysql.select/*
-         unwrap:x:+/*/*
-         .tmp
-            ""
-               name:x:@.dp/#/*/Field
-               db:x:@.dp/#/*/Type
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
 
-         // Checking if column is nullable.
-         if
-            eq
-               get-value:x:@.dp/#/*/Null
-               .:NO
-            .lambda
-               add:x:@.tmp/*
-                  .
-                     nullable:bool:false
-         else
-            add:x:@.tmp/*
-               .
-                  nullable:bool:true
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-         // Checking if column is a part of the primary key.
-         if
-            eq
-               get-value:x:@.dp/#/*/Key
-               .:PRI
-            .lambda
-               add:x:@.tmp/*
-                  .
-                     primary:bool:true
-         else
-            add:x:@.tmp/*
-               .
-                  primary:bool:false
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:address
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
 
-         // Checking if column has a default value.
-         if
-            or
-               and
-                  not
-                     eq
-                        get-value:x:@.dp/#/*/Default
-                        .:
-                  not
-                     eq
-                        get-value:x:@.dp/#/*/Default
-                        .
-               eq
-                  get-value:x:@.dp/#/*/Extra
-                  .:auto_increment
-               eq
-                  get-value:x:@.dp/#/*/Extra
-                  .:DEFAULT_GENERATED
-            .lambda
-               add:x:@.tmp/*
-                  .
-                     automatic:bool:true
-         else
-            add:x:@.tmp/*
-               .
-                  automatic:bool:false
-
-         /*
-          * Figuring our which Hyperlambda type to project
-          * its database type to.
-          */
-         .type
-
-         // Checking for boolean types.
-         if
-            or
-               eq
-                  get-value:x:@.dp/#/*/Type
-                  .:tinyint(1)
-               eq
-                  get-value:x:@.dp/#/*/Type
-                  .:bool
-               eq
-                  get-value:x:@.dp/#/*/Type
-                  .:boolean
-            .lambda
-
-               // This is some sort of boolean type.
-               set-value:x:@.type
-                  .:bool
-         else
-
-            // Anything BUT booleans.
-            strings.regex-replace:x:@.dp/#/*/Type
-               .:"\\([0-9,]+\\)"
-               .:
-            strings.replace:x:@strings.regex-replace
-               .:" unsigned"
-               .:
-            switch:x:@strings.replace
-
-               // Everything transformed into date values.
-               case:date
-               case:datetime
-               case:timestamp
-                  set-value:x:@.type
-                     .:date
-
-               // Everything transformed into decimal values.
-               case:float
-               case:double
-               case:double precision
-               case:decimal
-               case:dec
-                  set-value:x:@.type
-                     .:decimal
-
-               // Everything transformed into integer long values.
-               case:bit
-               case:tinyint
-               case:bool
-               case:boolean
-               case:smallint
-               case:mediumint
-               case:integer
-               case:bigint
-               case:int
-               case:int unsigned
-                  set-value:x:@.type
-                     .:long
-
-               // Everything transformed into string values.
-               case:char
-               case:varchar
-               case:binary
-               case:varbinary
-               case:tinyblob
-               case:tinytext
-               case:text
-               case:blob
-               case:mediumtext
-               case:mediumblob
-               case:longtext
-               case:longblob
-               case:enum
-               case:set
-                  set-value:x:@.type
-                     .:string
-
-               // Everything transformed into boolean.
-               case:tinyint
-                  set-value:x:@.type
-                     .:bool
-
-               // Default/special cases.
-               default
-                  if
-                     strings.starts-with:x:@strings.replace
-                        .:enum
-                     .lambda
-
-                        // Enum type
-                        set-value:x:@.type
-                           .:string
-                  else
-
-                     // Defaulting to string type.
-                     set-value:x:@.type
-                        .:string
-
-         // Adding Hyperlambda type to [.tmp] above.
-         unwrap:x:+/*/*
-         add:x:@.tmp/*
-            .
-               hl:x:@.type
-
-         // Adding [.tmp] to [return-nodes] below.
-         add:x:../*/mysql.connect/*/return-nodes
-            get-nodes:x:@.tmp/*
-
-      // Returning results to caller.
-      return-nodes
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

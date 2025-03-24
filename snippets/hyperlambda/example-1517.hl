@@ -1,24 +1,16 @@
-/*
- * Validates a session ID by POSTing it to an authentication API.
- * If the HTTP status code is within 200–299, the response content is returned.
- */
 
-.arguments
-   id:int
+// Create a Hyperlambda snippet that repeats logging while [.attempts] is below 3.
 
-http.post:"https://auth.example.com/api/validate-session"
-   convert:true
-   payload
-      session_id:x:@.arguments/*/id
-
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
+// Repeats logging while [.attempts] is below 3.
+.attempts:int:0
+while
+   lt
+      get-value:x:@.attempts
+      .:int:3
    .lambda
-      yield
-         result:x:@http.post/*/content/*
-else
-   throw:Session validation failed
+
+      // Logging attempt.
+      log.info:Attempting task
+
+      // Increasing attempt count.
+      math.increment:x:@.attempts

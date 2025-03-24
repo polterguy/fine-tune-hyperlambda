@@ -1,12 +1,37 @@
-// Using [switch] with boolean values to determine if a car part is available
-.available:bool:true
-.result
-switch:x:@.available
 
-   case:bool:true
-      set-value:x:@.result
-         .:Car part is available
+// Delete one record from your plugins table in your cms database
+.arguments
 
-   case:bool:false
-      set-value:x:@.result
-         .:Car part is not available
+   // Primary key of record to delete, mandatory argument
+   id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:plugins
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.plugins.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

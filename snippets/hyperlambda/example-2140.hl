@@ -1,42 +1,24 @@
+/*
+ * Sends a POST request to an internal user service with a user ID.
+ * Verifies that the status code is 2xx and yields the full response content.
+ */
 
-// Create one record in your Genre table in your chinook database.
 .arguments
+   id:int
 
-   // GenreId column value
-   GenreId:long
+http.post:"https://internal.api.example.com/users/lookup"
+   convert:true
+   payload
+      userId:x:@.arguments/*/id
 
-   // Name column value
-   Name:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:partner
-
-// Logging invocation.
-auth.ticket.get
-lambda2hyper:x:@.arguments/*
-log.info:chinook.Genre entry created
-   username:x:@auth.ticket.get
-   arguments:x:@lambda2hyper
-
-// Opening up database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:Genre
-      return-id:bool:false
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      result:success
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         result:x:@http.post/*/content/*
+else
+   throw:User lookup failed

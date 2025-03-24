@@ -1,24 +1,44 @@
-// Hello world, taking name and age, and returning a personalised greeting
+
+// Create one record in your plugins table in your cms database
 .arguments
+
+   // name column value
    name:string
-   age:int
 
-// IMPORTANT! Endpoints and hyperlambda files taking arguments should almost ALWAYS have an [.arguments] node such as above!
+   // description column value
+   description:string
 
-// Ensures name was provided.
-validators.mandatory:x:@.arguments/*/name
+   // is_active column value
+   is_active:long
 
-// Ensures age was provided.
-validators.mandatory:x:@.arguments/*/age
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
 
-// Concatenates the name and age into a greeting.
-strings.concat
-   .:"Hello "
-   get-value:x:@.arguments/*/name
-   .:", you are "
-   get-value:x:@.arguments/*/age
-   .:" years old."
+// Opening up database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
 
-// Returns the greeting to the caller.
-yield
-   greeting:x:@strings.concat
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:plugins
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.plugins.post
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

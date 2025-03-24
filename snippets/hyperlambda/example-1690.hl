@@ -1,8 +1,25 @@
-// This example connects to the 'restaurant' database and inserts a new menu item into the 'menu' table.
-sqlite.connect:restaurant
-   sqlite.create
-      table:menu
-      values
-         dish_name:Margherita Pizza
-         price:decimal:8.50
-         category:Pizza
+/*
+ * Finds other companies a director is affiliated with based on director_nbr
+ */
+.arguments
+   director_id:long
+   limit:long
+   offset:long
+
+data.connect:[mysql|affiliations]
+   database-type:mysql
+
+   data.select:@"
+select d1.org_number, b.company_name, d1.role_name
+   from directors d1
+      join basic b on b.org_number = d1.org_number
+      join directors d2 on d1.director_nbr = d2.director_nbr
+   where d2.director_id = @id and d1.org_number != d2.org_number
+   limit @limit offset @offset"
+      database-type:mysql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   yield
+      cross_affiliations:x:@data.select/*

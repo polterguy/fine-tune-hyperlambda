@@ -1,10 +1,30 @@
-// How can I check if the current user is in the 'admin' role?
-.result
-if
-   auth.ticket.in-role:admin
-   .lambda
-      set-value:x:@.result
-         .:Welcome, admin!
-else
-   set-value:x:@.result
-      .:Access denied
+
+// Creates an item in your cloudlets table in your [generic|hub] database according to the specified arguments.
+.arguments
+   created:date
+   name:string
+   plan:string
+   cluster:string
+   user:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up database connection.
+data.connect:[generic|hub]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:cloudlets
+      return-id:bool:true
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      id:x:@data.create

@@ -1,27 +1,35 @@
 
-// Hyperlambda file and endpoint that changes the password of the currently authenticated user, ensuring the user is authorized.
+// Hyperlambda script that creates a log item using specified arguments like type, content, and meta information.
 .arguments
-   password:string
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/password
-
-// Making sure password is at least 12 characters in length
-validators.string:x:@.arguments/*/password
-   min:12
-
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify
+   type:string
+   content:string
+   meta:*
 
 /*
- * Invokes the slot that does the heavy lifting, and updates the user's current password.
- * 
- * This slot will change the password of the currently logged in user.
+ * Ensures user is authorized to access endpoint.
+ * Notice, we only allow authenticated users to access this endpoint.
+ * What roles they belong to is not important, as long as they're authenticated.
  */
-unwrap:x:+/*
-signal:magic.auth.change-password
-   password:x:@.arguments/*/password
+auth.ticket.verify
 
-// Returns success to caller.
-return-nodes
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/content
+validators.enum:x:@.arguments/*/type
+   .:info
+   .:error
+   .:debug
+   .:fatal
+
+// Creating a log entry using the specified type of logger.
+add:x:../*/log-invocation
+   get-nodes:x:@.arguments/*/meta/*
+set-name:x:../*/log-invocation
+   strings.concat
+      .:log.
+      get-value:x:@.arguments/*/type
+log-invocation:x:@.arguments/*/content
+
+// Returning success to caller.
+return
    result:success

@@ -1,28 +1,63 @@
 
-// Hyperlambda action to throw an exception with a mandatory 'message'. Optionally include 'status' and 'public' to control HTTP propagation and status code. Validate and apply defaults.
+// Create a Hyperlambda script that returns all filtered training snippets as a CSV file, ensuring the user is authorized.
 .arguments
-   message
-      type:string
-      mandatory:bool:true
-   status
-      type:int
-      mandatory:bool:false
-   public
-      type:bool
-      mandatory:bool:false
+   ml_training_snippets.completion.like:string
+   ml_training_snippets.prompt.like:string
+   ml_training_snippets.uri.like:string
+   ml_training_snippets.type.eq:string
 
-// Use any Angular icon reference here to make sure the action gets a toolbox icon
-.icon:warning
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/message
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-// Applying defaults.
-validators.default:x:@.arguments
-   status:int:500
-   public:bool:false
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*/*/or
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
 
-// Throwing exception.
-throw:x:@.arguments/*/message
-   public:x:@.arguments/*/public
-   status:x:@.arguments/*/status
+   // Removing [or] parts unless we've got something to actually or.
+   if
+      not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
+
+   // Invoking our read slot.
+   data.read
+      table:ml_training_snippets
+      columns
+         type
+         uri
+         prompt
+         completion
+      where
+         and
+            or
+      limit:-1
+
+   // Verifying records exists.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         response.status.set:404
+         return
+            result:No records found
+
+   // Converting result to CSV.
+   lambda2csv:x:@data.read/*
+
+   // Applying correct HTTP header.
+   response.headers.set
+      Content-Type:text/csv
+      Access-Control-Expose-Headers:Content-Disposition
+      Content-Disposition:"attachment; filename=\"training-snippets.csv\""
+
+   // Returning content to caller.
+   return:x:@lambda2csv

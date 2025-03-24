@@ -1,36 +1,16 @@
 
-// Delete one record from your menu_items table in your cms database
-.arguments
+// Provide a Hyperlambda example where [.lambda] runs based on the boolean value of [.flag].
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+// Runs [.lambda] based on the boolean value of [.flag].
+.flag:bool:true
+if
+   eq:x:@.flag
+      .:bool:true
+   .lambda
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-validators.mandatory:x:@.arguments/*/id
+      // Runs when [.flag] is set to true.
+      log.info:[.flag] is enabled
+else
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:menu_items
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.menu_items.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Runs when [.flag] is false.
+   log.info:[.flag] is disabled

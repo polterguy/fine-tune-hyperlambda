@@ -1,35 +1,17 @@
-// Attempts to register a user, throws on 500, fallback message on other errors, and return success to caller if the invocation was a success
 
+// Deletes the specified [username] from the system.
 .arguments
+   username:string
 
-// Status to return
-.register.status
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
 
-// Invoking GET
-http.post:"https://api.example.com/users/register"
-   convert:true
-   payload
-      username:alice
-      email:alice@example.com
-      password:Secure123!
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      set-value:x:@.register.status
-         .:Registration successful
-else-if
-   eq:x:@http.post
-      .:int:500
-   .lambda
-      throw
-         .:Internal server error during registration (500)
-else
-   set-value:x:@.register.status
-      .:Registration failed
+// Opens up database connection.
+data.connect:[generic|magic]
 
-yield
-   result:x:@.register.status
+   // Deleting user from database.
+   data.delete
+      table:users
+      where
+         and
+            username.eq:x:@.arguments/*/username

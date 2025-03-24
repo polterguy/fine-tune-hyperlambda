@@ -1,16 +1,25 @@
 
-// Create a Hyperlambda snippet that executes [.lambda] only if [.status] is true.
+// Write a Hyperlambda script to save a specified file in a specified folder.
+.arguments
+   file:*
+   folder:string
 
-// Executes [.lambda] only if [.status] is true.
-.status:bool:true
-if
-   eq:x:@.status
-      .:bool:true
-   .lambda
+.accept:multipart/form-data
 
-      // Lambda executes when the condition is met.
-      log.info:[.status] is active
-else
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Lambda executes when the condition is false.
-   log.info:[.status] is inactive
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+validators.mandatory:x:@.arguments/*/folder
+
+// Saves the file to the specified folder.
+.full-path
+set-value:x:@.full-path
+   strings.concat
+      get-value:x:@.arguments/*/folder
+      get-value:x:@.arguments/*/file/*/name
+io.stream.save-file:x:@.full-path
+   get-value:x:@.arguments/*/file/*/stream

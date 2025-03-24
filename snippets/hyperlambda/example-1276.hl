@@ -1,45 +1,44 @@
 
-// Counts items from your Customers table in your northwind database
+// Write a Hyperlambda script to create a new training snippet with optional URL, prompt, completion, and type.
 .arguments
-   Customers.CustomerID.like:string
-   Customers.CustomerID.eq:string
-   Customers.CompanyName.like:string
-   Customers.CompanyName.eq:string
-   Customers.ContactName.like:string
-   Customers.ContactName.eq:string
-   Customers.ContactTitle.like:string
-   Customers.ContactTitle.eq:string
-   Customers.Address.like:string
-   Customers.Address.eq:string
-   Customers.City.like:string
-   Customers.City.eq:string
-   Customers.Region.like:string
-   Customers.Region.eq:string
-   Customers.PostalCode.like:string
-   Customers.PostalCode.eq:string
-   Customers.Country.like:string
-   Customers.Country.eq:string
-   Customers.Phone.like:string
-   Customers.Phone.eq:string
-   Customers.Fax.like:string
-   Customers.Fax.eq:string
 
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-   add:x:+/*/where/*
+   // Optional URL for citations
+   uri:string
+
+   // Mandatory prompt or short one liner description
+   prompt:string
+
+   // Mandatory completion being the content or body of your snippet
+   completion:string
+
+   // Mandatory machine learning to to associate snippet with
+   type:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,service
+
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Verifying user can create more snippets.
+   add:x:+
+      get-nodes:x:@.arguments/*/type
+   try-signal:magic.ai.can-create-snippet
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
       get-nodes:x:@.arguments/*
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Customers
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
+   // Creating our record.
+   data.create
+      table:ml_training_snippets
+      return-id:bool:true
+      values
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

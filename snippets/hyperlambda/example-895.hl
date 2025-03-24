@@ -1,7 +1,107 @@
-// Connects to crm SQLite database using generic connection string
-data.connect:[generic|crm]
 
-   // Notice, you can only de-reference the connection created above inside the 'scope' of the [data.connect] slot
-   data.select:select * from contacts
+// Generate filtered result
+.arguments
+   _type:string
 
-// The default database type to use is SQLite
+   // Mandatory and is your SQL filtering condition, for instance 'John Doe' implying keywords the training snippets must contain to be considered. This will become a LIKE SQL condition for records to match, filtering out all records not matching the condition.
+   query:string
+
+   // Mandatory and is your VSS search condition for instance 'address, zip code, location, country, zip'
+   full_query:string
+
+   // Optional and will default to 4000 if not specified
+   max_tokens:int
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/_type
+validators.mandatory:x:@.arguments/*/query
+validators.mandatory:x:@.arguments/*/full_query
+
+// Applying defaults.
+validators.default:x:@.arguments
+   max_tokens:int:4000
+
+// Converting to integer to be safe.
+set-value:x:@.arguments/*/max_tokens
+   convert:x:@.arguments/*/max_tokens
+      type:int
+
+// Retrieving embeddings.
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:openai:key"
+
+// Retrieving embedding for prompt.
+http.post:"https://api.openai.com/v1/embeddings"
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json
+   payload
+      input:x:@.arguments/*/full_query
+      model:text-embedding-ada-002
+   convert:true
+
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+
+      // Oops, error - Logging error and returning OpenAI's HTTP status code to caller.
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         error:x:@lambda2hyper
+      throw:x:@http.post/*/content/*/error/*/message
+         public:bool:true
+         status:x:@http.post
+
+// Converting embeddings to a byte array of floats, since this is how we store embeddings in SQLite.
+floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+
+// Creating our filter string
+.filter
+set-value:x:@.filter
+   strings.concat
+      .:%
+      get-value:x:@.arguments/*/query
+      .:%
+
+// Connecting to database.
+data.connect:[generic|magic]
+
+   // Creating our SQL.
+   strings.concat
+      .:"\nselect vss.rowid as id, ts.prompt, ts.completion, ts.uri\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and\n      (ts.completion like @filter or ts.prompt like @filter) and\n      vss_search(vss.embedding_vss, @embedding)"
+
+   // Executing SQL.
+   data.select:x:@strings.concat
+      embedding:x:@floatArray2bytes
+      type:x:@.arguments/*/_type
+      filter:x:@.filter
+   .cont:bool:true
+   while:x:@.cont
+      lambda2hyper:x:@data.select/*
+      if
+         lt
+            openai.tokenize:x:@lambda2hyper
+            convert:x:@.arguments/*/max_tokens
+               type:int
+         .lambda
+
+            // We're within the max_tokens threshold so we can stop the while loop.
+            set-value:x:@.cont
+               .:bool:false
+      else
+
+         // We're above max_tokens, so we'll need to remove the last snippet.
+         remove-nodes:x:@data.select/0/-
+
+   // Returning result to caller.
+   return-nodes:x:@data.select/*

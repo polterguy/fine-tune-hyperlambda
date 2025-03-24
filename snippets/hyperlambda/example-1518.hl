@@ -1,27 +1,20 @@
-/*
- * Invokes HTTP post with dynamic set of arguments and returning error if unsuccessful,
- * otherwise returns name an email of user
- */
 
+// Returns a single object of the specified type to caller
 .arguments
-   id:int
 
-// Adding ALL arguments to payload.
-add:x:+/*/payload
+   // Mandatory argument declaring the type of object you want to retrieve.
+   type:string
+
+   // Mandatory argument being the id of the object you want to retrieve.
+   id:string
+
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
+
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
    get-nodes:x:@.arguments/*
-http.post:"https://logistics.example.org/get-user"
-   convert:true
-   payload
+execute-file:/modules/netsuite/workflows/workflows/netsuite-get-record.hl
 
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      yield
-         name:x:@http.post/*/content/*/name
-         email:x:@http.post/*/content/*/email
-return
-   error:Something went wrong
+// Returning result to caller.
+return-nodes:x:@execute-file/*

@@ -1,17 +1,17 @@
 
-// Create a Hyperlambda script to compile a snippet of C# code into a library, load it as a plugin, and invoke a slot.
-system.compile
-   references
-      .:netstandard
-      .:System.Runtime
-      .:System.Private.CoreLib
-      .:magic.node
-      .:magic.signals.contracts
-   code:"\n\n// Example C# code creating a Hyperlambda slot.\nusing System;\nusing magic.node;\nusing magic.signals.contracts;\n\n// Our slot class.\n[Slot(Name = \"bar\")]\npublic class Bar : ISlot\n{\n   public void Signal(ISignaler signaler, Node input)\n   {\n      input.Value = \"Hello from C#\";\n   }\n}"
-   assembly-name:bar.dll
+// Hyperlambda API endpoint that saves the specified configuration object to appsettings.json, ensuring the user is authorized.
+.arguments:*
 
-// Loading assembly now that we've created it.
-system.plugin.execute:x:@system.compile
+// Ensuring user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Invoking dynamically created C# slot.
-   bar
+// Converting input arguments to JSON.
+lambda2json:x:@.arguments/*
+   format:true
+
+// Saving the specified config object to the 'appsettings.json' file.
+config.save:x:@lambda2json
+
+// Returning success to caller.
+return
+   result:success

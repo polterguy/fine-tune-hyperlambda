@@ -1,24 +1,15 @@
 /*
- * Returns all companies where the director is no longer active
+ * Sends a multipart email containing both HTML and plain text parts.
+ * Static values are used for 'to', 'subject', and content.
  */
-.arguments
-   director_id:long
-   limit:long
-   offset:long
 
-data.connect:[mssql|legacy_data]
-   database-type:mssql
-
-   data.select:@"
-select b.company_name, d.role_name, d.end_date
-   from directors d
-      join basic b on d.org_number = b.org_number
-   where d.director_id = @id and d.active = 0
-   limit @limit offset @offset"
-      database-type:mssql
-      @id:x:@.arguments/*/director_id
-      @limit:x:@.arguments/*/limit
-      @offset:x:@.arguments/*/offset
-
-   yield
-      inactive_roles:x:@data.select/*
+mail.smtp.send
+   message
+      to
+         recipient:john.doe@example.com
+      subject:Multipart Email Example
+      entity:multipart/alternative
+         entity:text/plain
+            content:This is the plain text version of the email.
+         entity:text/html
+            content:<html><body><h1>This is the HTML version of the email.</h1></body></html>

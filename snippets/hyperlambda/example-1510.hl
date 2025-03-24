@@ -1,24 +1,46 @@
-/*
- * Posts an order ID to the order system to fetch order details.
- * If the request is successful (2xx), the full response content is returned.
- */
 
+// Hyperlambda script for a CRUD update endpoint that updates an existing item in the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
 .arguments
-   id:int
+   name:string
+   description:string
 
-http.post:"https://orders.api.example.com/get-order"
-   convert:true
-   payload
-      order_id:x:@.arguments/*/id
+// Mandatory argument!
+validators.mandatory:x:@.arguments/*/name
 
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      yield
-         result:x:@http.post/*/content/*
-else
-   throw:Failed to fetch order
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our invocation.
+
+   // This adds all arguments EXCEPT the first argument into [values]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+
+   // This makes sure our first argument ([name]) is added into the [and] node
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      table:roles
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning success to caller.
+   response.status.set:202
+   yield
+      affected:x:@data.update

@@ -1,10 +1,26 @@
-// This snippet uses the '[x|y]' iterator to filter by multiple node names.
-.set
-   apple:red
-   banana:yellow
-   cherry:red
-   date:brown
-for-each:x:@.set/*/[apple|cherry]  
-   set-value:x:@.dp/#
-      :picked
-// The expression @.set/*/[apple|cherry] selects all children of .set whose name is "apple" or "cherry". The loop sets those nodes' values to "picked".
+
+// Hyperlambda script for a CRUD delete endpoint that deletes one item from the users table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   username:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/username
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:users
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

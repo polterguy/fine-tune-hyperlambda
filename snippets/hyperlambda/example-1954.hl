@@ -1,28 +1,30 @@
-// Attempts to fetch a random cat fact, throws on 500, fallback message otherwise
 
-// Buffer node to store our fact
-.cat-fact
+// Ensures our system messages are updated during deployments
+io.file.list:/modules/finovo/system-messages/
 
-// Retrieving a random cat fact
-http.get:"https://meowfacts.herokuapp.com/"
-   convert:true
+// Opening up database connection.
+data.connect:magic
 
-// Making sure it's a success
-if
-   and
-      mte:x:@http.get
-         .:int:200
-      lt:x:@http.get
-         .:int:300
-   .lambda
-      set-value:x:@.cat-fact
-         get-value:x:@http.get/*/content/*/data/0
-else-if
-   eq:x:@http.get
-      .:int:500
-   .lambda
-      throw
-         .:Server error while fetching cat fact (500)
-else
-   set-value:x:@.cat-fact
-      .:Failed to fetch cat fact
+   // Looping through each system message and updating our machine learning type accordingly.
+   for-each:x:@io.file.list/*
+
+      // Loading file.
+      io.file.load:x:@.dp/#
+
+      // Finding type name
+      .type
+      strings.split:x:@.dp/#
+         .:/
+      strings.split:x:-/0/-
+         .:.
+      set-value:x:@.type
+         get-value:x:@strings.split/0
+
+      // Updating type name's system message.
+      data.update
+         table:ml_types
+         values
+            system_message:x:@io.file.load
+         where
+            and
+               type.eq:x:@.type

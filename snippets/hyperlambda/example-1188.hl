@@ -1,11 +1,29 @@
 
-// Write a Hyperlambda snippet that opens a connection to 'warehouse_db' and gets recent inventory changes.
+// Hyperlambda script returning a named task to the caller.
+.arguments
+   offset:long
+   limit:long
+   filter:string
 
-// Opens a connection to "warehouse_db" and gets recent inventory changes.
-.result
-data.connect:warehouse_db
-   database-type:sqlite
-   data.select:select * from inventory_changes order by modified_at desc limit 15
-      database-type:sqlite
-   add:x:@.result
-      get-nodes:x:@data.select/*
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Retrieves all scheduled tasks in the system.
+add:x:../*/tasks.list
+   get-nodes:x:@.arguments/*/offset
+   get-nodes:x:@.arguments/*/limit
+tasks.list:x:@.arguments/*/filter
+
+// Retrieving schedules for tasks, if any.
+include:x:@tasks.list/*
+   tasks.get:x:@.dp/#/*/id
+      schedules:true
+   add:x:+/*
+      get-nodes:x:@tasks.get/*/schedules/*
+   add:x:./*/return/*/schedules
+      .
+   return
+      schedules
+
+// Returning the results of the evaluation to caller.
+return-nodes:x:@tasks.list/*

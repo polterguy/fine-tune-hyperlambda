@@ -1,131 +1,81 @@
 
-// Adds additional extra fields to be associated with the user after registration, including IP address and location information.
+// Hyperlambda endpoint that sends an email to the cloudlet owner with specified details, ensuring the email body is transformed into HTML.
 .arguments
-   username:string
-   recaptcha_response:string
 
-// Sanity checking invocation
-validators.mandatory:x:@.arguments/*/username
+   // Mandatory argument being the reply to name of the person sending the email.
+   reply-to:string
+
+   // Mandatory argument being the email address of the person sending the email.
+   reply-to-email:string
+
+   // Mandatory argument being the subject line of the email.
+   subject:string
+
+   // Mandatory argument being the body of the email to send. This argument can be Markdown at which point it will be automatically transformed into HTML.
+   body:string
+
+// HTML encodes the specified [html] and returns to caller.
+execute:magic.workflows.actions.execute
+   name:html-encode-body
+   filename:/misc/workflows/actions/misc/html-encode.hl
+   arguments
+      html:x:@.arguments/*/body
+
+// HTML encodes the specified [html] and returns to caller.
+execute:magic.workflows.actions.execute
+   name:html-encode-subject
+   filename:/misc/workflows/actions/misc/html-encode.hl
+   arguments
+      html:x:@.arguments/*/subject
+
+// Transforms the specified [markdown] to HTML and returns to caller.
+execute:magic.workflows.actions.execute
+   name:markdown2html
+   filename:/misc/workflows/actions/misc/markdown2html.hl
+   arguments
+      markdown:x:--/execute/=html-encode-body/*/content
 
 /*
- * Checking if backend is configured to use reCAPTCHA, and if so,
- * making sure we ensure the frontend supplied a [recaptcha_response],
- * and invoking slot responsible for verifying reCAPTCHA value.
+ * Returns the specified [key] configuration setting.
+ * 
+ * Notice, to traverse into for instance magic.foo.bar, you'll have to colon separate
+ * your path as follows "magic:foo:bar".
  */
-config.get:"magic:auth:recaptcha:key"
-if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-   .lambda
+execute:magic.workflows.actions.execute
+   name:config-name
+   filename:/misc/workflows/actions/misc/config.hl
+   arguments
+      key:"magic:smtp:from:name"
 
-      // [recaptcha_response] is a mandatory field.
-      validators.mandatory:x:@.arguments/*/recaptcha_response
+/*
+ * Returns the specified [key] configuration setting.
+ * 
+ * Notice, to traverse into for instance magic.foo.bar, you'll have to colon separate
+ * your path as follows "magic:foo:bar".
+ */
+execute:magic.workflows.actions.execute
+   name:config-email
+   filename:/misc/workflows/actions/misc/config.hl
+   arguments
+      key:"magic:smtp:from:address"
 
-      // Retrieving secret and invoking slot responsible for verifying reCAPTCHA value.
-      config.get:"magic:auth:recaptcha:secret"
-      validators.recaptcha:x:@.arguments/*/recaptcha_response
-         min:decimal:0.3
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-
-// Opening up database connection
-data.connect:[generic|magic]
-
-   // Retrieving IP address of user
-   .ip
-   set-value:x:-
-      get-first-value
-         request.headers.get:cf-connecting-ip
-         request.ip
-
-   /*
-    * Verifying user is still unconfirmed for security reasons,
-    * to prevent malicious users from changing countries of users
-    * already having invoked endpoint, and/or retrieve usernames in
-    * the system.
-    */
-   data.read
-      table:users_roles
-      values
-         role
-      where
-         and
-            user.eq:x:@.arguments/*/username
-            role.eq:unconfirmed
-   if
-      not
-         exists:x:@data.read/*/*
-      .lambda
-
-         // Oops, malicious invocation!
-         log.error:User attempted to initialise his or her IP address twice
-            username:x:@.arguments/*/username
-            ip:x:@.ip
-
-         // To avoid giving the malicious user hints to whether or not user exists, we return 404.
-         throw:No such user
-            public:true
-            status:404
-
-   // Checking if we've got an IP API key.
-   .ip-api-key
-   set-value:x:-
-      config.get:"magic:ipapi-key"
-
-   // Decorating and invoking IP API.
-   .url
-   set-value:x:-
-      strings.concat
-         .:"https://ipapi.co/"
-         get-value:x:@.ip
-         .:/json/
-   if
-      not-null:x:@.ip-api-key
-      .lambda
-         set-value:x:@.url
-            strings.concat
-               get-value:x:@.url
-               .:?key=
-               config.get:"magic:ipapi-key"
-   http.get:x:@.url
-      convert:true
-
-   // Inserting user's IP address used during registration into extra-fields.
-   data.create
-      table:users_extra
-      values
-         user:x:@.arguments/*/username
-         type:registration-ip-address
-         value:x:@.ip
-
-   // Associating fields with user as extra info
-   .fields
-      .:country
-      .:postal
-      .:country_calling_code
-   for-each:x:@.fields/*
-
-      // Checking if IP API returned the specified value for the currently iterated field.
-      if
-         and
-            exists:x:"@http.get/*/content/*/\"{@.dp/#}\""
-            neq:x:"@http.get/*/content/*/\"{@.dp/#}\""
-               .
-            neq:x:"@http.get/*/content/*/\"{@.dp/#}\""
-               .:
-         .lambda
-
-            // Inserting field into database to associate information with user.
-            data.create
-               table:users_extra
-               values
-                  user:x:@.arguments/*/username
-                  type:x:@.dp/#
-                  value:x:"@http.get/*/content/*/\"{@.dp/#}\""
-
-// Returning success to caller.
+/*
+ * Send an email to the specified [name]/[email] recipient, with the specified [subject] and [body].
+ * 
+ * Optionally supply [from] and [from-email] as name/email sender, and/or [reply-to] and [reply-to-email]
+ * as the email to reply to. If you don't supply [from] or [from-email] then this action will use the
+ * default sender settings from your configuration.
+ */
+execute:magic.workflows.actions.execute
+   name:email
+   filename:/misc/workflows/actions/misc/email.hl
+   arguments
+      reply-to:x:@.arguments/*/reply-to
+      subject:x:--/execute/=html-encode-subject/*/content
+      body:x:--/execute/=markdown2html/*/html
+      html:bool:true
+      name:x:--/execute/=config-name/*/value
+      email:x:--/execute/=config-email/*/value
+      reply-to-email:x:@.arguments/*/reply-to-email
 return
    result:success

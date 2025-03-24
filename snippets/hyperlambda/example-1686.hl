@@ -1,80 +1,24 @@
-
-// Count unique and distinct items from your Customers table in your northwind database
+/*
+ * Returns companies where the director has taken a role within the last year
+ */
 .arguments
+   director_id:long
+   limit:long
+   offset:long
 
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+data.connect:[pg|appointments_log]
+   database-type:pgsql
 
-   /*
-    * Filtering columns
-    * - '.eq' implies equals
-    * - '.like' implies like filtering using SQL 'LIKE' where condition
-    */
-   Customers.CustomerID.like:string
-   Customers.CustomerID.eq:string
-   Customers.CompanyName.like:string
-   Customers.CompanyName.eq:string
-   Customers.ContactName.like:string
-   Customers.ContactName.eq:string
-   Customers.ContactTitle.like:string
-   Customers.ContactTitle.eq:string
-   Customers.Address.like:string
-   Customers.Address.eq:string
-   Customers.City.like:string
-   Customers.City.eq:string
-   Customers.Region.like:string
-   Customers.Region.eq:string
-   Customers.PostalCode.like:string
-   Customers.PostalCode.eq:string
-   Customers.Country.like:string
-   Customers.Country.eq:string
-   Customers.Phone.like:string
-   Customers.Phone.eq:string
-   Customers.Fax.like:string
-   Customers.Fax.eq:string
+   data.select:@"
+select b.company_name, d.role_name, d.start_date
+   from directors d
+      inner join basic b on b.org_number = d.org_number
+   where d.director_id = @id and d.start_date >= current_date - interval '1 year'
+   limit @limit offset @offset"
+      database-type:pgsql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
 
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:Customers.CustomerID
-   .:Customers.CompanyName
-   .:Customers.ContactName
-   .:Customers.ContactTitle
-   .:Customers.Address
-   .:Customers.City
-   .:Customers.Region
-   .:Customers.PostalCode
-   .:Customers.Country
-   .:Customers.Phone
-   .:Customers.Fax
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
-      strings.concat
-         .:"count(distinct "
-         get-value:x:@.arguments/*/distinct_column
-         .:)
-
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Customers
-      columns
-         distinct_functor
-            as:count
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   yield
+      recent_roles:x:@data.select/*

@@ -1,17 +1,120 @@
 
-// Hyperlambda endpoint taking ZERO arguments. The SQL aggregates and returns the top 25 artists with the most albums from the chinook database.
+// Hyperlambda action for workflows that executes a SQL CRUD Read operation with specified 'database-type', 'connection-string', 'database', 'table', and optional filters like 'and', 'or', 'limit', 'offset', 'order', 'direction'. Validate mandatory fields and enums.
 .arguments
+   database-type
+      type:enum
+      mandatory:bool:true
+      values
+         .:sqlite
+         .:mssql
+         .:mysql
+         .:pgsql
+   connection-string
+      type:string
+      mandatory:bool:true
+   database
+      type:string
+      mandatory:bool:true
+   table
+      type:string
+      mandatory:bool:true
+   columns
+      type:array
+      mandatory:bool:false
+   and
+      type:key-value
+      mandatory:bool:false
+   or
+      type:key-value
+      mandatory:bool:false
+   limit
+      type:int
+      mandatory:bool:false
+   offset
+      type:int
+      mandatory:bool:false
+   order
+      type:string
+      mandatory:bool:false
+   direction
+      type:enum
+      mandatory:bool:false
+      values
+         .:asc
+         .:desc
+.icon:cloud_download
 
-// Making sure user is authorized to invoke endpoint.
-auth.ticket.verify:root,admin
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/table
+validators.enum:x:@.arguments/*/database-type
+   .:sqlite
+   .:mssql
+   .:mysql
+   .:pgsql
+
+// Applying defaults.
+validators.default:x:@.arguments
+   connection-string:generic
+   database-type:sqlite
+   database:magic
+
+// Ensuring user provided either [or] or [and] and not both.
+if
+   and
+      exists:x:@.arguments/*/or/*
+      exists:x:@.arguments/*/and/*
+   .lambda
+      throw:Provide either [or] or [and] to sql-read action, and not both
+         public:bool:true
+         status:500
+
+// Connection string to actually use as we connect.
+.connection-string
+
+// Caller supplied an explicit [connection-string] argument.
+set-value:x:@.connection-string
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connection-string
+      .:|
+      get-value:x:@.arguments/*/database
+      .:]
 
 // Connecting to database.
-data.connect:chinook
-   database-type:sqlite
+data.connect:x:@.connection-string
+   database-type:x:@.arguments/*/database-type
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Script to aggregate records for each artist in chinook database.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect ar.Name, count(*) as count\n  from Album al, Artist ar where al.ArtistId = ar.ArtistId\n  group by al.ArtistId\n  order by count desc\n  limit 25\n"
-      database-type:sqlite
+   // Checking if caller provided explicit [columns].
+   if
+      exists:x:@.arguments/*/columns/*
+      .lambda
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+         // Adding explicit columns declaration
+         add:x:@data.connect/*/data.read
+            .
+               columns
+         for-each:x:@.arguments/*/columns/*
+            set-name:x:./0/-/*/*
+               get-value:x:@.dp/#
+            add:x:@data.connect/*/data.read/*/columns
+               .
+                  name
+
+   // Adding [limit], [offset], [order] and [direction] arguments.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+
+   // Adding [or] or [and] arguments.
+   add:x:@data.connect/*/data.read/*/where
+      get-nodes:x:@.arguments/*/or
+      get-nodes:x:@.arguments/*/and
+
+   // Executing SQL.
+   data.read
+      database-type:x:@.arguments/*/database-type
+      table:x:@.arguments/*/table
+      where
+   return-nodes:x:@data.read/*

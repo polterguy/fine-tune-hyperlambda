@@ -1,91 +1,28 @@
 
-// Returns number of registrations for the last 14 days grouped by day.
-auth.ticket.get
+// Hyperlambda script to load a specified file and return it as 'application/octet-stream' with appropriate headers.
+.arguments
+   access_token:string
+   file:string
 
-// Storing commission for later.
-.percent
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/access_token
 
-// Ensuring user is an affiliate
-data.connect:[generic|magic]
+/*
+ * Loading file and returning it, as text content to caller, making
+ * sure we return the correct Content-Type in the process.
+ */
+strings.split:x:@.arguments/*/file
+   .:/
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@strings.split/0/-
+   .:"\""
+response.headers.set
+   Content-Type:application/octet-stream
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
 
-   /*
-    * Retrieving affiliate percent for user.
-    * Notice, if user doesn't have an affiliate percent, user ir
-    * not an affiliate.
-    */
-   data.read
-      table:users_extra
-      columns
-         value
-      where
-         and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
-   if
-      not-exists:x:@data.read/*/*/value
-      .lambda
-
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
-
-   // Storing percentage for later.
-   convert:x:@data.read/*/*/value
-      type:decimal
-   set-value:x:@.percent
-      math.divide:x:@convert
-         .:decimal:100
-
-// Connecting to Stripe database.
-data.connect:[generic|stripe]
-
-   // Retrieving transactions from database.
-   data.select:"\nselect date_format(t.created, '%Y-%m-%d') as date, sum(amount) as amount\n   from transactions t\n      where t.created > now() - interval 6 week and\n         t.affiliate = @affiliate and\n         t.type = 'charge.succeeded'\n   group by date\n   order by date asc"
-      @affiliate:x:@auth.ticket.get
-
-   // Looping through all days the last 6 weeks.
-   .buffer
-   .cur
-   set-value:x:@.cur
-      math.subtract
-         date.now
-         time
-            days:42
-   while
-      lt:x:@.cur
-         date.now
-      .lambda
-         date.format:x:@.cur
-            format:yyyy-MM-dd
-         if
-            exists:x:@data.select/*/*/date/={@date.format}
-            .lambda
-               set-value:x:@data.select/*/*/date/={@date.format}/./*/amount
-                  math.multiply:x:@data.select/*/*/date/={@date.format}/./*/amount
-                     get-value:x:@.percent
-               get-nodes:x:@data.select/*/*/date/={@date.format}/.
-               add:x:@.buffer
-                  get-nodes:x:@data.select/*/*/date/={@date.format}/.
-         else
-            unwrap:x:+/*/*/*
-            add:x:@.buffer
-               .
-                  .
-                     date:x:@date.format
-                     amount:int:0
-
-         // Decrementing current day.
-         set-value:x:@.cur
-            math.add:x:@.cur
-               time
-                  days:1
-
-   // Applying some HTTP caching since endpoint is kind of expensive to invoke.
-   response.headers.set
-      Cache-Control:public, max-age=3600
-
-   // Returning result to caller.
-   return-nodes:x:@.buffer/*
+// This avoids loading the whole file into memory, instead it will stream the file's content directly back to the client.
+io.stream.open-file:x:@.arguments/*/file
+return:x:-

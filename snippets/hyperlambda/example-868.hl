@@ -1,24 +1,30 @@
-/*
- * The following code compiles the "/etc/foo.cs" file and saves it as an assembly
- * in "/etc/foo.dll".
- */
-io.file.load:/etc/foo.cs
-system.compile
-   references
-      .:netstandard
-      .:System.Runtime
-      .:System.Console
-      .:System.Private.Uri
-      .:System.ComponentModel
-      .:System.Private.CoreLib
-      .:System.Net.Primitives
-      .:magic.node
-      .:magic.node.extensions
-      .:magic.library
-      .:magic.signals.contracts
-   code:x:@io.file.load
-   assembly-name:foo.dll
 
-// Saving our compiled CLR assembly to '/etc/foo.dll'.
-io.file.save.binary:/etc/foo.dll
-   get-value:x:@system.compile
+// Delete one record from your Invoice table in your chinook database.
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   InvoiceId:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/InvoiceId
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Invoice
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

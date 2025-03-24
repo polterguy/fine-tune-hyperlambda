@@ -1,37 +1,27 @@
-// Build the dynamic JSON payload
-.payload
-   api_key:sk_test_51H9...
-   scope:all
+// Executing the following Hyperlambda results in the following
 
-// Create headers for content-type and custom request ID
-.headers
-   Content-Type:application/json
-   X-Request-ID:api-call-002
+// When executing the following Hyperlambda
+.static:JO
+.data
+   foo1:bar1
+   foo2:bar2
+   foo3:bar3
+include:x:@.data/*
+   strings.concat
+      get-value:x:@.dp/#
+      .:" howdy "
+      get-value:x:@.static
+   unwrap:x:+/*
+   return
+      howdy:x:@strings.concat
 
-// Make the HTTP POST request
-add:x:./*/http.post/*/headers
-   get-nodes:x:@.headers/*
-add:x:./*/http.post/*/payload
-   get-nodes:x:@.payload/*
-http.post:"https://api.example.com/token/validate"
-   headers
-   payload
-   convert:true
-
-// Verify 2xx response
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      .token-status
-      set-value:x:@.token-status
-         get-value:x:@http.post/*/content/*/status
-
-      .plan-type
-      set-value:x:@.plan-type
-         get-value:x:@http.post/*/content/*/plan
-else
-   throw:Token validation failed
+// We end up with this result
+.static:JO
+.data
+   foo1:bar1
+      howdy:bar1 howdy JO
+   foo2:bar2
+      howdy:bar2 howdy JO
+   foo3:bar3
+      howdy:bar3 howdy JO
+include:x:@.data/*

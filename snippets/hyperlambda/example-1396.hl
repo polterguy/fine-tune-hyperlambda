@@ -1,7 +1,30 @@
-/*
- * This example checks if "/tmp/session/" exists before deleting it.
- */
-if
-   io.folder.exists:/tmp/session/
-   .lambda
-      io.folder.delete:/tmp/session/
+
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the questionnaires table in the magic database with a name matching the argument, ensuring authentication and authorization for root and admin roles.
+.arguments
+   name:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/name
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:questionnaires
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

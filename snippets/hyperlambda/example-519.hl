@@ -1,31 +1,47 @@
 
-// Compiles C# code files required to wire up module correctly
-
-// Assumes this file exists and is valid C# code (for .Net Core)
-io.file.load:/modules/netsuite/magic.startup/csharp/GenerateToken.cs.raw
-
-// Compiling file into an assembly.
-system.compile
-   references
-      .:netstandard
-      .:System.Linq
-      .:System.Runtime
-      .:System.Net.Http
-      .:System.Private.Uri
-      .:System.ComponentModel
-      .:System.Private.CoreLib
-      .:System.Linq.Expressions
-      .:System.Security.Cryptography
-      .:Microsoft.IdentityModel.Tokens
-      .:System.IdentityModel.Tokens.Jwt
-      .:Microsoft.IdentityModel.Abstractions
-      .:Newtonsoft.Json
-      .:magic.node
-      .:magic.node.extensions
-      .:magic.signals.contracts
-      .:System.Net.Primitives
-   code:x:@io.file.load
-   assembly-name:dynamic.magic.lambda.netsuite.dll
-
-// Loading assembly as plugin now that we've created it.
-system.plugin.load:x:@system.compile
+// KPI file for accounts that was created each day the last 14 days
+.name:New accounts
+.description:New accounts per day the last 14 days
+.enabled:bool:false
+.type:line
+.lambda
+   .now
+   set-value:x:-
+      math.subtract
+         date.now
+         time
+            days:13
+   data.connect:[generic|robo-crm]
+      while
+         lt:x:@.now
+            date.now
+         .lambda
+            .max
+            set-value:x:@.max
+               math.add:x:@.now
+                  time
+                     days:1
+            date.format:x:@.now
+               format:yyyy-MM-dd
+            date.format:x:@.max
+               format:yyyy-MM-dd
+            data.read
+               table:accounts
+               columns
+                  count(*)
+                     as:name
+               where
+                  and
+                     created.mt:x:@date.format/@date.format
+                     created.lt:x:@date.format
+            unwrap:x:+/*/*/*
+            add:x:../*/return
+               .
+                  .
+                     name:x:@date.format/@date.format
+                     value:x:@data.read/*/*
+            set-value:x:@.now
+               math.add:x:@.now
+                  time
+                     days:1
+   return

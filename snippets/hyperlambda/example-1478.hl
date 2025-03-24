@@ -1,15 +1,69 @@
 
-// Hyperlambda script that update an item in a specified database and table using SQLite, with a specific ID and new values.
-data.connect:DATABASE_NAME
+// Read endpoint with paging, sorting, filtering selecting records from your crawl_urls table.
+.arguments
+
+   // Number of records to return
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // What column to order by
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // crawl_urls table crawl_url_id column equality exact match filtering
+   crawl_urls.crawl_url_id.eq:long
+
+   // crawl_urls table url column wildcard filtering with SQL like '%' comparison
+   crawl_urls.url.like:string
+
+   // crawl_urls table url column equality exact match filtering
+   crawl_urls.url.eq:string
+
+   // crawl_urls table type column wildcard filtering with SQL like '%' comparison
+   crawl_urls.type.like:string
+
+   // crawl_urls table type column equality exact match filtering
+   crawl_urls.type.eq:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|scraper]
    database-type:sqlite
 
-   // Invoking our update slot.
-   data.update
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
       database-type:sqlite
-      table:TABLE_NAME
-      values
-         column1:NEW_VALUE_HERE
-         column2:ANOTHER NEW_VALUE_HERE
+      table:crawl_urls
+      columns
+         crawl_urls.crawl_url_id
+         crawl_urls.url
+         crawl_urls.type
       where
          and
-            id.eq:x:@WHATEVER_ID_HERE
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

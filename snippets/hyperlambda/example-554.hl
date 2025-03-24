@@ -1,36 +1,53 @@
 
-// Delete one record from your media table in your cms database
-.arguments
+/*
+ * Returns a stacked chart image to caller.
+ * 
+ * Values is a mandatory comma separated list of values.
+ */
+.arguments:*
 
-   // Primary key of record to delete, mandatory argument
-   id:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/legend
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
-validators.mandatory:x:@.arguments/*/id
+// Creating our individual bars.
+.bars
+for-each:x:@.arguments/*
+   get-name:x:@.dp/#
+   if
+      not
+         strings.starts-with:x:@get-name
+            .:legend
+      .lambda
 
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
+         // Adding primary node for bar.
+         set-name:x:+/*/*
+            get-value:x:@get-name
+         add:x:@.bars
+            .
+               .
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+         // Adding values for individual cells.
+         add:x:@.bars/0/-
+            strings.split:x:@.dp/#
+               .:,
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:media
-      where
-         and
+// Creating our legend.
+add:x:../*/image.chart/*/legend
+   strings.split:x:@.arguments/*/legend
+      .:,
 
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.media.delete
-      args
+// Parametrizing [image.chart] invocation.
+add:x:../*/image.chart/*/bars
+   get-nodes:x:@.bars/*
+image.chart:stacked
+   width:800
+   height:500
+   bars
+   legend
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Applying correct HTTP header.
+response.headers.set
+   Content-Type:image/png
+
+// Returning chart to caller.
+return:x:@image.chart

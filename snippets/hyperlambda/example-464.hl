@@ -1,236 +1,80 @@
 
-// Adds the specified table to the specified database.
+// Hyperlambda workflow action returning [max_tokens] context from the specified [url].
 .arguments
-   databaseType:string
-   connectionString:string
-   databaseName:string
-   tableName:string
-   pkName:string
-   pkType:string
-   pkLength:int
-   pkDefault:string
-   generate:bool
-
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   url
+      type:string
+      mandatory:bool:true
+   max_tokens
+      type:int
+      default:int:4000
+   throw
+      type:boolean
+      default:bool:false
+.icon:extension
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/connectionString
-validators.mandatory:x:@.arguments/*/databaseName
-validators.mandatory:x:@.arguments/*/tableName
-validators.mandatory:x:@.arguments/*/pkName
-validators.mandatory:x:@.arguments/*/pkType
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:sqlite
-   .:pgsql
-   .:mssql
-validators.enum:x:@.arguments/*/pkType
-   .:auto_increment
-   .:varchar
+validators.mandatory:x:@.arguments/*/url
 
-// SQL that executes to modify DDL.
-.sql
+// Applying default values for optional arguments.
+validators.default:x:@.arguments
+   max_tokens:int:4000
 
-// Creating our correct SQL according to [databaseType].
-switch:x:@.arguments/*/databaseType
-   case:sqlite
-      .type
-      if
-         eq:x:@.arguments/*/pkType
-            .:auto_increment
-         .lambda
-            set-value:x:@.type
-               strings.concat
-                  .:integer not null primary key autoincrement
-      else
-         set-value:x:@.type
-            strings.concat
-               get-value:x:@.arguments/*/pkType
-               .:(
-               get-value:x:@.arguments/*/pkLength
-               .:) not null primary key
-      set-value:x:@.sql
-         strings.concat
-            .:"create table "
-            get-value:x:@.arguments/*/tableName
-            .:(
-            get-value:x:@.arguments/*/pkName
-            .:" "
-            get-value:x:@.type
-      if
-         and
-            exists:x:@.arguments/*/pkDefault
-            neq:x:@.arguments/*/pkDefault
-               .
-            neq:x:@.arguments/*/pkDefault
-               .:
-         .lambda
-            set-value:x:@.sql
-               strings.concat
-                  get-value:x:@.sql
-                  .:" default "
-                  get-value:x:@.arguments/*/pkDefault
-      set-value:x:@.sql
-         strings.concat
-            get-value:x:@.sql
-            .:);
-   case:mysql
-      .type
-      if
-         eq:x:@.arguments/*/pkType
-            .:auto_increment
-         .lambda
-            set-value:x:@.type
-               strings.concat
-                  .:int not null auto_increment primary key
-      else
-         set-value:x:@.type
-            strings.concat
-               get-value:x:@.arguments/*/pkType
-               .:(
-               get-value:x:@.arguments/*/pkLength
-               .:) not null primary key
-      set-value:x:@.sql
-         strings.concat
-            .:"create table "
-            get-value:x:@.arguments/*/tableName
-            .:(
-            get-value:x:@.arguments/*/pkName
-            .:" "
-            get-value:x:@.type
-      if
-         and
-            exists:x:@.arguments/*/pkDefault
-            neq:x:@.arguments/*/pkDefault
-               .
-            neq:x:@.arguments/*/pkDefault
-               .:
-         .lambda
-            set-value:x:@.sql
-               strings.concat
-                  get-value:x:@.sql
-                  .:" default "
-                  get-value:x:@.arguments/*/pkDefault
-      set-value:x:@.sql
-         strings.concat
-            get-value:x:@.sql
-            .:);
-   case:pgsql
-      .type
-      if
-         eq:x:@.arguments/*/pkType
-            .:auto_increment
-         .lambda
-            set-value:x:@.type
-               strings.concat
-                  get-value:x:@.arguments/*/pkName
-                  .:" serial primary key"
-      else
-         set-value:x:@.type
-            strings.concat
-               get-value:x:@.arguments/*/pkName
-               .:" "
-               get-value:x:@.arguments/*/pkType
-               .:(
-               get-value:x:@.arguments/*/pkLength
-               .:) primary key
-      set-value:x:@.sql
-         strings.concat
-            .:"create table "
-            get-value:x:@.arguments/*/tableName
-            .:(
-            get-value:x:@.type
-      if
-         and
-            exists:x:@.arguments/*/pkDefault
-            neq:x:@.arguments/*/pkDefault
-               .
-            neq:x:@.arguments/*/pkDefault
-               .:
-         .lambda
-            set-value:x:@.sql
-               strings.concat
-                  get-value:x:@.sql
-                  .:" default "
-                  get-value:x:@.arguments/*/pkDefault
-      set-value:x:@.sql
-         strings.concat
-            get-value:x:@.sql
-            .:);
-   case:mssql
-      .type
-      if
-         eq:x:@.arguments/*/pkType
-            .:auto_increment
-         .lambda
-            set-value:x:@.type
-               strings.concat
-                  get-value:x:@.arguments/*/pkName
-                  .:" integer"
-                  .:" not null identity(1,1) primary key"
-      else
-         set-value:x:@.type
-            strings.concat
-               get-value:x:@.arguments/*/pkName
-               .:" "
-               get-value:x:@.arguments/*/pkType
-               .:(
-               get-value:x:@.arguments/*/pkLength
-               .:) not null primary key
-      set-value:x:@.sql
-         strings.concat
-            .:"create table "
-            get-value:x:@.arguments/*/tableName
-            .:(
-            get-value:x:@.type
-      if
-         and
-            exists:x:@.arguments/*/pkDefault
-            neq:x:@.arguments/*/pkDefault
-               .
-            neq:x:@.arguments/*/pkDefault
-               .:
-         .lambda
-            set-value:x:@.sql
-               strings.concat
-                  get-value:x:@.sql
-                  .:" default "
-                  get-value:x:@.arguments/*/pkDefault
-      set-value:x:@.sql
-         strings.concat
-            get-value:x:@.sql
-            .:);
+// Retrieving context.
+execute:magic.http.scrape-url
+   url:x:@.arguments/*/url
+if
+   and
+      get-value:x:@.arguments/*/throw
+      not-null:x:@execute
+   .lambda
+      throw:Could not scrape URL
+         public:bool:true
+         status:x:@execute
 
-// Checking if caller only wants to generate SQL statement.
-if:x:@.arguments/*/generate
-   unwrap:x:+/*
-   return
-      sql:x:@.sql
+// Building our context return value.
+.context:
+while
+   and
+      exists:x:@execute/0
+      lt
+         openai.tokenize:x:@.context
+         convert:x:@.arguments/*/max_tokens
+            type:int
+   .lambda
 
-// Creating our database connection.
-strings.concat
-   .:[
-   get-value:x:@.arguments/*/connectionString
-   .:|
-   get-value:x:@.arguments/*/databaseName
-   .:]
-data.connect:x:-
-   database-type:x:@.arguments/*/databaseType
-   data.execute:x:@.sql
-      database-type:x:@.arguments/*/databaseType
+      // Temporary value.
+      .tmp
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@.context
+            .:"\n\n"
+            get-value:x:@execute/0/*/prompt
+            .:"\n\n"
+            get-value:x:@execute/0/*/completion
+      if
+         lt
+            openai.tokenize:x:@.tmp
+            convert:x:@.arguments/*/max_tokens
+               type:int
+         .lambda
 
-// Flushing database cache.
-strings.concat
-   .:magic.sql.databases.
-   get-value:x:@.arguments/*/databaseType
-   :.
-   get-value:x:@.arguments/*/connectionString
-cache.set:x:-
+            // Still below [max_tokes].
+            set-value:x:@.context
+               get-value:x:@.tmp
+
+      // Removing top snippet.
+      remove-nodes:x:@execute/0/*/snippets/0
+      if
+         not-exists:x:@execute/0/*/snippets/0
+         .lambda
+
+            // Removing currently iterated URL.
+            remove-nodes:x:@execute/0
+
+// Trimming result.
+set-value:x:@.context
+   strings.trim:x:@.context
 
 // Returning result to caller.
-unwrap:x:+/*
-return
-   result:success
-   sql:x:@.sql
+yield
+   context:x:@.context

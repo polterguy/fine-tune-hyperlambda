@@ -1,6 +1,92 @@
 
-// Connect using a named connection string "foo" and database "bar", then count records
-data.connect:[foo|bar]
-   data.scalar:select count(*) from users
+/*
+ * Returns segmentation data for an individual customer
+ * 
+ * Optionally apply limit or offset as you see fit.
+ *
+ * Filter is mandatory, and becomes a LIKE where condition that looks through customer name or customer number
+ */
+.arguments
 
-   // [foo|bar] uses connection string "foo" and database "bar" from configuration
+   // Mandatory filtering argument allowing to filter items on customer name or customer no
+   filter:string
+
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
+
+   // Optional offset into records of where to start returning items.
+   offset:long
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Getting limit value, defaulting to 10
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:10
+
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:c.No_
+            .:c.Name
+            .:c.E-Mail
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.eq
+            set-value:x:@.condition/*
+               get-value:x:@.arguments/*/filter
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Reading records.
+   mssql.read
+      table:MNDG$Customer$437dbf0e-84ff-417a-965d-ed2bb9650972
+         as:c
+         join:MNDG$Customer$88c9935b-5e96-4804-b105-5618aa274ae1
+            as:s
+            type:left
+            on
+               and
+                  c.No_.eq:s.No_
+      columns
+         s.No_
+            as:CustomerNo
+         c.Name
+         s.Segment No_
+            as:SegmentNo
+         s.Subsegment No_
+            as:SubSegmentNo
+         s.Value No_
+            as:ValueNo
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         or
+   
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.read/*

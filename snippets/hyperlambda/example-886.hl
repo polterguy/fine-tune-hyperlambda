@@ -1,33 +1,37 @@
+
+// Returns Stripe charges.
+.arguments
+   limit:int
+   starting_after:string
+   customer_id:string
+
 /*
- * Appends the string 'hello' 3 times into a list node
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
  */
-.times:int:0
-.greetings
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
 
-while
-   lt
-      get-value:x:@.times
-      .:int:3
-   .lambda
-      add:x:+/*/*
-      add:x:@.greetings
-         .
-            message:hello
-      math.increment:x:@.times
+/*
+ * Retrieves charges from Stripe.
+ * 
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-charges-get
+   filename:/modules/stripe/workflows/actions/stripe-charges-get.hl
+   arguments
+      limit:x:@.arguments/*/limit
+      starting_after:x:@.arguments/*/starting_after
+      customer_id:x:@.arguments/*/customer_id
 
-// Result:
-.times:int:3
-.greetings
-   message:hello
-   message:hello
-   message:hello
-while:bool:false
-   lt:bool:false
-      get-value:int:3
-      .:int:3
-   .lambda
-      add:x:+/*/*
-      add:x:@.greetings
-         .
-            message:hello
-      math.increment:x:@.times
+// Returns the result of your last action.
+return-nodes:x:@execute/*

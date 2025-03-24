@@ -1,16 +1,24 @@
 
-// Hyperlambda example where a new order is inserted into the 'ecommerce_db' database and its 'orders' table. Use Microsoft SQL Server
-
-// Inserts a new order into the "ecommerce_db" database and its "orders" table.
-data.connect:ecommerce_db
-   database-type:mssql
-
-   // Storing order details.
-   data.create
-      database-type:mssql
-      table:orders
-      values
-         order_id:int:12345
-         user_id:int:1001
-         total:decimal:199.99
-         order_date:date:"2025-04-01T00:00:00.000"
+// KPI file for displaying 10 last log items
+.name:Latest log items
+.description:10 last log items
+.enabled:bool:true
+.type:table
+.lambda
+   data.connect:[generic|magic]
+      data.read
+         table:log_entries
+         columns
+            content
+            created
+         where
+            and
+               content.like:Robo CRM - %
+         order:created
+         direction:desc
+         limit:10
+      for-each:x:@data.read/*
+         set-value:x:@.dp/#/*/content
+            strings.substring:x:@.dp/#/*/content
+               .:int:11
+      return-nodes:x:@data.read/*

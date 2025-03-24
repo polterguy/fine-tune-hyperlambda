@@ -1,31 +1,11 @@
-/*
- * This example checks user role permissions before allowing access.
- * If the user is an "admin", they get full access.
- * If the user is a "moderator" but the feature is disabled, access is denied.
- * Otherwise, they get limited access.
- */
-.user
-   role:moderator
-   feature-enabled:bool:false
 
-.access
-if
-   eq:x:@.user/*/role
-      .:admin
-   .lambda
-      set-value:x:@.access
-         .:Full Access Granted
+// Generate a Hyperlambda snippet that retrieves product inventory from 'inventory_db'.
 
-else-if
-   and
-      eq:x:@.user/*/role
-         .:moderator
-      eq:x:@.user/feature-enabled
-         .:bool:true
-   .lambda
-      set-value:x:@.access
-         .:Limited Access Granted
-
-else
-   set-value:x:@.access
-      .:Access Denied
+// Retrieves product inventory from "inventory_db".
+.result
+data.connect:inventory_db
+   database-type:mysql
+   data.select:select product_id, name, stock, price from products where stock > 0 order by stock asc
+      database-type:mysql
+   add:x:@.result
+      get-nodes:x:@data.select/*

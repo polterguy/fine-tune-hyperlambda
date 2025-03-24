@@ -1,121 +1,84 @@
 
-// Hyperlambda script that searches DuckDuckGo for some query, finds URLs matching a CSS selector, scrapes each URL, and returns the aggregated result as a single Markdown.
-slots.create:magic.http.duckduckgo-and-scrape
+// Hyperlambda script importing a specified page as training data by scraping its content, with options for summarization and content types.
+.arguments
+   url:string
+   type:string
+   threshold:int
+   summarize:bool
+   images:bool
+   lists:bool
+   code:bool
+   feedback-channel:string
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/query
-   validators.string:x:@.arguments/*/query
-      min:3
-      max:250
-   validators.integer:x:@.arguments/*/max
-      min:1
-      max:10
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Searching DuckDuckGo for matches.
-   add:x:+
-      get-nodes:x:@.arguments/*
-   signal:magic.http.duckduckgo-search
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/threshold
+validators.url:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/type
+validators.integer:x:@.arguments/*/threshold
+   min:25
+validators.default:x:@.arguments
+   summarize:bool:true
+   images:bool:true
+   lists:bool:true
+   code:bool:true
 
-   // Checking if we've got a session, and if so, notifying user using web sockets.
-   if
-      exists:x:@.arguments/*/session
-      .lambda
-         for-each:x:@signal/*/result/*
-            strings.concat
-               .:"Scraping: "
-               get-value:x:@.dp/#/*/url
-            unwrap:x:+/**
-            sockets.signal:x:@.arguments/*/session
-               args
-                  message:x:@strings.concat
-                  type:system
-            sleep:100
+// Doing some basic logging.
+log.info:Crawling page generating OpenAI training snippets
+   url:x:@.arguments/*/url
+   type:x:@.arguments/*/type
+   threshold:x:@.arguments/*/threshold
 
-   // Building our execution object that fetches all URLs simultaneously in parallel.
-   .exe
+// Creating a thread and invoking file doing the heavy lifting.
+insert-before:x:./*/fork/0
+   get-nodes:x:@.arguments
+fork
 
-      // Waiting for all scraping operations to return.
-      join
-   for-each:x:@signal/*/result/*
+   // Making sure exceptions does not leave thread.
+   try
 
-      // Dynamically contructing our lambda object.
-      .cur
-         fork
-            .reference
-            try
-               unwrap:x:+/*
-               signal:magic.http.scrape-url
-                  url:x:@.reference/*/url
-                  semantics:bool:true
-               if
-                  exists:x:@.reference/*/session
-                  .lambda
-                     strings.concat
-                        .:"Done scraping "
-                        get-value:x:@.reference/*/url
-                     unwrap:x:+/**
-                     sockets.signal:x:@.reference/*/session
-                        args
-                           message:x:@strings.concat
-                           type:system
-            .catch
-               log.error:Could not scrape URL
-                  url:x:@.reference/*/url
-                  message:x:@.arguments/*/message
+      /*
+       * Invoking crawl implementation file, now with explicit list of links,
+       * informing invocation that we do NOT want to process links.
+       */
+      unwrap:x:+/*
+      signal:magic.ai.url.scrape
+         url:x:@.arguments/*/url
+         type:x:@.arguments/*/type
+         feedback-channel:x:@.arguments/*/feedback-channel
+         threshold:x:@.arguments/*/threshold
+         summarize:x:@.arguments/*/summarize
+         lists:x:@.arguments/*/lists
+         images:x:@.arguments/*/images
+         code:x:@.arguments/*/code
 
-      // Adding URL and title as reference to currently iterated [fork].
-      add:x:+/+/*
-         get-nodes:x:@.arguments/*/session
-      unwrap:x:+/*/*
-      add:x:@.cur/*/fork/*/.reference
-         .
-            url:x:@.dp/#/*/url
-            title:x:@.dp/#/*/title
+      /*
+       * Crawling is done.
+       * Making sure we notify client that we're done and do some logging.
+       */
+      sockets.signal:magic.backend.message
+         roles:root
+         args
+            message:Done creating OpenAI training data from page
+            type:success
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Done!
+            type:success
 
-      // Adding current thread to above [join].
-      add:x:@.exe/*/join
-         get-nodes:x:@.cur/*
+      // Basic logging.
+      log.info:OpenAI training data successfully created from page
+         url:x:@.arguments/*/url
+         type:x:@.arguments/*/type
+   .catch
 
-   // Executing [.exe] retrieving all URLs in parallel.
-   eval:x:@.exe
-   remove-nodes:x:@.exe/**/session
+      // Oops ...!!
+      log.error:x:@.arguments/*/message
+         url:x:@.arguments/*/url
 
-   // Signaling caller on sockets.
-   if
-      exists:x:@.arguments/*/session
-      .lambda
-         sockets.signal:x:@.arguments/*/session
-            args
-               message:Building context
-               type:system
-         sleep:100
-
-   /*
-    * Iterating through each above result,
-    * returning result to caller.
-    * 
-    * Notice, we only iterate through invocations that have result, and
-    * did not timeout by verifying [signal] slot has children.
-    */
-   for-each:x:@.exe/*/join/*/fork
-
-      // Verifying currently iterated node has result, containing both prompt and completion.
-      if
-         exists:x:@.dp/#/*/try/*/signal/*/*/prompt/./*/completion
-         .lambda
-
-            // Adding primary return lambda to [return] below.
-            unwrap:x:+/*/*/*
-            add:x:../*/return
-               .
-                  .
-                     url:x:@.dp/#/*/.reference/*/url
-                     title:x:@.dp/#/*/.reference/*/title
-                     snippets
-
-            // Adding [snippets] to return below.
-            add:x:../*/return/0/-/*/snippets
-               get-nodes:x:@.dp/#/*/try/*/signal/*
-
-   // Returning result of invocation to caller.
-   return
+// Returning success to caller.
+return
+   result:success

@@ -1,46 +1,18 @@
-
-// Updates an existing item in your types table in your [generic|onboarding] database according to the specified arguments.
+/*
+ * Endpoint Hyperlambda file storing a value in the cache with explicit expiration.
+ */
 .arguments
-   name:string
-   description:string
-   max_upload:int
-   max_timeout:int
-   enabled:bool
-   price_reference:string
-   bandwidth:string
+   key:string
+   value:string
+   seconds:int
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/key
+validators.mandatory:x:@.arguments/*/value
+validators.mandatory:x:@.arguments/*/seconds
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/name
+cache.set:x:@.arguments/*/key
+   get-value:x:@.arguments/*/value
+   expiration:x:@.arguments/*/seconds
 
-// Opening up our database connection.
-data.connect:[generic|hub]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-
-   // Invoking our update slot.
-   data.update
-      table:plans
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning success to caller.
-   response.status.set:202
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+return
+   success:true

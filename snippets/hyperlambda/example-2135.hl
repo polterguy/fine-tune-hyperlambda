@@ -1,32 +1,25 @@
 
-// Delete endpoint deleting one record from your products table in your shopping-cart-demo database.
+// Create a Hyperlambda script that changes the password of the currently authenticated user, ensuring the user is authorized.
 .arguments
+   password:string
 
-   // Primary key of record to delete
-   product_id:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/password
+validators.string:x:@.arguments/*/password
+   min:12
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/product_id
+/*
+ * Invokes the slot that does the heavy lifting, and updates the user's current password.
+ * 
+ * This slot will change the password of the currently logged in user.
+ */
+unwrap:x:+/*
+signal:magic.auth.change-password
+   password:x:@.arguments/*/password
 
-// Opening up our database connection.
-data.connect:[generic|shopping-cart-demo]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:products
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returns success to caller.
+return-nodes
+   result:success

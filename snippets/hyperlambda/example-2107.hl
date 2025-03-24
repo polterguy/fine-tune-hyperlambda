@@ -1,11 +1,51 @@
-// Computes net profit by subtracting costs and taxes from revenue
-.finance
-   revenue:int:100000
-   cost:int:40000
-   tax:int:15000
-   netProfit
-set-value:x:@.finance/*/netProfit
-   math.subtract
-      get-value:x:@.finance/*/revenue
-      get-value:x:@.finance/*/cost
-      get-value:x:@.finance/*/tax
+
+// Hyperlambda endpoint for a CRUD update endpoint that updates one record in the ml_training_snippets table in the magic database, filtering which item to update with ID and updating uri, prompt, and completion fields, ensuring authentication and authorization for root roles.
+.arguments
+   id:long
+   uri:string
+   prompt:string
+   completion:string
+   meta:string
+   type:string
+   pushed:long
+   cached:int
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/id
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      table:ml_training_snippets
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

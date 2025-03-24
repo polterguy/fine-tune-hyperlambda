@@ -1,20 +1,45 @@
-/*
- * This script counts the number of Hyperlambda files, in addition to the combined
- * number of nodes, within the specified folder.
- */
-.folder:/
-.loc:int:0
-.files:int:0
-unwrap:x:+/*
-signal:magic.io.file.load-recursively
-   .:x:@.folder
-for-each:x:@signal/*
+
+// Dynamic Hyperlambda slot that invokes an HTTP endpoint using POST, passing in arguments as payload, ensuring the user is authorized.
+slots.create:magic.http.post
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
+
+   // Retrieving URL.
+   .url:x:@.arguments/*/url
+   unwrap:x:@.url
+   remove-nodes:x:@.arguments/*/url
+
+   // Decorating invocation.
+   unwrap:x:./*/http.post
+   add:x:./*/http.post/*/payload
+      get-nodes:x:@.arguments/*
+
+   // Invoking endpoint.
+   http.post:x:@.url
+      payload
+
+   // Verifying invocation was a success.
    if
-      strings.ends-with:x:@.dp/#
-         .:.hl
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
       .lambda
-         hyper2lambda:x:@.dp/#/0
-         math.increment:x:@.loc
-            get-count:x:@hyper2lambda/**
-         math.increment:x:@.files
-remove-nodes:x:@signal/*
+
+         // Success!
+         add:x:./*/log.info
+            get-nodes:x:@.arguments/*
+         log.info:Webhook successfull invoked
+            url:x:@.url
+   else
+
+      // Failure!
+      add:x:./*/log.info
+         get-nodes:x:@.arguments/*
+      lambda2hyper:x:@http.post/*/content
+      log.error:Webhook failed
+         url:x:@.url
+         content:x:@lambda2hyper

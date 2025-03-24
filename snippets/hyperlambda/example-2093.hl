@@ -1,17 +1,41 @@
 
-// Hyperlambda endpoint taking arguments. This SQL query retrieves and returns the names of artists and the titles of their albums from the Chinook database, ordering the results by artist name and limiting the output to 50 records.
+// Hyperlambda script for a CRUD update endpoint that updates an existing item in the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
 .arguments
+   name:string
+   description:string
 
-// Making sure user is authorized to invoke endpoint.
-auth.ticket.verify:enterprise
+// Verifying user is authorized to access endpoint.
+validators.mandatory:x:@.arguments/*/name
+auth.ticket.verify:root
 
-// Connecting to database.
-data.connect:chinook
-   database-type:sqlite
+// Opening up our database connection.
+data.connect:[generic|magic]
 
-   // Executing [data.select] slot with our SQL.
-   data.select:"\n/*\n * Script to join artists to albums in your Chinook database.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect ar.Name, al.Title\n  from Album al\n    inner join Artist ar on al.ArtistId = ar.ArtistId\n  order by ar.Name\n  limit 50\n"
-      database-type:sqlite
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
 
-   // Returning a result of above invocation to caller.
-   return-nodes:x:@data.select/*
+   // Invoking our update slot.
+   data.update
+      table:roles
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning success to caller.
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

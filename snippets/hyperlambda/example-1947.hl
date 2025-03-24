@@ -1,46 +1,23 @@
 
-// Workflow action returning true if the specified username is available.
+// Search the web
 .arguments
-   username
-      type:string
-      mandatory:bool:true
-   throw
-      type:bool
-      mandatory:bool:false
-.icon:supervisor_account
 
-// Applying defaults.
-validators.default:x:@.arguments
-   throw:bool:false
+   // Mandatory argument being the actual query to submit to DuckDuckGo.
+   query:string
 
-// Opens up database connection.
-data.connect:[generic|magic]
+   // Optional argument being the maximum number of tokens to return.
+   max_tokens:int
 
-   // Selecting user from database such that we can check if it exists or not.
-   data.read
-      table:users
-      columns
-         username
-      where
-         and
-            username.eq:x:@.arguments/*/username
+// Public endpoints can also be used as AI functions
+.type:public
 
-   // Checks if above invocation returned anything.
-   if
-      exists:x:@data.read/*
-      .lambda
+// Returns [max_tokens] context for the specified [query] by searching DuckDuckGo.
+execute:magic.workflows.actions.execute
+   name:openai-context-from-search
+   filename:/modules/openai/workflows/actions/openai-context-from-search.hl
+   arguments
+      query:x:@.arguments/*/query
+      max_tokens:x:@.arguments/*/max_tokens
 
-         // Checking if we should throw an exception instead of returning false.
-         if:x:@.arguments/*/throw
-            throw:User already exists
-               status:int:400
-               public:bool:true
-
-         // User exists, returning false to caller.
-         return
-            available:bool:false
-   else
-
-      // User does not exist, returning true to caller.
-      return
-         available:bool:true
+// Returns the result of your last action.
+return-nodes:x:@execute/*

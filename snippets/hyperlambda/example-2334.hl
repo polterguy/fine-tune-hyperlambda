@@ -1,42 +1,27 @@
 
-// Deletes the training snippet with the specified [id]
+// Counts items from your CustomerDemographics table in your northwind database
 .arguments
-
-   // Mandatory and is the ID of the training snippet to delete.
-   id:int
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/id
-validators.integer:x:@.arguments/*/id
-   min:int:0
+   CustomerDemographics.CustomerTypeID.like:string
+   CustomerDemographics.CustomerTypeID.eq:string
+   CustomerDemographics.CustomerDesc.like:string
+   CustomerDemographics.CustomerDesc.eq:string
 
 // Opening up our database connection.
-data.connect:[generic|magic]
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-   // Making sure snippet exists.
+   // Reading data from database.
    data.read
-      table:ml_training_snippets
+      database-type:sqlite
+      table:CustomerDemographics
       columns
-         prompt
-         completion
-         uri
+         count(*)
+            as:count
       where
          and
-            id.eq:x:@.arguments/*/id
-   if
-      not-exists:x:@data.read/*
-      .lambda
-         throw:Now such snippet
-         public:bool:true
-         status:int:401
+      limit:long:1
 
-   // Deleting snippet.
-   data.execute:delete from vss_ml_training_snippets where rowid = @id
-      @id:x:@.arguments/*/id
-   data.delete
-      table:ml_training_snippets
-      where
-         and
-            id.eq:x:@.arguments/*/id
-return
-   result:success
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

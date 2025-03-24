@@ -1,21 +1,27 @@
+// Requests weather forecast from NOAA in XML format and handles selected HTTP status codes
 
-// Tracks an order in Shopify.
 .arguments
-   order:string
 
-// Retrieving secret and shop.
-.secret
-set-value:x:@.secret
-   config.get:"magic:shopify:secret"
-.shop
-set-value:x:@.shop
-   config.get:"magic:shopify:shop"
+// Result node for weather info
+.weather.result
 
-// Invoking slot to do the heavy work.
-execute:shopify.orders.track
-   secret:x:@.secret
-   shop:x:@.shop
-   order_no:x:@.arguments/*/order
+http.get:"https://api.weather.gov/gridpoints/MPX/107,71/forecast"
+   convert:true
+   headers
+      Accept:application/xml
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+switch:x:@http.get
+
+   case:int:200
+      set-value:x:@.weather.result
+         .:Weather data received in XML format
+
+   case:int:406
+      throw:406 Not Acceptable – Server cannot return XML
+
+   default
+      set-value:x:@.weather.result
+         .:Unable to fetch weather data
+
+yield
+   result:x:@.weather.result

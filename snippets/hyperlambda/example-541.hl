@@ -1,55 +1,42 @@
 
-// Hyperlambda script that reads or lists records from a specified table in a database with optional filtering arguments and a logical operator.
+// Deletes the training snippet with the specified [id]
 .arguments
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
-
-   // Offset into the dataset of where to start retrieving records
-   offset:long
-
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
-   operator:string
+   // Mandatory and is the ID of the training snippet to delete.
+   id:int
 
 // Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
-
-/*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
- */
-if
-   exists:x:@.arguments/*/operator
-   .lambda
-
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/0
-         get-value:x:@.arguments/*/operator
-      remove-nodes:x:@.arguments/*/operator
+validators.mandatory:x:@.arguments/*/id
+validators.integer:x:@.arguments/*/id
+   min:int:0
 
 // Opening up our database connection.
-data.connect:{database}
-   database-type:{database-type}
+data.connect:[generic|magic]
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
+   // Making sure snippet exists.
    data.read
-      database-type:{database-type}
-      table:{table}
+      table:ml_training_snippets
       columns
+         prompt
+         completion
+         uri
       where
          and
+            id.eq:x:@.arguments/*/id
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Now such snippet
+         public:bool:true
+         status:int:401
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+   // Deleting snippet.
+   data.execute:delete from vss_ml_training_snippets where rowid = @id
+      @id:x:@.arguments/*/id
+   data.delete
+      table:ml_training_snippets
+      where
+         and
+            id.eq:x:@.arguments/*/id
+return
+   result:success

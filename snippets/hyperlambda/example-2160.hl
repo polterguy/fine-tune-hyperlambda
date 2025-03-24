@@ -1,13 +1,30 @@
 
-// Create a Hyperlambda snippet that invokes an HTTP GET endpoint to fetch a post title.
+// CRUD Hyperlambda file that deletes one record from your menu_items table in your cms database
+.arguments
 
-// Invokes an HTTP GET endpoint to fetch a post title.
-http.get:"https://jsonplaceholder.typicode.com/posts/1"
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-   // Converts response from JSON to lambda.
-   convert:true
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
 
-// Sets [.title] to the post's title
-.title
-set-value:x:@.title
-   get-value:x:@http.get/*/content/*/title
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:menu_items
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

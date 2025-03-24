@@ -1,15 +1,17 @@
 
-// Hyperlambda script to return all saved SQL files in the system for a specified database type.
+// Returns the schema specifications for the specified type
 .arguments
-   databaseType:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Mandatory argument declaring the type of object to retrieve the schema specification for.
+   type:string
 
-// Returns all files in the "/etc/[databaseType]/templates/" folder.
-strings.concat
-   .:/etc/
-   get-value:x:@.arguments/*/databaseType
-   .:/templates/
-io.file.list:x:@strings.concat
-return-nodes:x:-/*
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
+
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-schema-spec.hl
+
+// Returning result to caller.
+return-nodes:x:@execute-file/*

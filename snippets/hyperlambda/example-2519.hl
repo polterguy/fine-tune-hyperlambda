@@ -1,101 +1,30 @@
 
-// Write a Hyperlambda script to create a migration script of specified SQL for a specified module.
+// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the questions table in the magic database with a question_id matching the argument, ensuring authentication and authorization for root and admin roles.
 .arguments
-   databaseType:string
-   module:string
-   sql:string
+   question_id:long
 
-// Ensures user is authorized to access endpoint.
+// Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/sql
-validators.mandatory:x:@.arguments/*/module
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:sqlite
-   .:mssql
-   .:pgsql
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/question_id
 
-// Ensuring folders exists.
-strings.concat
-   .:/modules/
-   get-value:x:@.arguments/*/module
-   .:/
-if
-   not
-      io.folder.exists:x:@strings.concat
-   .lambda
-      io.folder.create:x:@strings.concat
-strings.concat
-   .:/modules/
-   get-value:x:@.arguments/*/module
-   .:/magic.startup/
-if
-   not
-      io.folder.exists:x:@strings.concat
-   .lambda
-      io.folder.create:x:@strings.concat
-strings.concat
-   .:/modules/
-   get-value:x:@.arguments/*/module
-   .:/magic.startup/db-migrations/
-if
-   not
-      io.folder.exists:x:@strings.concat
-   .lambda
-      io.folder.create:x:@strings.concat
-strings.concat
-   .:/modules/
-   get-value:x:@.arguments/*/module
-   .:/magic.startup/db-migrations/
-   get-value:x:@.arguments/*/databaseType
-   .:/
-if
-   not
-      io.folder.exists:x:@strings.concat
-   .lambda
-      io.folder.create:x:@strings.concat
+// Opening up our database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
 
-// Figuring out filename for next migration script file.
-.no:int:1
-io.file.list:x:@strings.concat
-for-each:x:-/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.sql
-      .lambda
-         strings.split:x:@.dp/#
-            .:/
-         strings.split:x:-/0/-
-            .:-
-         convert:x:-/0
-            type:int
-         if
-            mte:x:@convert
-               get-value:x:@.no
-            .lambda
-               set-value:x:@.no
-                  math.add:x:@convert
-                     .:int:1
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-// Figuring out complete filename for migration script file.
-strings.concat
-   .:/modules/
-   get-value:x:@.arguments/*/module
-   .:/magic.startup/db-migrations/
-   get-value:x:@.arguments/*/databaseType
-   .:/
-   format:x:@.no
-      pattern:"{0:D4}"
-   .:-migration-script.sql
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:questions
+      where
+         and
 
-// Saving migration script.
-io.file.save:x:-
-   get-value:x:@.arguments/*/sql
-
-// Returning result to caller.
-unwrap:x:+/*
-return
-   result:success
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

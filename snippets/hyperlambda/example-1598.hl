@@ -1,6 +1,28 @@
+/*
+ * Retrieves customer contact info from a database and sends each of them a reminder email.
+ */
 
-// Opens a database connection and executes some arbitrary SQL, returning result as a record set
-data.connect:DATABASE_NAME_HERE
-   database-type:sqlite
-   data.select:select * from TABLE_NAME_HERE
-      database-type:sqlite
+data.connect:[pgsql|customer_db]
+   database-type:pgsql
+
+   data.select:@"
+select name, email
+   from customers
+   where active = true"
+      database-type:pgsql
+
+   for-each:x:@data.select/*
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            from
+               .
+                  name:Support Team
+                  email:support@yourcompany.com
+            subject:Important Reminder from YourCompany
+            entity:text/plain
+               content:Hi, this is just a friendly reminder to check your account dashboard.

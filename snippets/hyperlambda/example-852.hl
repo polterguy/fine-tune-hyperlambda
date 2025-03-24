@@ -1,10 +1,389 @@
 
-// Hyperlambda snippet that appends several key-value pairs into the given result node.
+// Write a Hyperlambda script to return context and references for a specified type, given a threshold, prompt, and max_tokens.
+slots.create:magic.ai.get-context
 
-// Appends several key-value pairs into the given result node.
-.result
-add:x:@.result
-   .
-      keyA:valA
-      keyB:valB
-      keyC:valC
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/prompt
+   validators.mandatory:x:@.arguments/*/threshold
+   validators.mandatory:x:@.arguments/*/max_tokens
+   validators.string:x:@.arguments/*/prompt
+      min:1
+
+   /*
+    * Verifying we've got any training snippets that are vectorized at all,
+    * and if not, returning nothing to caller.
+    */
+   .embeddings-model
+   data.connect:[generic|magic]
+      data.scalar:select count(*) from ml_training_snippets where embedding is not null and type = @type
+         @type:x:@.arguments/*/type
+      if
+         eq
+            convert:x:@data.scalar
+               type:int
+            .:int:0
+         .lambda
+
+            // There are zero snippets in our database that have been vectorized.
+            return
+               context
+               snippets
+
+      // Finding vector model for type.
+      data.read
+         table:ml_types
+         columns
+            vector_model
+         where
+            and
+               type.eq:x:@.arguments/*/type
+      set-value:x:@.embeddings-model
+         get-value:x:@data.read/*/*/vector_model
+
+   // Converting threshold in case we're given the wrong type.
+   set-value:x:@.arguments/*/threshold
+      convert:x:@.arguments/*/threshold
+         type:double
+
+   // Retrieving embeddings.
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+
+   // Text value we're passing on to OpenAI to create embeddings for prompt.
+   .prompt
+   if
+      and
+         not-null:x:@.arguments/*/search_postfix
+         neq:x:@.arguments/*/search_postfix
+            .:
+      .lambda
+
+         // We have a search postfix.
+         set-value:x:@.prompt
+            strings.concat
+               get-value:x:@.arguments/*/prompt
+               .:" "
+               get-value:x:@.arguments/*/search_postfix
+   else
+
+      // Not search postfix.
+      set-value:x:@.prompt
+         get-value:x:@.arguments/*/prompt
+
+   // Retrieving embedding for prompt.
+   http.post:"https://api.openai.com/v1/embeddings"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         input:x:@.prompt
+         model:x:@.embeddings-model
+      convert:true
+
+   // Sanity checking above invocation.
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+
+         // Oops, error - Logging error and returning OpenAI's HTTP status code to caller.
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            error:x:@lambda2hyper
+         throw:x:@http.post/*/content/*/error/*/message
+            public:bool:true
+            status:x:@http.post
+
+   // Making sure we actually have a [session] argument before we try to create a tal for our SQL.
+   .tail:
+   .next
+   .cache-key
+   if
+      and
+         exists:x:@.arguments/*/session
+         not-null:x:@.arguments/*/session
+      .lambda
+
+         // Figuring out cache key to use for snippets we've already used in session.
+         set-value:x:@.cache-key
+            strings.concat
+               get-value:x:@.arguments/*/session
+               .:.IDs
+
+         // Retrieving IDs of snippet's we already used in session from cache.
+         cache.get:x:@.cache-key
+         if
+            not-null:x:@cache.get
+            .lambda
+
+               // Adding our tal to our SQL contaning all IDs of items we've previously used.
+               set-value:x:@.tail
+                  strings.concat
+                     .:" and id not in("
+                     get-value:x:@cache.get
+                     .:)
+               set-value:x:@.next
+                  get-value:x:@cache.get
+
+   // Fetching relevant snippets, making sure we profile the time it takes.
+   .begin
+   set-value:x:@.begin
+      date.now
+
+   // Connecting to database to retrieve embeddings that are related to prompt.
+   .scan
+   data.connect:[generic|magic]
+
+      // Converting embeddings to a byte array of floats, since this is how we store embeddings in SQLite.
+      floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+      math.subtract
+         .:float:1
+         get-value:x:@.arguments/*/threshold
+      strings.concat
+         .:"\nselect vss.distance, vss.rowid as id, ts.prompt, ts.completion, ts.uri, ts.cached\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and\n      vss_search(vss.embedding_vss, @embedding) and\n      vss.distance < @threshold"
+         get-value:x:@.tail
+         .:" limit 20"
+      data.select:x:@strings.concat
+         embedding:x:@floatArray2bytes
+         type:x:@.arguments/*/type
+         threshold:x:@math.subtract
+      add:x:@.scan
+         get-nodes:x:@data.select/*
+
+   // Measuring how much time we spent looping through snippets.
+   .time
+   set-value:x:@.time
+      math.subtract
+         date.now
+         get-value:x:@.begin
+   set-value:x:@.time
+      time.format:x:@.time
+         format:"ss\\.fff"
+
+   /*
+    * Checking if first snippet is cached, at which point we return ONLY that snippet.
+    * 
+    * This allows you to have responses that are statically cached, yet still
+    * dependent upon semantic AI search towards your training snippets.
+    * 
+    * Noticed, caches snippets are executed as mixins if they are the first match.
+    */
+   if
+      and
+         exists:x:@.scan/0
+         not-null:x:@.scan/0/*/cached
+         mt
+            convert:x:@.scan/0/*/cached
+               type:int
+            .:int:0
+      .lambda
+
+         // First matching snippet has been cached.
+         unwrap:x:+/*/*
+         set-value:x:@.scan/0/*/completion
+            strings.mixin:x:@.scan/0/*/completion
+               prompt:x:@.arguments/*/prompt
+         unwrap:x:+/*
+         return
+            cached:x:@.scan/0/*/completion
+            db_time:x:@.time
+
+   /*
+    * To avoid mixin snippets from being executed unless they're matched at the top,
+    * we execute mixin logic on the first snippet, and ignore all other mixin snippets
+    * while we iterate through all other snippets.
+    */
+   if
+      and
+         exists:x:@.scan/0/*/completion
+         not-null:x:@.scan/0/*/completion
+         strings.contains:x:@.scan/0/*/completion
+            .:{{
+      .lambda
+
+         // Executing mixin on the first snippet if snippet contains mixin Hyperlambda.
+         unwrap:x:+/*/*
+         set-value:x:@.scan/0/*/completion
+            strings.mixin:x:@.scan/0/*/completion
+               prompt:x:@.arguments/*/prompt
+
+   /*
+    * Used to hold the referenced snippets used to create our context.
+    * 
+    * Returned to caller as [snippets].
+    */
+   .result
+
+   // Context value we return to caller.
+   .context:
+
+   // Temporary variable used to calculate tokens.
+   .tmp:
+
+   // Used to store IDs of snippets we've created context out of.
+   .ids
+
+   /*
+    * Running through all training snippets, creating our context,
+    * and storing referenced snippets in the process.
+    */
+   for-each:x:@.scan/*
+
+      // Only using non-mixin snippets.
+      if
+         not
+            strings.contains:x:@.dp/#/*/completion
+               .:{{
+         .lambda
+
+            /*
+             * Concatenating top snippet to [.tmp] buffer,
+             * such that we can calculate total number of tokens
+             * resulting from adding currently iterated snippet.
+             */
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.tmp
+                  .:"\n"
+                  get-value:x:@.dp/#/*/prompt
+                  .:"\n"
+                  .:"\n"
+                  get-value:x:@.dp/#/*/completion
+                  .:"\n\n---\n"
+
+            /*
+             * Verifying that adding currently iterated snippet doesn't
+             * produce more tokens than the model's max_tokens value.
+             * 
+             * Notice, even if currently iterated snippet might overflow threshold,
+             * it might be possible to add the NEXT snippet, with lower dot product score,
+             * if it is smaller in size. Hence we continue through entire set instead of
+             * stopping once we've reached threshold.
+             */
+            if
+               lt
+                  openai.tokenize:x:@.tmp
+                  get-value:x:@.arguments/*/max_tokens
+               .lambda
+
+                  /*
+                   * We've got room for more context, hence updating [.context]
+                   * to the value of [.tmp].
+                   */
+                  set-value:x:@.context
+                     get-value:x:@.tmp
+
+                  // Storing ID of currently used snippet.
+                  unwrap:x:+/*/*
+                  add:x:@.ids
+                     .
+                        .:x:@.dp/#/*/id
+
+                  /*
+                   * Checking if we can use currently iterated snippet as a "reference",
+                   * which is only true if the snippet actually contains a [uri], and has
+                   * not already been added as a reference.
+                   */
+                  if
+                     and
+                        not-null:x:@.dp/#/*/uri
+                        not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+                     .lambda
+
+                        // Adding current reference to [.result]
+                        unwrap:x:+/*/*/*
+                        add:x:@.result
+                           .
+                              .
+                                 prompt:x:@.dp/#/*/prompt
+                                 uri:x:@.dp/#/*/uri
+                                 distance:x:@.dp/#/*/distance
+            else
+
+               /*
+                * Removing the currently appended snippet from [.tmp]
+                * to allow the logic to correctly check if we can use the next snippet.
+                */
+               set-value:x:@.tmp
+                  get-value:x:@.context
+
+   // Trimming [.context] before we return it to caller.
+   set-value:x:@.context
+      strings.trim:x:@.context
+         .:"\n \t-"
+
+   // Making sure we've got a [session] before storing snippet IDs into cache.
+   if
+      and
+         exists:x:@.arguments/*/session
+         not-null:x:@.arguments/*/session
+      .lambda
+
+         // Storing IDs of snippets we've already used for session in server cache.
+         .value
+         set-value:x:@.value
+            strings.join:x:@.ids/*
+               .:,
+         if
+            not-null:x:@.tail/+
+            .lambda
+
+               // Adding snippets from session to [.value].
+               set-value:x:@.value
+                  strings.concat
+                     get-value:x:@.value
+                     .:,
+                     get-value:x:@.tail/+
+               set-value:x:@.value
+                  strings.trim:x:@.value
+                     .:,
+
+               /*
+                * Making sure we never cache more than maximum 20 IDs to allow for
+                * re-retrieving the same snippet again.
+                */
+               strings.split:x:@.value
+                  .:,
+               if
+                  mte
+                     get-count:x:@strings.split/*
+                     .:int:20
+                  .lambda
+                     remove-nodes:x:@strings.split/*/[15,20]
+                     set-value:x:@.value
+                        strings.join:x:@strings.split/*
+                           .:,
+
+         // Storing snippet IDs used in cache.
+         cache.set:x:@.cache-key
+            value:x:@.value
+            expiration:x:@.arguments/*/session_timeout
+
+   // Returning context and relevant snippets to caller.
+   if
+      neq:x:@.context
+         .:
+      .lambda
+
+         // We've got at least some context.
+         add:x:+/+/*/*/snippets
+            get-nodes:x:@.result/*
+         unwrap:x:+/*/*/context
+         add:x:../*/return
+            .
+               context:x:@.context
+               snippets
+
+   // We didn't find any context at all.
+   unwrap:x:+/*
+   return
+      db_time:x:@.time

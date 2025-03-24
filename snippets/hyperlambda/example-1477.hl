@@ -1,24 +1,26 @@
 
-// Generate an endpoint returning line_items from financial database. Add optional paging support and optional filtering on name
+// Write a Hyperlambda script to return a specified TXT training data file to the client.
 .arguments
-   limit:long
-   offset:long
-   comments.name.eq:string
+   file:string
 
-// Opening up our database connection.
-data.connect:financial
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*/and
-      get-nodes:x:@.arguments/*/comments.name.eq
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   data.read
-      table:line_items
-      where
-         and
+// Figuringout full path of file.
+strings.concat
+   .:/etc/system/openai/pdf/
+   get-value:x:@.arguments/*/file
 
-   // Returning result of above read invocation to caller.
-   yield
-      result:x:@data.read/*
+// Getting our response HTTP headers sorted out.
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@.arguments/*/file
+   .:"\""
+response.headers.set
+   Content-Type:text/plain
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
+
+// Returning file to caller.
+io.stream.open-file:x:@strings.concat/@strings.concat
+return:x:-

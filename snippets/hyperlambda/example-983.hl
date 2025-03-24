@@ -1,15 +1,36 @@
 
-// Hyperlambda endpoint that returns true if the specified text contains 'xyz'
-.arguments
-   arg:string
+// Hyperlambda script that executes startup files, create the magic database, and apply default configuration settings.
+io.file.execute:/system/sql/magic.startup/mssql/magic.db.mssql.databases.hl
+io.file.execute:/system/sql/magic.startup/mysql/magic.db.mysql.databases.hl
+io.file.execute:/system/sql/magic.startup/pgsql/magic.db.pgsql.databases.hl
+io.file.execute:/system/sql/magic.startup/sqlite/magic.db.sqlite.databases.hl
 
-// Making sure argument was given
-validators.mandatory:x:@.arguments/*/arg
+// Creating our magic database.
+io.file.execute:/system/ensure-magic-database.hl
 
-// Checking if 'xyz' exists in string
-strings.contains:x:@.arguments/*/arg
-   .:xyz
+// Executing all magic.startup Hyperlambda files.
+io.file.list-recursively:/system/
+io.file.list-recursively:/modules/
+for-each:x:./*/io.file.list-recursively/*
 
-// Returning result to caller
-yield
-   result:x:@strings.contains
+   // Checking if file is a startup Hyperlambda file.
+   if
+      and
+         strings.contains:x:@.dp/#
+            .:/magic.startup/
+         strings.ends-with:x:@.dp/#
+            .:.hl
+      .lambda
+
+         // Executing file.
+         strings.concat
+            .:"Executing startup file '"
+            get-value:x:@.dp/#
+            .:.
+         console.log:x:-
+         try
+            io.file.execute:x:@.dp/#
+         .catch
+            log.error:Error while executing startup file
+               exception:x:@.arguments/*/message
+               file:x:@.dp/#

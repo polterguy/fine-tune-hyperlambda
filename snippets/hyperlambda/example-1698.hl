@@ -1,61 +1,9 @@
-
-// Hyperlambda script to test a specified connection string, ensuring the backend can connect to the database.
-.arguments
-   databaseType:string
-   connectionString:string
-
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/connectionString
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:pgsql
-   .:mssql
-
-// Sanity checking that connection string contains {database} allowing for dynamic substitutions.
+// Loads the config.txt file and checks if it contains the word 'OpenAI'
+io.file.load:/config.txt
 if
-   not
-      strings.contains:x:@.arguments/*/connectionString
-         .:{database}
+   strings.contains:x:@io.file.load
+      .:OpenAI
    .lambda
-
-      // Oops!
-      return
-         result:failure
-         message:Connection string does not contain {database}
-
-// Doing the try catch thing, to return failure if connection string is invalid.
-try
-   switch:x:@.arguments/*/databaseType
-      case:mssql
-         strings.replace:x:@.arguments/*/connectionString
-            .:{database}
-            .:master
-         mssql.connect:x:@strings.replace
-            mssql.select:select name from master.dbo.sysdatabases
-      case:mysql
-         strings.replace:x:@.arguments/*/connectionString
-            .:{database}
-            .:information_schema
-         mysql.connect:x:@strings.replace
-            mysql.select:show databases
-      case:pgsql
-         strings.replace:x:@.arguments/*/connectionString
-            .:{database}
-            .:postgres
-         pgsql.connect:x:@strings.replace
-            pgsql.select:select datname from pg_database
-
-   // Success, connetion string is valid.
-   return
-      result:success
-.catch
-
-   // Oops, failure ...
-   unwrap:x:+/*
-   return
-      result:failure
-      message:x:@.arguments/*/message
+      log.info:"File contains 'OpenAI'"
+else
+   log.info:"File does not contain 'OpenAI'"

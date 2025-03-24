@@ -1,89 +1,86 @@
 
-// Read or list records from your Artist table in your chinook database
-.arguments
+// Hyperlambda script to create an HTTP interceptor or gateway that invokes another endpoint, executing lambda objects before and after the invocation.
+.arguments:*
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
-
-   // Offset into the dataset of where to start retrieving records
-   offset:long
-
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
-   operator:string
-
-   // Filtering
-   Artist.ArtistId.mt:long
-   Artist.ArtistId.lt:long
-   Artist.ArtistId.mteq:long
-   Artist.ArtistId.lteq:long
-   Artist.ArtistId.neq:long
-   Artist.ArtistId.eq:long
-   Artist.Name.like:string
-   Artist.Name.mt:string
-   Artist.Name.lt:string
-   Artist.Name.mteq:string
-   Artist.Name.lteq:string
-   Artist.Name.neq:string
-   Artist.Name.eq:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
+// Endpoint we're intercepting.
+.endpoint:"https://your-app.com/your-endpoint"
 
 /*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
+ * Retrieving Authorization header to transmit to
+ * intercepted endpoint.
+ */
+request.headers.get:Authorization
+
+/*
+ * Lambda object executed as an "intercepted lambda object"
+ * before invocation to HTTP endpoint.
+ */
+.before
+
+/*
+ * This is where you would parametrise your above [.before] object
+ * with for instance arguments given by the client, before the
+ * invocation to [eval] below.
+ */
+
+// Evaluating [.before] lambda object.
+eval:x:@.before
+
+// Forwarding arguments given to endpoint to intercepted endpoint.
+add:x:../*/http.post/*/payload
+   get-nodes:x:@.arguments/*
+
+/*
+ * Checking if we've got an Authorization HTTP header,
+ * at which point we forward it to the original HTTP endpoint.
  */
 if
-   exists:x:@.arguments/*/operator
+   not-null:x:@request.headers.get
    .lambda
+      add:x:../*/http.post/*/headers
+         .
+            Authorization:x:@request.headers.get
 
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/0
-         get-value:x:@.arguments/*/operator
-      remove-nodes:x:@.arguments/*/operator
+// Invoking the intercepted HTTP endpoint.
+http.post:x:@.endpoint
+   headers
+      Content-Type:application/json
+   convert:true
+   payload
 
-// Opening up our database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
+// Sanity checking invocation to endpoint.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:400
+   .lambda
+      log.error:Something went wrong as we invoked our intercepted HTTP endpoint
+         endpoint:x:@.endpoint
+         status:x:@http.post
+         result:x:@http.post/*/content
+      throw:Intercepted endpoint did not return success
+         public:true
+         status:502
 
-   // Parametrising our read invocation with ordering arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
+/*
+ * Lambda object to execute after invocation to
+ * intercepted endpoint.
+ */
+.after
 
-   // Parametrising our read invocation with paging arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
+/*
+ * This is where you would parametrise your above [.after] object
+ * with for instance arguments given by the client, before the
+ * invocation to [eval] below.
+ */
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
+// Evaluating [.before] lambda object.
+eval:x:@.after
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:Artist
-      columns
-         Artist.ArtistId
-         Artist.Name
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+// Return result to caller.
+add:x:+
+   get-nodes:x:@http.post/*/content/*
+return

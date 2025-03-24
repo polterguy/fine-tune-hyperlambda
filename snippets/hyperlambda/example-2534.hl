@@ -1,22 +1,52 @@
 
-// Provide a Hyperlambda example where a boolean status is evaluated using a switch case with a default option.
+// Returns a specific patent from its patent ID using Google API.
+.arguments
 
-// Switch case comparison for boolean values.
-.status:bool:true
-.result
-switch:x:@.status
-   case:bool:true
+   // Mandatory ID for patent as return from search API.
+   patent_id:string
 
-      // If status is true.
-      set-value:x:@.result
-         .:Status is active
-   case:bool:false
+// Retrieving Google API key and making sure we've got one.
+.api-key
+set-value:x:@.api-key
+   config.get:"magic:serp-api:api_key"
+if
+   or
+      null:x:@.api-key
+      eq:x:@.api-key
+         .:
+   .lambda
+      throw:Could not find a Google API key to use for fetching patents.
 
-      // If status is false.
-      set-value:x:@.result
-         .:Status is inactive
-   default
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/patent_id
 
-      // If the value does not match true/false.
-      set-value:x:@.result
-         .:Invalid status
+// Creating our URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://serpapi.com/search.json?engine=google_patents_details&api_key="
+      get-value:x:@.api-key
+      .:&patent_id=
+      strings.url-encode:x:@.arguments/*/patent_id
+
+// Retrieving result.
+http.get:x:@.url
+   convert:true
+
+// Sanity checking result of above invocation.
+if
+   not
+      and
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+   .lambda
+
+      // Oops ...!!
+      lambda2hyper:x:../*
+      log.info:x:-
+      throw:Something went wrong while invoking Google patent API
+
+// Returning everything as is.
+return-nodes:x:@http.get/*/content/*

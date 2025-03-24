@@ -1,35 +1,27 @@
 
-// Lists all database in your MySQL instance.
-slots.create:magic.db.mssql.databases
+// Create a Hyperlambda action to execute a specified workflow file with optional arguments. Validate the workflow parameter and return the execution result.
+.arguments
+   workflow
+      type:workflow
+      mandatory:bool:true
+   arguments
+      type:key-value
+      mandatory:bool:false
+.icon:settings
 
-   // Opens up our connection
-   .connection:master
-   if
-      and
-         exists:x:@.arguments/*/connection-string
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
-      .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               .:master]
-   mssql.connect:x:@.connection
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/workflow
 
-      // Runs our query
-      mssql.select:select name from master.dbo.sysdatabases where has_dbaccess(name) = 1
+// Parametrising [execute-file].
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*/arguments/*
 
-      // Renaming "Database" nodes.
-      set-name:x:@mssql.select/*/*
-         .:db
+// Executing file.
+execute-file:x:@.arguments/*/workflow
 
-      // Returns the remaining databases to caller.
-      return-nodes:x:@mssql.select/*
+// Parametrising [return] invocation.
+add:x:./*/return
+   get-nodes:x:@execute-file/*
+
+// Returning result of execution to caller.
+return

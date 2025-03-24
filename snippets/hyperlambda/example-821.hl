@@ -1,50 +1,14 @@
+/*
+ * Save this file as `/modules/search/endpoints/query.hl`
+ * This exposes an HTTP POST endpoint at `/search/query`
+ *
+ * It requires a `query` string in `.arguments`, which is used for filtering or searching.
+ */
 
-// Associates the specified [username] with the specified [roles] roles. This is a workflow action
 .arguments
-   username
-      type:string
-      mandatory:bool:true
-   roles
-      type:array
-      mandatory:bool:true
-.icon:supervisor_account
+   query
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/roles
+validators.mandatory:x:@.arguments/*/query
 
-// Connecting to database.
-data.connect:[generic|magic]
-
-   // Verifying user exists.
-   data.read
-      table:users
-      columns
-         username
-      where
-         and
-            username.eq:x:@.arguments/*/username
-
-   // Verifying above invocation returned something.
-   if
-      not-exists:x:@data.read/*
-      .lambda
-
-         // Oops ...!!
-         throw:No such user
-            username:x:@.arguments/*/username
-
-   // Removing all roles user is already associated with.
-   data.delete
-      table:users_roles
-      where
-         and
-            user.eq:x:@.arguments/*/username
-
-   // Associating user with specified [roles].
-   for-each:x:@.arguments/*/roles/*
-      data.create
-         table:users_roles
-         values
-            user:x:@.arguments/*/username
-            role:x:@.dp/#
+yield
+   result:Search results for query (simulated)

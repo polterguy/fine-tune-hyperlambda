@@ -1,29 +1,32 @@
 
-// Write a Hyperlambda script to delete a specified connection string.
-.arguments
-   databaseType:string
-   name:string
+/*
+ * Compiles a C# file and creates a library from the compiled result,
+ * for then to dynamically load it as a plugin and invoke a slot
+ * called [foo] expected to exist within the C# code.
+ * 
+ * Notice, the code assumes there's a C# file called "foo.cs"
+ * in your '/etc/' folder. Create this file with Hyper IDE
+ * using the "slot" template to test the code.
+ */
+io.file.load:/etc/foo.cs
+system.compile
+   references
+      .:netstandard
+      .:System.Runtime
+      .:System.ComponentModel
+      .:System.Private.CoreLib
+      .:magic.node
+      .:magic.node.extensions
+      .:magic.signals.contracts
+   code:x:@io.file.load
+   assembly-name:foo.dll
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+// Loading assembly now that we've created it and saved it.
+system.plugin.load:x:@system.compile
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/databaseType
-validators.mandatory:x:@.arguments/*/name
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:pgsql
-   .:mssql
+// Invoking dynamically created C# slot.
+.name:John Doe
+foo:x:@.name
 
-// Loading config file such that we can delete connection string from current configuration.
-config.load
-json2lambda:x:-
-
-// Deleting actual connection string from section.
-remove-nodes:x:"@json2lambda/*/magic/*/databases/*/\"{@.arguments/*/databaseType}\"/*/\"{@.arguments/*/name}\""
-lambda2json:x:@json2lambda/*
-config.save:x:-
-
-// Success, connetion string deleted.
-return
-   result:success
+// Unloading plugin.
+system.plugin.unload:foo.dll

@@ -1,26 +1,33 @@
 
-// Registers the specified [username] as a user in the system, with the specified [password].
+// Hyperlambda script to update one record in a specified table in a database with optional filtering arguments.
 .arguments
-   username:string
-   password:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/password
-validators.regex:x:@.arguments/*/username
-   regex:[a-z0-9-]{2,20}
-validators.string:x:@.arguments/*/password
-   min:12
+// Opening up our database connection.
+data.connect:{database}
+   database-type:{database-type}
 
-// Hashing user's password.
-crypto.password.hash:x:@.arguments/*/password
-
-// Opens up database connection.
-data.connect:[generic|magic]
-
-   // Inserting user into database.
-   data.create
-      table:users
+   // Invoking our update slot.
+   data.update
+      database-type:{database-type}
+      table:{table}
       values
-         username:x:@.arguments/*/username
-         password:x:@crypto.password.hash
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

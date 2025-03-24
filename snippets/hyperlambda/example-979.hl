@@ -1,27 +1,33 @@
 
-// Write a Hyperlambda script to log lines of code (LOC) generated, including the type and name of the code.
+// Hyperlambda script for an endpoint that counts items in the questions table in the magic database, ensuring the user is authorized and handling optional filters.
 .arguments
-   loc:int
-   type:string
-   name:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/loc
-validators.mandatory:x:@.arguments/*/type
-validators.mandatory:x:@.arguments/*/name
-validators.enum:x:@.arguments/*/type
-   .:backend
-   .:frontend
+   // Optional filtering arguments.
+   questions.question_id.eq:long
+   questions.question.like:string
+   questions.question.eq:string
+   questions.questionnaire.like:string
+   questions.questionnaire.eq:string
 
-// Ensures user is authorized to access endpoint.
+// Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
 
-// Creating a log entry with LOC that was generated.
-log.info:LOC generated
-   loc:x:@.arguments/*/loc
-   type:x:@.arguments/*/type
-   name:x:@.arguments/*/name
+// Opening up our database connection.
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-// Returning success to caller.
-return
-   result:success
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:questions
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

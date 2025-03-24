@@ -1,25 +1,63 @@
-/*
- * Replaces placeholders {{name}} and {{confirmation_link}} in a registration email template.
- * Prepares a fully rendered message ready to be sent as email.
- */
-.template:@"
-Hello {{name}},
 
-Thank you for registering at our site!
+// Reads contacts from HubSpot
+.arguments
+   after:int
 
-Click the link below to confirm your email:
-{{confirmation_link}}
+// Retrieving token from configuration and verifying it exists.
+config.get:"magic:hubspot:token"
+if
+   or
+      eq:x:@config.get
+         .:
+      null:x:@config.get
+   .lambda
 
-Regards,
-The Team"
+      // Oops ...!!
+      throw:No authorization token found in your configuration
+         public:bool:true
+         status:int:500
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      get-value:x:@config.get
 
-.final-message
-set-value:x:-
-   strings.replace:x:@.template
-      .:{{name}}
-      .:Sarah
+// Creating our URL.
+.url:"https://api.hubapi.com/crm/v3/objects/contacts"
+if
+   and
+      exists:x:@.arguments/*/after
+      not-null:x:@.arguments/*/after
+      neq:x:@.arguments/*/after
+         .:
+   .lambda
 
-set-value:x:@.final-message
-   strings.replace:x:@.final-message
-      .:{{confirmation_link}}
-      .:"https://example.com/confirm?id=123"
+      // appending QUERY parameter to URL.
+      set-value:x:@.url
+         strings.concat
+            get-value:x:@.url
+            .:?after=
+            get-value:x:@.arguments/*/after
+
+// Reading contacts from HubSpot.
+http.get:x:@.url
+   convert:true
+   headers
+      Authorization:x:@.token
+
+// Verifying above invocation was a success.
+if
+   neq:x:@http.get
+      .:int:200
+   .lambda
+
+      // Oops ...!!
+      lambda2hyper:x:@http.get
+      log.error:Could not read contacts from HubSpot
+         message:x:@lambda2hyper
+      throw:Something went wrong as we tried to read contacts from HubSpot, check your log for details.
+         status:int:500
+         public:bool:true
+
+// Returning result of invocation to caller.
+return-nodes:x:@http.get/*/content/*/results/*

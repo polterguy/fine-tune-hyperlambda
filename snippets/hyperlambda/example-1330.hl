@@ -1,28 +1,19 @@
 
-// Delete one record from your Categories table in your northwind database
+// Hyperlambda endpoint taking arguments. This SQL query selects media types and their aggregate counts, ordering the results by count in descending order, filtered by a specified name pattern.
 .arguments
+   filter:string
 
-   // Primary key of record to delete, mandatory argument
-   CategoryID:long
-
-validators.mandatory:x:@.arguments/*/CategoryID
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
+// Connecting to database.
+data.connect:chinook
    database-type:sqlite
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
+   // Parametrizing [data.select].
+   add:x:./*/data.select
       get-nodes:x:@.arguments/*
 
-   // Deleting item from database.
-   data.delete
+   // Executing [data.select] slot with our SQL.
+   data.select:"\n/*\n * Selects media types and aggregate of counts, and orders by count descending.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect mt.Name, count(mt.MediaTypeId) as Amount \n  from MediaType mt\n    inner join Track t on mt.MediaTypeId = t.MediaTypeId\n  where mt.Name like @filter\n  group by mt.MediaTypeId\n  order by Amount desc;\n"
       database-type:sqlite
-      table:Categories
-      where
-         and
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

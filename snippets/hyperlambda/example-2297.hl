@@ -1,26 +1,21 @@
 
-// Create a Hyperlambda script for a CRUD delete endpoint that deletes one item from the roles table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
+// Write a Hyperlambda script for an OpenAI chat endpoint to handle conversations using 'gpt-xxx' models, with an option to stream response tokens.
 .arguments
-   name:string
+   prompt:string
+   type:string
+   references:bool
+   chat:bool
+   recaptcha_response:string
+   user_id:string
+   session:string
+   stream:bool
+   data:string
+   referrer:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
-validators.mandatory:x:@.arguments/*/name
+// Forwarding to get Hyperlambda file.
+add:x:+
+   get-nodes:x:@.arguments/*
+execute-file:/system/openai/chat.get.hl
 
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      table:roles
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Returning result to caller.
+return-nodes:x:-/*

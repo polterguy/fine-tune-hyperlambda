@@ -1,9 +1,21 @@
-// Replace "dog" with "cat" using values from other nodes
-.target-string:I love my dog
-.search-for:dog
-.replace-with:cat
 
-set-value:x:@.target-string
-   strings.replace:x:@.target-string
-      get-value:x:@.search-for
-      get-value:x:@.replace-with
+// Hyperlambda endpoint that creates a log entry with a specified 'type' (info, error, fatal, debug) and 'message'. Also allows for passing in optional 'args' for additional meta information.
+.arguments
+   type:string
+   message:string
+   args:*
+
+// Lambda object actually creating our log entry.
+.invoke-log
+   name:x:@.arguments/*/message
+
+// Parametrising invocation.
+set-name:x:@.invoke-log/*/name
+   strings.concat
+      .:log.
+      get-value:x:@.arguments/*/type
+add:x:@.invoke-log/*
+   get-nodes:x:@.arguments/*/args/*
+
+// Invoking lambda object responsible for creating our log entry.
+eval:x:@.invoke-log

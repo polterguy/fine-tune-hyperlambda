@@ -1,38 +1,72 @@
 
-// CRUD endpoint - Create one record in your actor table in your sakila database with authorization
+// Hyperlambda script for an upsert endpoint that upserts questions for a questionnaire, assuming questions are in Markdown with list items, ensuring the user is authorized.
 .arguments
-
-   // Optional first_name column value
-   first_name:string
-
-   // Optional last_name column value
-   last_name:string
-
-   // Optional last_update column value
-   last_update:date
+   name:string
+   questions:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+auth.ticket.verify:root
 
-// Opening up database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/name
+validators.mandatory:x:@.arguments/*/questions
 
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
+// Connecting to database.
+data.connect:[generic|magic]
 
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:actor
-      return-id:bool:true
-      values
+   // Deleting all old questions.
+   data.delete
+      table:questions
+      where
+         and
+            questionnaire.eq:x:@.arguments/*/name
 
-   // Returning the correct status code.
-   response.status.set:201
+   /*
+    * Turning questions string into individual questions by transforming
+    * to HTML and then semantically traversing.
+    */
+   markdown2html:x:@.arguments/*/questions
+   html2lambda:x:-
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
+   // Iterating all li elements in HTML.
+   for-each:x:@html2lambda/**/li
+
+      // Semantically parsing question.
+      strings.split:x:"@.dp/#/*/\\#text"
+         .:=>
+      .question
+      set-value:x:@.question
+         strings.trim:x:@strings.split/0
+
+      // Checking if question contains meta information.
+      if
+         mt
+            get-count:x:@strings.split/*
+            .:int:1
+         .lambda
+
+            // Question contain meta information.
+            strings.trim:x:@strings.split/1
+            strings.split:x:-
+               .:,
+            for-each:x:@strings.split/*
+               strings.split:x:@.dp/#
+                  .:=
+               set-value:x:./*/add/*/*/name
+                  strings.trim:x:@strings.split/1
+               set-name:x:./*/add/*/*/name
+                  strings.trim:x:@strings.split/0
+               add:x:@for-each/@for-each/*/data.create/*/values
+                  .
+                     name:value
+
+      // Inserting currently iterated question and associating it with specified questionnaire.
+      data.create
+         table:questions
+         values
+            questionnaire:x:@.arguments/*/name
+            question:x:@.question
+
+   // Returning success to caller.
    return
-      id:x:@data.create
+      result:success

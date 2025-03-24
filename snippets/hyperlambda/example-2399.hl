@@ -1,11 +1,54 @@
-/*
- * Invalid: Uses `#` iterator to dereference a value that is not a node.
- * The value of [.scalar] is a string, not a reference to another node or
- * a node by itself.
- *
- * This code will throw an exception since the `#` node will try to convert
- * the string "hello" to a node, which throws an exception.
- */
 
-.scalar:hello
-get-value:x:@.scalar/#
+// Workflow action that refunds a specified charge using its payment ID in Stripe. The function should validate the payment ID, retrieve the Stripe API token, and make a POST request to the Stripe API to process the refund. Handle any errors by logging and throwing exceptions. Ensure the function is robust and capable of handling metadata if provided.
+.arguments
+   payment_id
+      type:string
+      mandatory:bool:true
+.icon:payment
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/payment_id
+
+// Adding metadata.
+for-each:x:@.arguments/*/metadata/*
+   set-name:x:./0/-/*/*
+      strings.concat
+         .:metadata[
+         get-name:x:@.dp/#
+         .:]
+   unwrap:x:./0/-/*/*
+   add:x:../*/http.post/*/payload
+      .
+         name:x:@.dp/#
+
+// Retrieving token to use for invocations towards Stripe.
+.token
+set-value:x:-
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
+
+// Invoking Stripe REST API.
+http.post:"https://api.stripe.com/v1/refunds"
+   headers
+      Authorization:x:@.token
+      Content-Type:application/x-www-form-urlencoded
+   convert:true
+   payload
+      payment_intent:x:@.arguments/*/payment_id
+
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.delete
+      .:int:400
+   .lambda
+
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe API to delete subscription
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe API to delete subscription
+         public:true
+         status:500

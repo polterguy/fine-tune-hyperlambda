@@ -1,120 +1,26 @@
+/*
+ * FILE: /modules/api/employees/get-all.get.hl
+ * 
+ * DESCRIPTION:
+ * This endpoint retrieves a list of employees from a database using raw SQL through `[data.select]`.
+ * 
+ * HOW TO CREATE THIS ENDPOINT:
+ * 1. Save this file at `/modules/api/employees/get-all.hl`.
+ * 2. This automatically exposes the endpoint at `GET /api/employees/get-all`.
+ * 3. It connects to a database (e.g., 'sakila'), executes the SQL query, and returns the result.
+ * 
+ * USAGE:
+ *     GET /api/employees/get-all
+ * 
+ * NOTES:
+ * - This example assumes a database connection named "sakila" is configured.
+ * - `[data.select]` executes raw SQL, so it's specific to the underlying SQL dialect.
+ */
 
-// Workflow action invoking OpenAI's chat API with the specified [model], [max_tokens], [context], [instruction] and [query].
+// Making sure endpoint accespt no arguments.
 .arguments
-   model
-      type:string
-      mandatory:bool:true
-      default:gpt-4-1106-preview
-      values
-         .:gpt-4o
-         .:gpt-4o-mini
-         .:gpt-4o-2024-05-13
-         .:gpt-3.5-turbo
-         .:gpt-3.5-turbo-16k
-         .:gpt-3.5-turbo-1106
-         .:gpt-3.5-turbo-0125
-         .:gpt-4
-         .:gpt-4-1106-preview
-         .:03-mini
-         .:gpt-4.5-preview
-   max_tokens
-      type:int
-      mandatory:bool:true
-      default:int:1500
-   context
-      type:textarea
-      mandatory:bool:false
-   instruction
-      type:textarea
-      mandatory:bool:false
-   query
-      type:textarea
-      mandatory:bool:true
-.icon:chat_bubble
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/model
-validators.mandatory:x:@.arguments/*/query
-validators.mandatory:x:@.arguments/*/max_tokens
-
-// Retrieving OpenAI API token from configuration settings.
-.token
-set-value:x:@.token
-   strings.concat
-      .:"Bearer "
-      config.get:"magic:openai:key"
-
-// Checking if caller provided a [context].
-if
-   exists:x:@.arguments/*/context
-   .lambda
-
-      // Adding [context].
-      insert-before:x:../*/http.post/*/payload/*/messages/0
-         .
-            .
-               role:user
-               content:x:@.arguments/*/context
-
-// Checking if caller provided an [instruction].
-if
-   exists:x:@.arguments/*/instruction
-   .lambda
-
-      // Adding [instruction].
-      insert-before:x:../*/http.post/*/payload/*/messages/0
-         .
-            .
-               role:system
-               content:x:@.arguments/*/instruction
-
-// Checking if model is o3 something, at which point we'll have to change [max_tokens] to [max_completion_tokens]
-if
-   strings.starts-with:x:@.arguments/*/model
-      .:o3-
-   .lambda
-
-      // Changing name of argument.
-      set-name:x:../*/http.post/*/payload/*/max_tokens
-         .:max_completion_tokens
-      remove-nodes:x:../*/http.post/*/payload/*/temperature
-
-// Invokes OpenAI.
-http.post:"https://api.openai.com/v1/chat/completions"
-   convert:bool:true
-   headers
-      Authorization:x:@.token
-      Content-Type:application/json
-   payload
-      model:x:@.arguments/*/model
-      max_tokens:x:@.arguments/*/max_tokens
-      temperature:decimal:0.3
-      messages
-         .
-            role:user
-            content:x:@.arguments/*/query
-
-// Sanity checking above invocation.
-if
-   not
-      and
-         mte:x:@http.post
-            .:int:200
-         lt:x:@http.post
-            .:int:300
-   .lambda
-
-      // Oops, error - Logging error and returning status 500 to caller.
-      lambda2hyper:x:@http.post
-      log.error:Something went wrong while invoking OpenAI
-         message:x:@http.post/*/content/*/error/*/message
-         status:x:@http.post
-         error:x:@lambda2hyper
-      throw:Something went wrong while invoking OpenAI
-         message:x:@http.post/*/content/*/error/*/message
-         status:x:@http.post
-         error:x:@lambda2hyper
-
-// Returning answer to caller.
+data.connect:sakila
+   data.select:SELECT first_name, last_name FROM actor LIMIT 10
 yield
-   answer:x:@http.post/*/content/*/choices/0/*/message/*/content
+   result:x:@data.connect/*/data.select/*

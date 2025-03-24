@@ -1,54 +1,54 @@
 
-// Searches through your training data for records matching a filtering condition
-.arguments
-   _type:string
+// Enables a cloudlet when a subscription payment has gone through.
+slots.create:payments.subscriptions.unsubscribed.cloudlets.destroy
 
-   // Mandatory argument and becomes an SQL LIKE type of condition snippets must match to be considered.
-   query:string
+   // Checking if invocation is for us.
+   if
+      neq:x:@.arguments/*/type
+         .:subscription
+      .lambda
 
-   // Maximum number of tokens to return.
-   max_tokens:int
+         // Not our guy.
+         return:bool:false
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/_type
-validators.mandatory:x:@.arguments/*/query
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/meta
+   validators.mandatory:x:@.arguments/*/username
 
-// Applying defaults.
-validators.default:x:@.arguments
-   max_tokens:int:4000
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Creating our filter string
-   .filter
-   set-value:x:@.filter
+   // Invoking slot responsible for deleting cloudlet.
+   .name
+   set-value:x:@.name
       strings.concat
-         .:%
-         get-value:x:@.arguments/*/query
-         .:%
-   data.read
-      table:ml_training_snippets
-      columns
-         id
-         prompt
-         completion
-         uri
-      where
-         or
-            prompt.like:x:@.filter
-            completion.like:x:@.filter
-   .cont:bool:true
-   while:x:@.cont
-      lambda2hyper:x:@data.read/*
-      if
-         lt
-            openai.tokenize:x:@lambda2hyper
-            convert:x:@.arguments/*/max_tokens
-               type:int
-         .lambda
-            set-value:x:@.cont
-               .:bool:false
-      else
-         remove-nodes:x:@data.read/0/-
-   return-nodes:x:@data.read/*
+         get-value:x:@.arguments/*/meta
+         .:-
+         get-value:x:@.arguments/*/username
+
+   // Finding cluster for cloudlet.
+   .cluster
+   data.connect:[generic|hub]
+      data.read
+         table:cloudlets
+         values
+            cluster
+         where
+            and
+               user.eq:x:@.arguments/*/username
+               name.eq:x:@.arguments/*/meta
+      set-value:x:@.cluster
+         get-value:x:@data.read/*/*/cluster
+   unwrap:x:+/*
+   signal:hub.cloudlets.hard-delete
+      cluster:x:@.cluster
+      name:x:@.name
+
+   // Deleting cloudlet from database.
+   data.connect:[generic|hub]
+      data.delete
+         table:cloudlets
+         where
+            and
+               name.eq:x:@.arguments/*/meta
+               user.eq:x:@.arguments/*/username
+
+   // Returning true to indicate we handled the callback.
+   return:bool:true
