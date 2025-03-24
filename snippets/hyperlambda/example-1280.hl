@@ -1,6 +1,33 @@
+// Search through a log file and extracting all emails from it
 
-// Example: Check if a string ends with a substring that is not at the end.
+// Making sure current Hyperlambda file and endpoint does NOT take any arguments
+.arguments
 
-// Returns false
-strings.ends-with:HelloWorld
-   .:Universe
+// Read the log file
+if
+   io.file.exists:/var/logs/server.log
+   .lambda
+
+      // Reading file's content as text.
+      io.file.load:/var/logs/server.log
+
+      // A temporary place to hold the extracted emails
+      .emails
+
+      // Extracting email addresses using regex
+      strings.matches:x:@io.file.load
+         .:"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z]{2,6}"
+
+      // Loop through the matches and add them to the list
+      for-each:x:@strings.matches/*/match
+         unwrap:x:+/*/*
+         add:x:@.emails
+            .
+               .:x:@.dp/#
+
+      // Returning the result to caller.
+      yield
+         emails:x:@.emails/*
+
+else
+   log.error:Log file not found

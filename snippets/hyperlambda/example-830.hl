@@ -1,37 +1,32 @@
-// Build the dynamic JSON payload
-.payload
-   api_key:sk_test_51H9...
-   scope:all
+/*
+ * Sends a bold, energetic welcome email using HTML to users of the fitness tracker app.
+ */
 
-// Create headers for content-type and custom request ID
-.headers
-   Content-Type:application/json
-   X-Request-ID:api-call-002
+data.connect:[pgsql|fitpulse]
+   database-type:pgsql
 
-// Make the HTTP POST request
-add:x:./*/http.post/*/headers
-   get-nodes:x:@.headers/*
-add:x:./*/http.post/*/payload
-   get-nodes:x:@.payload/*
-http.post:"https://api.example.com/token/validate"
-   headers
-   payload
-   convert:true
+   data.select:@"
+select name, email
+   from users
+   where created_at >= current_date - interval '1 day'"
+      database-type:pgsql
 
-// Verify 2xx response
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      .token-status
-      set-value:x:@.token-status
-         get-value:x:@http.post/*/content/*/status
-
-      .plan-type
-      set-value:x:@.plan-type
-         get-value:x:@http.post/*/content/*/plan
-else
-   throw:Token validation failed
+   for-each:x:@data.select/*
+      strings.concat
+         .:"<div style='font-family:Arial;'><h1>Welcome, "
+         get-value:x:@.dp/#/*/name
+         .:"!</h1><p>Let’s get moving! 🚀 Start tracking your progress with <strong>FitPulse</strong> today.</p></div>"
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            from
+               .
+                  name:FitPulse Coach
+                  email:coach@fitpulse.app
+            subject:Let’s get fit with FitPulse!
+            entity:text/html
+               content:x:@strings.concat

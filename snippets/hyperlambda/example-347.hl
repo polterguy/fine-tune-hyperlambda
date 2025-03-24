@@ -1,9 +1,41 @@
-// Dynamic slot returning a list of programming languages using return-nodes
-slots.create:get.languages
-   return-nodes
-      languages
-         .:Python
-         .:JavaScript
-         .:Go
 
-execute:get.languages
+// CRUD / Create Hyperlambda that creates one record in your comments table in your cms database
+.arguments
+
+   // post_id column value
+   post_id:long
+
+   // user_id column value
+   user_id:long
+
+   // content column value
+   content:string
+
+   // created_at column value
+   created_at:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:comments
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

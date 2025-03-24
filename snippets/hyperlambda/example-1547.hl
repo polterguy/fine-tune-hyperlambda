@@ -1,34 +1,34 @@
 
-// Delete one record from your address table in your sakila database without authorization. Log invocation
+// Create a Hyperlambda action to publish a web socket message with a specified 'channel' and 'args'. Optionally include 'roles' to restrict notifications. Validate mandatory fields.
 .arguments
+   channel:string
+   args:*
+   roles:*
+.icon:send
 
-   // Primary key of record to delete, mandatory argument
-   address_id:long
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/channel
+validators.mandatory:x:@.arguments/*/args
 
-// Logging invocation.
-auth.ticket.get
-lambda2hyper:x:@.arguments/*
-log.info:sakila.address entry deleted
-   username:x:@auth.ticket.get
-   arguments:x:@lambda2hyper
-validators.mandatory:x:@.arguments/*/address_id
+// Decorating invocation.
+add:x:./*/sockets.signal/*/args
+   get-nodes:x:@.arguments/*/args/*
 
-// Opening up our database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
+// Checking if we've got a [roles] declaration and if so decorating invocation.
+if
+   and
+      exists:x:@.arguments/*/roles
+      not-null:x:@.arguments/*/roles
+   .lambda
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
+      // Decorating invocation with comma separated list of roles.
+      strings.join:x:@.arguments/*/roles
+         .:,
+      unwrap:x:+/*/*
+      add:x:../*/sockets.signal
+         .
+            roles:x:@strings.join
 
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:address
-      where
-         and
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Publishing socket message.
+sockets.signal:x:@.arguments/*/channel
+   args

@@ -1,75 +1,41 @@
 
-// HTTP endpoint that evaluates the given SQL for a specified database and return the result to the caller.
+// Counts items from your spice_urls table in your scraper database.
 .arguments
-   databaseType:string
-   database:string
-   sql:string
-   safeMode:bool
-   batch:bool
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // spice_urls table spice_url_id column equality exact match filtering
+   spice_urls.spice_url_id.eq:long
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/databaseType
-validators.enum:x:@.arguments/*/databaseType
-   .:mysql
-   .:pgsql
-   .:mssql
-   .:sqlite
+   // spice_urls table url column wildcard filtering with SQL like '%' comparison
+   spice_urls.url.like:string
 
-// Creating our database connection.
-data.connect:x:@.arguments/*/database
-   database-type:x:@.arguments/*/databaseType
+   // spice_urls table url column equality exact match filtering
+   spice_urls.url.eq:string
 
-   /*
-    * Checking if we're supposed to execute SQL in safe mode, only
-    * returning the first 200 records.
-    */
-   if
-      and
-         get-value:x:@.arguments/*/safeMode
-         not
-            get-value:x:@.arguments/*/batch
-      .lambda
-         add:x:@data.connect/**/data.select
-            .
-               max:200
+   // spice_urls table type column wildcard filtering with SQL like '%' comparison
+   spice_urls.type.like:string
 
-   /*
-    * Checking if we're supposed to execute SQL as an MS SQL 'batch' operation,
-    * which implies respecting 'go' keywords, splitting SQL by each 'go' keyword.
-    */
-   if
-      and
-         eq
-            get-value:x:@.arguments/*/databaseType
-            .:mssql
-         get-value:x:@.arguments/*/batch
-      .lambda
-         set-name:x:@data.connect/**/data.select
-            .:mssql.execute-batch
-   else
-      add:x:@data.connect/**/data.select
-         .
-            database-type:x:@.arguments/*/databaseType
+   // spice_urls table type column equality exact match filtering
+   spice_urls.type.eq:string
 
-   /*
-    * Executing SQL and returning results to caller, making sure we're
-    * able to return exceptions to caller.
-    */
-   try
-      data.select:x:@.arguments/*/sql
-         multiple-result-sets:true
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
 
-      // Returning result of invocation to caller.
-      if
-         exists:x:@data.select/*/*
-         .lambda
-            return-nodes:x:@data.select/*
-   .catch
+// Opening up our database connection.
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-      // Notice, throwing exceptions as public now.
-      throw:x:@.arguments/*/message
-         public:bool:true
-         status:int:401
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:spice_urls
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

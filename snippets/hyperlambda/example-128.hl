@@ -1,56 +1,200 @@
 
-// Counts items from your products table in your shopping-cart-demo database.
-.arguments
+// Hyperlambda script that returns system information, including version, tasks, log items, and module details.
 
-   // products table product_id column equality exact match filtering
-   products.product_id.eq:long
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // products table name column wildcard filtering with SQL like '%' comparison
-   products.name.like:string
+// Verifying system has been setup.
+config.get:"magic:auth:secret"
+if
+   neq:x:@config.get
+      .:THIS-IS-NOT-A-GOOD-SECRET-PLEASE-CHANGE-IT
+   .lambda
 
-   // products table name column equality exact match filtering
-   products.name.eq:string
+      // Making sure we aggressively cache the HTTP response object on the client side.
+      response.headers.set
+         Cache-Control:public, max-age=300
 
-   // products table description column wildcard filtering with SQL like '%' comparison
-   products.description.like:string
+      // Retrieving data from cache, and/or creating our cache entry.
+      cache.try-get:system-information
+         expiration:300
+         .lambda
 
-   // products table description column equality exact match filtering
-   products.description.eq:string
+            // Retrieving version of Magic we're currently running.
+            version
 
-   // products table sku column wildcard filtering with SQL like '%' comparison
-   products.sku.like:string
+            // Retrieving number of persisted tasks.
+            tasks.count
 
-   // products table sku column equality exact match filtering
-   products.sku.eq:string
+            /*
+             * Retrieving plugin information associated with endpoint.
+             * Notice, this logic will invoke all slots starting
+             * with [magic.system-information.] and return whatever these
+             * slots are returning back to caller.
+             */
+            slots.vocabulary:magic.system-information.
+            for-each:x:-/*
+               signal:x:@.dp/#
+               add:x:+/*
+                  get-nodes:x:@signal/*
+               add:x:././*/lambda2hyper
+                  .
 
-   // products table price column equality exact match filtering
-   products.price.eq:decimal
+            // Counting total number of log items.
+            log.count
 
-   // products table image_url column wildcard filtering with SQL like '%' comparison
-   products.image_url.like:string
+            /*
+             * Retrieving capabilities of log implementation, and verifying implementation
+             * supports timeshifts before we invoke timeshifts.
+             */
+            log.capabilities
+            if:x:@log.capabilities/*/can-timeshift
 
-   // products table image_url column equality exact match filtering
-   products.image_url.eq:string
+               // Adding root nodes for timeshifts.
+               add:x:@.lambda/*/lambda2hyper
+                  .
+                     timeshifts
+                        logins
+                           name:Logins
+                           description:Successfully authenticated users
+                           items
+                        access_denied
+                           name:Access denied
+                           description:Access denied requests
+                           items
+                        openai_success
+                           name:OpenAI success
+                           description:Successful OpenAI API requests
+                           items
+                        openai_failure
+                           name:OpenAI failure
+                           description:Failed OpenAI API requests
+                           items
+                        lead_generated
+                           name:Lead
+                           description:Lead generated
+                           items
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+               // Retrieving count of log items grouped by day for root logins.
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/logins/*/items
+                  log.timeshift:User successfully authenticated
 
-// Opening up our database connection.
-data.connect:[generic|shopping-cart-demo]
-   database-type:sqlite
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+               // Retrieving access denied invocations.
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/access_denied/*/items
+                  log.timeshift:Access denied
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:products
-      columns
-         count(*)
-            as:count
-      where
-         and
-      limit:long:1
+               // Retrieving successful OpenAI API requests
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/openai_success/*/items
+                  log.timeshift:Invoking OpenAI was a success
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+               // Retrieving failed OpenAI API requests
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/openai_failure/*/items
+                  log.timeshift:Something went wrong while invoking OpenAI
+
+               // Retrieving leads
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/lead_generated/*/items
+                  log.timeshift:Lead was generated
+
+            // Retrieving endpoints.
+            endpoints.list
+            .no-endpoints
+            set-value:x:-
+               get-count:x:@endpoints.list/*
+
+            // Retrieving last 10 log items.
+            add:x:@.lambda/*/lambda2hyper/*/last_log_items
+               log.query
+                  max:10
+
+            // Retrieving slots.
+            vocabulary
+            .no-slots
+            set-value:x:-
+               get-count:x:@vocabulary/*
+
+            // Retrieving dynamic slots.
+            slots.vocabulary
+            .no-dynamic-slots
+            set-value:x:-
+               get-count:x:@slots.vocabulary/*
+
+            // Retrieving default database adapter.
+            .default-db
+            set-value:x:-
+               config.get:"magic:databases:default"
+
+            // Retrieving default timezone.
+            .default-timezone
+            set-value:x:-
+               config.get:"magic:culture:defaultTimeZone"
+
+            // Counting cache items.
+            cache.count
+
+            // Verifying scheduler is turned on.
+            .has-scheduler:bool:true
+            if
+               eq
+                  config.get:"magic:tasks:scheduler"
+                  .
+               .lambda
+                  set-value:x:@.has-scheduler
+                     .:bool:false
+
+            // Iterating through each module, counting LOC, and files.
+            io.folder.list:/modules/
+            for-each:x:@io.folder.list/*
+
+               // Finding module name.
+               strings.split:x:@.dp/#
+                  .:/
+
+               // Loading all files in module recursively.
+               unwrap:x:+/*
+               signal:magic.io.file.load-recursively
+                  .:x:@.dp/#
+
+               // Looping through each file in module folder.
+               .loc:int:0
+               .files:int:0
+               for-each:x:@signal/*
+                  if
+                     strings.ends-with:x:@.dp/#
+                        .:.hl
+                     .lambda
+                        hyper2lambda:x:@.dp/#/0
+                        math.increment:x:@.loc
+                           get-count:x:@hyper2lambda/**
+                        math.increment:x:@.files
+
+               // Adding result to return value.
+               unwrap:x:+/+/*/*/*
+               set-name:x:+/*/*
+                  get-value:x:@strings.split/0/-
+               add:x:@.lambda/*/lambda2hyper/*/modules
+                  .
+                     foo
+                        loc:x:@.loc
+                        files:x:@.files
+
+            // Returning result to caller.
+            unwrap:x:+/*
+            lambda2hyper
+               version:x:@version
+               persisted_tasks:x:@tasks.count
+               has_sockets:x:@.has-sockets
+               has_scheduler:x:@.has-scheduler
+               log_items:x:@log.count
+               cache_items:x:@cache.count
+               endpoints:x:@.no-endpoints
+               slots:x:@.no-slots
+               dynamic_slots:x:@.no-dynamic-slots
+               default_db:x:@.default-db
+               default_timezone:x:@.default-timezone
+               last_log_items
+               modules
+            return:x:@lambda2hyper
+
+      // Returning result of cache invocation to caller.
+      hyper2lambda:x:@cache.try-get
+      return-nodes:x:@hyper2lambda/*

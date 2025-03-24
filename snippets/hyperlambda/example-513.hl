@@ -1,13 +1,36 @@
 
-// Loop while a condition is true (increment counter and add items)
-.i:int:0
-.list
-while
-   lt
-      get-value:x:@.i
-      .:int:3
-   .lambda
-      add:x:@.list
-         .
-            item
-      math.increment:x:@.i
+// Delete one record from your address table in your sakila database without authorization. Log invocation
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   address_id:long
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.address entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Without this line of code, this Hyperlambda could be invoked WITHOUT an address_id, resulting in ALL records being deleted.
+validators.mandatory:x:@.arguments/*/address_id
+
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:address
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

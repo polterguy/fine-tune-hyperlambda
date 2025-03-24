@@ -1,45 +1,23 @@
+/*
+ * Hyperlambda action that returns artists and count of records per artist, sorted by artist having the most albums.
+ */
+.arguments
 
-// Create a dynamic slot that ensures the specified role exists, creating it if not, ensuring the user is authorized.
-slots.create:magic.auth.ensure-role
+   // Notice, action syntax
+   filter
+      type:string
+      mandatory:bool:true
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/role
-   validators.mandatory:x:@.arguments/*/description
+// This becomes the icon used to show the activity in your toolbox
+.icon:home
 
-   /*
-    * Ensures the [role] role exists.
-    * 
-    * Notice, in case system hasn't been setup yet, we'll need to silently
-    * catch all exceptions.
-    */
-   try
-
-      // Connecting to Magic database.
-      data.connect:[generic|magic]
-
-         // Checking to see if [role] role exists.
-         data.read
-            table:roles
-            where
-               and
-                  name.eq:x:@.arguments/*/role
-
-         // Checking result of above invocation.
-         if
-            not
-               exists:x:@data.read/*/*
-            .lambda
-
-               // We need to insert [role] role into Magic database.
-               data.create
-                  table:roles
-                  values
-                     name:x:@.arguments/*/role
-                     description:x:@.arguments/*/description
-   .catch
-
-      /*
-       * Silently catching here, to avoid application crash
-       * if system hasn't been setup yet.
-       */
-      .silent
+data.connect:chinook
+   data.select:@"
+select ar.Name, count(*) as count
+   from Album al, Artist ar where al.ArtistId = ar.ArtistId
+   and ar.Name like @filter
+   group by al.ArtistId
+   order by count desc
+   limit 25"
+      @filter:x:@.arguments/*/filter
+   return:x:-/*

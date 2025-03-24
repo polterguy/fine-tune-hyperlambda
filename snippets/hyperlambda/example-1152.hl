@@ -1,22 +1,40 @@
-// Logs an event with a timestamp and severity
-.log
-   timestamp:date:"2025-03-22T10:30:00Z"
-   level:info
-   message:Task executed successfully
-switch:x:@.log/*/level
 
-   case:info
-      log.info:x:@.log/*/message
-         timestamp:x:@.log/*/timestamp
+// Hyperlambda script that returns all dynamic HTTP endpoints in the system with their associated verbs and roles, caching the results for efficiency.
 
-   case:fatal
-      log.fatal:x:@.log/*/message
-         timestamp:x:@.log/*/timestamp
+// Declares how many seconds the operation should be cached.
+.cache-seconds:int:300
 
-   case:error
-      log.error:x:@.log/*/message
-         timestamp:x:@.log/*/timestamp
+/*
+ * Invokes [endpoints.list], making sure we cache the results, since it's a
+ * fairly expensive operation.
+ */
+cache.try-get:magic.auth.endpoints
+   expiration:x:@.cache-seconds
+   .lambda
 
-   case:debug
-      log.debug:x:@.log/*/message
-         timestamp:x:@.log/*/timestamp
+      // Cache miss, retrieving endpoints, and returning to caller.
+      .result
+      endpoints.list
+      for-each:x:@endpoints.list/*
+         if
+            exists:x:@.dp/#/*/auth/*
+            .lambda
+               add:x:+/*/*
+                  get-nodes:x:@.dp/#/*/auth/*
+               add:x:@if/+/+/*/*
+                  .
+                     auth
+         unwrap:x:+/*/*/*
+         add:x:@.result
+            .
+               .
+                  path:x:@.dp/#/*/path
+                  verb:x:@.dp/#/*/verb
+      lambda2hyper:x:@.result/*
+      return:x:-
+
+// Returning results of above invocation to caller.
+hyper2lambda:x:@cache.try-get
+add:x:../*/return
+   get-nodes:x:@hyper2lambda/*
+return

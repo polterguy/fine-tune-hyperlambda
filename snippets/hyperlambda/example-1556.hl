@@ -1,55 +1,25 @@
+/*
+ * Replaces placeholders {{name}} and {{confirmation_link}} in a registration email template.
+ * Prepares a fully rendered message ready to be sent as email.
+ */
+.template:@"
+Hello {{name}},
 
-// Write a Hyperlambda script to transcribe a specified audio file using OpenAI Whisper API.
-.arguments
-   file:*
-   type:string
-   mediaType:string
-   references:bool
-   chat:bool
-   recaptcha_response:string
-   user_id:string
-   session:string
-   stream:bool
-   data:string
-   referrer:string
-   whisper:*
-   language:string
+Thank you for registering at our site!
 
-// Retrieving token used to invoke OpenAI.
-config.get:"magic:openai:key"
+Click the link below to confirm your email:
+{{confirmation_link}}
 
-// Applying defaults.
-validators.default:x:@.arguments
-   mediaType:audio/mp4
+Regards,
+The Team"
 
-// Reading stream.
-io.stream.read:x:@.arguments/*/file/*/stream
+.final-message
+set-value:x:-
+   strings.replace:x:@.template
+      .:{{name}}
+      .:Sarah
 
-// Invoking Whisper to retrieve prompt.
-openai.whisper
-   key:x:@config.get
-   type:x:@.arguments/*/mediaType
-   language:x:@.arguments/*/language
-   content:x:@io.stream.read
-if
-   or
-      null:x:@openai.whisper
-      eq:x:@openai.whisper
-         .:
-   .lambda
-      throw:Nothing returned from Whisper
-         public:bool:true
-         status:int:400
-
-// Invoking main chat file.
-remove-nodes:x:@.arguments/*/file
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/system/openai/chat.get.hl
-   prompt:x:@openai.whisper
-
-// Returning success to caller.
-add:x:+
-   get-nodes:x:@execute-file/*
-yield
-   prompt:x:@openai.whisper
+set-value:x:@.final-message
+   strings.replace:x:@.final-message
+      .:{{confirmation_link}}
+      .:"https://example.com/confirm?id=123"

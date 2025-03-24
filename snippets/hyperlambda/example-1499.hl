@@ -1,18 +1,38 @@
+// Build the dynamic JSON payload
+.payload
+   email:user@example.com
+   pin:4321
+   source:mobile-app
 
-// Write a Hyperlambda script to return the maximum tokens for a specified completion slot.
-.arguments
-   slot:string
+// Create headers for content-type and custom request ID
+.headers
+   Content-Type:application/json
+   X-Request-ID:abc-001-login
 
-// Making sure user is authenticate to access endpoint
-auth.ticket.verify:root
+// Make the HTTP POST request
+add:x:./*/http.post/*/headers
+   get-value:x:@.headers/*
+add:x:./*/http.post/*/payload
+   get-value:x:@.payload/*
+http.post:"https://api.example.com/login/email"
+   headers
+   payload
+   convert:true
 
-// Retrieving max tokens from config.
-strings.split:x:@.arguments/*/slot
-   .:.
-strings.concat
-   .:"magic:"
-   get-value:x:@strings.split/0/-
-   .:":max_tokens"
-config.get:x:@strings.concat
-yield
-   max_tokens:x:@config.get
+// Verify response status is 2xx
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      .user-name
+      set-value:x:@.user-name
+         get-value:x:@http.post/*/content/*/user-name
+
+      .session-id
+      set-value:x:@.session-id
+         get-value:x:@http.post/*/content/*/session-id
+else
+   throw:Email login failed

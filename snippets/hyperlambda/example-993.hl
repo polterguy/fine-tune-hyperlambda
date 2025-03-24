@@ -1,49 +1,130 @@
 
-/*
- * Counts usage of slots in our training material
- * 
- * Returns all slots, and how many times each slot is mentioned in training material
- */
+// Returns minimum, maximum, average, or sum from the SubscriptionPlan table in the saas database based on specified conditions.
 .arguments
 
-// Used as buffer to hold result.
-.result
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
 
-// Fetching vocabulary of server.
-vocabulary
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
 
-// Iterating through each slot
-for-each:x:@vocabulary/*
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
 
-   // Executing file that actually counts how many instances we can find of slot.
-   execute-file:/modules/fine-tune-hyperlambda/api/hyperlambda-search-count.get.hl
-      query:x:@.dp/#
+   // Below you can find optional filtering arguments
+   /*
+    * - 'mt' implies more than
+    * - 'lt' implies less than
+    * - 'lteq' implies less than or equal to
+    * - 'mteq' implies more than or equal to
+    * - 'neq' implies not equal to
+    */
+   SubscriptionPlan.PlanId.mt:long
+   SubscriptionPlan.PlanId.lt:long
+   SubscriptionPlan.PlanId.mteq:long
+   SubscriptionPlan.PlanId.lteq:long
+   SubscriptionPlan.PlanId.neq:long
+   SubscriptionPlan.PlanId.eq:long
+   SubscriptionPlan.PlanName.like:string
+   SubscriptionPlan.PlanName.mt:string
+   SubscriptionPlan.PlanName.lt:string
+   SubscriptionPlan.PlanName.mteq:string
+   SubscriptionPlan.PlanName.lteq:string
+   SubscriptionPlan.PlanName.neq:string
+   SubscriptionPlan.PlanName.eq:string
+   SubscriptionPlan.MonthlyPrice.mt:decimal
+   SubscriptionPlan.MonthlyPrice.lt:decimal
+   SubscriptionPlan.MonthlyPrice.mteq:decimal
+   SubscriptionPlan.MonthlyPrice.lteq:decimal
+   SubscriptionPlan.MonthlyPrice.neq:decimal
+   SubscriptionPlan.MonthlyPrice.eq:decimal
+   SubscriptionPlan.MonthlyQuota.mt:long
+   SubscriptionPlan.MonthlyQuota.lt:long
+   SubscriptionPlan.MonthlyQuota.mteq:long
+   SubscriptionPlan.MonthlyQuota.lteq:long
+   SubscriptionPlan.MonthlyQuota.neq:long
+   SubscriptionPlan.MonthlyQuota.eq:long
+   SubscriptionPlan.Features.like:string
+   SubscriptionPlan.Features.mt:string
+   SubscriptionPlan.Features.lt:string
+   SubscriptionPlan.Features.mteq:string
+   SubscriptionPlan.Features.lteq:string
+   SubscriptionPlan.Features.neq:string
+   SubscriptionPlan.Features.eq:string
 
-   // Adding result of above invocation to [.result] folder.
-   set-name:x:+/+/*/*
-      get-value:x:@.dp/#
-   unwrap:x:+/*/*
-   add:x:@.result
-      .
-         .:x:@execute-file/*/count
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
 
-// Sorting result.
-sort:x:@.result/*
-   if
-      lt:x:@.lhs/#
-         get-value:x:@.rhs/#
-      .lambda
-         set-value:x:@.result
-            .:int:-1
-   else-if
-      mt:x:@.lhs/#
-         get-value:x:@.rhs/#
-      .lambda
-         set-value:x:@.result
-            .:int:1
-   else
-      set-value:x:@.result
-         .:int:0
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
 
-// Returning result to caller.
-return-nodes:x:@sort/*
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:SubscriptionPlan.PlanId
+   .:SubscriptionPlan.PlanName
+   .:SubscriptionPlan.MonthlyPrice
+   .:SubscriptionPlan.MonthlyQuota
+   .:SubscriptionPlan.Features
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:private, max-age=50
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|saas]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:SubscriptionPlan
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

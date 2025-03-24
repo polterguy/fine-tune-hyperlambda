@@ -1,44 +1,16 @@
 
-// Sends the user a warning email informing them that their cloudlet is about to be destroyed 5 days from now.
-slots.create:hub.emails.user.warn-destruction-of-cloudlet
+// Provide a Hyperlambda example where a counter counts down from 10.
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/username
-   validators.mandatory:x:@.arguments/*/cloudlet
+// Counts down from 10.
+.counter:int:10
+while
+   gt
+      get-value:x:@.counter
+      .:int:0
+   .lambda
 
-   // Retrieving frontend URL.
-   .url
-   set-value:x:@.url
-      config.get:"magic:hub:frontend-url"
+      // Logging countdown.
+      log.info:Counting down
 
-   // Retrieving user's name and email address.
-   .email
-   .name
-   data.connect:[generic|magic]
-      data.read
-         table:users_extra
-         values
-            type
-            name
-         where
-            and
-               user.eq:x:@.arguments/*/username
-               or
-                  type.eq:email
-                  type.eq:name
-      set-value:x:@.email
-         get-value:x:@data.read/*/*/type/=email/./*/value
-      set-value:x:@.name
-         get-value:x:@data.read/*/*/type/=name/./*/value
-
-   // Sending user his warning email.
-   unwrap:x:+/**
-   signal:magic.emails.send
-      subject:[Important] - Your AINIRO cloudlet is scheduled for destruction!
-      template-file:/modules/hub/magic.startup/templates/cloudlet-to-be-destroyed.html
-      substitutes
-         url:x:@.url
-         cloudlet:x:@.arguments/*/cloudlet
-      mime-type:text/html
-      email:x:@.email
-      name:x:@.name
+      // Decrementing counter.
+      math.decrement:x:@.counter

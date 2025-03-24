@@ -1,38 +1,23 @@
-// Build the dynamic JSON payload
-.payload
-   email:user@example.com
-   pin:4321
-   source:mobile-app
 
-// Create headers for content-type and custom request ID
-.headers
-   Content-Type:application/json
-   X-Request-ID:abc-001-login
+// Returns objects of the specified type to caller
+.arguments
 
-// Make the HTTP POST request
-add:x:./*/http.post/*/headers
-   get-value:x:@.headers/*
-add:x:./*/http.post/*/payload
-   get-value:x:@.payload/*
-http.post:"https://api.example.com/login/email"
-   headers
-   payload
-   convert:true
+   // Type of objects you want to retrieve. Mandatory.
+   type:string
 
-// Verify response status is 2xx
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      .user-name
-      set-value:x:@.user-name
-         get-value:x:@http.post/*/content/*/user-name
+   // Optional maximum number of objects to return. Defaults to 10 if not specified.
+   limit:long
 
-      .session-id
-      set-value:x:@.session-id
-         get-value:x:@http.post/*/content/*/session-id
-else
-   throw:Email login failed
+   // Optional offset of where to start retrieving objects.
+   from:long
+
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
+
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-get-records.hl
+
+// Returning result to caller.
+return-nodes:x:@execute-file/*

@@ -1,133 +1,88 @@
 
-// Returns unique and distinct values from the SubscriptionPlan table in the saas database based on specified conditions.
-.arguments
+// Dynamic slot that tracks the specified order and returns status to caller.
+slots.create:shopify.orders.track
 
-   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/shop
+   validators.mandatory:x:@.arguments/*/secret
+   validators.mandatory:x:@.arguments/*/order_no
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
-
-   // Offset into the dataset of where to start retrieving records
-   offset:long
-
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
-   operator:string
-
-   // Optional filtering arguments
-   SubscriptionPlan.PlanId.mt:long
-   SubscriptionPlan.PlanId.lt:long
-   SubscriptionPlan.PlanId.mteq:long
-   SubscriptionPlan.PlanId.lteq:long
-   SubscriptionPlan.PlanId.neq:long
-   SubscriptionPlan.PlanId.eq:long
-   SubscriptionPlan.PlanName.like:string
-   SubscriptionPlan.PlanName.mt:string
-   SubscriptionPlan.PlanName.lt:string
-   SubscriptionPlan.PlanName.mteq:string
-   SubscriptionPlan.PlanName.lteq:string
-   SubscriptionPlan.PlanName.neq:string
-   SubscriptionPlan.PlanName.eq:string
-   SubscriptionPlan.MonthlyPrice.mt:decimal
-   SubscriptionPlan.MonthlyPrice.lt:decimal
-   SubscriptionPlan.MonthlyPrice.mteq:decimal
-   SubscriptionPlan.MonthlyPrice.lteq:decimal
-   SubscriptionPlan.MonthlyPrice.neq:decimal
-   SubscriptionPlan.MonthlyPrice.eq:decimal
-   SubscriptionPlan.MonthlyQuota.mt:long
-   SubscriptionPlan.MonthlyQuota.lt:long
-   SubscriptionPlan.MonthlyQuota.mteq:long
-   SubscriptionPlan.MonthlyQuota.lteq:long
-   SubscriptionPlan.MonthlyQuota.neq:long
-   SubscriptionPlan.MonthlyQuota.eq:long
-   SubscriptionPlan.Features.like:string
-   SubscriptionPlan.Features.mt:string
-   SubscriptionPlan.Features.lt:string
-   SubscriptionPlan.Features.mteq:string
-   SubscriptionPlan.Features.lteq:string
-   SubscriptionPlan.Features.neq:string
-   SubscriptionPlan.Features.eq:string
-
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:SubscriptionPlan.PlanId
-   .:SubscriptionPlan.PlanName
-   .:SubscriptionPlan.MonthlyPrice
-   .:SubscriptionPlan.MonthlyQuota
-   .:SubscriptionPlan.Features
-
-// Adding Cache-Control HTTP header.
-response.headers.set
-   Cache-Control:private, max-age=50
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:admin
-
-// Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
-
-/*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
- */
-if
-   exists:x:@.arguments/*/operator
-   .lambda
-
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/0
-         get-value:x:@.arguments/*/operator
-      remove-nodes:x:@.arguments/*/operator
-
-// Opening up our database connection.
-data.connect:[generic|saas]
-   database-type:sqlite
-
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
+   // Creating our URL.
+   .url
+   set-value:x:@.url
       strings.concat
-         .:distinct(
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+         .:"https://"
+         get-value:x:@.arguments/*/shop
+         .:.myshopify.com/admin/api/2023-07/orders.json?name=
+         strings.url-encode:x:@.arguments/*/order_no
+         .:&status=any
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
+   // Retrieving order status.
+   http.get:x:@.url
+      convert:bool:true
+      headers
+         X-Shopify-Access-Token:x:@.arguments/*/secret
 
-   // Adding [limit] and [offset] arguments
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-
-   // Adding filtering arguments.
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:SubscriptionPlan
-      columns
-         distinct_functor
-            as:.
-      where
+   // Sanity checking HTTP request.
+   if
+      not
          and
+            mte:x:@http.get
+               .:int:200
+            lt:x:@http.get
+               .:int:300
+      .lambda
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+         // Oops ...!!
+         log.error:x:@.arguments/*/message
+         throw:Something went wrong while invoking Shopify, check your log for details.
+            status:int:500
+            public:bool:true
+
+   // Creating our order status that we return to caller.
+   .status
+   .status-description
+   switch:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      case:fulfilled
+         set-value:x:@.status-description
+            .:"Order is fulfilled by us. "
+         set-value:x:@.status
+            get-value:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      case:shipped
+         set-value:x:@.status-description
+            .:"Order is in shipping. "
+         set-value:x:@.status
+            get-value:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      case:partial
+         set-value:x:@.status-description
+            .:"Order has been partially shipped. "
+         set-value:x:@.status
+            get-value:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      case:unshipped
+         set-value:x:@.status-description
+            .:"Order is not shipped. "
+         set-value:x:@.status
+            get-value:x:@http.get/*/content/*/orders/0/*/fulfillment_status
+      default
+         set-value:x:@.status-description
+            .:No such order
+         set-value:x:@.status
+            .:unknown
+
+   // Checking if we've got fulfillments.
+   if
+      exists:x:@http.get/*/content/*/orders/0/*/fulfillments/0/*/tracking_urls/0
+      .lambda
+
+         // Order is fulfilled from merchant's side, and we've got a tracking url.
+         set-value:x:@.status-description
+            strings.concat
+               get-value:x:@.status-description
+               .:You can track your shipping [here](
+               get-value:x:@http.get/*/content/*/orders/0/*/fulfillments/0/*/tracking_urls/0
+               .:)
+
+   // Returning status to caller.
+   yield
+      status:x:@.status
+      description:x:@.status-description

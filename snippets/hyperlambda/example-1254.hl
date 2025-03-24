@@ -1,2 +1,27 @@
-// This snippet defines a node with an unsigned long (UInt64) value.
-.veryBigNumber:ulong:1234567890123456789
+/*
+ * FILE: /modules/api/employees/search-lastname.get.hl
+ *
+ * DESCRIPTION:
+ * Searches employees by their last name using a `LIKE` query.
+ * Useful for autocomplete by surname.
+ *
+ * HOW TO CREATE THIS ENDPOINT:
+ * 1. Save as `/modules/api/employees/search-lastname.get.hl`
+ * 2. Access via: GET /api/employees/search-lastname?lastname=Smi
+ */
+
+.arguments
+   lastname:string
+
+validators.mandatory:x:@.arguments/*/lastname
+
+data.connect:sakila
+   strings.concat
+      .:%
+      get-value:x:@.arguments/*/lastname
+      .:%
+   data.select:SELECT first_name, last_name FROM actor WHERE last_name LIKE @filter
+      @filter:x:@strings.concat
+
+   yield
+      results:x:@data.select/*

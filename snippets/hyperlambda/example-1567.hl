@@ -1,18 +1,34 @@
-/*
- * This example attempts to connect to a non-existent database.
- * It demonstrates how to handle connection failures gracefully by catching exceptions
- * and logging an error message.
- */
 
-try
-   data.connect:non_existent_database
-      data.select:SELECT * FROM non_existent_table
-.catch
-   log.error:Failed to connect to the database or execute the query.
+// Creates an item in your clusters table in your [generic|hub] database according to the specified arguments.
+.arguments
+   id:string
+   country:string
+   name:string
+   enabled:bool
 
-// Notice, the [data.connect] slot will not fail, since the default database
-// is SQLite, which will simply create a new database file with the
-// path of '/data/non_existent_database.db' - But since this database
-// is initialised as an empty database, without any tables, the
-// [data.select] invocation will still fail, since it doesn't have
-// the 'non_existent_table' table.
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+validators.mandatory:x:@.arguments/*/country
+validators.mandatory:x:@.arguments/*/name
+
+// Opening up database connection.
+data.connect:[generic|hub]
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:clusters
+      return-id:bool:false
+      values
+
+   // Returning result of above invoction to caller.
+   response.status.set:201
+   unwrap:x:+/*
+   return
+      result:success

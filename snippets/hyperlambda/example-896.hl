@@ -1,29 +1,26 @@
-
 /*
- * Inserts training data into database
+ * Returns all active companies the specified director is part of
  * 
- * Saves training data for using to fine-tune an LLM.
+ * director_id is required
  */
 .arguments
+   director_id:long
+   limit:long
+   offset:long
 
-   // Mandatory prompt used to generate specified Hyperlambda
-   prompt:string
+data.connect:[mssql|director_db]
+   database-type:mssql
 
-   // Mandatory reference to Hyperlambda file.
-   file-no:int
+   data.select:@"
+select d.org_number, b.company_name, d.role_name
+   from directors d
+      inner join basic b on d.org_number = b.org_number
+   where d.director_id = @id and d.active = 1
+   limit @limit offset @offset"
+      database-type:mssql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
 
-// Getting Hyperlambda.
-execute-file:/modules/fine-tune/workflows/create-training-data.hl
-   file-no:x:@.arguments/*/file-no
-
-// Inserting item.
-data.connect:fine-tune
-   data.create
-      table:hyperlambda
-      values
-         prompt:x:@.arguments/*/prompt
-         code:x:@execute-file/*/hyperlambda
-
-// Returning success.
-return
-   result:success
+   yield
+      companies:x:@data.select/*

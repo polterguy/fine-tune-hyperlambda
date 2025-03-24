@@ -1,52 +1,32 @@
 
-// Returns a specific patent from its patent ID using Google API.
+// Hyperlambda endpoint that counts items from your Categories table in your northwind database with optional filtering arguments
 .arguments
+   Categories.CategoryID.eq:long
+   Categories.CategoryName.like:string
+   Categories.CategoryName.eq:string
+   Categories.Description.like:string
+   Categories.Description.eq:string
+   Categories.Picture.like:string
+   Categories.Picture.eq:string
 
-   // Mandatory ID for patent as return from search API.
-   patent_id:string
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
 
-// Retrieving Google API key and making sure we've got one.
-.api-key
-set-value:x:@.api-key
-   config.get:"magic:serp-api:api_key"
-if
-   or
-      null:x:@.api-key
-      eq:x:@.api-key
-         .:
-   .lambda
-      throw:Could not find a Google API key to use for fetching patents.
+   // Adding all arguments into [and] node ensuring filtering is applied
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/patent_id
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Categories
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
 
-// Creating our URL.
-.url
-set-value:x:@.url
-   strings.concat
-      .:"https://serpapi.com/search.json?engine=google_patents_details&api_key="
-      get-value:x:@.api-key
-      .:&patent_id=
-      strings.url-encode:x:@.arguments/*/patent_id
-
-// Retrieving result.
-http.get:x:@.url
-   convert:true
-
-// Sanity checking result of above invocation.
-if
-   not
-      and
-         mte:x:@http.get
-            .:int:200
-         lt:x:@http.get
-            .:int:300
-   .lambda
-
-      // Oops ...!!
-      lambda2hyper:x:../*
-      log.info:x:-
-      throw:Something went wrong while invoking Google patent API
-
-// Returning everything as is.
-return-nodes:x:@http.get/*/content/*
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

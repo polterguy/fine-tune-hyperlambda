@@ -1,10 +1,24 @@
 
-// Hyperlambda script to override the exception handler and return information to root users.
-log.error:x:@.arguments/*/message
-   url:x:@.arguments/*/path
-   exception:x:@.arguments/*/stack
+// Write a Hyperlambda script to list all connection strings in your installation for a specified database type.
+.arguments
+   databaseType:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:pgsql
+   .:mssql
+   .:sqlite
+
+// Retrieves all connection strings according to database type specified.
+strings.concat
+   .:"magic:databases:"
+   get-value:x:@.arguments/*/databaseType
+config.section:x:-
 add:x:+
-   get-nodes:x:@.arguments/*/status
-   get-nodes:x:@.arguments/*/field
-   get-nodes:x:@.arguments/*/message
+   get-nodes:x:@config.section/*
 return

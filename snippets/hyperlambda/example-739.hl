@@ -1,34 +1,35 @@
 
-// Lists all database in your MySQL instance.
-slots.create:magic.db.pgsql.databases
+// CRUD Create endpoint inserting one record into your crawl_urls table in your scraper database.
+.arguments
 
-   // Opens up our connection
-   .connection:[postgres]
-   if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
-      .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               .:postgres]
-   pgsql.connect:x:@.connection
+   // url column value
+   url:string
 
-      // Runs our query
-      pgsql.select:select datname from pg_database
+   // type column value
+   type:string
 
-      // Renaming "Database" nodes.
-      set-name:x:@pgsql.select/*/*
-         .:db
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
 
-      // Returns the remaining databases to caller.
-      return-nodes:x:@pgsql.select/*
+// Opening up database connection.
+data.connect:[generic|scraper]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:crawl_urls
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

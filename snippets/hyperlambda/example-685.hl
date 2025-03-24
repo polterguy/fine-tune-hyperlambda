@@ -1,36 +1,20 @@
+// Hyperlambda workflow scraping the specified URL
+.arguments
+   url:string
 
-// Hyperlambda script that executes startup files, create the magic database, and apply default configuration settings.
-io.file.execute:/system/sql/magic.startup/mssql/magic.db.mssql.databases.hl
-io.file.execute:/system/sql/magic.startup/mysql/magic.db.mysql.databases.hl
-io.file.execute:/system/sql/magic.startup/pgsql/magic.db.pgsql.databases.hl
-io.file.execute:/system/sql/magic.startup/sqlite/magic.db.sqlite.databases.hl
+// Returns [max_tokens] context from the specified [url].
+execute:magic.workflows.actions.execute
+   name:openai-context-from-url
+   filename:/modules/openai/workflows/actions/openai-context-from-url.hl
+   arguments
+      url:x:@.arguments/*/url
 
-// Creating our magic database.
-io.file.execute:/system/ensure-magic-database.hl
+      // Make sure we only retrieve 8,000 OpenAI API tokens max.
+      max_tokens:int:8000
 
-// Executing all magic.startup Hyperlambda files.
-io.file.list-recursively:/system/
-io.file.list-recursively:/modules/
-for-each:x:./*/io.file.list-recursively/*
+// Returns the result of your last action.
+return-nodes:x:@execute/*
 
-   // Checking if file is a startup Hyperlambda file.
-   if
-      and
-         strings.contains:x:@.dp/#
-            .:/magic.startup/
-         strings.ends-with:x:@.dp/#
-            .:.hl
-      .lambda
-
-         // Executing file.
-         strings.concat
-            .:"Executing startup file '"
-            get-value:x:@.dp/#
-            .:.
-         console.log:x:-
-         try
-            io.file.execute:x:@.dp/#
-         .catch
-            log.error:Error while executing startup file
-               exception:x:@.arguments/*/message
-               file:x:@.dp/#
+/*
+ * Notice, this code requires the OpenAI plugin to be installed.
+ */

@@ -1,9 +1,7 @@
 
-// Returns Stripe charges.
+// Scrapes the specified [url] and returns as context data to caller.
 .arguments
-   limit:int
-   starting_after:string
-   customer_id:string
+   url:string
 
 /*
  * Ensures user is authorized to access endpoint.
@@ -13,25 +11,19 @@
  */
 execute:magic.workflows.actions.execute
    name:authorize
-   filename:/misc/workflows/actions/security/authorize.hl
+   filename:/modules/auth/workflows/actions/authorize.hl
    arguments
       roles
          .:root
          .:gpt
 
-/*
- * Retrieves charges from Stripe.
- * 
- * Will use your Stripe API token found from your settings as it's interacting
- * with the Stripe API.
- */
+// Returns [max_tokens] context from the specified [url].
 execute:magic.workflows.actions.execute
-   name:stripe-charges-get
-   filename:/modules/stripe/workflows/actions/stripe-charges-get.hl
+   name:openai-context-from-url
+   filename:/modules/openai/workflows/actions/openai-context-from-url.hl
    arguments
-      limit:x:@.arguments/*/limit
-      starting_after:x:@.arguments/*/starting_after
-      customer_id:x:@.arguments/*/customer_id
+      url:x:@.arguments/*/url
+      max_tokens:int:2000
 
 // Returns the result of your last action.
 return-nodes:x:@execute/*

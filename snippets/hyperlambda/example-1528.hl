@@ -1,9 +1,42 @@
-// Create two dynamic slots 'alpha' and 'beta'
-slots.create:alpha  
-   return-value:1
-slots.create:beta  
-   return-value:2
+// Build the dynamic JSON payload
+.payload
+   username:admin
+   password:supersecret123
+   client_id:web-client
 
-// Get all dynamic slot names
-slots.vocabulary
-// Returns ["alpha", "beta"] (the list of all slot names defined dynamically), in addition to all other dynamic slots in the system.
+// Create headers for content-type and custom request ID
+.headers
+   Content-Type:application/json
+   X-Request-ID:xyz-123-abc
+
+// Make the HTTP POST request
+add:x:./*/http.post/*/headers
+   get-value:x:@.headers/*
+add:x:./*/http.post/*/payload
+   get-value:x:@.payload/*
+http.post:"https://api.example.com/auth/login"
+   headers
+   payload
+
+   // This automatically converts result to lambda object
+   convert:true
+
+// Verify above POST was a success.
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+
+      // Store response status and body
+      .name
+      set-value:x:@.name
+         get-value:x:@http.post/*/content/*/name
+
+      .user-id
+      set-value:x:@.user-id
+         get-value:x:@http.post/*/content/*/user-id
+else
+   throw:Something went wrong when invoking HTTP POST

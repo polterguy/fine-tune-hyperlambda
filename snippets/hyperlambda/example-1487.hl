@@ -1,46 +1,9 @@
 /*
- * Slot that returns summarized sales orders for a given region.
+ * Accesses a specific configuration group based on a dynamic environment value.
+ *
+ * The `{@.env}` part is resolved at runtime and could yield "dev", "staging", "prod", etc.
+ * The full expression becomes something like: `@.config/*/prod`
+ *
+ * This allows you to fetch settings based on the current environment context.
  */
-
-slots.create:sales.orders.by-region
-
-   .limit
-   set-value:x:@.limit
-      get-first-value
-         get-value:x:@.arguments/*/limit
-         .:long:20
-
-   .offset
-   set-value:x:@.offset
-      get-first-value
-         get-value:x:@.arguments/*/offset
-         .:long:0
-
-   mssql.connect:[production|ORDSYS_MAIN]
-
-      mssql.read
-         table:SalesOrders
-            as:o
-            join:Customers
-               as:c
-               type:left
-               on
-                  and
-                     o.CustomerId.eq:c.Id
-         columns
-            c.Region
-            c.CompanyName
-            sum(o.TotalAmount)
-               as:TotalSales
-            count(*)
-               as:OrdersCount
-         limit:x:@.limit
-         offset:x:@.offset
-         where
-            and
-               c.Region.eq:x:@.arguments/*/filter
-         group
-            c.Region
-            c.CompanyName
-
-      return-nodes:x:@mssql.read/*
+.active-config:x:@.config/*/{@.env}

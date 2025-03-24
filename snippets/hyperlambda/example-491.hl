@@ -1,10 +1,30 @@
 
-// Decrement a value by a custom step from another node
-.value:int:10
-.step:int:4
-math.decrement:x:@.value
+// CRUD Hyperlambda file that deletes one record from your comments table in your cms database
+.arguments
 
-   // use 4 from .step as the decrement amount
-   get-value:x:@.step
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-// .value should now be 6
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:comments
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

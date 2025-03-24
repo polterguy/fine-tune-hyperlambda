@@ -1,59 +1,54 @@
 
-// Sends an email to AINIRO
+// Update endpoint updating one record in your spice_urls table in your scraper database.
 .arguments
-   content:string
-   email:string
-   name:string
-   recaptcha_response:string
 
-/*
- * Validates the specified mCAPTCHA token.
- *
- * This action will validate the specified recaptcha_response token and throw an exception if validation fails.
- */
-execute:magic.auth.captcha-verify
-   token:x:@.arguments/*/recaptcha_response
+   // spice_url_id column value being primary key of record to update
+   spice_url_id:long
 
-/*
- * Sends an email to the specified [name]/[email] recipient, with the specified [subject] and [body].
- *
- * Optionally supply [from] and [from-email] as name/email sender. If you don't supply from, this action
- * will use the default sender settings from your configuration.
- */
-set-value:x:@.arguments/*/content
-   strings.html-encode:x:@.arguments/*/content
-set-value:x:@.arguments/*/name
-   strings.html-encode:x:@.arguments/*/name
-set-value:x:@.arguments/*/email
-   strings.html-encode:x:@.arguments/*/email
-execute:magic.workflows.actions.execute
-   name:email
-   filename:/misc/workflows/actions/misc/email.hl
-   arguments
-      name:Team AINIRO
-      email:team@ainiro.io
-      html:bool:false
-      reply-to:x:@.arguments/*/name
-      reply-to-email:x:@.arguments/*/email
-      subject:Contact request from website
-      body:x:@.arguments/*/content
+   // url column's new value
+   url:string
 
-// Making sure we catch exceptions in case contact already exists in HubSpot.
-try
+   // type column's new value
+   type:string
 
-   // Pushing contact to HubSpot.
-   execute-file:/modules/hubspot/contacts.post.hl
-      email:x:@.arguments/*/email
-      firstname:x:@.arguments/*/name
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/spice_url_id
 
-   // Pushing contact to HubSpot.
-   execute-file:/modules/hubspot/note.post.hl
-      id:x:@execute-file/@execute-file/*/id
-      note:x:@.arguments/*/content
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
 
-.catch
-   log.error:x:@.arguments/*/message
+// Opening up our database connection.
+data.connect:[generic|scraper]
+   database-type:sqlite
 
-// Returning success to caller.
-return
-   result:success
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:spice_urls
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

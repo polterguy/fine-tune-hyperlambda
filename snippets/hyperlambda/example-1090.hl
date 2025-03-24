@@ -1,30 +1,34 @@
 
-// Hyperlambda endpoint that deletes a specified cache item, ensuring the user is authorized, and handles both single and multiple cache item deletions.
+// Delete one record from your address table in your sakila database without authorization. Log invocation
 .arguments
-   id:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Primary key of record to delete, mandatory argument
+   address_id:long
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/id
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.address entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/address_id
 
-// Checking if caller wants to delete multiple cache items simultaneously.
-if
-   strings.ends-with:x:@.arguments/*/id
-      .:*
-   .lambda
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
 
-      // Deletes all cache items starting with specified string.
-      strings.split:x:@.arguments/*/id
-         .:*
-      cache.clear
-         filter:x:@strings.split/0
-else
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-   // Deletes a single cache item.
-   cache.set:x:@.arguments/*/id
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:address
+      where
+         and
 
-// Returning success to caller.
-return
-   result:success
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

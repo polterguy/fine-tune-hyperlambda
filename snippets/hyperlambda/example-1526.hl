@@ -1,14 +1,26 @@
+/*
+ * Posts a dynamic set of arguments to a user info API.
+ * Returns full name and contact email on success; error message otherwise.
+ */
 
-// KPI file for displaying employee productivity
-.name:Employee productivity
-.description:Closed activities by user for current month
-.enabled:bool:false
-.type:pie
-.lambda
-   data.connect:[generic|robo-crm]
-      date.now
-      date.format:x:-
-         format:yyyy-MM-00
-      data.select:"\nselect username as name, count(*) as value\n   from activities\n      where closed > @date\n   group by username"
-         @date:x:@date.format
-      return-nodes:x:-/*
+.arguments
+   id:int
+
+add:x:+/*/payload
+   get-nodes:x:@.arguments/*
+http.post:"https://api.example.com/user/profile"
+   convert:true
+   payload
+
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         full_name:x:@http.post/*/content/*/full_name
+         contact_email:x:@http.post/*/content/*/contact_email
+return
+   error:Unable to retrieve user profile

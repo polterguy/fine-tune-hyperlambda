@@ -1,124 +1,56 @@
 
-// Create a Hyperlambda script for a CRUD read endpoint with paging, sorting, and filtering that selects records from the ml_training_snippets table in the magic database, ensuring authentication and authorization for root roles.
-.arguments
-   limit:long
-   offset:long
-   order:string
-   direction:string
-   ml_training_snippets.id.eq:long
-   ml_training_snippets.id.mt:long
-   ml_training_snippets.id.lt:long
-   ml_training_snippets.type.like:string
-   ml_training_snippets.type.eq:string
-   ml_training_snippets.pushed.eq:long
-   ml_training_snippets.uri.like:string
-   ml_training_snippets.uri.eq:string
-   ml_training_snippets.prompt.like:string
-   ml_training_snippets.prompt.eq:string
-   ml_training_snippets.completion.like:string
-   ml_training_snippets.completion.eq:string
+// Slot responsible for accepting a subscription payment
+slots.create:stripe.subscriptions.accepted.templates
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Sanity check invocation.
+   validators.mandatory:x:@.arguments/*/username
+   validators.mandatory:x:@.arguments/*/price
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+   // Figuring out what role to add user to, which depends upon the price.
+   .role
+   io.file.load:/etc/stripe-subscription-templates/templates.hl
+   hyper2lambda:x:@io.file.load
+   set-value:x:@.role
+      get-value:x:"@hyper2lambda/*/*/price_id/\"={@.arguments/*/price}\"/./*/role"
 
-   // Checking if order exists and if it is 'tokens', at which point we order by length of prompt + completion.
-   if
-      and
-         exists:x:@.arguments/*/order
-         eq:x:@.arguments/*/order
-            .:tokens
-      .lambda
-         set-value:x:@.arguments/*/order
-            .:length(prompt || completion)
+   // Buffer for extra information.
+   .extra
 
-   // Parametrising our read invocation with ordering arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
+   // Connecting to database to update user.
+   data.connect:magic
 
-   // Parametrising our read invocation with paging arguments if specified.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
+      // Adding user to role.
+      data.create
+         table:users_roles
+         values
+            user:x:@.arguments/*/username
+            role:x:@.role
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*/*/or
-      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
-      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
-      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
-      get-nodes:x:@.arguments/*/ml_training_snippets.completion.eq
-      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.eq
-      get-nodes:x:@.arguments/*/ml_training_snippets.uri.eq
-      get-nodes:x:@.arguments/*/ml_training_snippets.id.eq
-      get-nodes:x:@.arguments/*/ml_training_snippets.id.lt
-      get-nodes:x:@.arguments/*/ml_training_snippets.id.mt
-   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
-   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
-   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
-   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.eq
-   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.eq
-   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.eq
-   remove-nodes:x:@.arguments/*/ml_training_snippets.id.eq
-   remove-nodes:x:@.arguments/*/ml_training_snippets.id.lt
-   remove-nodes:x:@.arguments/*/ml_training_snippets.id.mt
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
+      // Retrieving extra information.
+      data.connect:magic
+         data.read
+            table:users_extra
+            where
+               and
+                  user.eq:x:@.arguments/*/username
+                  or
+                     type.eq:name
+                     type.eq:email
+         for-each:x:@data.read/*
+            set-name:x:./*/add/*/*
+               get-value:x:@.dp/#/*/type
+            set-value:x:./*/add/*/*
+               get-value:x:@.dp/#/*/value
+            add:x:@.extra
+               .
+                  .
 
-   // Removing [or] parts unless we've got something to actually or.
-   if
-      not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
-      .lambda
-         remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
+   // Authenticating user again creating a new JWT token since roles have been updated.
+   execute:magic.auth.authenticate
+      username:x:@.arguments/*/username
+      password-check:bool:false
 
-   // Reading data from database.
-   data.read
-      table:ml_training_snippets
-      columns
-         ml_training_snippets.id
-         ml_training_snippets.created
-         ml_training_snippets.type
-         ml_training_snippets.pushed
-         ml_training_snippets.uri
-         ml_training_snippets.prompt
-         ml_training_snippets.completion
-         ml_training_snippets.embedding
-            as:embedding_vss
-         ml_training_snippets.cached
-         ml_training_snippets.meta
-      where
-         and
-            or
-
-   // Changing embedding to a boolean value to preserve bandwidth, and returning token count.
-   for-each:x:@data.read/*
-
-      // Changing embedding to boolean to preserve bandwidth.
-      if
-         not-null:x:@.dp/#/*/embedding_vss
-         .lambda
-            set-value:x:@.dp/#/*/embedding_vss
-               .:bool:true
-      else
-         set-value:x:@.dp/#/*/embedding_vss
-            .:bool:false
-
-      // Adding token count for each snippet.
-      strings.concat
-         get-value:x:@.dp/#/*/prompt
-         .:"\n\n"
-         get-value:x:@.dp/#/*/completion
-      openai.tokenize:x:@strings.concat
-      unwrap:x:+/*/*
-      add:x:@.dp/#
-         .
-            tokens:x:@openai.tokenize
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+   // Returning token and extra information to caller.
+   yield
+      ticket:x:@execute/*/ticket
+      extra:x:@.extra/*

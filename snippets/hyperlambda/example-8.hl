@@ -1,137 +1,66 @@
 
-// Write a Hyperlambda script to upload and install a specified ZIP file module.
+// Write a Hyperlambda script to delete a specified column from your database.
 .arguments
-
-   // This becomes a name and content node, where content is the raw stream containing the file's content
-   file:*
-
-// Declaring MIME type endpoint accepts
-.accept:multipart/form-data
+   databaseType:string
+   connectionString:string
+   databaseName:string
+   tableName:string
+   columnName:string
+   generate:bool
 
 // Ensures user is authorized to access endpoint.
 auth.ticket.verify:root
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/file
-validators.mandatory:x:@.arguments/*/file/*/name
-validators.mandatory:x:@.arguments/*/file/*/stream
-validators.regex:x:@.arguments/*/file/*/name
-   regex:[a-z0-9_-]+
-strings.split:x:@.arguments/*/file/*/name
-   .:.
-if
-   not
-      eq
-         get-value:x:@strings.split/0/-
-         .:zip
-   .lambda
+validators.mandatory:x:@.arguments/*/connectionString
+validators.mandatory:x:@.arguments/*/databaseName
+validators.mandatory:x:@.arguments/*/tableName
+validators.mandatory:x:@.arguments/*/columnName
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:sqlite
+   .:pgsql
+   .:mssql
 
-      // Oops, not a ZIP file ...
-      throw:You can only install ZIP files
-         public:true
-         status:415
-if
-   not
-      eq
-         get-count:x:@strings.split/*
-         .:int:2
-   .lambda
-
-      // Oops, not a valid module name.
-      throw:That is not a valid module name
-         public:true
-         status:400
-
-// Figuring out full path to use for ZIP file.
-.full-path
-set-value:x:@.full-path
+// SQL that executes to modify DDL.
+.sql
+set-value:x:@.sql
    strings.concat
-      .:/modules/
-      get-value:x:@.arguments/*/file/*/name
+      .:"alter table "
+      get-value:x:@.arguments/*/tableName
+      .:" drop column "
+      get-value:x:@.arguments/*/columnName
+      .:;
 
-// Checking if ZIP file already exists, at which point we delete it.
-if
-   io.file.exists:x:@.full-path
-   .lambda
+// Checking if caller only wants to generate SQL statement.
+if:x:@.arguments/*/generate
+   unwrap:x:+/*
+   return
+      sql:x:@.sql
 
-      // File with specified filename already exists.
-      io.file.delete:x:@.full-path
+// Creating our database connection and executing SQL.
+strings.concat
+   .:[
+   get-value:x:@.arguments/*/connectionString
+   .:|
+   get-value:x:@.arguments/*/databaseName
+   .:]
+data.connect:x:-
+   database-type:x:@.arguments/*/databaseType
+   data.execute:x:@.sql
+      database-type:x:@.arguments/*/databaseType
 
-// Saving stream to file.
-io.stream.save-file:x:@.full-path
-   get-value:x:@.arguments/*/file/*/stream
+// Flushing database cache.
+strings.concat
+   .:magic.sql.databases.
+   get-value:x:@.arguments/*/databaseType
+   :.
+   get-value:x:@.arguments/*/connectionString
+cache.set:x:-
 
-// Figuring out folder name to use.
-.folder
-set-value:x:@.folder
-   strings.concat
-      .:/modules/
-      get-value:x:@strings.split/0
-      .:/
-
-// Deleting previously existing folder with same name.
-if
-   io.folder.exists:x:@.folder
-   .lambda
-
-      // Module already exists, deleting it.
-      io.folder.delete:x:@.folder
-
-// Creating folder.
-io.folder.create:x:@.folder
-
-// Unzipping file.
-io.file.unzip:x:@.full-path
-   folder:x:@.folder
-
-// Deleting ZIP file.
-io.file.delete:x:@.full-path
-
-// Defaulting module name to name of zip file.
-.module-name
-set-value:x:@.module-name
-   get-value:x:@strings.split/0
-
-// Figuring out manifest name and checking if it exists.
-.manifest
-set-value:x:@.manifest
-   strings.concat
-      get-value:x:@.folder
-      .:manifest.hl
-if
-   io.file.exists:x:@.manifest
-   .lambda
-
-      // Checking manifest file to see if we need to rename module.
-      io.file.load:x:@.manifest
-      hyper2lambda:x:-
-      if
-         neq
-            get-value:x:@.module-name
-            get-value:x:@hyper2lambda/*/module_name
-         .lambda
-
-            // We'll need to rename folder for module according to manifest.
-            strings.concat
-               .:/modules/
-               get-value:x:@hyper2lambda/*/module_name
-               .:/
-            if
-               io.folder.exists:x:@strings.concat
-               .lambda
-
-                  // Folder already exists, deleting it.
-                  io.folder.delete:x:@strings.concat
-
-            // Renaming folder according to manifest information.
-            io.folder.move:x:@.folder
-               get-value:x:@strings.concat
-            set-value:x:@.module-name
-               get-value:x:@hyper2lambda/*/module_name
-
-// Installing module.
+// Returning result to caller.
 unwrap:x:+/*
-signal:magic.modules.install-module
-   module:x:@.module-name
-return-nodes
-   result:Success
+return
+   result:success
+   sql:x:@.sql

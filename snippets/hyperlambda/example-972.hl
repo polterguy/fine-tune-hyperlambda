@@ -1,6 +1,189 @@
 
-// Opens a database connection and executes some arbitrary SQL, returning result as a record set
-data.connect:DATABASE_NAME_HERE
-   database-type:sqlite
-   data.select:select * from TABLE_NAME_HERE
-      database-type:sqlite
+// Hyperlambda script creating a dynamic slot that returns Markdown training snippets from specified HTML, with options for images, lists, and code.
+slots.create:magic.ai.html.extract
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/html
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
+
+   // Ensuring defaults.
+   validators.default:x:@.arguments
+      images:bool:true
+      lists:bool:true
+      code:bool:true
+
+   // Used to return meta information to caller.
+   .meta
+      main:int:0
+
+   // Buffer used for snippet to return.
+   .snippets
+
+   // Buffer for title.
+   .title
+
+   // Buffer for description.
+   .description
+
+   // Used to store a reference to above HTML transformed to Markdown.
+   .markdown
+
+   // Buffer used for URLs from HTML document.
+   .urls
+
+   // Converting HTML to Markdown.
+   html2markdown:x:@.arguments/*/html
+      url:x:@.arguments/*/url
+      images:x:@.arguments/*/images
+      lists:x:@.arguments/*/lists
+      code:x:@.arguments/*/code
+
+   // Checking if we have any Markdown at all, and if not we return early.
+   if
+      or
+         null:x:@html2markdown
+         eq:x:@html2markdown
+            .:
+      .lambda
+
+         // Nothing to do here ...
+         return
+            urls
+            snippets
+            meta
+               main:int:0
+
+   // Retrieving title and description from document.
+   set-value:x:@.title
+      get-value:x:@html2markdown/*/title/[0,1]
+   set-value:x:@.description
+      get-value:x:@html2markdown/*/description/[0,1]
+
+   // Adding URLs found as we transformed HTML to Markdown.
+   add:x:@.urls
+      get-nodes:x:@html2markdown/*/urls/*
+
+   // Storing Markdown in above buffer node.
+   set-value:x:@.markdown
+      get-value:x:@html2markdown
+
+   /*
+    * Creating our "base prompt", which is the default to be used for
+    * all training snippets found in document.
+    */
+   .prompt
+   set-value:x:@.prompt
+      get-first-value
+         get-value:x:@.title
+         get-value:x:@.description
+         .:Page
+
+   /*
+    * Breaking page into sections.
+    * 
+    * Here we are breaking page down into smaller training snippets, based upon
+    * lists found at root, and pre sections (code).
+    * 
+    * This is done to avoid creating summaries of lists that typically might contain
+    * navbar parts and URLs, in addition to making sure we keep all code segments as is.
+    * 
+    * The [.tmp-prompt] below is being used as the prompt for individual OL, UL and PRE
+    * elements, while the [.remaining] part is the remaining Markdown after we've remove
+    * all UL, OL and PRE elements.
+    */
+   .remaining
+   .tmp-prompt
+   set-value:x:@.tmp-prompt
+      get-value:x:@.prompt
+
+   /*
+    * For simplicity reasons we convert Markdown to HTML and then to lambda again,
+    * to allow us to semantically traverse UL elements, OL elements and PRE elements.
+    * 
+    * This allows us to extract UL, OL, and PRE elements, and import these as individual
+    * training snippets.
+    */
+   markdown2html:x:@html2markdown
+   html2lambda:x:@markdown2html
+
+   // Iterating through all root nodes found as we converted Markdown back to lambda again.
+   for-each:x:@html2lambda/*
+      get-name:x:@.dp/#
+      switch:x:@get-name
+         case:h1
+         case:h2
+         case:h3
+         case:h4
+         case:h5
+         case:h6
+
+            /*
+             * If page contains Hx element, we append it to our base
+             * prompt, to try to keep as much of the (relevant) information as
+             * possible in our prompt for our UL, OL and PRE training snippets.
+             */
+            set-value:x:@.tmp-prompt
+               strings.concat
+                  get-value:x:@.prompt
+                  .:" | "
+                  get-value:x:"@.dp/#/*/\\#text"
+         case:ul
+         case:ol
+         case:pre
+
+            /*
+             * This is a bulleted list, ordered list, or a code segment.
+             * 
+             * We keep it exactly as is, but return it as an individual training snippet,
+             * such that it becomes an isolated training snippet during
+             * import.
+             */
+            lambda2html:x:@.dp/#
+            html2markdown:x:@lambda2html
+               url:x:@.arguments/*/url
+            unwrap:x:+/*/*/*
+            add:x:@.snippets
+               .
+                  .
+                     prompt:x:@.tmp-prompt
+                     completion:x:@html2markdown
+         default
+
+            // Adding remaining HTML, minus the parts we removed.
+            add:x:@.remaining
+               get-nodes:x:@.dp/#
+
+   /*
+    * Now we have removed all UL, OL, Hx and PRE elements, and [.remaining] contains
+    * a lambda node hierarchy of everything that remains in the page, at which
+    * point we can transform it back to HTML for then to transform it to Markdown,
+    * and return that as an individual snippets, without PRE, UL and OL elements.
+    */
+   lambda2html:x:@.remaining/*
+   set-value:x:@.markdown
+      html2markdown:x:@lambda2html
+         url:x:@.arguments/*/url
+
+   // Adding remaining HTML as an individual training snippet.
+   .completion
+   set-value:x:@.completion
+      get-value:x:@.markdown
+   unwrap:x:+/*/*/*
+   add:x:@.snippets
+      .
+         .
+            prompt:x:@.prompt
+            completion:x:@.completion
+
+   // Returning snippets and meta information to caller.
+   add:x:./*/return/*/snippets
+      get-nodes:x:@.snippets/*
+   add:x:./*/return/*/meta
+      get-nodes:x:@.meta/*
+   add:x:./*/return/*/urls
+      get-nodes:x:@.urls/*
+   return
+      urls
+      snippets
+      meta

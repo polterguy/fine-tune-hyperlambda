@@ -1,28 +1,36 @@
 
-// Write a Hyperlambda script to return the JavaScript required to embed a ChatGPT-based chatbot on a website, with various customization options.
-.arguments
-   type:string
-   header:string
-   button:string
-   rtl:bool
-   color:string
-   start:string
-   end:string
-   link:string
-   theme:string
-   references:bool
-   file:string
-   placeholder:string
-   position:string
-   clear_button:bool
-   copyButton:bool
-   follow_up:bool
-   new_tab:bool
-   popup:string
+// Hyperlambda script that executes startup files, create the magic database, and apply default configuration settings.
+io.file.execute:/system/sql/magic.startup/mssql/magic.db.mssql.databases.hl
+io.file.execute:/system/sql/magic.startup/mysql/magic.db.mysql.databases.hl
+io.file.execute:/system/sql/magic.startup/pgsql/magic.db.pgsql.databases.hl
+io.file.execute:/system/sql/magic.startup/sqlite/magic.db.sqlite.databases.hl
 
-   // Not used, but allows embedders to do a hard refresh to reload JavaScript.
-   v:string
-add:x:./*/execute-file
-   get-nodes:x:@.arguments/*
-execute-file:/system/openai/include-chatbot.js.get.hl
-return:x:-
+// Creating our magic database.
+io.file.execute:/system/ensure-magic-database.hl
+
+// Executing all magic.startup Hyperlambda files.
+io.file.list-recursively:/system/
+io.file.list-recursively:/modules/
+for-each:x:./*/io.file.list-recursively/*
+
+   // Checking if file is a startup Hyperlambda file.
+   if
+      and
+         strings.contains:x:@.dp/#
+            .:/magic.startup/
+         strings.ends-with:x:@.dp/#
+            .:.hl
+      .lambda
+
+         // Executing file.
+         strings.concat
+            .:"Executing startup file '"
+            get-value:x:@.dp/#
+            .:.
+         console.log:x:-
+         try
+            io.file.execute:x:@.dp/#
+         .catch
+            log.error:Error while executing startup file
+               exception:x:@.arguments/*/message
+               file:x:@.dp/#

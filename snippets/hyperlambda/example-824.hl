@@ -1,58 +1,52 @@
 
-// Hyperlambda action that executes an action if a condition is true. The condition uses 'lhs', 'rhs', and 'comparison' (e.g., eq, neq, mt, mte, lt, lte). Include 'action' and optional 'arguments'. Validate and set comparison operator.
+// Write a Hyperlambda script to return all available template snippets from the backend, including prompt and completion details.
 .arguments
-   lhs
-      type:string
-      mandatory:bool:true
-   comparison
-      type:enum
-      mandatory:bool:true
-      values
-         .:eq
-         .:neq
-         .:mt
-         .:mte
-         .:lt
-         .:lte
-   rhs
-      type:string
-      mandatory:bool:true
-   action
-      type:action
-      mandatory:bool:true
-   arguments
-      type:key-value
-      mandatory:bool:false
-.icon:settings
+   private:bool
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/action
-validators.mandatory:x:@.arguments/*/comparison
+// Making sure user has access to invoked endpoint.
+auth.ticket.verify:root
 
-// Making sure we use correct comparison operator.
-set-name:x:./*/if/*/comparison
-   get-value:x:@.arguments/*/comparison
+// Contains list of templates we find.
+.result
 
-// Checking if [comparison] yields true.
-if
-   comparison
-      get-value:x:@.arguments/*/lhs
-      get-value:x:@.arguments/*/rhs
-   .lambda
+// Listing files recursively.
+io.file.list-recursively:/modules/
+io.file.list-recursively:/system/
+for-each:x:../*/io.file.list-recursively/*
 
-      // Parametrising [execute].
-      add:x:./*/execute/*/arguments
-         get-nodes:x:@.arguments/*/arguments/*
+   // Checking if this is a template file.
+   if
+      and
+         strings.ends-with:x:@.dp/#
+            .:.md
+         strings.contains:x:@.dp/#
+            .:/ts-templates/
+      .lambda
 
-      // Executing file.
-      execute:magic.workflows.actions.execute
-         name:_
-         filename:x:@.arguments/*/action
-         arguments
+         /*
+          * This is a template file.
+          * 
+          * Figuring out its prompt and completion.
+          */
+         load-file:x:@.dp/#
+         strings.split:x:@load-file
+            .:"\n"
+         .prompt
+         set-value:x:@.prompt
+            strings.trim:x:@strings.split/0
+         .completion
+         remove-nodes:x:@strings.split/0
+         set-value:x:@.completion
+            strings.join:x:@strings.split/*
+               .:"\n"
+         set-value:x:@.completion
+            strings.trim:x:@.completion
+         unwrap:x:+/*/*/*
+         add:x:@.result
+            .
+               .
+                  prompt:x:@.prompt
+                  completion:x:@.completion
 
-      // Parametrising [return] invocation.
-      add:x:./*/return
-         get-nodes:x:@execute/*
-
-      // Returning result of execution to caller.
-      return
+// Returning result to caller.
+return-nodes:x:@.result/*

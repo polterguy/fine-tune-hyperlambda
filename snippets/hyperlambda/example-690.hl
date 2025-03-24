@@ -1,12 +1,40 @@
 
-// Hyperlambda endpoint that accepts a name and an age as arguments, then returns a concatenated string.
+// Delete one record from your comments table in your cms database
 .arguments
-   name:string
-   age:int
-strings.concat
-   get-value:x:@.arguments/*/name
-   .:" is "
-   get-value:x:@.arguments/*/age
-   .:" years old."
-return
-   message:x:@strings.concat
+
+   // Primary key of record to delete, mandatory argument
+   id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:comments
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:cms.comments.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

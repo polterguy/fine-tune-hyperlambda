@@ -1,64 +1,13 @@
 /*
- * Returns all sales orders for a specified region
- * 
- * Optionally apply limit or offset as needed.
+ * Dynamically accesses a key inside the `.settings` node using extrapolated expressions.
  *
- * Filter is mandatory and matches the region name.
+ * Breakdown:
+ * - `@.settings/*/` navigates to all child nodes under `.settings`.
+ * - `{@.arguments/*/key}` is an **extrapolated expression** — it resolves dynamically at runtime.
+ *   It retrieves the value of the `.arguments/*/key` node and injects that as part of the path.
+ * - The final expression evaluates to something like `@.settings/*/timeout` or `.../theme`, depending on the argument passed.
+ *
+ * This construct is useful when the property name you want to access isn't known at design time,
+ * allowing for fully dynamic access to a config or data node structure.
  */
-.arguments
-
-   // Mandatory region filter
-   filter:string
-
-   // Optional record limit (defaults to 20)
-   limit:long
-
-   // Optional offset into results
-   offset:long
-
-// Authorisation for sales portal
-auth.ticket.verify:sales-admin
-
-// Assign limit or default
-.limit
-set-value:x:@.limit
-   get-first-value
-      get-value:x:@.arguments/*/limit
-      .:long:20
-
-// Assign offset or default
-.offset
-set-value:x:@.offset
-   get-first-value
-      get-value:x:@.arguments/*/offset
-      .:long:0
-
-// Connect to order system
-mssql.connect:[production|ORDSYS_MAIN]
-
-   // Read from orders and customer tables
-   mssql.read
-      table:SalesOrders
-         as:o
-         join:Customers
-            as:c
-            type:left
-            on
-               and
-                  o.CustomerId.eq:c.Id
-      columns
-         c.Region
-         c.CompanyName
-         sum(o.TotalAmount)
-            as:TotalSales
-         count(*)
-            as:OrdersCount
-      limit:x:@.limit
-      offset:x:@.offset
-      where
-         and
-            c.Region.eq:x:@.arguments/*/filter
-      group
-         c.Region
-         c.CompanyName
-   return-nodes:x:@mssql.read/*
+.dynamic-key:x:@.settings/*/{@.arguments/*/key}

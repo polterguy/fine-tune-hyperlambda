@@ -1,92 +1,40 @@
 
-// Dynamic slot that executes a single workflow action, ensuring the user is authorized.
-slots.create:magic.workflows.actions.execute
+// Deletes one record from your category table in your sakila database without authorization. Log invocation.
+.arguments
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/name
-   validators.mandatory:x:@.arguments/*/filename
+   // Primary key of record to delete, mandatory argument
+   category_id:long
 
-   /*
-    * Checking if we're authenticated as root user, and if so,
-    * publishing a socket message as "debug info" back to caller.
-    */
-   .time
-   if
-      auth.ticket.in-role:root
-      .lambda
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.category entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/category_id
 
-         // Publishing socket debug message to client.
-         add:x:./*/sockets.signal/*/args/*/input
-            get-nodes:x:@.arguments/*/arguments/*
-         unwrap:x:+/**
-         sockets.signal:magic.workflows.action
-            roles:root
-            args
-               type:action
-               name:x:@.arguments/*/name
-               input
-         set-value:x:@.time
-            date.now
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
 
-   // Making sure we're able to catch exceptions.
-   try
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
 
-      // Parametrising [execute-file].
-      add:x:./*/execute-file
-         get-nodes:x:@.arguments/*/arguments/*
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:category
+      where
+         and
 
-      // Executing action.
-      execute-file:x:@.arguments/*/filename
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:sakila.category.delete
+      args
 
-      /*
-       * Checking if we're authenticated as root user, and if so,
-       * publishing a socket message as "debug info" back to caller.
-       */
-      if
-         auth.ticket.in-role:root
-         .lambda
-
-            // Publishing socket debug message to client.
-            add:x:./*/sockets.signal/*/args/*/output
-               get-nodes:x:@execute-file/*
-            math.subtract
-               date.now
-               get-value:x:@.time
-            unwrap:x:+/**
-            sockets.signal:magic.workflows.action
-               roles:root
-               args
-                  type:result
-                  time:x:@math.subtract
-                  output
-
-      // Decorating [result] node.
-      set-value:x:./*/return
-         get-value:x:@.arguments/*/name
-      add:x:./*/return
-         get-nodes:x:@execute-file/*
-
-      // Returning result of invocation to caller.
-      return
-   .catch
-
-      /*
-       * Checking if we're authenticated as root user, and if so,
-       * publishing a socket message as "debug info" back to caller.
-       */
-      if
-         auth.ticket.in-role:root
-         .lambda
-
-            // Publishing socket debug message to client.
-            unwrap:x:+/**
-            sockets.signal:magic.workflows.action
-               roles:root
-               args
-                  type:error
-                  message:x:@.arguments/*/message
-
-      // Rethrowing exception
-      throw:x:@.arguments/*/message
-         status:x:@.arguments/*/status
-         public:x:@.arguments/*/public
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

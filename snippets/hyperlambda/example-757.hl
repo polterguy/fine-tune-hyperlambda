@@ -1,61 +1,27 @@
+// Executing the following Hyperlambda results in the following
 
-// Dynamic Hyperlambda slot that imports a list of training snippets, using prompt and completion, with optional URI, filename, and type.
-slots.create:magic.ai.import-snippets
+// When executing the following Hyperlambda
+.static:JO
+.data
+   foo1:bar1
+   foo2:bar2
+   foo3:bar3
+include:x:@.data/*
+   strings.concat
+      get-value:x:@.dp/#
+      .:" howdy "
+      get-value:x:@.static
+   unwrap:x:+/*
+   return
+      howdy:x:@strings.concat
 
-   // Connecting to database.
-   data.connect:[generic|magic]
-
-      // Looping through each record specified in [snippets] collection.
-      for-each:x:@.arguments/*/snippets/*
-
-         // Verifying prompt is not null.
-         if:x:@.dp/#/*/prompt
-
-            // Verifying user can create more snippets.
-            add:x:+
-               get-nodes:x:@.arguments/*/type
-            try-signal:magic.ai.can-create-snippet
-
-            // Creating a unique URI based upon the prompt unless the file contains a URI.
-            .uri
-            set-value:x:@.uri
-               get-first-value
-                  get-value:x:@.dp/#/*/uri
-                  .:
-
-            // Using type from arguments unless file contains a type declaration.
-            .type
-            if
-               and
-                  exists:x:@.arguments/*/type
-                  not-null:x:@.arguments/*/type
-                  neq:x:@.arguments/*/type
-                     .:
-               .lambda
-                  set-value:x:@.type
-                     get-value:x:@.arguments/*/type
-            else-if
-               exists:x:@.dp/#/*/type
-               .lambda
-                  set-value:x:@.type
-                     get-value:x:@.dp/#/*/type
-            else
-               set-value:x:@.type
-                  .:default
-
-            // Checking if we've got a filename value.
-            if
-               exists:x:@.dp/#/*/filename
-               .lambda
-                  add:x:@for-each/*/data.create/*/values
-                     get-nodes:x:@.dp/#/*/filename
-
-            // Inserting into database.
-            data.create
-               table:ml_training_snippets
-               values
-                  type:x:@.type
-                  uri:x:@.uri
-                  prompt:x:@.dp/#/*/prompt
-                  completion:x:@.dp/#/*/completion
-                  meta:imported
+// We end up with this result
+.static:JO
+.data
+   foo1:bar1
+      howdy:bar1 howdy JO
+   foo2:bar2
+      howdy:bar2 howdy JO
+   foo3:bar3
+      howdy:bar3 howdy JO
+include:x:@.data/*

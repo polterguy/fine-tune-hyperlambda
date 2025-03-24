@@ -1,46 +1,153 @@
 
-// How does CRUD slots in Hyperlambda
+// Returns minimum, maximum, average, sum or count from your Customers table in your northwind database grouped by a column
+.arguments
 
-// Hyperlambda has 4 basic CRUD slots, you can examples of these below.
+   // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME
+   group_column:string
 
-// Create
-data.create
-   table:table1
-   values
-      column1:value1
-      column2:value2
-      column3:value3
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
 
-// Read
-data.read
-   table:table1
+   // Offset into the dataset of where to start retrieving records
+   offset:long
 
-   // Optional
-   limit:5
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
 
-   // Optional
-   offset:5
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
 
-   // Optional
-   order
-      column1
-      column2
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum, avg or count
+   aggregate_function:string
 
-   // Optional
-   direction:desc
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
 
-// Update
-data.update
-   table:table1
-   values
-      column1:new-value
-   where
-      and
-         id.eq:PRIMARY-KEY-OF-RECORD-TO-UPDATE
+   // Optional filtering arguments.
+   Customers.CustomerID.like:string
+   Customers.CustomerID.eq:string
+   Customers.CompanyName.like:string
+   Customers.CompanyName.eq:string
+   Customers.ContactName.like:string
+   Customers.ContactName.eq:string
+   Customers.ContactTitle.like:string
+   Customers.ContactTitle.eq:string
+   Customers.Address.like:string
+   Customers.Address.eq:string
+   Customers.City.like:string
+   Customers.City.eq:string
+   Customers.Region.like:string
+   Customers.Region.eq:string
+   Customers.PostalCode.like:string
+   Customers.PostalCode.eq:string
+   Customers.Country.like:string
+   Customers.Country.eq:string
+   Customers.Phone.like:string
+   Customers.Phone.eq:string
+   Customers.Fax.like:string
+   Customers.Fax.eq:string
 
-// Delete
-data.delete
-   table:table1
-   where
-      and
-         id.eq:PRIMARY-KEY-OF-RECORD-TO-UPDATE
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/group_column
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+   .:count
+
+// Sanity checking group column.
+validators.enum:x:@.arguments/*/group_column
+   .:Customers.CustomerID
+   .:Customers.CompanyName
+   .:Customers.ContactName
+   .:Customers.ContactTitle
+   .:Customers.Address
+   .:Customers.City
+   .:Customers.Region
+   .:Customers.PostalCode
+   .:Customers.Country
+   .:Customers.Phone
+   .:Customers.Fax
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:Customers.CustomerID
+   .:Customers.CompanyName
+   .:Customers.ContactName
+   .:Customers.ContactTitle
+   .:Customers.Address
+   .:Customers.City
+   .:Customers.Region
+   .:Customers.PostalCode
+   .:Customers.Country
+   .:Customers.Phone
+   .:Customers.Fax
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Making sure we're using the correct group column
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+
+   // Making sure we return group column as a part of the result
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+
+   // Changing name of aggregate column returned to caller.
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+
+   // Removing group column to simplify adding other arguments
+   remove-nodes:x:@.arguments/*/group_column
+
+   // Adding paging arguments
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Customers
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

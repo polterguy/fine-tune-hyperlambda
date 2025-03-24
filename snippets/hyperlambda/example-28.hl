@@ -1,16 +1,28 @@
-/*
- * This example checks if both "/config/settings.json" and "/logs/system.log" exist.
- * If both files exist, a message is logged. Otherwise, a warning is logged.
- */
-.result
-if
-   and
-      io.file.exists:/config/settings.json
-      io.file.exists:/logs/system.log
-   .lambda
-      set-value:x:@.result
-         .:Both files are available for processing.
 
-else
-   set-value:x:@.result
-      .:One or both files are missing!
+// Create a Hyperlambda endpoint for a CRUD delete endpoint that deletes one record from the ml_requests table in the magic database with an ID matching the argument, ensuring authentication and authorization for root roles.
+.arguments
+   id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/id
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:ml_requests
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

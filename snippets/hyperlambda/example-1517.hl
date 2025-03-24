@@ -1,15 +1,24 @@
+/*
+ * Validates a session ID by POSTing it to an authentication API.
+ * If the HTTP status code is within 200–299, the response content is returned.
+ */
 
-// Hyperlambda snippet that counts transactions in the 'finance_db' database from the 'transactions' table.
+.arguments
+   id:int
 
-// Counts transactions in the "finance_db" database from the "transactions" table.
-data.connect:finance_db
-   database-type:pgsql
+http.post:"https://auth.example.com/api/validate-session"
+   convert:true
+   payload
+      session_id:x:@.arguments/*/id
 
-   // Counting total transactions.
-   data.read
-      database-type:pgsql
-      table:transactions
-      columns
-         count(*)
-            as:count
-      limit:long:1
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         result:x:@http.post/*/content/*
+else
+   throw:Session validation failed

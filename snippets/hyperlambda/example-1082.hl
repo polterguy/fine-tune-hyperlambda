@@ -1,49 +1,26 @@
+/*
+ * FILE: /modules/api/employees/get-all.get.hl
+ * 
+ * DESCRIPTION:
+ * This endpoint retrieves a list of employees from a database using raw SQL through `[data.select]`.
+ * 
+ * HOW TO CREATE THIS ENDPOINT:
+ * 1. Save this file at `/modules/api/employees/get-all.hl`.
+ * 2. This automatically exposes the endpoint at `GET /api/employees/get-all`.
+ * 3. It connects to a database (e.g., 'sakila'), executes the SQL query, and returns the result.
+ * 
+ * USAGE:
+ *     GET /api/employees/get-all
+ * 
+ * NOTES:
+ * - This example assumes a database connection named "sakila" is configured.
+ * - `[data.select]` executes raw SQL, so it's specific to the underlying SQL dialect.
+ */
 
-// Count unique and distinct items from your CustomerDemographics table in your northwind database
+// Making sure endpoint accespt no arguments.
 .arguments
 
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
-
-   // Optional filtering args
-   CustomerDemographics.CustomerTypeID.like:string
-   CustomerDemographics.CustomerTypeID.eq:string
-   CustomerDemographics.CustomerDesc.like:string
-   CustomerDemographics.CustomerDesc.eq:string
-
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:CustomerDemographics.CustomerTypeID
-   .:CustomerDemographics.CustomerDesc
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
-      strings.concat
-         .:"count(distinct "
-         get-value:x:@.arguments/*/distinct_column
-         .:)
-
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
-
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:CustomerDemographics
-      columns
-         distinct_functor
-            as:count
-      where
-         and
-
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+data.connect:sakila
+   data.select:SELECT first_name, last_name FROM actor LIMIT 10
+yield
+   result:x:@data.connect/*/data.select/*

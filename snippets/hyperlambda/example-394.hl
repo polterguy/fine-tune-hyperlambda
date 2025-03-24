@@ -1,77 +1,43 @@
 
-// Invokes OpenAI's image generation API with the specified [query] and [model].
-.arguments
-   query
-      type:textarea
-      mandatory:bool:true
-   model
-      type:string
-      mandatory:bool:false
-      default:dall-e-3
-   size
-      type:string
-      mandatory:bool:false
-      default:1024x1024
-      values
-         .:1024x1024
-         .:1024x1792
-         .:1792x1024
-   style
-      type:string
-      mandatory:bool:false
-      default:vivid
-      values
-         .:vivid
-         .:natural
-.icon:chat_bubble
+// Hyperlambda script to crawl a specified website generating training data for machine learning, with error handling.
+slots.create:magic.ai.crawl-site
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/query
-validators.default:x:@.arguments
-   model:dall-e-3
-   default:1024x1024
+   // Creating a thread and invoking file doing the heavy lifting.
+   insert-before:x:./*/fork/0
+      get-nodes:x:@.arguments
+   fork
 
-// Retrieving OpenAI API token from configuration settings.
-.token
-set-value:x:@.token
-   strings.concat
-      .:"Bearer "
-      config.get:"magic:openai:key"
+      // Making sure exceptions does not leave thread.
+      try
 
-// Invokes OpenAI.
-http.post:"https://api.openai.com/v1/images/generations"
-   convert:bool:true
-   headers
-      Authorization:x:@.token
-      Content-Type:application/json
-   payload
-      model:x:@.arguments/*/model
-      prompt:x:@.arguments/*/query
-      n:int:1
-      size:x:@.arguments/*/size
-      style:x:@.arguments/*/style
+         // Invoking slot responsible for doing the actual crawling.
+         add:x:./*/signal
+            get-nodes:x:@.arguments/*
+         signal:magic.ai.crawl-site-on-thread
+      .catch
 
-// Sanity checking above invocation.
-if
-   not
-      and
-         mte:x:@http.post
-            .:int:200
-         lt:x:@http.post
-            .:int:300
-   .lambda
+         // Oops ...!!
+         log.error:x:@.arguments/*/message
+            url:x:@.arguments/*/url
 
-      // Oops, error - Logging error and returning status 500 to caller.
-      lambda2hyper:x:@http.post
-      log.error:Something went wrong while invoking OpenAI
-         message:x:@http.post/*/content/*/error/*/message
-         status:x:@http.post
-         error:x:@lambda2hyper
-      throw:Something went wrong while invoking OpenAI
-         message:x:@http.post/*/content/*/error/*/message
-         status:x:@http.post
-         error:x:@lambda2hyper
+         // Signaling frontend.
+         strings.concat
+            .:"Error - "
+            get-value:x:@.arguments/*/message
+         unwrap:x:+/*/args/*
+         sockets.signal:x:@.arguments/@.arguments/*/feedback-channel
+            roles:root
+            args
+               message:x:@strings.concat
+               type:error
+         sleep:100
 
-// Returning answer to caller.
-yield
-   images:x:@http.post/*/content/*/data/*
+         // Checking if caller supplied [.onerror] handler.
+         if
+            exists:x:@.onerror
+            .lambda
+               add:x:+/+
+                  get-nodes:x:@.arguments/*
+               add:x:+
+                  get-nodes:x:@.arguments/@.arguments/*
+               invoke:x:@.onerror

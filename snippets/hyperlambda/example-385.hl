@@ -1,35 +1,65 @@
-// Attempts to register a user, throws on 500, fallback message on other errors, and return success to caller if the invocation was a success
 
+// Hyperlambda script that returns the Magic CAPTCHA JavaScript library, substituting the public key and URL dynamically.
 .arguments
+   v:string
 
-// Status to return
-.register.status
+// Getting server auth secret.
+config.get:"magic:auth:secret"
 
-// Invoking GET
-http.post:"https://api.example.com/users/register"
-   convert:true
-   payload
-      username:alice
-      email:alice@example.com
-      password:Secure123!
+// Double hashing auth secret using SHA256 to avoid predictable hash values.
+crypto.hash.sha256:x:@config.get
+crypto.hash.sha256:x:-
+
+// Loading JavaScript file.
+.file
 if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
+   io.file.exists:/system/misc/magic-captcha-challenge.min.js
    .lambda
-      set-value:x:@.register.status
-         .:Registration successful
-else-if
-   eq:x:@http.post
-      .:int:500
-   .lambda
-      throw
-         .:Internal server error during registration (500)
-else
-   set-value:x:@.register.status
-      .:Registration failed
 
-yield
-   result:x:@.register.status
+      // We have a minified file.
+      set-value:x:@.file
+         load-file:/system/misc/magic-captcha-challenge.min.js
+else
+
+   // We don't have a minified file.
+   set-value:x:@.file
+      load-file:/system/misc/magic-captcha-challenge.js
+
+/*
+ * Dynamically substituting public key in file with public key that was generated
+ * specifically for current server.
+ */
+set-value:x:@.file
+   strings.replace:x:@.file
+      .:[[public-key]]
+      get-value:x:@crypto.hash.sha256
+
+// Figuring out API URL.
+.scheme
+request.host
+if
+   strings.contains:x:@request.host
+      .:localhost
+   .lambda
+      set-value:x:@.scheme
+         .:http
+else
+   set-value:x:@.scheme
+      .:https
+.url
+set-value:x:@.url
+   strings.concat
+      get-value:x:@.scheme
+      .:"://"
+      request.host
+set-value:x:@.file
+   strings.replace:x:@.file
+      .:[[url]]
+      get-value:x:@.url
+
+// Applying correct HTTP headers.
+response.headers.set
+   Content-Type:text/javascript
+
+// Returning result to caller.
+return:x:@.file

@@ -1,20 +1,28 @@
 /*
- * This script counts the number of Hyperlambda files, in addition to the combined
- * number of nodes, within the specified folder.
+ * Retrieves customer contact info from a database and sends each of them a reminder email.
  */
-.folder:/
-.loc:int:0
-.files:int:0
-unwrap:x:+/*
-signal:magic.io.file.load-recursively
-   .:x:@.folder
-for-each:x:@signal/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-         hyper2lambda:x:@.dp/#/0
-         math.increment:x:@.loc
-            get-count:x:@hyper2lambda/**
-         math.increment:x:@.files
-remove-nodes:x:@signal/*
+
+data.connect:[pgsql|customer_db]
+   database-type:pgsql
+
+   data.select:@"
+select name, email
+   from customers
+   where active = true"
+      database-type:pgsql
+
+   for-each:x:@data.select/*
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            from
+               .
+                  name:Support Team
+                  email:support@yourcompany.com
+            subject:Important Reminder from YourCompany
+            entity:text/plain
+               content:Hi, this is just a friendly reminder to check your account dashboard.

@@ -1,43 +1,27 @@
 
-// Workflow action associating the specified [username] with the specified [roles] roles.
+// Hyperlambda action that returns specified HTTP headers from a request. Use 'headers' as an input array to determine which headers to return.
 .arguments
-   username
-      type:string
-      mandatory:bool:true
-   roles
+   headers
       type:array
       mandatory:bool:true
-.icon:supervisor_account
+.icon:http
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/roles
+// Retrieving HTTP headers from request.
+request.headers.list
 
-// Connecting to database.
-data.connect:[generic|magic]
-
-   // Verifying user exists.
-   data.read
-      table:users
-      columns
-         username
-      where
-         and
-            username.eq:x:@.arguments/*/username
-
-   // Verifying above invocation returned something.
+/*
+ * Iterating through each header from above invocation and checking if caller is interested in it,
+ * and if caller wants this particular header, we make sure we return it below.
+ */
+for-each:x:@request.headers.list/*
+   get-name:x:@.dp/#
    if
-      not-exists:x:@data.read/*
+      exists:x:@.arguments/*/headers/*/={@get-name}
       .lambda
 
-         // Oops ...!!
-         throw:No such user
-            username:x:@.arguments/*/username
+         // Caller wants currently iterated HTTP header.
+         add:x:../*/return-nodes
+            get-nodes:x:@.dp/#
 
-   // Associating user with specified [roles].
-   for-each:x:@.arguments/*/roles/*
-      data.create
-         table:users_roles
-         values
-            user:x:@.arguments/*/username
-            role:x:@.dp/#
+// Returning result to caller.
+return-nodes

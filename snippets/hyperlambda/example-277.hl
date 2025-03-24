@@ -1,12 +1,44 @@
 
-// Write a Hyperlambda script to create a specified folder on the server.
+/*
+ * Returns Stripe customers.
+ * 
+ * [limit] and [starting_after] are optional arguments and [limit] is the number of customers
+ * to return, while [starting_after] is from which record to start returning charges.
+ * 
+ * [email] is an optional case sensitive filter that emails must match.
+ */
 .arguments
-   folder:string
+   limit:int
+   starting_after:string
+   email:string
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
+/*
+ * Ensures user is authorized to access endpoint.
+ * 
+ * If you don't supply a list of [roles] this action only verifies the user is authenticated,
+ * and does not care about what roles the user belongs to.
+ */
+execute:magic.workflows.actions.execute
+   name:authorize
+   filename:/misc/workflows/actions/security/authorize.hl
+   arguments
+      roles
+         .:root
+         .:gpt
 
-// Creates the specified folder.
-io.folder.create:x:@.arguments/*/folder
-return
-   result:success
+/*
+ * Retrieves charges from Stripe.
+ * 
+ * Will use your Stripe API token found from your settings as it's interacting
+ * with the Stripe API.
+ */
+execute:magic.workflows.actions.execute
+   name:stripe-customers-get
+   filename:/modules/stripe/workflows/actions/stripe-customers-get.hl
+   arguments
+      limit:x:@.arguments/*/limit
+      email:x:@.arguments/*/email
+      starting_after:x:@.arguments/*/starting_after
+
+// Returns the result of your last action.
+return-nodes:x:@execute/*

@@ -1,15 +1,49 @@
 
-// Hyperlambda script that refreshes the currently authenticated user's token and returns a new JWT token with a new expiration date, ensuring the user is authorized.
+// Count unique and distinct items from your CustomerCustomerDemo table in your northwind database
+.arguments
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
 
-/*
- * Invokes [auth.ticket.refresh] that does the heavy lifting, and creates our JWT token,
- * making sure we return that token to caller.
- */
-auth.ticket.refresh
+   // Optional filtering arguments
+   CustomerCustomerDemo.CustomerID.like:string
+   CustomerCustomerDemo.CustomerID.eq:string
+   CustomerCustomerDemo.CustomerTypeID.like:string
+   CustomerCustomerDemo.CustomerTypeID.eq:string
 
-// Returns the authentication JWT ticket created above to caller.
-yield
-   ticket:x:@auth.ticket.refresh
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:CustomerCustomerDemo.CustomerID
+   .:CustomerCustomerDemo.CustomerTypeID
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:CustomerCustomerDemo
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

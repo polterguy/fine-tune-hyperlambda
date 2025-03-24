@@ -1,42 +1,25 @@
 
-// Write a Hyperlambda script to unzip a specified file in its current folder, with an option to create a new folder.
-.arguments
-   file:string
-   create_folder:bool
+// This script generates training data from Markdown files.
+execute:magic.io.file.load-recursively
+   .:/etc/slett/
+for-each:x:@execute/*
 
-// Ensures user is authorized to access endpoint.
-auth.ticket.verify:root
-
-// Checking if we need to create folder with name and path of zip file.
-if:x:@.arguments/*/create_folder
-   strings.length:x:@.arguments/*/file
-   strings.substring:x:@.arguments/*/file
-      .:int:0
-      math.subtract:x:@strings.length
-         .:int:4
-   strings.concat
-      get-value:x:@strings.substring
-      .:/
-   unwrap:x:+/*/*
-   add:x:../*/io.file.unzip
-      .
-         folder:x:@strings.concat
+   // Verifying we're dealing with a Markdown file.
    if
-      not
-         io.folder.exists:x:@strings.concat
+      strings.ends-with:x:@.dp/#
+         .:.md
       .lambda
 
-         // Creating folder we're unzipping into.
-         io.folder.create:x:@strings.concat
-   else
+         // Extracting training data.
+         markdown2html:x:@.dp/#/0
+         html2lambda:x:-
+         for-each:x:@html2lambda/*/pre/*/code
+            strings.trim:x:"@.dp/#/*/\\#text"
+            data.connect:fine-tune
+               data.create
+                  table:hyperlambda
+                  values
+                     code:x:@strings.trim
 
-      // Deleting folder and re-creating it to ensure it's empty.
-      io.folder.delete:x:@strings.concat
-      io.folder.create:x:@strings.concat
-
-// Unzipping file.
-io.file.unzip:x:@.arguments/*/file
-
-// Returning success to caller.
-return-nodes
-   result:success
+// House cleanups.
+remove-nodes:x:@execute/*

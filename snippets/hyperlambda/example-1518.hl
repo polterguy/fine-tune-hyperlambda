@@ -1,57 +1,27 @@
+/*
+ * Invokes HTTP post with dynamic set of arguments and returning error if unsuccessful,
+ * otherwise returns name an email of user
+ */
 
-// Create a Hyperlambda action to execute a workflow file if a condition is true. The condition uses 'lhs', 'rhs', and 'comparison' (e.g., eq, neq, mt, mte, lt, lte). Include 'workflow' and optional 'arguments'. Validate and set comparison operator.
 .arguments
+   id:int
 
-   // Notice, this is action syntax
-   lhs
-      type:string
-      mandatory:bool:true
-   comparison
-      type:enum
-      mandatory:bool:true
-      values
-         .:eq
-         .:neq
-         .:mt
-         .:mte
-         .:lt
-         .:lte
-   rhs
-      type:string
-      mandatory:bool:true
-   workflow
-      type:workflow
-      mandatory:bool:true
-   arguments
-      type:key-value
-      mandatory:bool:false
-.icon:settings
+// Adding ALL arguments to payload.
+add:x:+/*/payload
+   get-nodes:x:@.arguments/*
+http.post:"https://logistics.example.org/get-user"
+   convert:true
+   payload
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/workflow
-validators.mandatory:x:@.arguments/*/comparison
-
-// Making sure we use correct comparison operator.
-set-name:x:./*/if/*/comparison
-   get-value:x:@.arguments/*/comparison
-
-// Checking if [comparison] yields true.
 if
-   comparison
-      get-value:x:@.arguments/*/lhs
-      get-value:x:@.arguments/*/rhs
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
    .lambda
-
-      // Parametrising [execute-file].
-      add:x:./*/execute-file
-         get-nodes:x:@.arguments/*/arguments/*
-
-      // Executing file.
-      execute-file:x:@.arguments/*/workflow
-
-      // Parametrising [return] invocation.
-      add:x:./*/return
-         get-nodes:x:@execute-file/*
-
-      // Returning result of execution to caller.
-      return
+      yield
+         name:x:@http.post/*/content/*/name
+         email:x:@http.post/*/content/*/email
+return
+   error:Something went wrong

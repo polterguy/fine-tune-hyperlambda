@@ -1,13 +1,22 @@
-// Hyperlambda [if] and [else] with exists check
-.data
-   item1:value1
-   item2:value2
-.has-item
-if
-   exists:x:@.data/*/item3
-   .lambda
-      set-value:x:@.has-item
-         .:bool:true
-else
-   set-value:x:@.has-item
-      .:bool:false
+
+// Use nested data.connect to interact with two databases in one snippet
+data.connect:MainDB
+   data.read
+
+      // Query orders from MainDB
+      table:orders
+
+   // Insert a log in LogsDB
+   data.connect:LogsDB
+
+      // This will use our second [data.connect] invocation
+      data.create
+         table:log_storage
+         values
+            message:Checked orders
+
+   // This will use our first connection
+   data.read
+
+      // Back to MainDB connection (still open) to re-query orders
+      table:orders

@@ -1,34 +1,33 @@
 
-// Lists all database in your MySQL instance.
-slots.create:magic.db.mysql.databases
+// Hyperlambda script to update one record in a specified table in a database with optional filtering arguments.
+.arguments
 
-   // Opens up our connection
-   .connection:[information_schema]
+// Opening up our database connection.
+data.connect:{database}
+   database-type:{database-type}
+
+   // Invoking our update slot.
+   data.update
+      database-type:{database-type}
+      table:{table}
+      values
+      where
+         and
+
+   // Verifying record exists.
    if
-      and
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .
-         not
-            eq
-               get-value:x:@.arguments/*/connection-string
-               .:
+      eq
+         get-value:x:@data.update
+         .:int:0
       .lambda
-         set-value:x:@.connection
-            strings.concat
-               .:[
-               get-value:x:@.arguments/*/connection-string
-               .:|
-               .:information_schema]
-   mysql.connect:x:@.connection
+         response.status.set:404
+         return
+            result:Record not found
 
-      // Runs our query
-      mysql.select:show databases
+   // Returning the correct status code.
+   response.status.set:202
 
-      // Renaming "Database" nodes.
-      set-name:x:@mysql.select/*/*
-         .:db
-
-      // Returns the remaining databases to caller.
-      return-nodes:x:@mysql.select/*
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

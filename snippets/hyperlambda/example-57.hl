@@ -1,8 +1,44 @@
 
-// Provide a Hyperlambda example simulating a long-running task using [fork].
+// Write a Hyperlambda script to create a new training snippet with optional URL, prompt, completion, and type.
+.arguments
 
-// Simulates a long-running task running in parallel.
-fork
-   sleep:3000
-   log.info:Long-running task completed
-log.info:Main process continues...
+   // Optional URL for citations
+   uri:string
+
+   // Mandatory prompt or short one liner description
+   prompt:string
+
+   // Mandatory completion being the content or body of your snippet
+   completion:string
+
+   // Mandatory machine learning to to associate snippet with
+   type:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,service
+
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Verifying user can create more snippets.
+   add:x:+
+      get-nodes:x:@.arguments/*/type
+   try-signal:magic.ai.can-create-snippet
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      table:ml_training_snippets
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

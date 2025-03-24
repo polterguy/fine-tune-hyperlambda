@@ -1,35 +1,17 @@
+// Updates SQLIte's table1, setting field1 to 'howdy' with filtering on field2 and field3
+sqlite.update
+   table:table1
+   values
+      field1:howdy
+   where
 
-// Delete one record from your Employee table in your chinook database.
-.arguments
+      // [where] node MUST have either [and] or [or] child, which becomes the logical operator to filter on
+      and
 
-   // Primary key of record to delete, mandatory argument
-   EmployeeId:long
+         // more than comparison
+         field2.mt:someValue
 
-validators.mandatory:x:@.arguments/*/EmployeeId
+         // Less than or equal to comparison
+         field3.lte:someValue
 
-// Opening up our database connection.
-data.connect:[generic|chinook]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:Employee
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:chinook.employee.delete
-      args
-      roles:enterprise,guest
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+// Notice, before executing [sqlite.update] you must have an open database connection using [data.connect].

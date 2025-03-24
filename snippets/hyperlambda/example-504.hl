@@ -1,17 +1,26 @@
-/*
- * Save this file as `/modules/stats/endpoints/set-level.hl`
- * This exposes an HTTP POST endpoint at `/stats/set-level`
- *
- * Requires `level` to be present and within the range 1–10.
- */
 
+// Returns the training snippet with the specified [id] to the caller.
 .arguments
-   level:int
 
-validators.mandatory:x:@.arguments/*/level
-validators.integer:x:@.arguments/*/level
-   min:int:1
-   max:int:10
+   // Mandatory argument and the primary key and ID of the training snippet to return
+   id:int
 
-yield
-   result:Level accepted
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/id
+validators.integer:x:@.arguments/*/id
+   min:int:0
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Finding our snippet from the database.
+   data.read
+      table:ml_training_snippets
+      columns
+         prompt
+         completion
+         uri
+      where
+         and
+            id.eq:x:@.arguments/*/id
+   return-nodes:x:@data.read/*

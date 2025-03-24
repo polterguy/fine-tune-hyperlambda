@@ -1,44 +1,29 @@
 
-// Create endpoint inserting one record into your products table in your shopping-cart-demo database.
+// Returns all companies that the specified director is associated with
 .arguments
+   director_id:long
+   limit:long
+   offset:long
 
-   // name column value
-   name:string
+// Opening database connection.
+data.connect:[finovo|finovo]
+   database-type:pgsql
 
-   // description column value
-   description:string
+   // Reading from directors.
+   data.select:"\nselect d1.org_number, b.company_name, d1.role_name\n   from directors d1\n      inner join basic b on b.org_number = d1.org_number\n      inner join directors d2 on d1.director_nbr = d2.director_nbr\n   where d2.director_id = @id and d1.org_number != d2.org_number\n   limit @limit offset @offset"
+      database-type:pgsql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+   if
+      mte
+         get-count:x:@data.select/*
+         .:int:10
+      .lambda
 
-   // sku column value
-   sku:string
-
-   // price column value
-   price:decimal
-
-   // image_url column value
-   image_url:string
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
-
-// Opening up database connection.
-data.connect:[generic|shopping-cart-demo]
-   database-type:sqlite
-
-   // Parametrising our create invocation.
-   add:x:./*/data.create/*/values
-      get-nodes:x:@.arguments/*
-
-   // Creating our record.
-   data.create
-      database-type:sqlite
-      table:products
-      return-id:bool:true
-      values
-
-   // Returning the correct status code.
-   response.status.set:201
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      id:x:@data.create
+         // Making sure we inform caller that there might exist additional companies.
+         add:x:@data.connect/*/yield
+            .
+               notice:The director is probably associated with more companies
+   yield
+      companies:x:@data.select/*

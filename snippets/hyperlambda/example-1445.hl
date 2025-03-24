@@ -1,42 +1,34 @@
 
-// Delete one record from your post_tags table in your cms database
-.arguments
+// Lists all database in your MySQL instance.
+slots.create:magic.db.pgsql.databases
 
-   // Primary key of record to delete, mandatory argument
-   post_id:long
+   // Opens up our connection
+   .connection:[postgres]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               .:postgres]
+   pgsql.connect:x:@.connection
 
-   // Primary key of record to delete, mandatory argument
-   tag_id:long
+      // Runs our query
+      pgsql.select:select datname from pg_database
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+      // Renaming "Database" nodes.
+      set-name:x:@pgsql.select/*/*
+         .:db
 
-// Making sure both arguments was supplied
-validators.mandatory:x:@.arguments/*/post_id
-validators.mandatory:x:@.arguments/*/tag_id
-
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
-      get-nodes:x:@.arguments/*
-
-   // Deleting item from database.
-   data.delete
-      database-type:sqlite
-      table:post_tags
-      where
-         and
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   sockets.signal:cms.post_tags.delete
-      args
-
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+      // Returns the remaining databases to caller.
+      return-nodes:x:@pgsql.select/*

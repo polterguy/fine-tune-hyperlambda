@@ -1,25 +1,26 @@
-// Gets a random activity from the Bored API and handles common statuses
 
+// Hyperlambda script to create one record in a specified table in a database with optional filtering arguments.
 .arguments
 
-// Final output from the activity API
-.activity.result
+// Opening up database connection.
+data.connect:{database}
+   database-type:{database-type}
 
-http.get:"https://www.boredapi.com/api/activity"
-   convert:true
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-switch:x:@http.get
+   // Creating our record.
+   data.create
+      database-type:{database-type}
+      table:{table}
+      return-id:{return-id}
+      values
 
-   case:int:200
-      set-value:x:@.activity.result
-         get-value:x:@http.get/*/content/*/activity
+   // Returning the correct status code.
+   response.status.set:201
 
-   case:int:500
-      throw:500 Internal Server Error – Failed to retrieve activity
-
-   default
-      set-value:x:@.activity.result
-         .:Unexpected error occurred
-
-yield
-   result:x:@.activity.result
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

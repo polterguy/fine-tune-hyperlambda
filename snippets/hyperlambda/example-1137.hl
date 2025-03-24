@@ -1,18 +1,30 @@
-// Compares role and returns whether user is an admin
-slots.create:is.admin
-   if
-      eq:x:@.arguments/*/role
-         .:admin
-      .lambda
-         return
-            isAdmin:bool:true
+
+// Delete one record from your Track table in your chinook database
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   TrackId:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/TrackId
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Track
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
    return
-      isAdmin:bool:false
-
-// Returns true
-execute:is.admin
-   role:admin
-
-// Returns false
-execute:is.admin
-   role:guest
+      affected:x:@data.delete

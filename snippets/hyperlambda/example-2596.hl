@@ -1,0 +1,31 @@
+
+/*
+ * Hyperlambda endpoint taking arguments. The SQL aggregates and returns the top 25 artists with the most albums from the chinook database.
+ * 
+ * This SQL script is designed to retrieve and aggregate data from the chinook database, specifically focusing on the number of albums associated with each artist. The script joins the Album and Artist tables on the ArtistId field, counts the number of albums per artist, and orders the results in descending order based on the album count. It then limits the output to the top 25 artists with the highest number of albums. This query is useful for analyzing the distribution of albums across different artists within the database, providing insights into which artists have the most extensive discographies. The SQL is executed within a controlled environment where user authorization is verified, and a connection to the SQLite database is established before running the query. The results are then returned to the caller, ensuring that only authorized users can access this aggregated data.
+ */
+.arguments
+
+// Making sure user is authorized to invoke endpoint.
+auth.ticket.verify:root,admin
+
+// Connecting to database.
+data.connect:chinook
+   database-type:sqlite
+
+   // Executing [data.select] slot with our SQL.
+   data.select:@"
+/*
+ * Script to aggregate records for each artist in chinook database.
+ * Make sure you select the chinook database before execxuting the script.
+ */
+select ar.Name, count(*) as count
+  from Album al, Artist ar where al.ArtistId = ar.ArtistId
+  group by al.ArtistId
+  order by count desc
+  limit 25
+"
+      database-type:sqlite
+
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

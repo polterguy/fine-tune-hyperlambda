@@ -1,30 +1,67 @@
 
-// Create a Hyperlambda script for a CRUD delete endpoint that deletes one record from the questions table in the magic database with a question_id matching the argument, ensuring authentication and authorization for root and admin roles.
+// Returns minimum, maximum, average or sum from your Categories table in your northwind database
 .arguments
-   question_id:long
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/question_id
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+
+   // Optionally apply filtering if you want to
+   Categories.CategoryID.eq:long
+   Categories.CategoryName.like:string
+   Categories.CategoryName.eq:string
+   Categories.Description.like:string
+   Categories.Description.eq:string
+   Categories.Picture.like:string
+   Categories.Picture.eq:string
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:Categories.CategoryID
+   .:Categories.CategoryName
+   .:Categories.Description
+   .:Categories.Picture
 
 // Opening up our database connection.
-data.connect:[generic|magic]
+data.connect:[generic|northwind]
    database-type:sqlite
 
-   // Parametrising our delete invocation.
-   add:x:./*/data.delete/*/where/*/and
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 
-   // Deleting item from database.
-   data.delete
+   // Reading data from database.
+   data.read
       database-type:sqlite
-      table:questions
+      table:Categories
+      columns
+         aggregate_functor
+            as:result
       where
          and
+      limit:long:1
 
-   // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.delete
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

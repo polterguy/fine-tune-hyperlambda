@@ -1,72 +1,166 @@
 
-// Returns unique and distinct values from your CustomerCustomerDemo table in your northwind database
-.arguments
+// Hyperlambda script that creates and migrate a module app's database by executing SQL scripts based on the database type.
+slots.create:magic.modules.ensure-database
 
-   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/module
+   validators.mandatory:x:@.arguments/*/database
 
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
+   // Returned to caller to signal whether or not operation was a success or not.
+   .result:bool:true
 
-   // Offset into the dataset of where to start retrieving records
-   offset:long
+   // Flushing cache.
+   cache.clear
 
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Optional filtering conditions.
-   CustomerCustomerDemo.CustomerID.like:string
-   CustomerCustomerDemo.CustomerID.eq:string
-   CustomerCustomerDemo.CustomerTypeID.like:string
-   CustomerCustomerDemo.CustomerTypeID.eq:string
-
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:CustomerCustomerDemo.CustomerID
-   .:CustomerCustomerDemo.CustomerTypeID
-
-// Opening up our database connection.
-data.connect:[generic|northwind]
-   database-type:sqlite
-
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
+   /*
+    * Figuring out folder from where to read migration scripts and
+    * main 'create-database.sql' script.
+    */
+   .database-type:x:@.arguments/*/database-type
+   unwrap:x:-
+   if
+      null:x:@.database-type
+      .lambda
+         set-value:x:@.database-type
+            config.get:"magic:databases:default"
+   .create-database-script
+   .migration-script-folder
+   set-value:x:@.create-database-script
       strings.concat
-         .:distinct(
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+         .:/modules/
+         get-value:x:@.arguments/*/module
+         .:/magic.startup/
+         get-value:x:@.arguments/*/module
+         .:.
+         get-value:x:@.database-type
+         .:.sql
+   set-value:x:@.migration-script-folder
+      strings.concat
+         .:/modules/
+         get-value:x:@.arguments/*/module
+         .:/magic.startup/db-migrations/
+         get-value:x:@.database-type
+         .:/
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
+   // Checking if database already exists.
+   strings.concat
+      .:magic.db.
+      get-value:x:@.database-type
+      .:.databases
+   signal:x:-
+   strings.concat
+      .:@signal/*/*/db/=
+      get-value:x:@.arguments/*/database
+   set-x:x:+/*/*/exists
+      convert:x:@strings.concat
+         type:x
+   if
+      not
+         exists
+      .lambda
 
-   // Adding [limit] and [offset] arguments
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+         // Executing create database SQL script, making sure we trap exceptions.
+         try
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:CustomerCustomerDemo
-      columns
-         distinct_functor
-            as:.
-      where
-         and
+            // Loading file.
+            io.file.load:x:@.create-database-script
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+            // Opening database connection.
+            switch:x:@.database-type
+               case:mysql
+                  mysql.connect:sys
+                     mysql.execute:x:@io.file.load
+               case:pgsql
+                  pgsql.connect:postgres
+                     strings.concat
+                        .:"create database "
+                        get-value:x:@.arguments/*/database
+                     pgsql.execute:x:-
+                        database:x:@.arguments/*/database
+                  pgsql.connect:x:@.arguments/*/database
+                     pgsql.execute:x:@io.file.load
+               case:mssql
+                  mssql.connect:master
+                     mssql.execute-batch:x:@io.file.load
+               case:sqlite
+                  strings.concat
+                     .:/data/
+                     get-value:x:@.arguments/*/database
+                     .:.db
+                  io.file.save:x:-
+                     .:
+                  sqlite.connect:x:@.arguments/*/database
+                     sqlite.execute:x:@io.file.load
+
+            // Doing some basic logging.
+            log.info:Successfully created database
+               database_name:x:@.arguments/*/database
+         .catch
+
+            // Logging exception.
+            log.error:Something went wrong when creating database
+               database:x:@.arguments/@.arguments/*/database
+               script:x:@.create-database-script
+               error:x:@.arguments/*/message
+
+   /*
+    * Making sure module has a migration script folder, and if not,
+    * returning early.
+    */
+   if
+      not
+         io.folder.exists:x:@.migration-script-folder
+      .lambda
+
+         // Module doesn't have a migration script folder.
+         return:bool:true
+
+   // Iterating through each SQL script found in folder.
+   io.file.list:x:@.migration-script-folder
+   for-each:x:@io.file.list/*
+
+      // Verifying file is an SQL file.
+      if
+         strings.ends-with:x:@.dp/#
+            .:.sql
+         .lambda
+
+            // Loading SQL migration script file.
+            io.file.load:x:@.dp/#
+
+            // Executing file, making sure we trap exceptions.
+            try
+
+               // Opening database connection.
+               data.connect:x:@.arguments/*/database
+
+                  // Special case for MS SQL to make sure we use batch execute.
+                  if
+                     eq
+                        get-value:x:@.database-type
+                        .:mssql
+                     .lambda
+
+                        // SQL server, ensuring we use batch execute.
+                        set-name:x:@data.connect/*/data.execute
+                           .:mssql.execute-batch
+
+                  // Executing SQL script now.
+                  data.execute:x:@io.file.load
+
+                  // Logging the fact that we've executed the database migration script.
+                  log.info:Database migration script successfully executed
+                     script:x:@.dp/#
+            .catch
+
+               // Logging exception.
+               log.error:Something went wrong as we tried to execute plugin database migration script
+                  script:x:@.dp/#
+                  error:x:@.arguments/*/message
+
+               // Ensuring slot returns false.
+               set-value:x:@.result
+                  .:bool:false
+
+   // Returning result of invocation to caller.
+   return

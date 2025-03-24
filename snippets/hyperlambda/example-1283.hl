@@ -1,8 +1,21 @@
-/*
- * This example connects to the 'galaxy' database and retrieves the total number of planets from the 'planets' table.
- * It uses the sqlite.scalar slot to execute a SQL query that counts the number of records in the 'planets' table.
- * The result is returned as a single scalar value representing the total count of planets.
- */
+// Create a new order and update product stock in one atomic transaction
+data.connect:shopDB
 
-sqlite.connect:galaxy
-   sqlite.scalar:select count(*) from planets
+   // MUST be in a [data.connect] invocation
+   data.transaction.create
+      data.create
+         table:orders
+         values
+            customer_id:42
+            total:100.00
+      data.update
+         table:products
+         values
+            stock:long:50
+         where
+            and
+               product_id:123
+
+      // Commit the transaction to save both changes
+      data.transaction.commit
+   // Both the new order and the stock update are committed together

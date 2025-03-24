@@ -1,33 +1,55 @@
 
-// Write a Hyperlambda script to return the conversation starters for a specified type.
+// Create one record in your address table in your sakila database without authorization. Log invocation
 .arguments
-   type:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/type
+   // address column value
+   address:string
+
+   // address2 column value
+   address2:string
+
+   // district column value
+   district:string
+
+   // city_id column value
+   city_id:long
+
+   // postal_code column value
+   postal_code:string
+
+   // phone column value
+   phone:string
+
+   // last_update column value
+   last_update:date
+
+// Columns with custom handling as we generate a frontend
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:sakila.address entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
 
 // Opening up database connection.
-data.connect:[generic|magic]
+data.connect:[generic|sakila]
+   database-type:sqlite
 
-   // Retrieving all questions from database.
-   data.select:"\nselect conversation_starters\n\tfrom ml_types\n\twhere type = @type"
-      type:x:@.arguments/*/type
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-   // Transforming to markdown and splitting into individual questions, but only if we have conversation starters.
-   if
-      and
-         not-null:x:@data.select/*/*/conversation_starters
-         neq:x:@data.select/*/*/conversation_starters
-            .:
-      .lambda
-         markdown2html:x:@data.select/*/*/conversation_starters
-         html2lambda:x:@markdown2html
-         for-each:x:"@html2lambda/**/li/**/\\#text"
-            unwrap:x:+/*/*
-            add:x:../*/return/*/questions
-               .
-                  .:x:@.dp/#
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:address
+      return-id:bool:true
+      values
 
-// Returning result to caller.
-return
-   questions
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

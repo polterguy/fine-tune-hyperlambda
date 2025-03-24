@@ -1,11 +1,75 @@
-// While loop for 20 iterations logging a message
-.no:int:0
-while
-   lt
-      get-value:@.no
-      .:int:20
-   .lambda
 
-      // Executing log inside the loop
-      log.info:Howdy from while
-      math.increment:@.no
+/*
+ * Lists products
+ * 
+ * Optionally apply limit, offset or filter as you see fit
+ */
+.arguments
+
+   // Optional filtering argument allowing to filter items on No_ and Description.
+   filter:string
+
+   // Optional maximum number of records to return. Defaults to 10 if not specified.
+   limit:long
+
+   // Optional offset into records of where to start returning items.
+   offset:long
+
+// Making sure user is authorised to access the workflow.
+auth.ticket.verify:mnhc-admin
+
+// Getting limit value, defaulting to 50
+.limit
+set-value:x:@.limit
+   get-first-value
+      get-value:x:@.arguments/*/limit
+      .:long:50
+
+// Getting offset value, defaulting to 0
+.offset
+set-value:x:@.offset
+   get-first-value
+      get-value:x:@.arguments/*/offset
+      .:long:0
+
+// Opening up database connection.
+mssql.connect:[production|MNDG_LSC18-1]
+
+   // Checking if we're filtering items.
+   if
+      and
+         exists:x:@.arguments/*/filter
+         not-null:x:@.arguments/*/filter
+         neq:x:@.arguments/*/filter
+            .:
+      .lambda
+
+         // Creating our filtering condition. To filter on additional columns, add these columns here.
+         .fields
+            .:No_
+            .:Description
+         for-each:x:@.fields/*
+            .condition
+               cond
+            set-name:x:@.condition/*
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:.like
+            set-value:x:@.condition/*
+               strings.concat
+                  .:%
+                  get-value:x:@.arguments/*/filter
+                  .:%
+            add:x:@mssql.connect/*/mssql.read/*/where/*/or
+               get-nodes:x:@.condition/*
+
+   // Reading records.
+   mssql.read
+      table:addv_Productos
+      limit:x:@.limit
+      offset:x:@.offset
+      where
+         or
+   
+   // Returning result of above invocation to caller.
+   return-nodes:x:@mssql.read/*

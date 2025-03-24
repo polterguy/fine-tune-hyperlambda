@@ -1,6 +1,62 @@
-// neq returns true if values or types differ (opposite of eq)
-.a:5
-.b:int:5
-neq
-   get-value:x:@.a
-   get-value:x:@.b
+
+// Creates a contact in HubSpot
+.arguments
+   email:string
+   firstname:string
+   lastname:string
+   phone:string
+   company:string
+   website:string
+   lifecyclestage:string
+
+// Sanity checking invoation.
+validators.mandatory:x:@.arguments/*/email
+
+// Retrieving token from configuration and verifying it exists.
+config.get:"magic:hubspot:token"
+if
+   or
+      eq:x:@config.get
+         .:
+      null:x:@config.get
+   .lambda
+
+      // Oops ...!!
+      throw:No authorization token found in your configuration
+         public:bool:true
+         status:int:500
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      get-value:x:@config.get
+
+// Creating our contact in HubSpot.
+add:x:./*/http.post/*/payload/*/properties
+   get-nodes:x:@.arguments/*
+http.post:"https://api.hubapi.com/crm/v3/objects/contacts"
+   convert:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json; charset=utf8
+   payload
+      properties
+
+// Verifying above invocation was a success.
+if
+   neq:x:@http.post
+      .:int:201
+   .lambda
+
+      // Oops ...!!
+      lambda2hyper:x:@http.post
+      log.error:Could not create contact in HubSpot
+         message:x:@lambda2hyper
+      throw:Something went wrong as we tried to post a contact to HubSpot, check your log for details.
+         status:int:500
+         public:bool:true
+
+// Returning success to caller.
+yield
+   result:success
+   id:x:@http.post/*/content/*/id

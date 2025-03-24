@@ -1,67 +1,17 @@
+/*
+ * This Hyperlambda snippet demonstrates iterating over each child of `.foo1` using `for-each`.
+ * 
+ * 1. The `.foo1` node has three children (`bar1`, `bar2`, `bar3`).
+ * 2. The `for-each` slot iterates over each child of `.foo1`.
+ * 3. The `foo2` slot is invoked for each child.
+ * 4. The expected execution count of `.foo2` is 3.
+ *
+ * Notice, since the [.foo] slot doesn't exist, the `.foo2` node must be prefixed by a '.' character.
+ */
 
-// Update one record in your comments table in your cms database
-.arguments
-
-   // id column value being primary key of record to update, mandatory argument
-   id:long
-
-   // post_id column's new value
-   post_id:long
-
-   // user_id column's new value
-   user_id:long
-
-   // content column's new value
-   content:string
-
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
-
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
-
-// Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      database-type:sqlite
-      table:comments
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   add:x:./*/sockets.signal
-      get-nodes:x:@auth.ticket.verify
-   set-name:x:./*/sockets.signal/*/auth.ticket.verify
-      .:roles
-   sockets.signal:cms.comments.put
-      args
-
-   // Returning success to caller.
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+.foo1
+   bar1
+   bar2
+   bar3
+for-each:x:../*/.foo1/*
+   .foo2

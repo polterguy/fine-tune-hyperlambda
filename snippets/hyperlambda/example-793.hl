@@ -1,28 +1,25 @@
 
-// Hyperlambda action to throw an exception with a mandatory 'message'. Optionally include 'status' and 'public' to control HTTP propagation and status code. Validate and apply defaults.
+// Retrieves the specified [username] and return information associated with the user.
 .arguments
-   message
+   username
       type:string
       mandatory:bool:true
-   status
-      type:int
-      mandatory:bool:false
-   public
-      type:bool
-      mandatory:bool:false
-
-// Use any Angular icon reference here to make sure the action gets a toolbox icon
-.icon:warning
+.icon:supervisor_account
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/message
+validators.mandatory:x:@.arguments/*/username
 
-// Applying defaults.
-validators.default:x:@.arguments
-   status:int:500
-   public:bool:false
+// Opens up database connection.
+data.connect:[generic|magic]
 
-// Throwing exception.
-throw:x:@.arguments/*/message
-   public:x:@.arguments/*/public
-   status:x:@.arguments/*/status
+   // Inserting user into database.
+   data.read
+      table:users
+      columns
+         username
+         created
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   yield
+      created:x:@data.read/*/*/created

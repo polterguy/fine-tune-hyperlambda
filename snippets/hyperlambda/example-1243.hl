@@ -1,43 +1,42 @@
 
-// Counts items from your media table in your cms database
+// Updates an existing item in your cloudlets table in your [generic|hub] database according to the specified arguments.
 .arguments
-
-   // Optional filter arguments
-   media.id.eq:long
-   media.post_id.eq:long
-   media.file_path.like:string
-   media.file_path.eq:string
-   media.file_type.like:string
-   media.file_type.eq:string
-   media.created_at.eq:date
-   post_id.title.eq:string
-   post_id.title.like:string
+   id:long
+   name:string
+   plan:string
+   cluster:string
+   user:string
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:enterprise,root
+validators.mandatory:x:@.arguments/*/id
+auth.ticket.verify:root
 
 // Opening up our database connection.
-data.connect:[generic|cms]
-   database-type:sqlite
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+data.connect:[generic|hub]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:media
-         join:posts
-            as:post_id
-            type:left
-            on
-               and
-                  media.post_id:post_id.id
-      columns
-         count(*)
-            as:count
+   // Invoking our update slot.
+   data.update
+      table:cloudlets
+      values
       where
          and
-      limit:long:1
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning success to caller.
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

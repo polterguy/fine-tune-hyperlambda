@@ -1,9 +1,62 @@
-// This snippet uses the '[n,n]' iterator to select a range of child nodes.
-.items
-   item0:A
-   item1:B
-   item2:C
-for-each:x:@.items/*/[0,2]  
-   set-value:x:@.dp/#
-      :selected
-// The expression @.items/*/[0,2] selects children from index 0 up to 2 (exclusive) – i.e., the first and second children (item0 and item1). The loop marks them as "selected".
+
+// Lists all indexes in some SQL Server table.
+slots.create:magic.db.mssql.indexes
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
+
+   // Opens up our connection
+   .connection:[information_schema]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mssql.connect:x:@.connection
+
+      // Dynamically creating our SQL.
+      strings.split:x:@.arguments/*/table
+         .:.
+      strings.concat
+         .:"\nselect IndexName = ind.name, ColumnName = col.name from sys.indexes ind \n  inner join sys.index_columns ic on ind.object_id = ic.object_id and ind.index_id = ic.index_id \n  inner join sys.columns col on ic.object_id = col.object_id and ic.column_id = col.column_id \n  inner join sys.tables t on ind.object_id = t.object_id \nwhere\n  ind.is_primary_key = 0 \n  and ind.is_unique = 0 \n  and ind.is_unique_constraint = 0 \n  and t.is_ms_shipped = 0 \n  and t.name = '"
+         get-value:x:@strings.split/0/-
+         .:"'"
+      mssql.select:x:@strings.concat
+
+      /*
+       * Creating our return value, by projecting it into
+       * a generic form, that does not rely upon SQL Server's syntactic
+       * details.
+       */
+      for-each:x:@mssql.select/*
+         unwrap:x:+/*/*/*
+         add:x:@mssql.connect/*/return-nodes
+            .
+               .
+                  name:x:@.dp/#/*/IndexName
+                  columns
+         unwrap:x:+/*/*
+         add:x:@mssql.connect/*/return-nodes/0/-/*/columns
+            .
+               .:x:@.dp/#/*/ColumnName
+      return-nodes

@@ -1,22 +1,31 @@
 
-// Hyperlambda script that returns cryptographically secure random text based on specified arguments.
+// Counts items from your roles table in your cms database
 .arguments
 
-   // Minimum value
-   min:long
+   // Optional filtering arguments
+   roles.id.eq:long
+   roles.name.like:string
+   roles.name.eq:string
 
-   // Maximum value
-   max:long
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
 
-// Required to make it possible to add as AI function to machine learning type
-.type:public
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
 
-// Generating gibberish text.
-add:x:./*/crypto.random
-   get-nodes:x:@.arguments/*
-crypto.random
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:roles
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
 
-// Generating gibberish text.
-unwrap:x:+/*
-return
-   result:x:@crypto.random
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

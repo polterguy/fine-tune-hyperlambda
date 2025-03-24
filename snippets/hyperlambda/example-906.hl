@@ -1,7 +1,24 @@
+/*
+ * Returns all companies where the director is no longer active
+ */
+.arguments
+   director_id:long
+   limit:long
+   offset:long
 
-// Connect to the "sakila" database using the default connection string (SQLite) and retrieve actors (default adapter from config)
-data.connect:sakila
-   data.read
+data.connect:[mssql|legacy_data]
+   database-type:mssql
 
-      // Reads from the "actor" table (returns first 25 records by default)
-      table:actor
+   data.select:@"
+select b.company_name, d.role_name, d.end_date
+   from directors d
+      join basic b on d.org_number = b.org_number
+   where d.director_id = @id and d.active = 0
+   limit @limit offset @offset"
+      database-type:mssql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   yield
+      inactive_roles:x:@data.select/*

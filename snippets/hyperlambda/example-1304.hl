@@ -1,13 +1,72 @@
-// Discount electronics that are not discontinued
-data.connect:shopDB
-   data.update
-      table:products
-      values
-         price:9.99
-         on_sale:bool:true
-      where
 
-         // Both conditions must match for update
+// Hyperlambda script for an upsert endpoint that upserts questions for a questionnaire, assuming questions are in Markdown with list items, ensuring the user is authorized.
+.arguments
+   name:string
+   questions:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/name
+validators.mandatory:x:@.arguments/*/questions
+
+// Connecting to database.
+data.connect:[generic|magic]
+
+   // Deleting all old questions.
+   data.delete
+      table:questions
+      where
          and
-            category.eq:"Electronics"
-            discontinued.eq:bool:false
+            questionnaire.eq:x:@.arguments/*/name
+
+   /*
+    * Turning questions string into individual questions by transforming
+    * to HTML and then semantically traversing.
+    */
+   markdown2html:x:@.arguments/*/questions
+   html2lambda:x:-
+
+   // Iterating all li elements in HTML.
+   for-each:x:@html2lambda/**/li
+
+      // Semantically parsing question.
+      strings.split:x:"@.dp/#/*/\\#text"
+         .:=>
+      .question
+      set-value:x:@.question
+         strings.trim:x:@strings.split/0
+
+      // Checking if question contains meta information.
+      if
+         mt
+            get-count:x:@strings.split/*
+            .:int:1
+         .lambda
+
+            // Question contain meta information.
+            strings.trim:x:@strings.split/1
+            strings.split:x:-
+               .:,
+            for-each:x:@strings.split/*
+               strings.split:x:@.dp/#
+                  .:=
+               set-value:x:./*/add/*/*/name
+                  strings.trim:x:@strings.split/1
+               set-name:x:./*/add/*/*/name
+                  strings.trim:x:@strings.split/0
+               add:x:@for-each/@for-each/*/data.create/*/values
+                  .
+                     name:value
+
+      // Inserting currently iterated question and associating it with specified questionnaire.
+      data.create
+         table:questions
+         values
+            questionnaire:x:@.arguments/*/name
+            question:x:@.question
+
+   // Returning success to caller.
+   return
+      result:success

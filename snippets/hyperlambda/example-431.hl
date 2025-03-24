@@ -1,22 +1,62 @@
-/*
- * Save this file as `/modules/code-cleaner/endpoints/standardize-vars.hl`
- * This exposes an HTTP POST endpoint at `/code-cleaner/standardize-vars`
- *
- * This endpoint reads the file path from the [filename] argument and performs
- * variable name replacements based on `what` and `with` values in the same argument list.
- * The updated file content is returned.
- */
 
+// Drops the specified table.
 .arguments
-   filename:string
+   databaseType:string
+   connectionString:string
+   databaseName:string
+   tableName:string
+   generate:bool
 
-.result
-set-value:x:-
-   io.file.load:x:@.arguments/*/filename
-for-each:x:@.arguments/*
-   set-value:x:@.result
-      strings.replace:x:@.result
-         get-value:x:@.dp/#/*/what
-         get-value:x:@.dp/#/*/with
-yield
-   result:x:@.result
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/connectionString
+validators.mandatory:x:@.arguments/*/databaseName
+validators.mandatory:x:@.arguments/*/tableName
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:sqlite
+   .:pgsql
+   .:mssql
+
+// SQL that executes to modify DDL.
+.sql
+set-value:x:@.sql
+   strings.concat
+      .:"drop table "
+      get-value:x:@.arguments/*/tableName
+      .:;
+
+// Checking if caller only wants to generate SQL statement.
+if:x:@.arguments/*/generate
+   unwrap:x:+/*
+   return
+      sql:x:@.sql
+
+// Creating our database connection.
+strings.concat
+   .:[
+   get-value:x:@.arguments/*/connectionString
+   .:|
+   get-value:x:@.arguments/*/databaseName
+   .:]
+data.connect:x:-
+   database-type:x:@.arguments/*/databaseType
+   data.execute:x:@.sql
+      database-type:x:@.arguments/*/databaseType
+
+// Flushing database cache.
+strings.concat
+   .:magic.sql.databases.
+   get-value:x:@.arguments/*/databaseType
+   :.
+   get-value:x:@.arguments/*/connectionString
+cache.set:x:-
+
+// Returning result to caller.
+unwrap:x:+/*
+return
+   result:success
+   sql:x:@.sql

@@ -1,24 +1,26 @@
-// Complex logic using multiple [if] and [else] within [for-each]
-.car-parts
-   engine:available
-   wheel:out-of-stock
-   door:out-of-stock
 
-for-each:x:@.car-parts/*
+// Endpoint returning the arguments required by specified Hyperlambda code.
+.arguments
+   hyperlambda:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Transforming Hyperlambda to lambda object.
+hyper2lambda:x:@.arguments/*/hyperlambda
+
+// Making sure we "normalize" arguments.
+for-each:x:@hyper2lambda/*/.arguments/*
    if
-      eq:x:@.dp/#
-         .:available
+      and
+         not-exists:x:@.dp/#/*/type
+         not-null:x:@.dp/#
       .lambda
+         unwrap:x:+/*/*
+         add:x:@.dp/#
+            .
+               type:x:@.dp/#
          set-value:x:@.dp/#
-            .:checked
-   else
-      get-name:x:@.dp/#
-      if
-         eq:x:@get-name
-            .:wheel
-         .lambda
-            set-value:x:@.dp/#
-               .:urgent restock
-      else
-         set-value:x:@.dp/#
-            .:restock
+
+// Returning arguments Hyperlambda requires to caller.
+return-nodes:x:@hyper2lambda/*/.arguments/*

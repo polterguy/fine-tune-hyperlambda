@@ -1,39 +1,31 @@
-
-// Removes the specified [roles] from the specified [username], where [roles] is supplied as a list of strings.
+// Helper file to vectorize xplain training data.
 .arguments
-   username:string
-   roles:*
+   vectorize:bool
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/username
-validators.mandatory:x:@.arguments/*/roles
+// Applying defaults.
+validators.default:x:@.arguments
+   vectorize:bool:true
 
-// Connecting to database.
-data.connect:[generic|magic]
+// Logging invocation.
+log.info:Started vectorizing training snippets from xplain-kennisbank-plus-caos model
 
-   // Verifying user exists.
-   data.read
-      table:users
-      columns
-         username
-      where
-         and
-            username.eq:x:@.arguments/*/username
+// Buffer for type name.
+.type:xplain-kennisbank-plus-caos 
 
-   // Verifying above invocation returned something.
-   if
-      not-exists:x:@data.read/*
-      .lambda
+// Making sure we can handle exceptions.
+try
 
-         // Oops ...!!
-         throw:No such user
-            username:x:@.arguments/*/username
+   // Vectorising
+   if:x:@.arguments/*/vectorize
+      execute:magic.ai.vectorise
+         type:x:@.type
 
-   // Removing [roles] from [username]
-   for-each:x:@.arguments/*/roles/*
-      data.delete
-         table:users_roles
-         where
-            and
-               user.eq:x:@.arguments/*/username
-               role.eq:x:@.dp/#
+      // Logging.
+      log.info:Finished vectorizing training snippets from xplain-kennisbank-plus-caos model
+
+.catch
+
+   // Oops ...!!
+   log.error:Something went wrong as we tried to vectorize training snippets from xplain-kennisbank-plus-caos model
+      error:x:@.arguments/*/message
+      type:x:@.type

@@ -1,20 +1,17 @@
 
-// Hyperlambda script that formats all Hyperlambda files recursively within a specified module's folder.
-.folder:/modules/YOUR-MODULE-FOLDER-HERE/
-io.file.list-recursively:x:-
-for-each:x:-/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-         io.file.load:x:@.dp/#
+// Executes the specified SuiteQL towards your NetSuite account
+.arguments
 
-         // These two guys will end up formatting all Hyperlambda code the exact same way
-         hyper2lambda:x:@io.file.load
-            comments:true
-         lambda2hyper:x:@hyper2lambda/*
-            comments:true
+   // Mandatory SuiteQL query you want to execute.
+   q:string
 
-         // Saving formatted file.
-         io.file.save:x:@.dp/#
-            get-value:x:@lambda2hyper
+// Ensuring user is authorized to invoking endpoint.
+auth.ticket.verify:netsuite
+
+// Forwarding heavy lifting to workflow file.
+add:x:./*/execute-file
+   get-nodes:x:@.arguments/*
+execute-file:/modules/netsuite/workflows/workflows/netsuite-query.hl
+
+// Returning result to caller.
+return-nodes:x:@execute-file/*

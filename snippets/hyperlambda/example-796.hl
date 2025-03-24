@@ -1,10 +1,41 @@
+
 /*
- * Retrieves a field from the `.user` node using a dynamic key.
- *
- * The expression `{@.arguments/*/field}` dynamically resolves the field name to access.
- * For example, if `.arguments/*/field` has the value `email`, the full expression becomes:
- * `@.user/*/email`
- *
- * This is useful when working with flexible APIs or field selectors.
+ * Returns some default conversation starters based upon the specified URL.
  */
-.dynamic-user-field:x:@.user/*/{@.arguments/*/field}
+slots.create:wl.get-conversation-starters
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
+
+   // Returns [max_tokens] context from the specified [url].
+   execute:magic.workflows.actions.execute
+      name:openai-context-from-url
+      filename:/modules/openai/workflows/actions/openai-context-from-url.hl
+      arguments
+         url:x:@.arguments/*/url
+         max_tokens:int:4000
+         throw:bool:true
+
+   /*
+    * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+    * [instruction] and [query].
+    *
+    * Will use the default API key found from configurations.
+    *
+    * [context] is additional data you can supply to OpenAI such that it responds using
+    * your data as its source for information. [instruction] is a system message allowing
+    * you to change how OpenAI responds.
+    */
+   execute:magic.workflows.actions.execute
+      name:openai-query
+      filename:/modules/openai/workflows/actions/openai-query.hl
+      arguments
+         model:gpt-4-1106-preview
+         max_tokens:int:1500
+         context:x:--/execute/=openai-context-from-url/*/context
+         query:Return a list of 3 short conversation starters as Markdown without the ``` parts that are relevant to the context. I want to use these as conversation starters for an AI chatbot answering questions about information found in the context, and I don't want you to use more than 50 characters for each question in total.
+
+   // Returns the result of your last action.
+   return-nodes:x:@execute/*
+

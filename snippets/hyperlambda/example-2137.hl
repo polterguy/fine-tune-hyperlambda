@@ -1,0 +1,90 @@
+
+// Returns unique and distinct values from your media table in your cms database
+.arguments
+
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Filtering
+   media.id.eq:long
+   media.post_id.eq:long
+   media.file_path.like:string
+   media.file_path.eq:string
+   media.file_type.like:string
+   media.file_type.eq:string
+   media.created_at.eq:date
+   post_id.title.eq:string
+   post_id.title.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:media.id
+   .:media.post_id
+   .:media.file_path
+   .:media.file_type
+   .:media.created_at
+   .:post_id.title
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:enterprise,root
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:media
+         join:posts
+            as:post_id
+            type:left
+            on
+               and
+                  media.post_id:post_id.id
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

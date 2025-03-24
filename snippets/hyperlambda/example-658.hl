@@ -1,3 +1,40 @@
 
-// Generate a Hyperlambda snippet using a string containing an escaped newline character.
-.string5:"foo\nbar"
+// Lists all tables in your MySQL instance.
+slots.create:magic.db.pgsql.tables
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+
+   // Opens up our connection
+   .connection:[postgres]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   pgsql.connect:x:@.connection
+
+      // Runs our query
+      pgsql.select:"select tablename from pg_catalog.pg_tables where schemaname != 'pg_catalog' and schemaname != 'information_schema'"
+      set-name:x:@pgsql.select/*/*
+         .:table
+      return-nodes:x:@pgsql.select/*

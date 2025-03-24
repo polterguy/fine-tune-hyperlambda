@@ -1,24 +1,32 @@
 /*
- * Posts an order ID to the order system to fetch order details.
- * If the request is successful (2xx), the full response content is returned.
+ * Sends a welcome email to freelancers who registered in the last 24 hours.
  */
 
-.arguments
-   id:int
+data.connect:[pgsql|gig_platform]
+   database-type:pgsql
 
-http.post:"https://orders.api.example.com/get-order"
-   convert:true
-   payload
-      order_id:x:@.arguments/*/id
+   data.select:@"
+select name, email
+   from freelancers
+   where created_at >= current_date - interval '1 day'"
+      database-type:pgsql
 
-if
-   and
-      mte:x:@http.post
-         .:int:200
-      lt:x:@http.post
-         .:int:300
-   .lambda
-      yield
-         result:x:@http.post/*/content/*
-else
-   throw:Failed to fetch order
+   for-each:x:@data.select/*
+      strings.concat
+         .:"Hey "
+         get-value:x:@.dp/#/*/name
+         .:", thanks for signing up with GigConnect. Let’s find your first project!"
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            from
+               .
+                  name:GigConnect Team
+                  email:welcome@gigconnect.io
+            subject:Welcome to GigConnect!
+            entity:text/plain
+               content:x:@strings.concat

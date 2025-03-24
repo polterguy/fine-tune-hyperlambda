@@ -1,48 +1,62 @@
 
-// Write a Hyperlambda script to speak the specified content using OpenAI TTS.
+// Returns the Swagger and OpenAPI specification for the specified type from NetSuite
 .arguments
-   content:string
-   session:string
+
+   // Type of object the caller wants the OpenAPI spec for.
+   type:string
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/content
-validators.mandatory:x:@.arguments/*/session
+validators.mandatory:x:@.arguments/*/type
 
-// Creating a new thread to return before timeout.
-insert-before:x:../*/fork/0
-   get-nodes:x:@.arguments
-fork
+/*
+ * Returns an access token for NetSuite.
+ * 
+ * Returns a JWT token that can be used to invoke NetSuite according to your configuration settings.
+ * Notice, this will read account-id, certificate-id, and consumer-key from your configuration settings,
+ * in addition to assume your private key exists in the file '/etc/netsuite/private-key.txt'.
+ */
+execute:magic.workflows.actions.execute
+   name:netsuite-get-access-token
+   filename:/modules/netsuite/workflows/actions/netsuite-get-access-token.hl
+   arguments
 
-   // Retrieving token used to invoke OpenAI.
-   .token
-   config.get:"magic:openai:key"
-   set-value:x:@.token
-      strings.concat
-         .:"Bearer "
-         get-first-value
-            get-value:x:@.arguments/*/api_key
-            config.get:"magic:openai:key"
+// Creating our idempotency key to prevent replay attacks.
+guid.new
 
-   // Invoking OpenAI's API.
-   http.post:"https://api.openai.com/v1/audio/speech"
-      convert:bool:true
-      headers
-         Authorization:x:@.token
-         Content-Type:application/json
-         Accept:text/event-stream
-      payload
-         model:tts-1
-         input:x:@.arguments/*/content
-         voice:alloy
-         response_format:mp3
-         speed:decimal:1.0
+// Creating invocation URL.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://"
+      config.get:"magic:netsuite:account-id"
+      .:.suitetalk.api.netsuite.com/services/rest/record/v1/metadata-catalog
+      .:/
+      get-value:x:@.arguments/*/type
 
-   // Sending speech to client.
-   convert:x:@http.post/*/content
-      type:base64
-   unwrap:x:+/*/*
-   sockets.signal:x:@.arguments/*/session
-      args
-         audio:x:@http.post/*/content
-yield
-   result:success
+// Invoking our HTTP GET endpoint, now correctly parametrised.
+http.get:x:@.url
+   token:x:--/execute/=netsuite-get-access-token/*/access-token
+   headers
+      Accept:application/swagger+json
+      X-NetSuite-Idempotency-Key:x:@guid.new
+
+// Converts the result to a lambda object.
+json2lambda:x:@http.get/*/content
+
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+   .lambda
+
+      // Oops, error ...!!
+      lambda2hyper:x:@json2lambda
+      log.error:x:@lambda2hyper
+      throw:Could not get entity from NetSuite, check your log for details.
+
+// Returning our entity to caller.
+return:x:@json2lambda/*

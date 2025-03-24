@@ -1,17 +1,24 @@
 
-// Hyperlambda endpoint that searches for specified query using VSS into ml_training_snippets and returns result to caller.
+// Hyperlambda file and endpoint that returns the setup status of the system, ensuring the user is authorized.
 .arguments
-   query:string
-   full_query:string
 
-execute:magic.workflows.actions.execute
-   name:execute-workflow
-   filename:/misc/workflows/actions/misc/execute-workflow.hl
-   arguments
-      workflow:/modules/openai/workflows/workflows/keyword-context-and-vss-search.hl
-      arguments
-         _type:csregs2
-         query:x:@.arguments/*/query
-         full_query:x:@.arguments/*/full_query
-         max_tokens:int:12000
-return-nodes:x:@execute/*
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Checking if JWT secret has been changed.
+config.get:"magic:auth:secret"
+if
+   or
+      null:x:@config.get
+      lt
+         strings.length:x:@config.get
+         .:int:50
+   .lambda
+
+      // System has not been setup.
+      return
+         result:bool:false
+
+// Returns results of above invocations to caller.
+return
+   result:bool:true

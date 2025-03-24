@@ -1,22 +1,48 @@
 
-// Removes the specified [item_id] from your shopping cart.
+// Write a Hyperlambda script to return a specified CSS file to the caller.
 .arguments
-   item_id:int
+   file:string
 
-   // This is automatically passed in by the AI agent and is the user's current session.
-   _session:string
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/file
 
-// Opening up database connection.
-data.connect:[generic|shopping-cart-demo]
+// Checking if custom CSS file exists.
+.result
+strings.concat
+   .:/etc/system/openai/css/search/
+   get-value:x:@.arguments/*/file
+   .:.css
+if
+   io.file.exists:x:@strings.concat
+   .lambda
 
-   // Removing item.
-   data.delete
-      table:items
-      where
-         and
-            item_id.eq:x:@.arguments/*/item_id
-            session_id.eq:x:@.arguments/*/_session
+      // Custom template file.
+      set-value:x:@.result
+         io.file.load:x:@strings.concat
+else
 
-// Returning success to caller.
-return
-   result:success
+   // Checking if system CSS file exists.
+   strings.concat
+      .:/system/openai/front.files/search/
+      get-value:x:@.arguments/*/file
+      .:.css
+   if
+      io.file.exists:x:@strings.concat
+      .lambda
+
+         // Generic template file.
+         set-value:x:@.result
+            io.file.load:x:@strings.concat
+   else
+
+      // Oops, no such file exists.
+      throw:No such AI chat template file exists
+         public:bool:true
+         status:400
+
+// Making sure we return correct Content-Type to caller, and applying some cache.
+response.headers.set
+   Content-Type:text/css
+
+// Returning result to caller.
+return:x:@.result

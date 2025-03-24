@@ -1,49 +1,6 @@
-
-// Hyperlambda file or endpoint for a CRUD update endpoint that updates an existing item in the users table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
-.arguments
-   username:string
-   password:string
-
-// Verifying user is authorized to access endpoint.
-validators.mandatory:x:@.arguments/*/username
-
-// Throws unless use belongs to 'root' role
-auth.ticket.verify:root
-
-// Sanity checking invocation
-validators.mandatory:x:@.arguments/*/username
-eval:x:+
-signal:transformers.hash-password
-   reference:x:@.arguments/*/password
-
-// Opening up our database connection.
-data.connect:[generic|magic]
-
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      table:users
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning success to caller.
-   response.status.set:202
-   unwrap:x:+/*
-   return
-      affected:x:@data.update
+/*
+ * Example: Check if a string starts with a specific substring (positive case).
+ */
+// Returns true
+strings.starts-with:HelloWorld
+   .:Hello

@@ -1,120 +1,20 @@
 
-// Create a Hyperlambda script that returns the arguments the specified Hyperlambda can handle, ensuring the user is authorized.
+// Search the web and returns only the URLs found
 .arguments
-   hyperlambda:string
-   path:string
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Mandatory argument being the actual query to submit to DuckDuckGo.
+   query:string
 
-// Checking if caller provided a [path] argument instead of a [hyperlambda] argument.
-if
-   and
-      not-exists:x:@.arguments/*/hyperlambda
-      exists:x:@.arguments/*/path
-      not-null:x:@.arguments/*/path
-   .lambda
+   // Optional argument being how many URLs to return. Defaults to 10 if not specified.
+   max_urls:int
 
-      // Loading file.
-      load-file:x:@.arguments/*/path
-      unwrap:x:+/*/*
-      add:x:@.arguments
-         .
-            hyperlambda:x:@load-file
+// Returns [max_urls] for the specified [query] by searching DuckDuckGo.
+execute:magic.workflows.actions.execute
+   name:openai-urls-search
+   filename:/modules/openai/workflows/actions/openai-urls-search.hl
+   arguments
+      query:x:@.arguments/*/query
+      max_urls:x:@.arguments/*/max_urls
 
-// Converting Hyperlambda to lambda.
-hyper2lambda:x:@.arguments/*/hyperlambda
-   comments:true
-
-// Verifying that file is possible to invoke, as in the file has an [.arguments] collection.
-if
-   and
-      exists:x:@.arguments/*/path
-      exists:x:@hyper2lambda/*/.arguments
-   .lambda
-
-      // Signaling to frontend that file has an [.arguments] collection.
-      add:x:../*/return-nodes
-         .
-            function:bool:true
-
-      /*
-       * Removing [session], [user-id] and [type], since these are
-       * dynamically added to the function invocation by the framework.
-       */
-      if
-         exists:x:@.arguments/*/path
-         .lambda
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_session
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_user-id
-            remove-nodes:x:@hyper2lambda/*/.arguments/*/_type
-else
-
-   // Signaling to frontend that file does not have an [.arguments] collection.
-   add:x:../*/return-nodes
-      .
-         function:bool:false
-
-/*
- * Iterating through each argument Hyperlambda can handle.
- * 
- * Notice, we ONLY return the first 100 arguments to avoid context overflow.
- */
-for-each:x:@hyper2lambda/*/.arguments/*/[0,100]
-   if
-      neq
-         get-name:x:@.dp/#
-         .:..
-      .lambda
-
-         // Checking if user provided a [path], at which point we return more data.
-         if
-            exists:x:@.arguments/*/path
-            .lambda
-
-               // User provided a [path].
-               set-value:x:+/+/*/*/*/name
-                  get-name:x:@.dp/#
-               set-value:x:+/*/*/*/type
-                  get-value:x:@.dp/#
-               add:x:../*/return-nodes/*/args
-                  .
-                     .
-                        name
-                        type
-
-               // Checking if we've got an argument description / comment.
-               if
-                  eq
-                     get-name:x:@.dp/#/-
-                     .:..
-                  .lambda
-                     unwrap:x:+/*/*
-                     add:x:../*/return-nodes/*/args/0/-
-                        .
-                           description:x:@.dp/#/-
-         else
-
-            // User provided [hyperlambda] argument.
-            set-name:x:+/+/*/*
-               get-name:x:@.dp/#
-            unwrap:x:+/*/*
-            add:x:../*/return-nodes/*/args
-               .
-                  name:x:@.dp/#
-
-// Fetching description if existing.
-.desc
-if
-   eq
-      get-name:x:@hyper2lambda/0
-      .:..
-   .lambda
-      set-value:x:@.desc
-         get-value:x:@hyper2lambda/0
-
-// Returning arguments to caller, together with their type information.
-unwrap:x:+/*
-return-nodes
-   args
-   description:x:@.desc
+// Returns the result of your last action.
+return-nodes:x:@execute/*

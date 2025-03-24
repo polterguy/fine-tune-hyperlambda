@@ -1,16 +1,50 @@
-// Basic usage of the [switch] slot to determine a result based on a car part
-.part:engine
-.result
-switch:x:@.part
 
-   case:engine
-      set-value:x:@.result
-         .:This is an engine
+// Returns all roles [username] belongs to.
+.arguments
+   username
+      type:string
+      mandatory:bool:true
+.icon:supervisor_account
 
-   case:wheel
-      set-value:x:@.result
-         .:This is a wheel
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
 
-   default
-      set-value:x:@.result
-         .:Unknown car part
+// Connecting to database.
+data.connect:[generic|magic]
+
+   // Verifying user exists.
+   data.read
+      table:users
+      columns
+         username
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   // Verifying above invocation returned something.
+   if
+      not-exists:x:@data.read/*
+      .lambda
+
+         // Oops ...!!
+         throw:No such user
+            username:x:@.arguments/*/username
+
+   // Selecting all roles user belongs to.
+   data.read
+      table:users_roles
+      columns
+         role
+      where
+         and
+            user.eq:x:@.arguments/*/username
+
+   // Parametrizing [return] invocation below.
+   for-each:x:@data.read/*
+      unwrap:x:+/*/*
+      add:x:../*/return
+         .
+            .:x:@.dp/#/*/role
+
+// Returning roles to user.
+return

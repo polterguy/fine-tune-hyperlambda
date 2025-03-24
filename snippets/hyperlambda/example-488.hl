@@ -1,16 +1,15 @@
-/*
- * Save this file as `/modules/auth/endpoints/register.hl`
- * This exposes an HTTP POST endpoint at `/auth/register`
- *
- * Requires `email` to be present and match a valid email regex.
- */
 
+// Hyperlambda endpoint counting the number of tasks in the system given an optional filter.
 .arguments
-   email
+   filter:string
 
-validators.mandatory:x:@.arguments/*/email
-validators.regex:x:@.arguments/*/email
-   .:^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-yield
-   result:Email is valid
+// Retrieves all scheduled tasks in the system.
+tasks.count:x:@.arguments/*/filter
+
+// Returning the results of the evaluation to caller.
+unwrap:x:+/*
+return-nodes
+   count:x:@tasks.count

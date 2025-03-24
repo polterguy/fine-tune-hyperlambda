@@ -1,101 +1,89 @@
-/*
- * Lists all companies / customers from NetSuite
- * 
- * Returns id, entityid, companyname, and dateclosed from customers in your NetSuite account.
- */
+
+// Read or list records from your city table in your sakila database
 .arguments
 
-   // Optionally how many rows to maximumly return. Defaults to 25 unless specified.
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
    limit:long
 
-   // Optional ID of customer from where to start returning rows. Defaults to nothing.
-   from:string
+   // Offset into the dataset of where to start retrieving records
+   offset:long
 
-   // Optional filtering argument the companyname must match. For instance 'AFS' here will match customers with company names containing 'AFS'.
-   filter:string
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
 
-   // Mandatory argument for subsidiary ID to retrieve customers for.
-   subsidiaryid:long
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/subsidiaryid
+   // Filtering, optional!
+   recaptcha:string
+   city.city_id.eq:long
+   city.city.like:string
+   city.city.eq:string
+   city.country_id.eq:long
+   city.last_update.eq:date
 
-// Checking if caller supplied -1 as limit.
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:private, max-age=500
+
+// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
+config.get:"magic:auth:recaptcha:key"
+config.get:"magic:auth:recaptcha:secret"
 if
-   or
-      and
-         exists:x:@.arguments/*/limit
-         not-null:x:@.arguments/*/limit
-         eq
-            convert:x:@.arguments/*/limit
-               type:long
-            .:long:-1
-      mt
-         convert:x:@.arguments/*/limit
-            type:long
-         .:long:25
-   .lambda
-
-      // Defaulting limit to 25 to avoid returning too many records.
-      set-value:x:@.arguments/*/limit
-         .:long:25
-      add:x:../*/return-nodes
+   and
+      neq:x:@config.get
          .
-            warning:We can only retrieve a maximum of 25 customers at the same time, ask for more customers to see more customers.
-
-// Dynamically creating our query.
-.q
-set-value:x:@.q
-   strings.concat
-      .:@"select
-   c.id,
-   c.entityid,
-   c.companyname,
-   c.dateclosed
-from customer c
-join subsidiary s on c.subsidiary = s.id
-where s.id = "
-      get-value:x:@.arguments/*/subsidiaryid
-
-// Checking if we're doing paging.
-if
-   exists:x:@.arguments/*/from
+      neq:x:@config.get
+         .:
+      neq:x:@config.get/@config.get
+         .
+      neq:x:@config.get/@config.get
+         .:
    .lambda
-      set-value:x:@.q
-         strings.concat
-            get-value:x:@.q
-            .:" and c.id > "
-            get-value:x:@.arguments/*/from
 
-// Checking if we're doing filtering.
-if
-   exists:x:@.arguments/*/filter
-   .lambda
-      set-value:x:@.q
-         strings.concat
-            get-value:x:@.q
-            .:" and upper(c.companyname) like upper('%"
-            get-value:x:@.arguments/*/filter
-            .:"%')"
+      // reCAPTCHA configuration settings found.
+      validators.mandatory:x:@.arguments/*/recaptcha
+      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
+         min:decimal:0.3
 
-// Adding limit.
-set-value:x:@.q
-   strings.concat
-      get-value:x:@.q
-      .:" order by c.id fetch first "
-      get-first-value
-         get-value:x:@.arguments/*/limit
-         .:long:25
-      .:" rows only"
+// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
+remove-nodes:x:@.arguments/*/recaptcha/[0,1]
 
-// Logging the generated query for debugging.
-log.info:x:@.q
+// Opening up our database connection.
+data.connect:[generic|sakila]
+   database-type:sqlite
 
-// Forwarding heavy lifting to core file.
-execute-file:/modules/netsuite/workflows/workflows/netsuite-query.hl
-   q:x:@.q
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
 
-// Returning result to caller.
-add:x:../*/return-nodes
-   get-nodes:x:@execute-file/*
-return-nodes
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:city
+      columns
+         city.city_id
+         city.city
+         city.country_id
+         city.last_update
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

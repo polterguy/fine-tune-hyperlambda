@@ -1,18 +1,25 @@
-// Executing the following Hyperlambda results in the following
 
-// When executing the following Hyperlambda
-data.connect:magic
-   data.read
-      table:log_entries
-      columns
-         count(*)
-            as:count
-      limit:long:1
+// Inserts training data into database by executing a Hyperlambda workflow action and inserting into our database.
+.arguments
 
-// We end up with this result
-data.connect
-   data.read
-      .
-         count:long:58354
+   // Mandatory prompt used to generate specified Hyperlambda
+   prompt:string
 
-// Notice how lists are declared with nodes having names of "." or even sometimes ""
+   // Mandatory reference to Hyperlambda file.
+   file-no:int
+
+// Getting Hyperlambda.
+execute-file:/modules/fine-tune/workflows/create-training-data.hl
+   file-no:x:@.arguments/*/file-no
+
+// Inserting item.
+data.connect:fine-tune
+   data.create
+      table:hyperlambda
+      values
+         prompt:x:@.arguments/*/prompt
+         code:x:@execute-file/*/hyperlambda
+
+// Returning success.
+return
+   result:success

@@ -1,15 +1,18 @@
 
-// Moves all default KPI widgets into etc folder during installation/startup
-if
-   not
-      io.folder.exists:/etc/robo-crm/kpi/
-   .lambda
+// Authenticates the user with the specified [username] and [password].
+.arguments
+   username:string
+   password:string
 
-      // Creating folder.
-      io.folder.create:/etc/robo-crm/kpi/
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
 
-      // Copying files.
-      io.file.list:/modules/robo-crm/magic.startup/kpi/
-      for-each:x:@io.file.list/*
-         io.file.copy:x:@.dp/#
-            .:/etc/robo-crm/kpi/
+// Invokes slot responsible for authenticating caller.
+execute:magic.auth.authenticate
+   username:x:@.arguments/*/username
+   password:x:@.arguments/*/password
+
+// Returning resulting ticket/token to caller.
+yield
+   ticket:x:@execute/*/ticket

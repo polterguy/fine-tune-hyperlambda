@@ -1,73 +1,45 @@
 
-// Create a Hyperlambda script that returns all workflow snippets to the caller, ensuring the user is authorized.
-auth.ticket.verify:root
+// Dynamic Hyperlambda slot that invokes an HTTP endpoint using POST, passing in arguments as payload, ensuring the user is authorized.
+slots.create:magic.http.post
 
-// Buffer for all snippets in the system.
-.result
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
 
-// Retrieving all system snippets.
-add:x:@.result
-   io.file.list-recursively:/misc/workflows/snippets/
+   // Retrieving URL.
+   .url:x:@.arguments/*/url
+   unwrap:x:@.url
+   remove-nodes:x:@.arguments/*/url
 
-// Retrieving all custom snippets.
-if
-   io.folder.exists:/etc/workflows/snippets/
-   .lambda
-      add:x:@.result
-         io.file.list-recursively:/etc/workflows/snippets/
+   // Decorating invocation.
+   unwrap:x:./*/http.post
+   add:x:./*/http.post/*/payload
+      get-nodes:x:@.arguments/*
 
-// Then iterating through each installed module, and retrieving all module snippets.
-io.folder.list:/modules/
-for-each:x:@io.folder.list/*
-   strings.concat
-      get-value:x:@.dp/#
-      .:workflows/snippets/
+   // Invoking endpoint.
+   http.post:x:@.url
+      payload
+
+   // Verifying invocation was a success.
    if
-      io.folder.exists:x:@strings.concat
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
       .lambda
 
-         // Module has custom snippets.
-         insert-before:x:@.result/0
-            io.file.list-recursively:x:@strings.concat
+         // Success!
+         add:x:./*/log.info
+            get-nodes:x:@.arguments/*
+         log.info:Webhook successfull invoked
+            url:x:@.url
+   else
 
-// Filtering out everything not ending with '.hl'.
-for-each:x:@.result/*
-   if
-      strings.ends-with:x:@.dp/#
-         .:.hl
-      .lambda
-
-         // Loading file to add meta data.
-         load-file:x:@.dp/#
-         hyper2lambda:x:-
-            comments:true
-         if
-            eq
-               get-name:x:@hyper2lambda/0
-               .:..
-            .lambda
-               unwrap:x:+/*/*
-               add:x:@.lambda/@.lambda/0/-/*/*
-                  .
-                     description:x:@hyper2lambda/0
-                     content:x:@load-file
-
-         // Creating a name for snippet by using filename.
-         strings.split:x:@.dp/#
-            .:/
-         strings.split:x:-/0/-
-            .:.
-         remove-nodes:x:@strings.split/0/-
-         strings.join:x:@strings.split/0
-            .:.
-
-         // Returning result to caller.
-         unwrap:x:+/*/*/*
-         add:x:../*/return
-            .
-               .
-                  name:x:@strings.join
-                  filename:x:@.dp/#
-
-// Returning result to caller.
-return
+      // Failure!
+      add:x:./*/log.info
+         get-nodes:x:@.arguments/*
+      lambda2hyper:x:@http.post/*/content
+      log.error:Webhook failed
+         url:x:@.url
+         content:x:@lambda2hyper

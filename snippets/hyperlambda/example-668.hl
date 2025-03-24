@@ -1,33 +1,35 @@
 
-/*
- * Creates a new Stripe payment for the given [customer_id], using the
- * specified [payment_method_id], for the given [amount], in the given [currency].
- * 
- * Will use your Stripe API token found from your settings as it's interacting
- * with the Stripe API.
- */
+// Write a Hyperlambda script to save an OpenAI API key to the configuration object.
 .arguments
-   amount:int
+   key:string
 
-// ... more code here ...
+// Making sure user has access to invoked endpoint.
+auth.ticket.verify:root
 
-// Executing action from Stripe plugin doing the heavy lifting ...
-execute:magic.workflows.actions.execute
-   name:stripe-payment-create
-   filename:/modules/stripe/workflows/actions/stripe-payment-create.hl
-   arguments
+// Sanity checking invocation
+validators.mandatory:x:@.arguments/*/key
+validators.string:x:@.arguments/*/key
+   min:20
+   max:500
 
-      // Will use the [customer_id] from a previous action
-      customer_id:x:--/execute/=stripe-customer-create/*/customer_id
+// Loading configuration.
+config.load
+json2lambda:x:@config.load
 
-      // Will use the [payment_method_id] from a previous action
-      payment_method_id:x:--/execute/=stripe-payment-method-create/*/payment_method_id
-      amount:x:@.arguments/*/amount
-      currency:usd
-      description:Payment from Magic
-      metadata
+// Removing existing API key.
+remove-nodes:x:@json2lambda/*/magic/*/openai
 
-         // Notice, since we're using [execute] we don't have to use [unwrap], since all expressions are automatically unwrapped when using [execute].
-         username:x:@.arguments/*/username
+// Adding specified key to configuration.
+unwrap:x:+/*/*/*
+add:x:@json2lambda/*/magic
+   .
+      openai
+         key:x:@.arguments/*/key
 
-// This code depends upon the Stripe plugin being installed
+// Transforming to JSON and saving configuration.
+lambda2json:x:@json2lambda/*
+config.save:x:@lambda2json
+
+// Returning success to caller.
+return
+   result:success

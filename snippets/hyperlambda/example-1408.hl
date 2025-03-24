@@ -1,55 +1,32 @@
 
-// Action that compiles the specified C# code and loads into the AppDomain
+// Hyperlambda script for a CRUD create endpoint that inserts one record into the ml_requests table in the magic database, taking type, prompt, completion, and finish_reason, ensuring authentication and authorization for root roles.
 .arguments
-   assembly-name
-      type:string
-      mandatory:bool:true
-      default:your-assembly-name.dll
-   recompile
-      type:bool
-      mandatory:bool:true
-      default:bool:true
-   references
-      type:array
-      mandatory:bool:true
-      default
-         .:netstandard
-         .:System.Runtime
-         .:System.ComponentModel
-         .:System.Private.CoreLib
-         .:magic.node
-         .:magic.node.extensions
-         .:magic.signals.contracts
-   code
-      type:csharp
-      mandatory:bool:true
-      default:"using System;\nusing magic.node;\nusing magic.node.extensions;\nusing magic.signals.contracts;\n\n[Slot(Name = \"get-employee-details\")]\npublic class Foo : ISlot\n{\n    public void Signal(ISignaler signaler, Node input)\n    {\n        switch (input.GetEx<string>().ToLower())\n        {\n            case \"john\":\n                input.Add(new Node(\"title\", \"cmo\"));\n                input.Add(new Node(\"phone\", \"92929292\"));\n                input.Add(new Node(\"email\", \"john@doe.come\"));\n                break;\n        }\n        input.Value = null;\n    }\n}"
-.icon:rocket_launch
+   type:string
+   prompt:string
+   completion:string
+   finish_reason:string
+   cached:int
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/code
-validators.mandatory:x:@.arguments/*/references
-validators.mandatory:x:@.arguments/*/assembly-name
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
 
-/*
- * We only compile C# code if it does not already exist in AppDomain,
- * unless caller explicitly specifies [recompile] as true.
- */
-system.plugin.list
-if
-   or
-      get-value:x:@.arguments/*/recompile
-      not-exists:x:"@system.plugin.list/*/\"={@.arguments/*/assembly-name}\""
-   .lambda
+// Opening up database connection.
+data.connect:[generic|magic]
 
-      // Parametrizing [system.compile] invocation.
-      add:x:./*/system.compile
-         get-nodes:x:@.arguments/*/references
-         get-nodes:x:@.arguments/*/assembly-name
-         get-nodes:x:@.arguments/*/code
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
 
-      // Compiling C# code.
-      system.compile
+   // Creating our record.
+   data.create
+      table:ml_requests
+      return-id:bool:true
+      values
 
-      // Loading assembly into AppDomain.
-      system.plugin.load:x:@system.compile
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

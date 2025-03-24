@@ -1,69 +1,30 @@
-/*
- * This script generates training data from Hyperlambda files.
- */
 
-// Loads all files recursively from the specified folder
-execute:magic.io.file.load-recursively
-   .:/etc/hyperlambda-training-material/hyperlambda/
-for-each:x:@execute/*
+// Hyperlambda script to get an access token for NetSuite using a private key, account ID, certificate ID, and consumer key.
+.key
+set-value:x:@.key
+   io.file.load:/etc/netsuite/private-key.txt
 
-   // Making sure we catch exceptions such that we can see which file fails.
-   try
+// Account id
+.account-id
+set-value:x:@.account-id
+   config.get:"magic:netsuite:account-id"
+validators.mandatory:x:@.account-id
 
-      // Verifying we're dealing with a Hyperlambda file.
-      if
-         strings.ends-with:x:@.dp/#
-            .:.hl
-         .lambda
+// Certificate id
+.certificate-id
+set-value:x:@.certificate-id
+   config.get:"magic:netsuite:certificate-id"
+validators.mandatory:x:@.certificate-id
 
-            // Transforming file to lambda object.
-            hyper2lambda:x:@.dp/#/0
-               comments:true
-            remove-nodes:x:-/*/.description
-            if
-               eq
-                  get-name:x:@hyper2lambda/0
-                  .:..
-               .lambda
+// Consumer key
+.consumer-key
+set-value:x:@.consumer-key
+   config.get:"magic:netsuite:consumer-key"
+validators.mandatory:x:@.consumer-key
 
-                  .prompt
-                  set-value:x:-
-                     get-value:x:@hyper2lambda/0
-                  remove-nodes:x:@hyper2lambda/0
-
-                  // Creating our code segment
-                  lambda2hyper:x:@hyper2lambda/*
-                     comments:true
-                  if
-                     lt
-                        openai.tokenize:x:@lambda2hyper
-                        .:int:5000
-                     .lambda
-
-                        // Saving above code snippet.
-                        data.connect:fine-tune
-                        
-                           // Making sure we avoid double inserts.
-                           data.read
-                              table:hyperlambda
-                              where
-                                 and
-                                    code.eq:x:@lambda2hyper
-                                    prompt.eq:x:@.prompt
-
-                           // Making sure we avoid double inserts of the same snippets
-                           if
-                              not-exists:x:@data.read/*
-                              .lambda
-                                 data.create
-                                    table:hyperlambda
-                                    values
-                                       code:x:@lambda2hyper
-                                       prompt:x:@.prompt
-   .catch
-   
-      // This throws an exception being the name of the currently processed filename
-      throw:x:@.dp/#
-
-// House cleanups.
-remove-nodes:x:@execute/*
+// Invoking slot doing the heavy lifting.
+netsuite.get-access-token
+   private-key:x:@.key
+   account-id:x:@.account-id
+   certificate-id:x:@.certificate-id
+   consumer-key:x:@.consumer-key

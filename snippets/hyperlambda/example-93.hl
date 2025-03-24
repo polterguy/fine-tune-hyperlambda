@@ -1,5 +1,79 @@
-/*
- * Example: Convert a mixed-case sentence to lowercase.
- */
-// Result: "hello world!"
-strings.to-lower:"Hello World!"
+
+// Workflow action that creates a Stripe payment link using a specified price reference, quantity, and success URL. The function should validate mandatory arguments, apply a default quantity of 1, and handle metadata. It should retrieve the Stripe API token and make a POST request to create the payment link. Handle any errors by logging and throwing exceptions, and return the payment link URL to the caller upon successful creation.
+.arguments
+   price_reference
+      type:string
+      mandatory:bool:true
+   quantity
+      type:int
+      mandatory:bool:false
+   success_url
+      type:string
+      mandatory:bool:true
+   metadata
+      type:key-value
+.icon:payment
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/price_reference
+validators.mandatory:x:@.arguments/*/success_url
+
+// Applying default values.
+validators.default:x:@.arguments
+   quantity:int:1
+
+// Adding metadata
+for-each:x:@.arguments/*/metadata/*
+   set-name:x:./0/-/*/*
+      strings.concat
+         .:metadata[
+         get-name:x:@.dp/#
+         .:]
+   unwrap:x:./0/-/*/*
+   add:x:../*/http.post/*/payload
+      .
+         name:x:@.dp/#
+
+// Retrieving Stripe token from configuration.
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
+
+// Invoking Stripe to create payment link here.
+http.post:"https://api.stripe.com/v1/payment_links"
+   convert:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/x-www-form-urlencoded
+   payload
+      line_items[0][price]:x:@.arguments/*/price_reference
+      line_items[0][quantity]:int:1
+      after_completion[type]:redirect
+      after_completion[redirect][url]:x:@.arguments/*/success_url
+
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+
+      // Oops, error - Logging error and returning status 500 to caller.
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe, could not create payment link
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      throw:Something went wrong while invoking Stripe, could not create payment link
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+
+// Returning payment link to caller.
+yield
+   purchase_link:x:@http.post/*/content/*/url

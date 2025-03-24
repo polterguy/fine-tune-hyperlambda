@@ -1,34 +1,7 @@
+// Connects to crm SQLite database using generic connection string
+data.connect:[generic|crm]
 
-// Create a Hyperlambda action to publish a web socket message with a specified 'channel' and 'args'. Optionally include 'roles' to restrict notifications. Validate mandatory fields.
-.arguments
-   channel:string
-   args:*
-   roles:*
-.icon:send
+   // Notice, you can only de-reference the connection created above inside the 'scope' of the [data.connect] slot
+   data.select:select * from contacts
 
-// Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/channel
-validators.mandatory:x:@.arguments/*/args
-
-// Decorating invocation.
-add:x:./*/sockets.signal/*/args
-   get-nodes:x:@.arguments/*/args/*
-
-// Checking if we've got a [roles] declaration and if so decorating invocation.
-if
-   and
-      exists:x:@.arguments/*/roles
-      not-null:x:@.arguments/*/roles
-   .lambda
-
-      // Decorating invocation with comma separated list of roles.
-      strings.join:x:@.arguments/*/roles
-         .:,
-      unwrap:x:+/*/*
-      add:x:../*/sockets.signal
-         .
-            roles:x:@strings.join
-
-// Publishing socket message.
-sockets.signal:x:@.arguments/*/channel
-   args
+// The default database type to use is SQLite

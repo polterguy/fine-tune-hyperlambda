@@ -1,130 +1,34 @@
 
-// Adds additional extra fields to be associated with the user after registration, including IP address and location information.
+// Hyperlambda script that creates a log item using specified arguments like type, content, and meta information.
 .arguments
-   username:string
-   recaptcha_response:string
-
-// Sanity checking invocation
-validators.mandatory:x:@.arguments/*/username
+   type:string
+   content:string
+   meta:*
 
 /*
- * Checking if backend is configured to use reCAPTCHA, and if so,
- * making sure we ensure the frontend supplied a [recaptcha_response],
- * and invoking slot responsible for verifying reCAPTCHA value.
+ * Ensures user is authorized to access endpoint.
+ * Notice, we only allow authenticated users to access this endpoint.
+ * What roles they belong to is not important, as long as they're authenticated.
  */
-config.get:"magic:auth:recaptcha:key"
-if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-   .lambda
+auth.ticket.verify
 
-      // [recaptcha_response] is a mandatory field.
-      validators.mandatory:x:@.arguments/*/recaptcha_response
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/content
+validators.enum:x:@.arguments/*/type
+   .:info
+   .:error
+   .:debug
+   .:fatal
 
-      // Retrieving secret and invoking slot responsible for verifying reCAPTCHA value.
-      config.get:"magic:auth:recaptcha:secret"
-      validators.recaptcha:x:@.arguments/*/recaptcha_response
-         min:decimal:0.3
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-
-// Opening up database connection
-data.connect:[generic|magic]
-
-   // Retrieving IP address of user
-   .ip
-   set-value:x:-
-      get-first-value
-         request.headers.get:cf-connecting-ip
-         request.ip
-
-   /*
-    * Verifying user is still unconfirmed for security reasons,
-    * to prevent malicious users from changing countries of users
-    * already having invoked endpoint, and/or retrieve usernames in
-    * the system.
-    */
-   data.read
-      table:users_roles
-      values
-         role
-      where
-         and
-            user.eq:x:@.arguments/*/username
-            role.eq:unconfirmed
-   if
-      not
-         exists:x:@data.read/*/*
-      .lambda
-
-         // Oops, malicious invocation!
-         log.error:User attempted to initialise his or her IP address twice
-            username:x:@.arguments/*/username
-            ip:x:@.ip
-
-         // To avoid giving the malicious user hints to whether or not user exists, we return 404.
-         throw:No such user
-            public:true
-            status:404
-
-   // Checking if we've got an IP API key.
-   .ip-api-key
-   set-value:x:-
-      config.get:"magic:ipapi-key"
-
-   // Decorating and invoking IP API.
-   .url
-   set-value:x:-
-      strings.concat
-         .:"https://ipapi.co/"
-         get-value:x:@.ip
-         .:/json/
-   if
-      not-null:x:@.ip-api-key
-      .lambda
-         set-value:x:@.url
-            strings.concat
-               get-value:x:@.url
-               .:?key=
-               config.get:"magic:ipapi-key"
-   http.get:x:@.url
-      convert:true
-
-   // Inserting user's IP address used during registration into extra-fields.
-   data.create
-      table:users_extra
-      values
-         user:x:@.arguments/*/username
-         type:registration-ip-address
-         value:x:@.ip
-
-   // Associating fields with user as extra info
-   .fields
-      .:country
-      .:postal
-      .:country_calling_code
-   for-each:x:@.fields/*
-
-      // Checking if IP API returned the specified value for the currently iterated field.
-      if
-         and
-            exists:x:"@http.get/*/content/*/\"{@.dp/#}\""
-            neq:x:"@http.get/*/content/*/\"{@.dp/#}\""
-               .
-            neq:x:"@http.get/*/content/*/\"{@.dp/#}\""
-               .:
-         .lambda
-
-            // Inserting field into database to associate information with user.
-            data.create
-               table:users_extra
-               values
-                  user:x:@.arguments/*/username
-                  type:x:@.dp/#
-                  value:x:"@http.get/*/content/*/\"{@.dp/#}\""
+// Creating a log entry using the specified type of logger.
+add:x:../*/log-invocation
+   get-nodes:x:@.arguments/*/meta/*
+set-name:x:../*/log-invocation
+   strings.concat
+      .:log.
+      get-value:x:@.arguments/*/type
+log-invocation:x:@.arguments/*/content
 
 // Returning success to caller.
 return

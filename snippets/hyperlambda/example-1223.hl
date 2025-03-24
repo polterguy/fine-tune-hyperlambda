@@ -1,17 +1,27 @@
-// Multiply two numbers given as arguments to endpoint or file and return the result to caller
+/*
+ * FILE: /modules/api/employees/search.get.hl
+ *
+ * DESCRIPTION:
+ * Accepts a `name` parameter and performs a SQL `LIKE` search.
+ * This is useful for autocomplete or fuzzy search.
+ *
+ * HOW TO CREATE THIS ENDPOINT:
+ * 1. Save as `/modules/api/employees/search.get.hl`.
+ * 2. Endpoint becomes available at:
+ *     GET /modules/api/employees/search?name=Joh
+ *
+ * SECURITY:
+ * - Uses parameterized SQL to prevent SQL injection.
+ */
+
 .arguments
-   arg1:int
-   arg2:int
+   name:string
 
-// Making sure arguments are actually passed in, throwing exceptions if not.
-validators.mandatory:x:@.arguments/*/arg1
-validators.mandatory:x:@.arguments/*/arg2
+validators.mandatory:x:@.arguments/*/name
 
-// Multiplication.
-math.multiply
-   get-value:x:@.arguments/*/arg1
-   get-value:x:@.arguments/*/arg2
+data.connect:sakila
+   data.select:SELECT first_name, last_name FROM actor WHERE first_name LIKE @filter
+      @filter:x:@.arguments/*/name
 
-// Returning result to caller
-yield
-   result:x:@math.multiply
+   yield
+      results:x:@data.select/*

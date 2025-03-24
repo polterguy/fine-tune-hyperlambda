@@ -1,17 +1,30 @@
 
-// Generate a Hyperlambda snippet that retrieves records from the sales database and its transactions table.
+// Ensures our system messages are updated during deployments
+io.file.list:/modules/finovo/system-messages/
 
-// Retrieves records from the sales database and its transactions table.
-data.connect:sales_db
+// Opening up database connection.
+data.connect:magic
 
-   // Using MySQL as the database type.
-   database-type:mysql
+   // Looping through each system message and updating our machine learning type accordingly.
+   for-each:x:@io.file.list/*
 
-   // Fetching data from the database.
-   data.read
-      database-type:mysql
-      table:transactions
-      limit:20
-      sort
-         transaction_date
-      direction:asc
+      // Loading file.
+      io.file.load:x:@.dp/#
+
+      // Finding type name
+      .type
+      strings.split:x:@.dp/#
+         .:/
+      strings.split:x:-/0/-
+         .:.
+      set-value:x:@.type
+         get-value:x:@strings.split/0
+
+      // Updating type name's system message.
+      data.update
+         table:ml_types
+         values
+            system_message:x:@io.file.load
+         where
+            and
+               type.eq:x:@.type

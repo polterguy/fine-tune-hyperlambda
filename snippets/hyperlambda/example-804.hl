@@ -1,9 +1,32 @@
-/*
- * Accesses a specific configuration group based on a dynamic environment value.
- *
- * The `{@.env}` part is resolved at runtime and could yield "dev", "staging", "prod", etc.
- * The full expression becomes something like: `@.config/*/prod`
- *
- * This allows you to fetch settings based on the current environment context.
- */
-.active-config:x:@.config/*/{@.env}
+
+// Creates one record in your CustomerDemographics table in your northwind database
+.arguments
+
+   // CustomerTypeID column value
+   CustomerTypeID:string
+
+   // CustomerDesc column value
+   CustomerDesc:string
+
+// Opening up database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:CustomerDemographics
+      return-id:bool:false
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      result:success

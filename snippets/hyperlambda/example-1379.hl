@@ -1,20 +1,68 @@
-// How to decide order fulfillment based on warehouse zone?
-.zone:string:B
-.orderStatus
-if
-   eq
-      get-value:x:@.zone
-      .:A
-   .lambda
-      set-value:x:@.orderStatus
-         .:Priority shipping
-else-if
-   eq
-      get-value:x:@.zone
-      .:B
-   .lambda
-      set-value:x:@.orderStatus
-         .:Standard shipping
-else
-   set-value:x:@.orderStatus
-      .:Delayed
+
+// Write a Hyperlambda script to import a specified CSV file as training data for a specified model.
+.arguments
+   type:string
+   file:*
+.accept:multipart/form-data
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+
+// Reading file data from stream.
+io.stream.read:x:@.arguments/*/file/*/stream
+
+// Converting file to lambda object.
+csv2lambda:x:@io.stream.read
+
+// Opening database connection.
+data.connect:[generic|magic]
+
+   // Iterating through each record in file.
+   for-each:x:@csv2lambda/*
+
+      // Creating our completion.
+      .prompt:
+      .completion:
+      set-value:x:@.prompt
+         strings.concat
+            get-name:x:@.dp/#/0
+            .:": "
+            get-value:x:@.dp/#/0
+      for-each:x:@.dp/#/*/[1,1000]
+         if
+            and
+               not-null:x:@.dp/#
+               neq:x:@.dp/#
+                  .:
+            .lambda
+               set-value:x:@.completion
+                  strings.concat
+                     get-value:x:@.completion
+                     .:"\n"
+                     .:"\n"
+                     get-name:x:@.dp/#
+                     .:": "
+                     get-value:x:@.dp/#
+      set-value:x:@.completion
+         strings.trim:x:@.completion
+
+      // Importing item into database.
+      data.create
+         table:ml_training_snippets
+         values
+            type:x:@.arguments/*/type
+            prompt:x:@.prompt
+            completion:x:@.completion
+            meta:x:@.arguments/*/file/*/name
+
+// Returning success to caller.
+get-count:x:@csv2lambda/*
+yield
+   result:success
+   count:x:@get-count

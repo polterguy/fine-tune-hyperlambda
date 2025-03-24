@@ -1,45 +1,43 @@
 
-// Moves SQL scripts to the correct folder and creates the Northwind database file if it doesn't exist.
-io.file.list:/modules/sqlite-northwind/magic.startup/
-for-each:x:-/*
-   strings.split:x:@.dp/#
-      .:/
+// Hyperlambda endpoint for a CRUD update endpoint that updates an existing item in the users_extra table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   user:string
+   type:string
+   value:string
+
+// Verifying user is authorized to access endpoint.
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/user
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[2,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,2]
+
+   // Invoking our update slot.
+   data.update
+      table:users_extra
+      values
+      where
+         and
+
+   // Verifying record exists.
    if
-      strings.ends-with:x:@.dp/#
-         .:.sql
+      eq
+         get-value:x:@data.update
+         .:int:0
       .lambda
-         strings.concat
-            .:/etc/sqlite/templates/
-            get-value:x:@strings.split/0/-
-         if
-            not
-               io.file.exists:x:@strings.concat
-            .lambda
+         response.status.set:404
+         return
+            result:Record not found
 
-               // File doesn't exists, hence moving it.
-               io.file.move:x:@.dp/#
-                  .:/etc/sqlite/templates/
-               log.info:SQL script moved into etc folder
-                  filename:x:@.dp/#
-
-// Creates the Northwind database file.
-if
-   not
-      io.file.exists:/data/northwind.db
-   .lambda
-
-      // Creating a default database file to store database in.
-      io.file.save:/data/northwind.db
-         .:
-      log.info:Northwind database file created
-         filename:/data/northwind.db
-
-      // Loads and executes the northwind.sql script.
-      io.file.load:/etc/sqlite/templates/northwind.sql
-      sqlite.connect:northwind
-         sqlite.execute:x:@io.file.load
-      log.info:The northwind database was successfully created
-         filename:/etc/sqlite/templates/northwind.sql
-
-      // Evicting cache item related to SQLite.
-      cache.set:magic.sql.databases.sqlite.generic
+   // Returning success to caller.
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

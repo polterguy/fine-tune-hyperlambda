@@ -1,40 +1,66 @@
 
-// Hyperlambda script that returns all dynamic HTTP endpoints in the system with their associated verbs and roles, caching the results for efficiency.
+// Hyperlambda script that authenticates a user with the specified username and password, returning a JWT token if successful.
+slots.create:magic.auth.authenticate
 
-// Declares how many seconds the operation should be cached.
-.cache-seconds:int:300
+   // Opens up our database connection.
+   data.connect:magic
 
-/*
- * Invokes [endpoints.list], making sure we cache the results, since it's a
- * fairly expensive operation.
- */
-cache.try-get:magic.auth.endpoints
-   expiration:x:@.cache-seconds
-   .lambda
+      // Selects password from our users table belonging to specified [username].
+      data.read
+         table:users
+         columns
+            password
+         where
+            and
+               username.eq:x:@.arguments/*/username
 
-      // Cache miss, retrieving endpoints, and returning to caller.
-      .result
-      endpoints.list
-      for-each:x:@endpoints.list/*
-         if
-            exists:x:@.dp/#/*/auth/*
-            .lambda
-               add:x:+/*/*
-                  get-nodes:x:@.dp/#/*/auth/*
-               add:x:@if/+/+/*/*
-                  .
-                     auth
-         unwrap:x:+/*/*/*
-         add:x:@.result
-            .
-               .
-                  path:x:@.dp/#/*/path
-                  verb:x:@.dp/#/*/verb
-      lambda2hyper:x:@.result/*
-      return:x:-
+      // Checking if user with specified [username] exists.
+      if
+         not-exists:x:@data.read/*
+         .lambda
 
-// Returning results of above invocation to caller.
-hyper2lambda:x:@cache.try-get
-add:x:../*/return
-   get-nodes:x:@hyper2lambda/*
-return
+            // No such user.
+            throw:Access denied
+               status:int:401
+               public:bool:true
+
+      // Verifying that the password is a match.
+      if
+         or
+            eq:x:@.arguments/*/password-check
+               .:bool:false
+            crypto.password.verify:x:@.arguments/*/password
+               hash:x:@data.read/*/*/password
+         .lambda
+
+            // Logging the fact that user successfully logged in.
+            log.info:User successfully authenticated
+               username:x:@.arguments/*/username
+
+            // Now we need to select all roles user belongs to.
+            data.read
+               table:users_roles
+               columns
+                  role
+               where
+                  and
+                     user.eq:x:@.arguments/*/username
+
+            // Parametrizing [auth.ticket.create] with roles user belongs to.
+            add:x:./*/auth.ticket.create/*/roles
+               get-nodes:x:@data.read/*/*
+
+            // Now we can create our JWT token/ticket.
+            auth.ticket.create
+               username:x:@.arguments/*/username
+               expires:x:@.arguments/*/expires
+               roles
+
+            // Returning JWT token to caller.
+            yield
+               ticket:x:@auth.ticket.create
+
+      // Hash version of password didn't match.
+      throw:Access denied
+         status:int:401
+         public:bool:true

@@ -1,3 +1,28 @@
-// How do you declare a 32-bit integer in Hyperlambda?
 
-.page-views:int:1048576
+// Hyperlambda script for a CRUD delete endpoint that deletes one item from the users_extra table in the magic database matching the specified arguments, ensuring authentication and authorization for root roles.
+.arguments
+   type:string
+   user:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/user
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      table:users_extra
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

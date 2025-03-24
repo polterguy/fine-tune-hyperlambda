@@ -1,36 +1,67 @@
 
-// Read or list records from your plugins table in your cms database
+// Update one record in your media table in your cms database
 .arguments
 
-   plugins.id.eq:long
-   plugins.name.like:string
-   plugins.name.eq:string
-   plugins.description.like:string
-   plugins.description.eq:string
-   plugins.is_active.eq:long
+   // id column value being primary key of record to update, mandatory argument
+   id:long
+
+   // post_id column's new value
+   post_id:long
+
+   // file_path column's new value
+   file_path:string
+
+   // file_type column's new value
+   file_type:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/id
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+auth.ticket.verify:enterprise,root
 
 // Opening up our database connection.
 data.connect:[generic|cms]
    database-type:sqlite
 
-   // Parametrising our read invocation with filtering arguments.
-   add:x:./*/data.read/*/where/*
-      get-nodes:x:@.arguments/*
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
 
-   // Reading data from database.
-   data.read
+   // Invoking our update slot.
+   data.update
       database-type:sqlite
-      table:plugins
-      columns
-         plugins.id
-         plugins.name
-         plugins.description
-         plugins.is_active
+      table:media
+      values
       where
          and
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:cms.media.put
+      args
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

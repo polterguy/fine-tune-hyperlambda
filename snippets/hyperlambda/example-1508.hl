@@ -1,16 +1,24 @@
-// Using [switch] with numeric values to set a result for car part quantities
-.quantity:int:4
-.result
-switch:x:@.quantity
+/*
+ * Sends a POST request to an internal user service with a user ID.
+ * Verifies that the status code is 2xx and yields the full response content.
+ */
 
-   case:int:1
-      set-value:x:@.result
-         .:One car part
+.arguments
+   id:int
 
-   case:int:4
-      set-value:x:@.result
-         .:Four car parts
+http.post:"https://internal.api.example.com/users/lookup"
+   convert:true
+   payload
+      userId:x:@.arguments/*/id
 
-   default
-      set-value:x:@.result
-         .:Unknown quantity
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      yield
+         result:x:@http.post/*/content/*
+else
+   throw:User lookup failed

@@ -1,15 +1,23 @@
 
-// Provide a Hyperlambda example where employees are counted in the 'hr_db' database from the 'employees' table.
+// Returns all clusters in system.
 
-// Counts employees in the "hr_db" database from the "employees" table.
-data.connect:hr_db
-   database-type:mssql
+// Adding 30 seconds of public caching to avoid DOS attacks from exhausting server.
+response.headers.set
+   Cache-Control:public, max-age=30
 
-   // Counting total employees.
+// Opening up our database connection.
+data.connect:[generic|hub]
+
+   // Reading data from database.
    data.read
-      database-type:mssql
-      table:employees
+      table:clusters
       columns
-         count(*)
-            as:count
-      limit:long:1
+         id
+         country
+         name
+      where
+         and
+            enabled.eq:bool:true
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

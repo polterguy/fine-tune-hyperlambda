@@ -1,8 +1,52 @@
-// Hash a message using SHA256 algorithm
 
-// The message to hash
-.message:Hello, World!
+// Workflow action that searches for customers in Stripe using a username, which corresponds to the user's email. The function should validate the username and retrieve the Stripe API token. It should construct a URL to search for customers by email, make a GET request to the Stripe API, and handle any errors by logging and throwing exceptions. If successful, the function should return the retrieved customer data to the caller.
+.arguments
+   username
+      type:string
+      mandatory:bool:true
+.icon:payment
 
-// Hashing above message
-crypto.hash:x:@.message
-   algorithm:sha256
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/username
+
+// Retrieving token to use for invocations towards Stripe.
+.token
+set-value:x:-
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:stripe:token"
+
+// Making sure we retrieve only customers with the specified email.
+.url
+strings.concat
+   .:"email:'"
+   get-value:x:@.arguments/*/username
+   .:"'"
+strings.url-encode:x:@strings.concat
+set-value:x:@.url
+   strings.concat
+      .:"https://api.stripe.com/v1/customers/search?query="
+      get-value:x:@strings.url-encode
+
+// Invoking Stripe REST API.
+http.get:x:@.url
+   headers
+      Authorization:x:@.token
+   convert:true
+
+// Sanity checking above invocation.
+if
+   mte
+      get-value:x:@http.post
+      .:int:400
+   .lambda
+
+      // Oops, something went wrong ...!!
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Stripe API to create subscription
+         result:x:@lambda2hyper
+         provider:Stripe
+      throw:Something went wrong while invoking Stripe API to create subscription
+         public:true
+         status:500
+return-nodes:x:@http.get/*/content/*

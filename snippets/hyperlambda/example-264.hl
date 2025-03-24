@@ -1,34 +1,64 @@
 
-// Creates an image
+// Deletes the specified forreign key from your database.
 .arguments
+   databaseType:string
+   connectionString:string
+   databaseName:string
+   tableName:string
+   fkName:string
+   generate:bool
 
-   // Mandatory and is the prompt used to generate the image.
-   prompt:string
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
 
-   // Optional and will default to '1024x1024' if not specified. Legal are 1024x1024, 1792x1024, and 1024x1792.
-   size:string
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/connectionString
+validators.mandatory:x:@.arguments/*/databaseName
+validators.mandatory:x:@.arguments/*/tableName
+validators.mandatory:x:@.arguments/*/fkName
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:pgsql
+   .:mssql
 
-   // Optional and will default to 'vivid' if not specified. Legal values are 'vivid' and 'natural'.
-   style:string
+// SQL that executes to modify DDL.
+.sql
+set-value:x:@.sql
+   strings.concat
+      .:"alter table "
+      get-value:x:@.arguments/*/tableName
+      .:" drop constraint "
+      get-value:x:@.arguments/*/fkName
 
-// Applying defaults.
-validators.default:x:@.arguments
-   size:1792x1024
-   style:vivid
+// Checking if caller only wants to generate SQL statement.
+if:x:@.arguments/*/generate
+   unwrap:x:+/*
+   return
+      sql:x:@.sql
 
-/*
- * Invokes OpenAI's image generation API with the specified [query] and [model].
- * 
- * Will use the default API key found from configurations.
- */
-execute:magic.workflows.actions.execute
-   name:openai-image-create
-   filename:/modules/openai/workflows/actions/openai-image-create.hl
-   arguments
-      model:dall-e-3
-      size:x:@.arguments/*/size
-      style:x:@.arguments/*/style
-      query:x:@.arguments/*/prompt
+// Creating our database connection.
+strings.concat
+   .:[
+   get-value:x:@.arguments/*/connectionString
+   .:|
+   get-value:x:@.arguments/*/databaseName
+   .:]
+data.connect:x:-
+   database-type:x:@.arguments/*/databaseType
+   data.execute:x:@.sql
+      database-type:x:@.arguments/*/databaseType
 
-// Returns the result of your last action.
-return-nodes:x:@execute/*
+// Flushing database cache.
+strings.concat
+   .:magic.sql.databases.
+   get-value:x:@.arguments/*/databaseType
+   :.
+   get-value:x:@.arguments/*/connectionString
+cache.set:x:-
+
+// Returning result to caller.
+unwrap:x:+/*
+return
+   result:success
+   sql:x:@.sql

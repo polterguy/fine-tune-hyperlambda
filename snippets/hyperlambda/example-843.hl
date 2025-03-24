@@ -1,26 +1,31 @@
 
-// Callback slot for Stripe, throws exception if cloudlet has child cloudlets.
-slots.create:payments.subscriptions.can-delete.cloudlet-not-parent
+// Hyperlambda script that sets the reCAPTCHA key and secret to the specified values, ensuring the user is authorized.
+.arguments
+   key:string
+   secret:string
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/meta
-   validators.mandatory:x:@.arguments/*/username
+// Making sure user is allowed to invoke endpoint
+auth.ticket.verify:root
 
-   // Verifying cloudlet is not a parent cloudlet.
-   data.connect:[generic|hub]
-      data.read
-         table:cloudlets
-         columns
-            id
-         where
-            and
-               source_cloudlet.eq:x:@.arguments/*/meta
-               user.eq:x:@.arguments/*/username
-      if
-         exists:x:@data.read/*/*
-         .lambda
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/key
+validators.mandatory:x:@.arguments/*/secret
 
-            // Oops ...!!
-            throw:Subscription cannot be cancelled since cloudlet associated with subscription is a source cloudlet for another cloudlet. Delete primary cloudlet first!
-               status:412
-               public:true
+// Updating settings.
+config.load
+json2lambda:x:-
+remove-nodes:x:@json2lambda/*/magic/*/auth/*/recaptcha
+unwrap:x:+/*/*/*
+add:x:@json2lambda/*/magic/*/auth
+   .
+      recaptcha
+         key:x:@.arguments/*/key
+         secret:x:@.arguments/*/secret
+
+// Saving updated settings.
+lambda2json:x:@json2lambda/*
+config.save:x:-
+
+// Retrieving key configuration setting and returning to caller.
+return-nodes
+   result:success

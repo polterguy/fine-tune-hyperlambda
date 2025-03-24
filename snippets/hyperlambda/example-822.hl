@@ -1,25 +1,36 @@
-// If/else-if and else lambda object
-.src:int:3
-.dest
-if
-   eq
-      get-value:x:@.src
-      .:int:1
-   .lambda
 
-      set-value:x:@.dest
-         .:yup!
+// Deletes one record from your pages table in your cms database
+.arguments
 
-else-if
-   eq
-      get-value:x:@.src
-      .:int:2
-   .lambda
+   // Primary key of record to delete, mandatory argument
+   id:long
 
-      set-value:x:@.dest
-         .:yup2.0!
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
 
-else
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
 
-   set-value:x:@.dest
-      .:nope
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:pages
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.pages.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

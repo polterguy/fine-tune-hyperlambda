@@ -1,52 +1,35 @@
 
-// Write a Hyperlambda script to subscribe a specified name and email to a newsletter using SendGrid.
-slots.create:magic.questionnaires.action.sendgrid-subscribe
+// Lists all database in your MySQL instance.
+slots.create:magic.db.mssql.databases
 
-   // Sanity checking invocation.
-   validators.mandatory:x:@.arguments/*/name
-   validators.mandatory:x:@.arguments/*/email
-   validators.email:x:@.arguments/*/email
-
-   // Invoking SendGrid to create recipient.
-   .auth
-   set-value:x:@.auth
-      strings.concat
-         .:"Bearer "
-         config.get:"magic:sendgrid:api-key"
-   config.get:"magic:sendgrid:chatbot-list"
-   set-name:x:./*/http.put/**/full_name
-      config.get:"magic:sendgrid:full_name_id"
-         .:e1_T
-   unwrap:x:+/**
-   http.put:"https://api.sendgrid.com/v3/marketing/contacts"
-      convert:true
-      headers
-         Authorization:x:@.auth
-         Content-Type:application/json
-      payload
-         list_ids
-            .:x:@config.get
-         contacts
-            .
-               email:x:@.arguments/*/email
-               custom_fields
-                  full_name:x:@.arguments/*/name
-
-   // Sanity checking invocation.
+   // Opens up our connection
+   .connection:master
    if
-      neq:x:@http.put
-         .:int:202
+      and
+         exists:x:@.arguments/*/connection-string
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
       .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               .:master]
+   mssql.connect:x:@.connection
 
-         // Oops ...!!
-         lambda2hyper:x:@http.put/*/content
-         log.error:Could not add new contact to list
-            email:x:@.arguments/*/email
-            name:x:@.arguments/*/name
-            stack:x:@lambda2hyper
-   else
+      // Runs our query
+      mssql.select:select name from master.dbo.sysdatabases where has_dbaccess(name) = 1
 
-      // Doing some basic logging
-      log.info:Successfully added contact to SendGrid automation
-         name:x:@.arguments/*/name
-         email:x:@.arguments/*/email
+      // Renaming "Database" nodes.
+      set-name:x:@mssql.select/*/*
+         .:db
+
+      // Returns the remaining databases to caller.
+      return-nodes:x:@mssql.select/*

@@ -1,9 +1,85 @@
-/*
- * Accesses a setting from a user-specific preferences section.
- *
- * The expression dynamically resolves the user's ID from `.arguments/*/userId`,
- * turning the path into something like: `@.preferences/*/u123/*/theme`
- *
- * Ideal for multi-user preference handling with per-user customization.
- */
-.user-preference:x:@.preferences/*/{@.arguments/*/userId}/*/theme
+
+// Returns the actual owner of the company with the specified [org_number]
+slots.create:finovo.get-actual-owner
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/org_number
+
+   // Buffer for XML.
+   .xml:@"<?xml version=""1.0"" encoding=""utf-8""?>
+<soap:Envelope xmlns:xsi=""http://www.w3.org/2001/XMLSchema-instance"" xmlns:xsd=""http://www.w3.org/2001/XMLSchema"" xmlns:soap=""http://schemas.xmlsoap.org/soap/envelope/"">
+  <soap:Body>
+    <GetDataBySecure xmlns=""https://webservice.creditsafe.se/getdata/"">
+      <GetData_Request>
+        <account>
+          <UserName>FINOVOIN</UserName>
+          <Password>YOUR_PASSWORD_HERE</Password>
+          <Language>EN</Language>
+        </account>
+        <Block_Name>YOUR_BLOCK_NAME</Block_Name>
+        <SearchNumber>{org_number}</SearchNumber>
+      </GetData_Request>
+    </GetDataBySecure>
+  </soap:Body>
+</soap:Envelope>"
+   set-value:x:@.xml
+      strings.replace:x:@.xml
+         .:{org_number}
+         get-value:x:@.arguments/*/org_number
+   http.post:"https://webservice.creditsafe.se/getdata/getdata.asmx"
+      headers
+         Content-Type:text/xml; charset=utf-8
+      payload:x:@.xml
+   if
+      eq:x:@http.post
+         .:int:200
+      .lambda
+
+         // We have an actual owner object.
+         xml2lambda:x:@http.post/*/content
+
+         // Retrieving "director_id" from database, if existing.
+         data.connect:[finovo|finovo]
+            database-type:pgsql
+
+            // Iterating through each actual owner from API.
+            for-each:x:@xml2lambda/**/GetDataBySecureResponse/*/GetDataBySecureResult/**/BENEFICIAL_OWNER
+               if
+                  exists:x:@.dp/#/*/NAME/*/\#text
+                  .lambda
+
+                     // This is an actual beneficial owner as returned from the API, checking if we've got PNR.
+                     .pnr
+                     if
+                        and
+                           exists:x:@.dp/#/*/PNR/*/\#text
+                           neq:x:@.dp/#/*/PNR/*/\#text
+                              .:
+                        .lambda
+
+                           // We've got a PNR (Social Security ID) for the owner.
+                           data.read
+                              database-type:pgsql
+                              table:directors
+                              columns
+                                 director_id
+                              where
+                                 and
+                                    director_pnr.eq:x:@.dp/#/*/PNR/*/\#text
+                                    org_number.eq:x:@.arguments/*/org_number
+                              order:director_pnr
+                              director:asc
+                           add:x:@.pnr
+                              get-nodes:x:@data.read/0/*
+
+                     // Making sure we return the beneficial owner to the caller.
+                     add:x:+/+/*/*
+                        get-nodes:x:@.pnr/*
+                     unwrap:x:+/*/*/*
+                     add:x:@.lambda/@.lambda/*/return-nodes
+                        .
+                           .
+                              name:x:@.dp/#/*/NAME/*/\#text
+                              ownership:x:@.dp/#/*/OWNER_EXTENT_TEXT/*/\#text
+                              control_text:x:@.dp/#/*/CONTROL_TEXT/*/\#text
+         return-nodes

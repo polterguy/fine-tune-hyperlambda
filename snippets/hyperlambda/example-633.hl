@@ -1,19 +1,41 @@
-/*
- * This Hyperlambda snippet demonstrates using `get-nodes` inside `for-each`.
- *
- * 1. The `.data` node contains multiple parent nodes, each with children.
- * 2. The `for-each` loop iterates over `.data`'s parents.
- * 3. The `get-nodes` slot retrieves all children of the currently iterated node and adds all nodes to [.result].
- * Expected result is that all child nodes exists as copies in [.result]
- */
 
-.data
-   parent1
-      child1:val1
-      child2:val2
-   parent2
-      child3:val3
-.result
-for-each:x:@.data/*
-   add:x:@.result
-      get-nodes:x:@.dp/#/*
+// Lists all tables in your MySQL instance.
+slots.create:magic.db.mysql.tables
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+
+   // Opens up our connection
+   .connection:[information_schema]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mysql.connect:x:@.connection
+
+      // Runs our query
+      mysql.select:"show full tables where Table_Type = 'BASE TABLE'"
+      remove-nodes:x:@mysql.select/*/*/Table_type
+      set-name:x:@mysql.select/*/*
+         .:table
+      return-nodes:x:@mysql.select/*

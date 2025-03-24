@@ -1,80 +1,71 @@
 
-// Hyperlambda workflow action returning [max_tokens] context from the specified [url].
+// Develop a function to confirm a payment using a session ID. The function should validate the session ID, ensuring it is exactly 25 characters long. It should retrieve and delete the stored session from the database, then find and execute all slots that handle payments with names starting with 'stripe.subscriptions.accepted.'. If any slot returns a result, the function should immediately return that result, indicating the payment was handled. Finally, if no slots return a result, the function should return a success message to the caller.
 .arguments
-   url
-      type:string
-      mandatory:bool:true
-   max_tokens
-      type:int
-      default:int:4000
-   throw
-      type:boolean
-      default:bool:false
-.icon:extension
+   session:string
 
 // Sanity checking invocation.
-validators.mandatory:x:@.arguments/*/url
+validators.mandatory:x:@.arguments/*/session
+validators.string:x:@.arguments/*/session
+   min:25
+   max:25
 
-// Applying default values for optional arguments.
-validators.default:x:@.arguments
-   max_tokens:int:4000
+// Retrieving stored session.
+.session
+data.connect:stripe
+   data.read
+      table:checkout_sessions
+      values
+         username
+         price
+      where
+         and
+            session_id.eq:x:@.arguments/*/session
+   add:x:@.session
+      get-nodes:x:@data.read/*/*
+   data.delete
+      table:checkout_sessions
+      where
+         and
+            session_id.eq:x:@.arguments/*/session
 
-// Retrieving context.
-execute:magic.http.scrape-url
-   url:x:@.arguments/*/url
-if
-   and
-      get-value:x:@.arguments/*/throw
-      not-null:x:@execute
-   .lambda
-      throw:Could not scrape URL
-         public:bool:true
-         status:x:@execute
+/*
+ * Finding all slots that handles payments.
+ * 
+ * This will invoke all slots starting out with [stripe.subscriptions.accepted.] as their names,
+ * and if one of these slots are returning anything, abort the iteration and return whatever
+ * that slots returned from its invocation.
+ */
+slots.vocabulary:stripe.subscriptions.accepted.
 
-// Building our context return value.
-.context:
-while
-   and
-      exists:x:@execute/0
-      lt
-         openai.tokenize:x:@.context
-         convert:x:@.arguments/*/max_tokens
-            type:int
-   .lambda
+// Looping through each slot returned above and executing it.
+for-each:x:@slots.vocabulary/*
 
-      // Temporary value.
-      .tmp
-      set-value:x:@.tmp
-         strings.concat
-            get-value:x:@.context
-            .:"\n\n"
-            get-value:x:@execute/0/*/prompt
-            .:"\n\n"
-            get-value:x:@execute/0/*/completion
-      if
-         lt
-            openai.tokenize:x:@.tmp
-            convert:x:@.arguments/*/max_tokens
-               type:int
-         .lambda
+   // Changing slot invocation name.
+   set-value:x:./*/execute
+      get-value:x:@.dp/#
 
-            // Still below [max_tokes].
-            set-value:x:@.context
-               get-value:x:@.tmp
+   // Parametrising invocation.
+   add:x:./*/execute
+      get-nodes:x:@.session/*
 
-      // Removing top snippet.
-      remove-nodes:x:@execute/0/*/snippets/0
-      if
-         not-exists:x:@execute/0/*/snippets/0
-         .lambda
+   /*
+    * Executing slot to retrieve supported providers.
+    * 
+    * Notice, name of slot (value of node) is dynamically created above.
+    */
+   execute
 
-            // Removing currently iterated URL.
-            remove-nodes:x:@execute/0
+   /*
+    * Checking if this slot returned something, at which point we return immediately
+    * since this implies the payment was handled.
+    */
+   if
+      exists:x:@execute/*
+      .lambda
 
-// Trimming result.
-set-value:x:@.context
-   strings.trim:x:@.context
+         // Slot handled payment.
+         return-nodes:x:@execute/*
 
-// Returning result to caller.
-yield
-   context:x:@.context
+// Returning success to caller.
+return
+   result:success

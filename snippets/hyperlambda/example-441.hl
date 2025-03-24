@@ -1,17 +1,46 @@
+
+// Workflow action returning an access token for NetSuite
+.arguments
+
+// Will become the toolbox icon
+.icon:http
+
+// Loading private key.
+.key
+set-value:x:@.key
+   io.file.load:/etc/netsuite/private-key.txt
+
 /*
- * Save this file as `/modules/auth/endpoints/login.hl`
- * This exposes an HTTP POST endpoint at `/auth/login`
- *
- * It requires `email` and `password` as mandatory arguments.
- * If either is missing, validation will fail and the request will be rejected automatically.
+ * Loading settings from configuration.
+ * 
+ * Notice, these settings must exist for the system to function.
  */
 
-.arguments
-   email
-   password
+// Account id
+.account-id
+set-value:x:@.account-id
+   config.get:"magic:netsuite:account-id"
+validators.mandatory:x:@.account-id
 
-validators.mandatory:x:@.arguments/*/email
-validators.mandatory:x:@.arguments/*/password
+// Certificate id
+.certificate-id
+set-value:x:@.certificate-id
+   config.get:"magic:netsuite:certificate-id"
+validators.mandatory:x:@.certificate-id
 
+// Consumer key
+.consumer-key
+set-value:x:@.consumer-key
+   config.get:"magic:netsuite:consumer-key"
+validators.mandatory:x:@.consumer-key
+
+// Invoking slot doing the heavy lifting.
+netsuite.get-access-token
+   private-key:x:@.key
+   account-id:x:@.account-id
+   certificate-id:x:@.certificate-id
+   consumer-key:x:@.consumer-key
+
+// Returning result to caller.
 yield
-   success:User logged in (simulated)
+   access-token:x:@netsuite.get-access-token

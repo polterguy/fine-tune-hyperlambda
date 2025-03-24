@@ -1,40 +1,133 @@
 
-// Hyperlambda script for an OpenAI AI search endpoint returning only references to matching training snippets.
-.arguments
-   prompt:string
-   type:string
-   recaptcha_response:string
-   max:int
+// Hyperlambda script that retrieves HTML from a specified URL and return it, with optional headers.
+slots.create:magic.ai.url.get
 
-// Invoking slot containing commonalities for all endpoints.
-insert-before:x:../*/signal/*/.callback
-   get-nodes:x:@.arguments/*
-signal:magic.ai.endpoint-common
-   .callback
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
 
-      // Invoking slot responsible for returning URLs to us.
-      add:x:+
-         get-nodes:x:@.arguments/*
-      signal:magic.ai.search
+   // Adding [headers] argument unless already specified.
+   if
+      not-exists:x:@.arguments/*/headers
+      .lambda
 
-      // Returning results of above invocation to caller.
-      add:x:./*/return-nodes/*/snippets
-         get-nodes:x:@signal/*/snippets/*
-      add:x:./*/return-nodes
-         get-nodes:x:@signal/*/db_time
-      return-nodes
-         snippets
+         // Adding [headers] to [.arguments] such that we can create default HTTP headers further down.
+         add:x:@.arguments
+            .
+               headers
 
-/*
- * Applying some HTTP caching to avoid invoking OpenAI again with
- * the same question before some minimum amount of time has passed.
- * 
- * Notice, we can apply more "aggressive" caching here than in our
- * chat endpoints, since the same query will mostly always return
- * the same result, since there is no room for "creativity" here.
- */
-response.headers.set
-   Cache-Control:max-age=300
+   // Adding default headers unless they're already specified.
+   validators.default:x:@.arguments/*/headers
+      User-Agent:AINIRO-Crawler 2.0
+      Accept:text/html
+      Accept-Encoding:identity
 
-// Returning result of worker slot to caller.
-return-nodes:x:@signal/*
+   // Adding HTTP headers to invocation.
+   add:x:./*/http.get
+      get-nodes:x:@.arguments/*/headers
+
+   // Retrieving HTML document from specified URL.
+   http.get:x:@.arguments/*/url
+      timeout:60
+
+   // Sanity checking above invocation.
+   if
+      not
+         and
+            mte:x:@http.get
+               .:int:200
+            lt:x:@http.get
+               .:int:300
+      .lambda
+
+         // Checking if this is a 301 or 302 redirect.
+         if
+            or
+               eq:x:@http.get
+                  .:int:301
+               eq:x:@http.get
+                  .:int:302
+            .lambda
+
+               // Checking if request was HTTP (no SSL) at which point we try SSL.
+               if
+                  strings.starts-with:x:@.arguments/*/url
+                     .:"http://"
+                  .lambda
+
+                     // Providing feedback to user.
+                     sockets.signal:x:@.arguments/*/feedback-channel
+                        args
+                           message:Page moved to, trying SSL equivalent
+                           type:info
+                     sleep:100
+
+                     // Invoking self and returning result, exchanging http:// with https://.
+                     strings.replace:x:@.arguments/*/url
+                        .:"http://"
+                        .:"https://"
+                     add:x:+/*/headers
+                        get-nodes:x:@.arguments/*/headers/*
+                     execute:magic.ai.url.get
+                        url:x:@strings.replace
+                        headers
+                     return:x:-
+               else
+
+                  // Providing feedback to user.
+                  strings.concat
+                     .:"Page moved to '"
+                     get-value:x:@http.get/*/headers/*/Location
+                     .:"', trying alternative location"
+                  unwrap:x:+/**
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:x:@strings.concat
+                        type:info
+                  sleep:100
+
+                  // Invoking self and returning result.
+                  add:x:+/+/*/headers
+                     get-nodes:x:@.arguments/*/headers/*
+                  add:x:+
+                     get-nodes:x:@.arguments/*/feedback-channel
+                  execute:magic.ai.url.get
+                     url:x:@http.get/*/headers/*/Location
+                     headers
+                  return:x:-
+         else
+
+            // Oops, logging error.
+            log.error:Something went wrong while trying to get URL
+               url:x:@.arguments/*/url
+               status:x:@http.get
+            strings.concat
+               .:"HTTP invocation returned status code "
+               get-value:x:@http.get
+            throw:x:-
+
+   /*
+    * Above HTTP GET invocation returned success.
+    * 
+    * Making sure URL returned HTML.
+    */
+   if
+      or
+         not-exists:x:@http.get/*/headers/*/Content-Type
+         not
+            strings.starts-with:x:@http.get/*/headers/*/Content-Type
+               .:text/html
+      .lambda
+
+         // Oops, doing some basic logging.
+         log.error:URL did not return HTML content
+            url:x:@.arguments/*/url
+            content-type:x:@http.get/*/headers/*/Content-Type
+         strings.concat
+            .:"URL did not return HTML content but '"
+            get-value:x:@http.get/*/headers/*/Content-Type
+            .:"' content"
+         throw:x:-
+
+   // Returning result of above HTTP GET invocation.
+   return:x:@http.get/*/content

@@ -1,150 +1,177 @@
 
-// Returns unique and distinct values from your address table in your sakila database without authorization
-.arguments
-
-   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
-   distinct_column:string
-
-   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
-   limit:long
-
-   // Offset into the dataset of where to start retrieving records
-   offset:long
-
-   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
-   order:string
-
-   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
-   direction:string
-
-   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
-   operator:string
-
-   // Filters
-   address.address_id.mt:long
-   address.address_id.lt:long
-   address.address_id.mteq:long
-   address.address_id.lteq:long
-   address.address_id.neq:long
-   address.address_id.eq:long
-   address.address.like:string
-   address.address.mt:string
-   address.address.lt:string
-   address.address.mteq:string
-   address.address.lteq:string
-   address.address.neq:string
-   address.address.eq:string
-   address.address2.like:string
-   address.address2.mt:string
-   address.address2.lt:string
-   address.address2.mteq:string
-   address.address2.lteq:string
-   address.address2.neq:string
-   address.address2.eq:string
-   address.district.like:string
-   address.district.mt:string
-   address.district.lt:string
-   address.district.mteq:string
-   address.district.lteq:string
-   address.district.neq:string
-   address.district.eq:string
-   address.city_id.mt:long
-   address.city_id.lt:long
-   address.city_id.mteq:long
-   address.city_id.lteq:long
-   address.city_id.neq:long
-   address.city_id.eq:long
-   address.postal_code.like:string
-   address.postal_code.mt:string
-   address.postal_code.lt:string
-   address.postal_code.mteq:string
-   address.postal_code.lteq:string
-   address.postal_code.neq:string
-   address.postal_code.eq:string
-   address.phone.like:string
-   address.phone.mt:string
-   address.phone.lt:string
-   address.phone.mteq:string
-   address.phone.lteq:string
-   address.phone.neq:string
-   address.phone.eq:string
-   address.last_update.mt:date
-   address.last_update.lt:date
-   address.last_update.mteq:date
-   address.last_update.lteq:date
-   address.last_update.neq:date
-   address.last_update.eq:date
-
-// Sanity checking that distinct column was passed in.
-validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
-validators.enum:x:@.arguments/*/distinct_column
-   .:address.address_id
-   .:address.address
-   .:address.address2
-   .:address.district
-   .:address.city_id
-   .:address.postal_code
-   .:address.phone
-   .:address.last_update
-
-// Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
-
 /*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
+ * Creates a sales email after x days.
  */
-if
-   exists:x:@.arguments/*/operator
-   .lambda
+slots.create:magic.wl.create-send-email-task
 
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/0
-         get-value:x:@.arguments/*/operator
-      remove-nodes:x:@.arguments/*/operator
+   // Parametrising task.
+   math.add
+      date.now
+      time
+         days:x:@.arguments/*/days
+   strings.concat
+      .:send-email-to-
+      get-value:x:@.arguments/*/type
+      .:-after-
+      get-value:x:@.arguments/*/days
+      .:-days
 
-// Opening up our database connection.
-data.connect:[generic|sakila]
-   database-type:sqlite
-
-   // Making sure we're using correct function.
-   set-name:x:./*/data.read/*/columns/*/distinct_functor
+   // Creating task.
+   .desc
+   set-value:x:@.desc
       strings.concat
-         .:distinct(
-         get-value:x:@.arguments/*/distinct_column
-         .:)
+         .:"Send demo user email "
+         get-value:x:@.arguments/*/days
+         .:" after creating demo"
+   unwrap:x:./*/tasks.create/*/.lambda/*/.input/*
+   tasks.create:x:@strings.concat
+      description:x:@.desc
+      due:x:@math.add
+      .lambda
+      
+         // Forward evaluated further up.
+         .input
+            type:x:@.args-input/*/type
+            task:x:@strings.concat
+            name:x:@.arguments/*/name
+            email:x:@.arguments/*/email
+            url:x:@.arguments/*/url
+            instruction:x:@.arguments/*/instruction
+            task-id:x:@strings.concat
 
-   // Removing distinct argument to simplify adding other arguments.
-   remove-nodes:x:@.arguments/*/distinct_column
+         // Scraping URL and sending user email making sure we trap exceptions.
+         try
 
-   // Adding [limit] and [offset] arguments
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-      get-nodes:x:@.arguments/*/order
-      get-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/order
-   remove-nodes:x:@.arguments/*/direction
-   remove-nodes:x:@.arguments/*/limit
-   remove-nodes:x:@.arguments/*/offset
+            // Retrieving token used to invoke OpenAI.
+            .token
+            set-value:x:@.token
+               strings.concat
+                  .:"Bearer "
+                  get-first-value
+                     get-value:x:@.arguments/*/api_key
+                     config.get:"magic:openai:key"
 
-   // Adding filtering arguments.
-   add:x:+/*/where/*
-      get-nodes:x:@.arguments/*
+            // Scraping lead's website
+            unwrap:x:+/*
+            signal:magic.http.scrape-url
+               url:x:@.input/*/url
+               semantics:bool:false
+            .scraped
+            set-value:x:-
+               strings.join:x:@signal/*/*
+                  .:"\r\n\r\n"
 
-   // Reading data from database.
-   data.read
-      database-type:sqlite
-      table:address
-      columns
-         distinct_functor
-            as:.
-      where
-         and
+            // Invoking OpenAI.
+            unwrap:x:./*/http.post/**
+            http.post:"https://api.openai.com/v1/chat/completions"
+               convert:bool:true
+               headers
+                  Authorization:x:@.token
+                  Content-Type:application/json
+               payload
+                  model:gpt-4-1106-preview
+                  max_tokens:int:2000
+                  temperature:decimal:0.3
+                  messages
+                     .
+                        role:system
+                        content:x:@.input/*/instruction
+                     .
+                        role:user
+                        content:x:@.scraped
 
-   // Returning result of above read invocation to caller.
-   return-nodes:x:@data.read/*/*
+            // Sanity checking above invocation.
+            if
+               not
+                  and
+                     mte:x:@http.post
+                        .:int:200
+                     lt:x:@http.post
+                        .:int:300
+               .lambda
+
+                  // Oops, error - Logging error and returning status 500 to caller.
+                  lambda2hyper:x:@http.post
+                  log.error:Something went wrong while invoking OpenAI
+                     message:x:@http.post/*/content/*/error/*/message
+                     status:x:@http.post
+                     error:x:@lambda2hyper
+            else
+
+               // Success, we have an email.
+               strings.split:x:@http.post/*/content/*/choices/0/*/message/*/content
+                  .:"\n"
+               .subject
+               set-value:x:@.subject
+                  strings.trim:x:@strings.split/0
+               if
+                  strings.contains:x:@.subject
+                     .:":"
+                  .lambda
+                     strings.split:x:@.subject
+                        .:":"
+                     set-value:x:@.subject
+                        strings.join:x:@strings.split/*/[1,20]
+                           .:":"
+               remove-nodes:x:@strings.split/0
+               .body
+               set-value:x:@.body
+                  strings.join:x:@strings.split/*
+                     strings.concat
+                        .:"\r\n"
+                        .:"\r\n"
+               .body-html
+               set-value:x:@.body-html
+                  strings.concat
+                     .:@"<!doctype html>
+<html lang=""en"">
+<head>
+<title>"
+                     get-value:x:@.subject
+                     .:@"</title>
+</head>
+<body>
+<div dir=""ltr"">
+"
+                     markdown2html:x:@.body
+                     .:@"
+</div>
+</body>
+</html>"
+
+
+               // Sending email.
+               unwrap:x:+/**
+               mail.smtp.send
+                  message
+                     to
+                        .
+                           name:x:@.input/*/name
+                           email:x:@.input/*/email
+                     subject:x:@.subject
+                     entity:multipart/alternative
+                        entity:text/html
+                           headers
+                              Content-Transfer-Encoding:utf8
+                           content:x:@.body-html
+                        entity:text/plain
+                           headers
+                              Content-Transfer-Encoding:utf8
+                           content:x:@.body
+
+               // Doing some basic logging.
+               log.info:Demo user was sent email 2 days after creating demo
+                  name:x:@.args-input/*/name
+                  email:x:@.args-input/*/email
+                  type:x:@.type
+                  body:x:@.body
+                  subject:x:@.subject
+
+         .catch
+
+            // Oops ...!!
+            log.info:Could not send user email
+               error:x:@.arguments/*/message
+
+         // Deleting currently executing task.
+         tasks.delete:x:@.input/*/task-id

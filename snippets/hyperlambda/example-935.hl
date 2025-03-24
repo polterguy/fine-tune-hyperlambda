@@ -1,48 +1,19 @@
 
-// A Hyperlambda endpoint for a CRUD update endpoint that updates one record in the ml_requests table in the magic database, filtering which item to update with ID and updating type, prompt, completion, and finish_reason fields, ensuring authentication and authorization for root roles.
+// Hyperlambda endpoint taking arguments. The SQL query selects distinct email, first name, last name, and genre name of customers who listen to rock music from the Chinook database.\n\nThis SQL script is designed to retrieve a list of customers from the Chinook database who are associated with rock music. It performs a series of inner joins between the Customer, Invoice, InvoiceLine, Track, and Genre tables to filter and extract customer details based on the genre specified by the `@filter` parameter. The query ensures that only unique customer records are returned by using the `DISTINCT` keyword, and it orders the results by the customer's email address. This script is particularly useful for generating targeted marketing lists or analyzing customer preferences within the rock genre. The use of parameterization with `@filter` enhances security by preventing SQL injection attacks.\n\nAll arguments are mandatory.
 .arguments
-   id:long
-   type:string
-   prompt:string
-   completion:string
-   finish_reason:string
-   cached:int
+   filter:string
 
-// Sanity checking invocation, making sure primary key(s) are specified.
-validators.mandatory:x:@.arguments/*/id
+// Connecting to database.
+data.connect:chinook
+   database-type:sqlite
 
-// Verifying user is authorized to access endpoint.
-auth.ticket.verify:root
+   // Parametrizing [data.select].
+   add:x:./*/data.select
+      get-nodes:x:@.arguments/*
 
-// Opening up our database connection.
-data.connect:[generic|magic]
+   // Executing [data.select] slot with our SQL.
+   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name like @filter\n  order by c.Email\n"
+      database-type:sqlite
 
-   // Parametrising our invocation.
-   add:x:./*/data.update/*/values
-      get-nodes:x:@.arguments/*/[1,1000]
-   add:x:./*/data.update/*/where/*/and
-      get-nodes:x:@.arguments/*/[0,1]
-
-   // Invoking our update slot.
-   data.update
-      table:ml_requests
-      values
-      where
-         and
-
-   // Verifying record exists.
-   if
-      eq
-         get-value:x:@data.update
-         .:int:0
-      .lambda
-         response.status.set:404
-         return
-            result:Record not found
-
-   // Returning the correct status code.
-   response.status.set:202
-
-   // Returning success to caller.
-   yield
-      affected:x:@data.update
+   // Returning a result of above invocation to caller.
+   return-nodes:x:@data.select/*

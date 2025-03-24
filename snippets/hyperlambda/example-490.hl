@@ -1,6 +1,104 @@
-// Compare two values for inequality
 
-.foo1:OK
-neq
-   get-value:x:../*/.foo1
-   .:OK
+// Hyperlambda script for a CRUD create endpoint that inserts one record into the ml_types table in the magic database, taking type, model, max_tokens, and temperature, ensuring authentication and authorization for root roles.
+.arguments
+   type:string
+   model:string
+   max_tokens:long
+   max_context_tokens:long
+   max_request_tokens:long
+   temperature:double
+   recaptcha:decimal
+   auth:string
+   supervised:int
+   cached:int
+   prefix:string
+   use_embeddings:int
+   threshold:decimal
+   vector_model:string
+   greeting:string
+   base_url:string
+   contact_us:string
+   lead_email:string
+   api_key:string
+   twilio_account_id:string
+   twilio_account_sid:string
+   webhook_incoming:string
+   webhook_outgoing:string
+   webhook_incoming_url:string
+   webhook_outgoing_url:string
+   system_message:string
+   conversation_starters:string
+   initial_questionnaire:string
+   no_requests:int
+   max_requests:int
+   search_postfix:string
+   max_function_invocations:int
+   max_session_items:int
+   completion_slot:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.integer:x:@.arguments/*/max_context_tokens
+   min:500
+   max:40000
+validators.integer:x:@.arguments/*/max_request_tokens
+   min:100
+   max:25000
+validators.integer:x:@.arguments/*/max_tokens
+   min:500
+   max:4000
+
+// Applying sane defaults.
+validators.default:x:@.arguments
+   vector_model:text-embedding-ada-002
+   model:gpt-4o
+   threshold:decimal:0.3
+
+// Opening up database connection.
+data.connect:[generic|magic]
+
+   // Verifying user can create a-(nother) machine learning model.
+   try-signal:magic.ai.can-create-machine-learning-model
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/[0,1]/*/values
+      get-nodes:x:@.arguments/*
+
+   // Making sure we default twilio_account_id token to model name unless explicitly specified.
+   if
+      or
+         not-exists:x:@.arguments/*/twilio_account_id
+         null:x:@.arguments/*/twilio_account_id
+         eq:x:@.arguments/*/twilio_account_id
+            .:
+      .lambda
+         remove-nodes:x:@data.connect/*/data.create/*/values/*/twilio_account_id
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/data.create/[0,1]/*/values
+            .
+               twilio_account_id:x:@.arguments/*/type
+
+   // Creating our record.
+   data.create
+      table:ml_types
+      return-id:bool:false
+      values
+
+   // Creating our default training snippets.
+   data.create
+      table:ml_training_snippets
+      values
+         type:x:@.arguments/*/type
+         prompt:Who created this AI chatbot?
+         completion:"This chatbot is a custom AI chatbot powered by OpenAI allowing you to use natural language to ask questions related to the website you're currently visiting. It was created by [AINIRO.IO](https://ainiro.io). AINIRO.io have AI chatbot solutions allowing you to scrape your website, upload documents, and create publicly available AI chatbots and AI-based search similar to Bing, in addition to tools helping you build custom GPTs."
+         uri:"https://ainiro.io"
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      result:success

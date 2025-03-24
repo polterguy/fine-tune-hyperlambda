@@ -1,13 +1,64 @@
-// Use else-if to check multiple conditions in sequence
 
-.result
-if
-   .:bool:false
-   .lambda
-      set-value:x:../*/.result
-         .:failure
-else-if
-   .:bool:true
-   .lambda
-      set-value:x:../*/.result
-         .:OK
+// Create a Hyperlambda script that returns the Google OpenID provider configuration, generating a nonce if required.
+slots.create:magic.openid.providers.google
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/createNonce
+
+   // Getting client ID for Google from configuration.
+   .client-id
+   set-value:x:@.client-id
+      config.get:"magic:oidc:google:client-id"
+
+   // Checking to see if we've got Google provider configured.
+   if
+      not-null:x:@.client-id
+      .lambda
+
+         // Buffer for nonce.
+         .nonce
+
+         // Checking if caller wants us to generate a nonce.
+         if
+            eq:x:@.arguments/*/createNonce
+               .:bool:true
+            .lambda
+
+               // Creating a unique nonce.
+               set-value:x:@.nonce
+                  crypto.random
+                     min:20
+                     max:30
+
+               /*
+                * Storing nonce to avoid replay attacks.
+                * 
+                * Notice, nonce is only stored for 60 minutes, implying the configuration
+                * returned below can only be used within 60 minutes of having been generated.
+                * 
+                * And we store the issuer value in cache such that we can verify later that the id_token
+                * was created by the correct issuer.
+                */
+               cache.set:x:@.nonce
+                  value:"https://accounts.google.com"
+                  expiration:3600
+
+               // Making sure we return nonce to caller.
+               add:x:@.lambda/@.lambda/*/add/*/*
+                  .
+                     nonce:x:@.nonce
+                     url:"https://accounts.google.com/o/oauth2/v2/auth"
+                     client_id:x:@.client-id
+                     response_type:id_token
+                     scope:openid email profile
+
+         // Returning providers to caller.
+         unwrap:x:+/*/*/*
+         add:x:../*/return
+            .
+               .
+                  name:Google
+                  issuer:"https://accounts.google.com"
+
+   // Returning result to caller.
+   return

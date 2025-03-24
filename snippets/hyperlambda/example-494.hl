@@ -1,193 +1,213 @@
 
-// Returns all clients that are affiliated with the currently authenticated client.
-.arguments
-   limit:long
-   offset:long
-   from:date
-   to:date
+// Dynamic slot listing all columns in the specified SQLite table.
+slots.create:magic.db.sqlite.columns
 
-// Verifying user has access to endpoint.
-auth.ticket.verify:root, admin, guest
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
 
-// Retrieving currently authenticated user to parametrise invocation towards database.
-auth.ticket.get
-
-// Buffer for returning users to caller.
-.result
-
-// Affiliate percentage user has.
-.percent
-
-// Returning all usernames that are affiliated with currently authenticated client.
-data.connect:[generic|magic]
-
-   /*
-    * Retrieving affiliate percent for user.
-    * This is the commission the currently authenticated user gets
-    * from sales originating from users he made register in our platform.
-    */
-   data.read
-      table:users_extra
-      columns
-         value
-      where
-         and
-            type.eq:affiliate_percent
-            user.eq:x:@auth.ticket.get
+   // Opens up our connection
+   .connection:[postgres]
    if
-      not-exists:x:@data.read/*/*/value
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
       .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   sqlite.connect:x:@.connection
+      strings.concat
+         .:"pragma table_info('"
+         get-value:x:@.arguments/*/table
+         .:"')"
+      sqlite.select:x:@strings.concat
 
-         // Oops ...!!
-         log.error:User is not affiliate
-            username:x:@auth.ticket.get
-         throw:You are not an affiliate
-            public:true
-            status:400
+      /*
+       * Creating our return value, by projecting it into
+       * a generic form, that does not rely upon SQLite's syntactic
+       * details.
+       */
+      for-each:x:@sqlite.select/*
+         unwrap:x:+/*/*
+         .tmp
+            ""
+               name:x:@.dp/#/*/name
+               db:x:@.dp/#/*/type
 
-   // Setting [.percent] value such that we can calculate affiliate earnings.
-   convert:x:@data.read/*/*/value
-      type:decimal
-   set-value:x:@.percent
-      math.divide:x:@convert
-         .:decimal:100
+         // Checking if column is nullable.
+         if
+            eq
+               get-value:x:@.dp/#/*/notnull
+               .:long:1
+            .lambda
+               add:x:@.tmp/*
+                  .
+                     nullable:bool:false
+         else
+            add:x:@.tmp/*
+               .
+                  nullable:bool:true
 
-   /*
-    * Applying paging and invoking read slot to find all users
-    * affiliated with the currently authenticated user.
-    */
-   add:x:./*/data.read/[1,2]
-      get-nodes:x:@.arguments/*/limit
-      get-nodes:x:@.arguments/*/offset
-   data.read
-      table:users_extra
-         join:users
-            table:users
-            type:inner
-            on
+         // Checking if column is a part of the primary key.
+         if
+            eq
+               get-value:x:@.dp/#/*/pk
+               .:long:0
+            .lambda
+               add:x:@.tmp/*
+                  .
+                     primary:bool:false
+         else
+            add:x:@.tmp/*
+               .
+                  primary:bool:true
+
+         // Checking if column has a default value.
+         if
+            and
+               not
+                  eq
+                     get-value:x:@.dp/#/*/dflt_value
+                     .:
+               not
+                  eq
+                     get-value:x:@.dp/#/*/dflt_value
+                     .
+            .lambda
+               add:x:@.tmp/*
+                  .
+                     automatic:bool:true
+         else
+
+            // Defaulting automatic to false
+            add:x:@.tmp/*
+               .
+                  automatic:bool:false
+
+            /*
+             * Notice, SQLite doesn't inform us that column is automatic if it's an
+             * "autoincrement" column using "pragma table_info" - Hence, we've got to
+             * do a lookup into "sqlite_master" if column is integer and primary key
+             * to determine if column is an autoincrement column.
+             */
+            strings.to-lower:x:@.dp/#/*/type
+            if
                and
-                  users.username.eq:users_extra.user
-      columns
-         users_extra.user
-         users.created
-      where
-         and
-            users_extra.type.eq:affiliate
-            users_extra.value.eq:x:@auth.ticket.get
-      order:users.created
-      direction:desc
+                  eq:x:@strings.to-lower
+                     .:integer
+                  eq:x:@.dp/#/*/pk
+                     .:long:1
+               .lambda
+                  sqlite.select:"select 1 from sqlite_master where type = 'table' and name = @table and sql like '%AUTOINCREMENT%'"
+                     @table:x:@.arguments/*/table
+                  if
+                     exists:x:@sqlite.select/*/*
+                     .lambda
 
-   // Adding usernames to return buffer.
-   for-each:x:@data.read/*
+                        // Column is autoincrement
+                        set-value:x:@.tmp/*/*/automatic
+                           .:bool:true
 
-      // Adding username to result.
-      add:x:@.result
-         get-nodes:x:@.dp/#
+         /*
+          * Figuring our which Hyperlambda type to project
+          * its database type to.
+          */
+         .type
+         strings.regex-replace:x:@.dp/#/*/type
+            .:"\\([0-9,]+\\)"
+            .:
+         strings.replace:x:@strings.regex-replace
+            .:" unsigned"
+            .:
+         strings.to-lower:x:@strings.replace
+         switch:x:@strings.to-lower
 
-      // Invoking read slot to retrieve name, email address and country of affiliated user.
-      data.read
-         table:users_extra
-         columns
-            value
-            type
-         where
-            and
-               or
-                  type.eq:email
-                  type.eq:name
-                  type.eq:country
-               user.eq:x:@.dp/#/*/user
-      unwrap:x:+/*/*
-      add:x:@.result/0/-
-         .
-            name:x:@data.read/*/*/type/=name/./*/value
-            email:x:@data.read/*/*/type/=email/./*/value
-            country:x:@data.read/*/*/type/=country/./*/value
+            // Everything transformed into long values.
+            case:int
+            case:integer
+            case:tinyint
+            case:smallint
+            case:mediumint
+            case:bigint
+            case:big int
+            case:int 2
+            case:int 8
+               set-value:x:@.type
+                  .:long
 
-      // Checking if user confirmed his or her email address.
-      data.read
-         table:users_roles
-         columns
-            user
-         where
-            and
-               user.eq:x:@.dp/#/*/user
-               role.eq:guest
-      if
-         exists:x:@data.read/*/*
-         .lambda
-            add:x:@.result/0/-
-               .
-                  confirmed:bool:true
-      else
-         add:x:@.result/0/-
+            // Everything transformed into date values.
+            case:timestamp
+            case:date
+            case:datetime
+               set-value:x:@.type
+                  .:date
+
+            // Everything transformed into decimal.
+            case:numeric
+            case:decimal
+               set-value:x:@.type
+                  .:decimal
+
+            // Everything transformed into double.
+            case:real
+            case:double
+            case:float
+            case:double precision
+               set-value:x:@.type
+                  .:double
+
+            // Everything transformed into string values.
+            case:character
+            case:varchar
+            case:varying character
+            case:nchar
+            case:native character
+            case:nvarchar
+            case:text
+            case:clob
+            case:char
+            case:blob sub_type text
+               set-value:x:@.type
+                  .:string
+
+            // Everything transformed into boolean values.
+            case:boolean
+               set-value:x:@.type
+                  .:bool
+
+            // Default/special cases.
+            default
+
+               // Defaulting to string type.
+               set-value:x:@.type
+                  .:string
+
+         // Adding Hyperlambda type to [.tmp] above.
+         unwrap:x:+/*/*
+         add:x:@.tmp/*
             .
-               confirmed:bool:false
+               hl:x:@.type
 
-/*
- * Returning sum and commission of transactions for each user
- * retrieved in the above invocation, which becomes the commission
- * on a per user basis the currently authenticated user earns.
- */
-data.connect:[generic|stripe]
+         // Adding [.tmp] to [return-nodes] below.
+         add:x:../*/sqlite.connect/*/return-nodes
+            get-nodes:x:@.tmp/*
 
-   // Looping through each username in affiliate list.
-   for-each:x:@.result/*
-
-      // Checking if we've got [from] and [to] filters.
-      if
-         not-null:x:@.arguments/*/from
-         .lambda
-            add:x:@for-each/*/data.read/[0,1]/*/where/*/and
-               .
-                  created.mteq:x:@.arguments/*/from
-      if
-         not-null:x:@.arguments/*/to
-         .lambda
-            add:x:@for-each/*/data.read/[0,1]/*/where/*/and
-               .
-                  created.lteq:x:@.arguments/*/to
-
-      // Invoking read slot.
-      data.read
-         table:transactions
-         columns
-            sum(amount)
-               as:sum
-         where
-            and
-               username.eq:x:@.dp/#/*/user
-               type.eq:charge.succeeded
-         group
-            username
-
-      // Checking if above invocation returned a result.
-      if
-         exists:x:@data.read/*/*/sum
-         .lambda
-
-            // Adding sum.
-            add:x:@.dp/#
-               get-nodes:x:@data.read/*/*/sum
-
-            // Adding commission for affiliate.
-            math.multiply:x:@data.read/*/*/sum
-               get-value:x:@.percent
-            unwrap:x:+/*/*
-            add:x:@.dp/#
-               .
-                  commission:x:@math.multiply
-      else
-
-         // Adding zero sum.
-         add:x:@.dp/#
-            .
-               sum:long:0
-               commission:long:0
-
-// Applying some HTTP caching since endpoint is kind of expensive to invoke.
-response.headers.set
-   Cache-Control:private, max-age=3600
-
-// Returning result to caller.
-return-nodes:x:@.result/*
+      // Returning results to caller.
+      return-nodes

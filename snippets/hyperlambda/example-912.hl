@@ -1,13 +1,24 @@
+/*
+ * Lists director roles and company sectors (SQLite)
+ */
+.arguments
+   director_id:long
+   limit:long
+   offset:long
 
-// Create a Hyperlambda script to count items from a specified database and table using SQLite.
-data.connect:DATABASE_NAME
+data.connect:[sqlite|company]
    database-type:sqlite
 
-   // Reading data from database.
-   data.read
+   data.select:@"
+select b.company_name, b.sector, d.role_name
+   from directors d
+      join basic b on b.org_number = d.org_number
+   where d.director_id = @id
+   limit @limit offset @offset"
       database-type:sqlite
-      table:TABLE_NAME
-      columns
-         count(*)
-            as:count
-      limit:long:1
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   yield
+      sector_roles:x:@data.select/*

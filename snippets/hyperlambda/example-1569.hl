@@ -1,25 +1,31 @@
-// Hyperlambda file that takes a lambda objects as an argument, and exceutes the lambda object from within the file, once for each role that exists in the system.
-.arguments
-   .execute:*
-
-// Retrieving roles from magic database
-data.connect:magic
-   data.read
-      table:roles
-
-   // Iterating through each role, executing [.execute] lambda object once for each role.
-   for-each:x:@data.read/*
-      unwrap:x:+/*
-      invoke:x:@.arguments/*/.execute
-         role:x:@.dp/#/*/name
-
 /*
-To execute the file, you can use something such as follows:
+ * This script generates training data from Markdown files.
+ */
+execute:magic.io.file.load-recursively
+   .:/etc/slett/
+for-each:x:@execute/*
 
-io.file.execute:/modules/slett/foo.get.hl
-   .execute
+   // Verifying we're dealing with a Markdown file.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.md
+      .lambda
 
-      // You will be getting the role in as an argument from the above Hyperlambda file here.
-      log.info:x:@.arguments/*/role
+         // Extracting training data.
+         markdown2html:x:@.dp/#/0
 
-*/
+         // Converts the value of the previous node to a lambda object, allowing us to traverse it using expressions
+         html2lambda:x:-
+
+         for-each:x:@html2lambda/*/pre/*/code
+
+            // The [.dp] pointer is passed in a a "node by reference" pointer by [for-each]
+            strings.trim:x:@.dp/#/*/\#text
+            data.connect:fine-tune
+               data.create
+                  table:hyperlambda
+                  values
+                     code:x:@strings.trim
+
+// House cleanups.
+remove-nodes:x:@execute/*
