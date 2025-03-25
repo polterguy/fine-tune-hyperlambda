@@ -1,0 +1,49 @@
+/*
+ * Create an authentication endpoint that accepts [username] and [password] arguments.
+ *
+ * It connects to the "usersdb" database, retrieves the user's password hash and roles,
+ * verifies the password using [crypto.password.verify], and if valid,
+ * generates a JWT token using [auth.ticket.create], returning it to the client.
+ */
+.arguments
+   username:string
+   password:string
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
+
+data.connect:usersdb
+   data.read
+      table:users
+      columns
+         password_hash
+         roles
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Invalid username or password
+
+   crypto.password.verify:x:@.arguments/*/password
+      hash:x:@data.read/*/*/password_hash
+
+   // If password does not match, throw error
+   if
+      not:x:@crypto.password.verify
+      .lambda
+         throw:Invalid username or password
+
+   // Convert roles string to individual [.:role] lines
+   strings.split:x:@data.read/*/*/roles
+      separator:,
+
+   add:x:+/*/roles
+      get-nodes:x:@strings.split/*
+   auth.ticket.create
+      username:x:@.arguments/*/username
+      roles
+
+   yield
+      token:x:@auth.ticket.create
