@@ -1,0 +1,17 @@
+/*
+ * Begins a transaction in the "accounts" database. If the email is invalid,
+ * rolls back the transaction and logs the failure.
+ */
+data.connect:accounts
+   data.transaction.create
+      .email:test@example
+      if
+         not
+            strings.contains:x:@.email
+               .:@
+         .lambda
+            log.error:Invalid email, rolling back transaction
+            data.transaction.rollback
+      data.execute:insert into subscribers (email) values (@email)
+         @email:x:@.email
+      data.transaction.commit
