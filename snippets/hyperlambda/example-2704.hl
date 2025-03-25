@@ -1,0 +1,158 @@
+
+/*
+ * Generate an HTTP REST generic SQL endpoint according to the given [.arguments].
+ */
+.arguments
+   databaseType:string
+   authorization:string
+   moduleName:string
+   database:string
+   arguments:string
+   verb:string
+   endpointName:string
+   sql:string
+   overwrite:bool
+   isList:bool
+
+
+/*
+ * Sanity checks invocation.
+ */
+validators.mandatory:x:@.arguments/*/databaseType
+validators.mandatory:x:@.arguments/*/moduleName
+validators.mandatory:x:@.arguments/*/database
+validators.mandatory:x:@.arguments/*/verb
+validators.mandatory:x:@.arguments/*/endpointName
+validators.mandatory:x:@.arguments/*/sql
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:mssql
+validators.enum:x:@.arguments/*/verb
+   .:post
+   .:get
+   .:put
+   .:delete
+
+
+/*
+ * Ensures user is authorized to access endpoint.
+ */
+auth.ticket.verify:root
+
+
+/*
+ * Creating our endpoint according to arguments given, by using [apply]
+ * on the [template] file given.
+ */
+io.file.load:/modules/system/crudifier/templates/sql.template.hl
+hyper2lambda:x:-
+unwrap:x:+/*
+apply:x:@hyper2lambda
+   database-type:x:@.arguments/*/databaseType
+   database:x:@.arguments/*/database
+   sql:x:@.arguments/*/sql
+   isList:x:@.arguments/*/isList
+
+
+/*
+ * Making sure we add arguments to the above lambda.
+ */
+if
+   and
+      exists:x:@.arguments/*/arguments
+      not
+         eq
+            get-value:x:@.arguments/*/arguments
+            .:
+      not
+         eq
+            get-value:x:@.arguments/*/arguments
+            .
+   .lambda
+
+      /*
+       * Argument collection was specified, hence applying arguments to lambda.
+       */
+      add:x:@apply/*/.arguments
+         hyper2lambda:x:@.arguments/*/arguments
+
+
+/*
+ * Checking if caller provided specific authorization
+ * for us to use, and if so, applying it to lambda.
+ */
+if
+   and
+      not
+         eq
+            get-value:x:@.arguments/*/authorization
+            .:
+      not
+         eq
+            get-value:x:@.arguments/*/authorization
+            .
+   .lambda
+
+
+      /*
+       * Adding authorization to endpoint's lambda.
+       */
+      unwrap:x:+/*/*
+      insert-after:x:@apply/*/.arguments
+         .
+            auth.ticket.verify:x:@.arguments/*/authorization
+
+
+/*
+ * Creating our folder if necessary.
+ */
+.folder:/modules/
+set-value:x:@.folder
+   strings.concat
+      get-value:x:@.folder
+      get-value:x:@.arguments/*/moduleName
+      .:/
+io.folder.create:x:@.folder
+
+
+/*
+ * Transforming above lambda to Hyperlambda, and figuring out filename.
+ */
+lambda2hyper:x:@apply/*
+unwrap:x:+
+.filename:x:@.folder
+set-value:x:@.filename
+   strings.concat
+      get-value:x:@.filename
+      get-value:x:@.arguments/*/endpointName
+      .:.
+      get-value:x:@.arguments/*/verb
+      .:.hl
+
+
+/*
+ * Making sure file does not exist from before, unless [.argument][overwrite] is true.
+ */
+if
+   and
+      not
+         get-value:x:@.arguments/*/overwrite
+      io.file.exists:x:@.filename
+   .lambda
+      throw:Endpoint already exists, choose a new name or enable overwrite
+         status:400
+         public:true
+
+
+/*
+ * Saving file.
+ */
+io.file.save:x:@.filename
+   get-value:x:@lambda2hyper
+
+
+/*
+ * Returns success to caller.
+ */
+return-nodes
+   result:success
