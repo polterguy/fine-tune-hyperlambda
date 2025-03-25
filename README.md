@@ -6,8 +6,8 @@ This project allows you to fine tune OpenAI and their GPT models on Hyperlambda.
 
 Below are hyper parameters I've had success with in some example runs.
 
-1. 4 epochs
-2. Batch size 3
-3. LR multiplier set to 0.7
+1. Batch size 3
+2. LR multiplier set to 0.7
+3. 4 epochs
 
 I used a seed of _"1949835149"_, but the above should give you a rough idea of where to start.
