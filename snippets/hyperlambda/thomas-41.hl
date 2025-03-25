@@ -1,0 +1,45 @@
+/*
+ * Secure HTTP API endpoint to view financial transaction records.
+ * Requires 'finance-user' role.
+ * Includes filtering by year and transaction amount.
+ */
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   Year.eq:int
+
+   // `.mt` implies "more then"
+   Amount.mt:decimal
+
+// Making sure user is authorised to access endpoint.
+auth.ticket.verify:finance-user
+
+data.connect:finance
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   data.read
+      table:Transactions
+      columns
+         TransactionId
+         Description
+         Year
+         Amount
+      where
+         and
+
+   return-nodes:x:@data.read/*
