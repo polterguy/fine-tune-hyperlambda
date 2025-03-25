@@ -1,0 +1,25 @@
+/*
+ * Create an endpoint that takes a [path] argument,
+ * verifies the caller's JWT token,
+ * and returns all folder containing "misc" characters under the specified folder.
+ */
+.arguments
+   path:string
+validators.mandatory:x:@.arguments/*/path
+
+auth.ticket.verify:user,admin
+
+io.folder.list-recursively:x:@.arguments/*/path
+.hl-files
+for-each:x:@io.folder.list-recursively/*
+   if
+      strings.contains:x:@.dp/#
+         .:misc
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.hl-files
+            .
+               .:x:@.dp/#
+
+yield
+   files:x:@.hl-files/*

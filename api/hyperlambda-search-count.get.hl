@@ -9,6 +9,9 @@
    // Mandatory query for records to search for
    query:string
 
+   // Optional argument, if 1 only return validation data, if 0 only training data, if not specified it selects everything.
+   validation:int
+
 // Type of endpoint
 .type:crud-count
 
@@ -158,6 +161,24 @@ data.connect:[generic|fine-tune]
          .:" from "
          .:hyperlambda
          .:" where keyword_count > 0"
+
+   // Checking what type of data we're retrieving.
+   if
+      exists:x:@.arguments/*/validation
+      .lambda
+         if
+            eq:x:@.arguments/*/validation
+               .:int:1
+            .lambda
+               set-value:x:@.sql
+                  strings.concat
+                     get-value:x:@.sql
+                     .:" and validation = 1"
+         else
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" and validation = 0"
 
    // Execute the SQL
    data.select:x:@.sql
