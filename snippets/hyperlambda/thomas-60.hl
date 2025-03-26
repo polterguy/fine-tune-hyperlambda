@@ -1,0 +1,49 @@
+/*
+ * Conditionally select paged records from either the 'inventory' or 'suppliers' table in the 'warehouse' database,
+ * filtered by a mandatory [filter] argument that performs a LIKE match on the [name] column.
+ *
+ * Uses [data.select] with parameterized SQL and string concatenation to safely apply wildcards.
+ * Also includes paging support using optional [limit] and [offset] arguments.
+ *
+ * Throws an exception if the [type] argument is invalid or if [filter] is not provided.
+ * Returns matched rows in the [rows] node.
+ */
+.arguments
+   type:string
+   filter:string
+   limit:int
+   offset:int
+validators.mandatory:x:@.arguments/*/filter
+strings.concat
+   get-value:x:@.arguments/*/filter
+   .:"%"
+.rows
+if
+   eq
+      get-value:x:@.arguments/*/type
+      .:inventory
+   .lambda
+      data.connect:[generic|warehouse]
+         add:x:@.rows
+            data.select:select * from inventory where name like @filter limit @limit offset @offset
+               @filter:x:@strings.concat
+               @limit:x:@.arguments/*/limit
+               @offset:x:@.arguments/*/offset
+
+else-if
+   eq
+      get-value:x:@.arguments/*/type
+      .:suppliers
+   .lambda
+      data.connect:[generic|warehouse]
+         add:x:@.rows
+            data.select:select * from suppliers where name like @filter limit @limit offset @offset
+               @filter:x:@strings.concat
+               @limit:x:@.arguments/*/limit
+               @offset:x:@.arguments/*/offset
+
+else
+   throw:"Invalid argument. Must be either 'inventory' or 'suppliers'"
+
+yield
+   rows:x:@.rows/*

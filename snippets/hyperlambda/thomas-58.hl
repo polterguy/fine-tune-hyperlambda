@@ -1,0 +1,45 @@
+/*
+ * Conditionally connect to either the 'shipments' or 'warehouses' table in the 'logistics' database
+ * based on the input [type] argument. Includes pagination via optional [limit] and [offset] arguments.
+ * 
+ * If 'type' is 'shipments', connects to 'logistics' and fetches from the 'shipments' table.
+ * If 'type' is 'warehouses', connects to 'logistics' and fetches from the 'warehouses' table.
+ * 
+ * If 'type' is invalid, an exception is thrown.
+ * 
+ * The records are returned in [rows]. If [limit] or [offset] are not specified, default values apply.
+ */
+.arguments
+   type:string
+   limit:int
+   offset:int
+.rows
+if
+   eq
+      get-value:x:@.arguments/*/type
+      .:shipments
+   .lambda
+      data.connect:[generic|logistics]
+         add:x:@.rows
+            data.read
+               table:shipments
+               limit:x:@.arguments/*/limit
+               offset:x:@.arguments/*/offset
+
+else-if
+   eq
+      get-value:x:@.arguments/*/type
+      .:warehouses
+   .lambda
+      data.connect:[generic|logistics]
+         add:x:@.rows
+            data.read
+               table:warehouses
+               limit:x:@.arguments/*/limit
+               offset:x:@.arguments/*/offset
+
+else
+   throw:"Invalid argument. Must be either 'shipments' or 'warehouses'"
+
+yield
+   rows:x:@.rows/*

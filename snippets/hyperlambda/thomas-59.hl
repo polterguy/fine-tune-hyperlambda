@@ -1,0 +1,42 @@
+/*
+ * Conditionally selects rows from either the 'inventory' or 'suppliers' table in the 'warehouse' database,
+ * depending on the [type] argument provided. The result is paginated based on optional [limit] and [offset] arguments.
+ *
+ * SQL is constructed using [data.select] and safely parameterized to protect against SQL injection.
+ *
+ * If 'type' is neither 'inventory' nor 'suppliers', the slot throws an exception.
+ *
+ * Returns the query result in the [rows] node.
+ */
+.arguments
+   type:string
+   limit:int
+   offset:int
+.rows
+if
+   eq
+      get-value:x:@.arguments/*/type
+      .:inventory
+   .lambda
+      data.connect:[generic|warehouse]
+         add:x:@.rows
+            data.select:select * from inventory limit @limit offset @offset
+               @limit:x:@.arguments/*/limit
+               @offset:x:@.arguments/*/offset
+
+else-if
+   eq
+      get-value:x:@.arguments/*/type
+      .:suppliers
+   .lambda
+      data.connect:[generic|warehouse]
+         add:x:@.rows
+            data.select:select * from suppliers limit @limit offset @offset
+               @limit:x:@.arguments/*/limit
+               @offset:x:@.arguments/*/offset
+
+else
+   throw:"Invalid argument. Must be either 'inventory' or 'suppliers'"
+
+yield
+   rows:x:@.rows/*

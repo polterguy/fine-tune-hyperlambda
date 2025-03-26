@@ -1,0 +1,38 @@
+/*
+ * Conditionally connect to either the 'customers' or 'contacts' database table based on an input argument named 'type'.
+ * 
+ * If the 'type' argument is 'customers', it connects to the 'crm' database and reads from the 'customers' table.
+ * If the 'type' argument is 'contacts', it connects to the 'crm' database and reads from the 'contacts' table.
+ * 
+ * If 'type' is anything else, throw an exception with an error message.
+ * 
+ * Returns the fetched records under the [result] node.
+ */
+.arguments
+   type:string
+.result
+if
+   eq
+      get-value:x:@.arguments/*/type
+      .:customers
+   .lambda
+      data.connect:[generic|crm]
+         add:x:@.result
+            data.read
+               table:customers
+
+else-if
+   eq
+      get-value:x:@.arguments/*/type
+      .:contacts
+   .lambda
+      data.connect:[generic|crm]
+         add:x:@.result
+            data.read
+               table:contacts
+
+else
+   throw:"Invalid argument. Must be either 'customers' or 'contacts'"
+
+yield
+   rows:x:@.result/*
