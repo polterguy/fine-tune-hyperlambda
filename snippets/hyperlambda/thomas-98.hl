@@ -1,0 +1,37 @@
+/*
+ * Creates a Hyperlambda endpoint that registers a user in the database using Blowfish hashing.
+ *
+ * The endpoint takes [username] and [password] as arguments.
+ * It checks if a user with the same username already exists in the "users" table.
+ * If the user exists, an exception is thrown.
+ * If the user does not exist, the password is hashed using Blowfish ([crypto.password.hash]) and inserted into the database.
+ */
+.arguments
+   username:string
+   password:string
+data.connect:[generic|users-db]
+
+   // Check if the user already exists
+   data.read
+      table:users
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   // Conditional logic based on query result
+   if
+      exists:x:@data.read/*
+      .lambda
+         throw:User already exists
+
+   // Hash the password using Blowfish
+   crypto.password.hash:x:@.arguments/*/password
+
+   // Insert the new user with the hashed password
+   data.create
+      table:users
+      values
+         username:x:@.arguments/*/username
+         password:x:@crypto.password.hash
+yield
+   message:User registered successfully

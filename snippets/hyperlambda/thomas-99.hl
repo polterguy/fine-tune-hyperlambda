@@ -1,0 +1,29 @@
+/*
+ * Registers a new IoT device in a provisioning system by storing a unique device ID and hashed API key.
+ *
+ * The endpoint takes [device-id] and [api-key] as input.
+ * If the device already exists in the "iot_devices" table, an exception is thrown.
+ * Otherwise, the API key is hashed using Blowfish and inserted along with the device ID.
+ */
+.arguments
+   device-id:string
+   api-key:string
+data.connect:[generic|iot]
+   data.read
+      table:iot_devices
+      where
+         and
+            device_id.eq:x:@.arguments/*/device-id
+   if
+      exists:x:@data.connect/*/data.read/*
+      .lambda
+         throw
+            message:Device already registered
+   crypto.password.hash:x:@.arguments/*/api-key
+   data.create
+      table:iot_devices
+      values
+         device_id:x:@.arguments/*/device-id
+         api_key:x:@crypto.password.hash
+yield
+   message:Device successfully provisioned

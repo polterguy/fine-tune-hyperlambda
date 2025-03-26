@@ -1,0 +1,29 @@
+/*
+ * Registers a new rescue animal into a shelter system, using a secure hashed tag for RFID identification.
+ *
+ * Takes [animal-id] and [rfid-tag] as arguments.
+ * If the animal already exists in the "shelter_animals" table, an error is thrown.
+ * Otherwise, the tag is hashed for secure storage, and the record is inserted.
+ */
+.arguments
+   animal-id:string
+   rfid-tag:string
+data.connect:[generic|shelter]
+   data.read
+      table:shelter_animals
+      where
+         and
+            id.eq:x:@.arguments/*/animal-id
+   if
+      exists:x:@data.connect/*/data.read/*
+      .lambda
+         throw
+            message:Animal already exists
+   crypto.password.hash:x:@.arguments/*/rfid-tag
+   data.create
+      table:shelter_animals
+      values
+         id:x:@.arguments/*/animal-id
+         rfid_hash:x:@crypto.password.hash
+yield
+   message:Animal registered in shelter
