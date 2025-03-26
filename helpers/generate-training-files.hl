@@ -18,10 +18,16 @@
 // Loading up system message
 .system-message
 set-value:x:-
-   io.file.load:/modules/fine-tune-hyperlambda/system-message.md
+   strings.concat
+      io.file.load:/modules/fine-tune-hyperlambda/system-message.md
+      .:"\n<end>"
 
 // Adding cheat sheet.
-io.file.load:/modules/fine-tune-hyperlambda/cheat-sheet.md
+.cheat
+set-value:x:-
+   strings.concat
+      io.file.load:/modules/fine-tune-hyperlambda/cheat-sheet.md
+      .:"\n<end>"
 .data
    messages
       .
@@ -32,7 +38,7 @@ io.file.load:/modules/fine-tune-hyperlambda/cheat-sheet.md
          content:What is Hyperlambda?
       .
          role:assistant
-         content:x:@io.file.load
+         content:x:@.cheat
 unwrap:x:-/**
 set-value:x:@.result
    strings.concat
@@ -54,7 +60,9 @@ data.connect:fine-tune
       // Then completion.
       .completion
       set-value:x:@.completion
-         get-value:x:@.dp/#/*/code
+         strings.concat
+            get-value:x:@.dp/#/*/code
+            .:"\n<end>"
 
       // Creating our buffer object to hold our messages.
       unwrap:x:+/**
