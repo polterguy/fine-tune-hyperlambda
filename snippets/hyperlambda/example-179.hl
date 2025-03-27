@@ -1,12 +1,14 @@
 
-// Delete one record endpoint that deletes one record from your comments table in your cms database
+// Delete one record endpoint that deletes one record from your comments table in your cms database that can only be executed by 'partner' roles
 .arguments
 
    // Primary key of record to delete, mandatory argument
    id:long
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:root,admin
+auth.ticket.verify:partner
+
+// Ensuring only ONE record is deleted, and not the whole table.
 validators.mandatory:x:@.arguments/*/id
 
 // Opening up our database connection.
@@ -24,17 +26,6 @@ data.connect:[generic|cms]
       where
          and
 
-   // Publishing socket message.
-   add:x:./*/sockets.signal/*/args
-      get-nodes:x:@.arguments/*
-   add:x:./*/sockets.signal
-      get-nodes:x:@auth.ticket.verify
-   set-name:x:./*/sockets.signal/*/auth.ticket.verify
-      .:roles
-   sockets.signal:cms.comments.delete
-      args
-
    // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
+   yield
       affected:x:@data.delete

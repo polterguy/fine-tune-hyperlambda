@@ -1,11 +1,10 @@
 
-// Endpoint with paging, filtering and sorting that returns items from your clusters table in your [generic|hub] database according to the specified arguments.
+// Endpoint with paging, filtering, and sorting that returns items from your clusters table in your [generic|hub] database according to the specified arguments, ensuring ONLY 'root' users can execute the endpoint.
 .arguments
    limit:long
    offset:long
    order:string
    direction:string
-   operator:string
    clusters.id.like:string
    clusters.id.eq:string
    clusters.country.like:string
@@ -16,23 +15,6 @@
 
 // Verifying user is authorized to access endpoint.
 auth.ticket.verify:root
-
-// Sanity checking invocation.
-validators.enum:x:@.arguments/*/operator
-   .:or
-   .:and
-
-/*
- * Checking if user supplied an [operator] argument, and if so
- * changing the boolean operator for comparison operations.
- */
-if
-   exists:x:@.arguments/*/operator
-   .lambda
-
-      // User provided a boolean comparison [operator] argument.
-      set-name:x:../*/data.connect/*/data.read/*/where/*
-         get-value:x:@.arguments/*/operator
 
 // Opening up our database connection.
 data.connect:[generic|hub]
