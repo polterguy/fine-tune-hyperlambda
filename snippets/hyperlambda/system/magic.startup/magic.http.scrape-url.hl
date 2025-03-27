@@ -1,0 +1,667 @@
+
+/*
+ * Scrapes the spcified [url] and returns the result as Markdown to caller.
+ *
+ * If you specify [semantics] as true, the scraper will try to return only
+ * results from semantic tags such as "article" and "main".
+ */
+slots.create:magic.http.scrape-url
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
+
+   // Figuring out base URL, such that we can correctly crawl hyperlinks in document.
+   .base
+   strings.split:x:@.arguments/*/url
+      .:"://"
+   strings.split:x:@strings.split/1
+      .:/
+   set-value:x:@.base
+      strings.concat
+         get-value:x:@strings.split/@strings.split/0
+         .:"://"
+         get-value:x:@strings.split/0
+
+   // Retrieving URL's content.
+   http.get:x:@.arguments/*/url
+      timeout:int:10
+      headers
+         User-Agent:AINIRO-Crawler 2.0
+         Accept:text/html
+         Accept-Encoding:identity
+
+   // Sanity checking above invocation.
+   if
+      not
+         and
+            mte:x:@http.get
+               .:int:200
+            lt:x:@http.get
+               .:int:300
+      .lambda
+
+         // Oops, logging error.
+         lambda2hyper:x:@http.get
+         log.error:Something went wrong while trying to crawl URL for Machine Learning data
+            url:x:@.arguments/*/url
+            error:x:@lambda2hyper
+         return:x:@http.get
+
+   // Making sure URL returned HTML.
+   if
+      or
+         not-exists:x:@http.get/*/content
+         null:x:@http.get/*/content
+         eq:x:@http.get/*/content
+            .:
+         not-exists:x:@http.get/*/headers/*/Content-Type
+         not
+            strings.starts-with:x:@http.get/*/headers/*/Content-Type
+               .:text/html
+      .lambda
+
+         // Oops, doing some basic logging.
+         lambda2hyper:x:@http.get
+         log.error:URL did not return HTML content when crawling for Machine Learning snippets
+            content:x:@lambda2hyper
+            url:x:@.arguments/*/url
+         return:int:415
+
+   // Converting HTML to lambda.
+   html2lambda:x:@http.get/*/content
+
+   // Buffer for snippets we found at specified URL.
+   .snippets
+
+   // Primary h1 tag's content for URL.
+   .page-header
+      h1
+      h2
+      h3
+      h4
+      h5
+      h6
+
+   // Buffer for URLs found in document.
+   .urls
+
+   // Temp buffer for completion.
+   .tmp-completion:
+   
+   // Checking if URL has a base HTML element.
+   if
+      exists:x:@html2lambda/*/head/*/base
+      .lambda
+
+         // Document contains base HTML tag, using it as our base for hyperlinks and images.
+         set-value:x:@.base
+            strings.trim-end:x:@html2lambda/*/head/*/base/*/\@href/[0,1]
+               .:/
+   
+   // Buffer for what nodes we're to traverse and scrape.
+   .content
+
+   /*
+    * Trying to find best semantic HTML tag to use as we traverse document,
+    * to ignore irrelevant HTML tags.
+    */
+   if
+      and
+         or
+            not
+               exists:x:@.arguments/*/semantics
+            get-value:x:@.arguments/*/semantics
+         exists:x:@html2lambda/*/html/*/body/**/article
+      .lambda
+
+         // Using [article] tags as our foundation.
+         add:x:@.content
+            get-nodes:x:@html2lambda/*/html/*/body/**/article/*
+
+   else-if
+      and
+         or
+            not
+               exists:x:@.arguments/*/semantics
+            get-value:x:@.arguments/*/semantics
+         exists:x:@html2lambda/*/html/*/body/**/main
+      .lambda
+
+         // Using [main] tags as our foundation.
+         add:x:@.content
+            get-nodes:x:@html2lambda/*/html/*/body/**/main/*
+
+   else
+
+      // Defaulting to [body] tag.
+      add:x:@.content
+         get-nodes:x:@html2lambda/*/html/*/body/*
+
+   // Looping through each HTML tag in document.
+   for-each:x:@.content/**
+
+      // Checking if this is a tag we need to handle.
+      get-name:x:@.dp/#
+      switch:x:@get-name
+
+         // Checking if this is code.
+         case:pre
+
+            // Verifying text node exists.
+            if
+               exists:x:@.dp/#/**/\#text
+               .lambda
+
+                  // Checking if we need to append code to existing completion or create new completion.
+                  if
+                     exists:x:@.snippets/0/-/*/completion
+                     .lambda
+
+                        // Appending to existing completion.
+                        set-value:x:@.snippets/0/-/*/completion
+                           strings.concat
+                              get-value:x:@.snippets/0/-/*/completion
+                              .:"\r\n\r\n```\r\n"
+                              strings.trim:x:@.dp/#/**/\#text/[0,1]
+                                 .:"  \r\n\t"
+                              .:"\r\n```"
+
+                  else
+
+                     // Adding new prompt to [.snippets] collection.
+                     strings.concat
+                        .:"```\r\n"
+                        strings.trim:x:@.dp/#/**/\#text/[0,1]
+                           .:"  \r\n\t"
+                        .:"\r\n```"
+                     unwrap:x:+/*/*
+                     add:x:@.snippets/0/-
+                        .
+                           completion:x:@strings.concat
+
+         // Checking if this is an image.
+         case:img
+
+            // Verifying we actually have a [@src] attribute.
+            if
+               and
+                  exists:x:@.dp/#/*/\@src/[0,1]
+                  not-null:x:@.dp/#/*/\@src/[0,1]
+                  neq:x:@.dp/#/*/\@src/[0,1]
+                     .:
+               .lambda
+
+                  // Normalising URL.
+                  .url
+                  if
+                     and
+                        not
+                           strings.starts-with:x:@.dp/#/*/\@src/[0,1]
+                              .:"http://"
+                        not
+                           strings.starts-with:x:@.dp/#/*/\@src/[0,1]
+                              .:"https://"
+                     .lambda
+
+                        // Local URL, prepending base URL.
+                        if
+                           strings.starts-with:x:@.dp/#/*/\@src/[0,1]
+                              .://
+                           .lambda
+
+                              strings.split:x:@.base
+                                 .:"://"
+                              set-value:x:@.url
+                                 strings.concat
+                                    get-value:x:@strings.split/0
+                                    .:":"
+                                    get-value:x:@.dp/#/*/\@src/[0,1]
+
+                        else-if
+                           strings.starts-with:x:@.dp/#/*/\@src/[0,1]
+                              .:/
+                           .lambda
+
+                              set-value:x:@.url
+                                 strings.concat
+                                    get-value:x:@.base
+                                    get-value:x:@.dp/#/*/\@src/[0,1]
+
+                        else
+
+                           set-value:x:@.url
+                              strings.concat
+                                 get-value:x:@.base
+                                 .:/
+                                 get-value:x:@.dp/#/*/\@src/[0,1]
+
+                  else
+
+                     // URL is absolute.
+                     set-value:x:@.url
+                        get-value:x:@.dp/#/*/\@src/[0,1]
+
+                  // Checking if we need to append code to existing completion or create new completion.
+                  if
+                     exists:x:@.snippets/0/-/*/completion
+                     .lambda
+
+                        // Appending to existing completion.
+                        set-value:x:@.snippets/0/-/*/completion
+                           strings.concat
+                              get-value:x:@.snippets/0/-/*/completion
+                              .:"\r\n\r\n!["
+                              get-first-value
+                                 get-value:x:@.dp/#/*/\@alt/[0,1]
+                                 .:"Image "
+                              .:"]("
+                              get-value:x:@.url
+                              .:")"
+
+                  else
+
+                     // Adding new completion to [.snippets] collection.
+                     strings.concat
+                        .:"!["
+                        get-first-value
+                           get-value:x:@.dp/#/*/\@alt/[0,1]
+                           .:"Image "
+                        .:"]("
+                        get-value:x:@.url
+                        .:")"
+                     unwrap:x:+/*/*
+                     add:x:@.snippets/0/-
+                        .
+                           completion:x:@strings.concat
+
+         // Checking if this is a hyperlink.
+         case:a
+
+            // Checking if it's a 'local' URL, implying within the same domain as we're currently scraping.
+            if
+               and
+                  exists:x:@.dp/#/*/\@href/[0,1]
+                  not-null:x:@.dp/#/*/\@href/[0,1]
+                  neq:x:@.dp/#/*/\@href/[0,1]
+                     .:#
+                  neq:x:@.dp/#/*/\@href/[0,1]
+                     .:
+                  not
+                     strings.starts-with:x:@.dp/#/*/\@href/[0,1]
+                        .:"http://"
+                  not
+                     strings.starts-with:x:@.dp/#/*/\@href/[0,1]
+                        .:"https://"
+               .lambda
+
+                  // Local URL.
+                  strings.split:x:@.dp/#/*/\@href/[0,1]
+                     .:#
+                  strings.trim-end:x:@strings.split/0
+                     .:/
+                  .tmp
+                  if
+                     strings.starts-with:x:@strings.trim-end
+                        .:/
+                     .lambda
+                        set-value:x:@.tmp
+                           strings.concat
+                              get-value:x:@.base
+                              get-value:x:@strings.trim-end
+                  else
+                     set-value:x:@.tmp
+                        strings.concat
+                           get-value:x:@.base
+                           .:/
+                           get-value:x:@strings.trim-end
+                  if
+                     not-exists:x:@.url/*/{@strings.concat}
+                     .lambda
+                        unwrap:x:+/*/*
+                        add:x:@.urls
+                           .
+                              .:x:@.tmp
+
+            else-if
+               and
+                  exists:x:@.dp/#/*/\@href/[0,1]
+                  not-null:x:@.dp/#/*/\@href/[0,1]
+                  neq:x:@.dp/#/*/\@href/[0,1]
+                     .:#
+                  neq:x:@.dp/#/*/\@href/[0,1]
+                     .:
+               .lambda
+
+                  // Absolute URL.
+                  strings.split:x:@.dp/#/*/\@href/[0,1]
+                     .:#
+                  strings.trim-end:x:@strings.split/0
+                     .:/
+                  if
+                     not-exists:x:@.urls/*/{@strings.split/0}
+                     .lambda
+                        unwrap:x:+/*/*
+                        add:x:@.urls
+                           .
+                              .:x:@strings.trim-end
+
+         // Headers becomes prompts.
+         case:h1
+         case:h2
+         case:h3
+         case:h4
+         case:h5
+         case:h6
+
+            // Creating a new prompt.
+            .prompt:
+
+            // Trimming and adding one SP characters between each part.
+            for-each:x:@.dp/#/**/\#text
+               set-value:x:@.prompt
+                  strings.concat
+                     get-value:x:@.prompt
+                     strings.trim:x:@.dp/#
+                        .:"  \r\n\t"
+                     .:" "
+            set-value:x:@.prompt
+               strings.trim:x:@.prompt
+                  .:" "
+
+            // Semantically storing Hx elements.
+            switch:x:@get-name
+               case:h1
+                  set-value:x:@.page-header/*/h1
+                     get-value:x:@.prompt
+                  set-value:x:@.page-header/*/h2
+                  set-value:x:@.page-header/*/h3
+                  set-value:x:@.page-header/*/h4
+                  set-value:x:@.page-header/*/h5
+                  set-value:x:@.page-header/*/h6
+               case:h2
+                  set-value:x:@.page-header/*/h2
+                     get-value:x:@.prompt
+                  set-value:x:@.page-header/*/h3
+                  set-value:x:@.page-header/*/h4
+                  set-value:x:@.page-header/*/h5
+                  set-value:x:@.page-header/*/h6
+               case:h3
+                  set-value:x:@.page-header/*/h3
+                     get-value:x:@.prompt
+                  set-value:x:@.page-header/*/h4
+                  set-value:x:@.page-header/*/h5
+                  set-value:x:@.page-header/*/h6
+               case:h4
+                  set-value:x:@.page-header/*/h4
+                     get-value:x:@.prompt
+                  set-value:x:@.page-header/*/h5
+                  set-value:x:@.page-header/*/h6
+               case:h5
+                  set-value:x:@.page-header/*/h5
+                     get-value:x:@.prompt
+                  set-value:x:@.page-header/*/h6
+               case:h6
+                  set-value:x:@.page-header/*/h6
+                     get-value:x:@.prompt
+
+            // Now creating prompt semantically by concatenating relevant Hx tags.
+            set-value:x:@.prompt
+               .:
+            for-each:x:@.page-header/*
+               if
+                  and
+                     not-null:x:@.dp/#
+                     neq:x:@.dp/#
+                        .:
+                  .lambda
+                     set-value:x:@.prompt
+                        strings.concat
+                           get-value:x:@.dp/#
+                           .:" - "
+                           get-value:x:@.prompt
+            set-value:x:@.prompt
+               strings.replace:x:@.prompt
+                  .:"  "
+                  .:" "
+            set-value:x:@.prompt
+               strings.trim-end:x:@.prompt
+                  .:" -"
+
+            // Adding new prompt to [.snippets] collection.
+            unwrap:x:+/*/*/*
+            add:x:@.snippets
+               .
+                  .
+                     prompt:x:@.prompt
+
+         // Adding extra CR/LF sequence for UL and OL.
+         case:ul
+         case:ol
+
+            // Verifying that paragraph actually contained some content.
+            if
+               neq:x:@.completion
+                  .:
+               .lambda
+
+                  // Checking if we need to append paragraph to existing completion or create new completion.
+                  if
+                     exists:x:@.snippets/0/-/*/completion
+                     .lambda
+
+                        // Appending to existing completion.
+                        set-value:x:@.snippets/0/-/*/completion
+                           strings.concat
+                              get-value:x:@.snippets/0/-/*/completion
+                              .:"\r\n"
+
+                  else
+
+                     // Adding new prompt to [.snippets] collection.
+                     unwrap:x:+/*/*
+                     add:x:@.snippets/0/-
+                        .
+                           completion:"\r\n"
+
+         // Paragraphs becomes completions.
+         case:p
+         case:li
+
+            // Making sure we've added at least one prompt.
+            if
+               exists:x:@.snippets/*
+               .lambda
+
+                  // Creating a new completion.
+                  .completion:
+
+                  // Trimming and adding one SP characters between each part.
+                  for-each:x:@.dp/#/**/\#text
+                     if
+                        and
+                           not-null:x:@.dp/#
+                           neq:x:@.dp/#
+                              .:
+                        .lambda
+                           strings.replace:x:@.dp/#
+                              .:"\r"
+                              .:" "
+                           strings.replace:x:@strings.replace
+                              .:"\n"
+                              .:" "
+                           strings.replace:x:@strings.replace
+                              .:"\t"
+                              .:" "
+                           strings.replace:x:@strings.replace
+                              .:"  "
+                              .:" "
+                           if
+                              and
+                                 eq
+                                    get-name:x:@.dp/#/.
+                                    .:a
+                                 exists:x:@.dp/#/./*/\@href/[0,1]
+                                 not-null:x:@.dp/#/./*/\@href/[0,1]
+                              .lambda
+
+                                 // Normalising URL.
+                                 .url
+                                 if
+                                    strings.starts-with:x:@.dp/#/./*/\@href/[0,1]
+                                       .:/
+                                    .lambda
+
+                                       // Prepending base URL.
+                                       set-value:x:@.url
+                                          strings.concat
+                                             get-value:x:@.base
+                                             get-value:x:@.dp/#/./*/\@href/[0,1]
+                                 else-if
+                                    and
+                                       not
+                                          strings.starts-with:x:@.dp/#/./*/\@href/[0,1]
+                                             .:"http://"
+                                       not
+                                          strings.starts-with:x:@.dp/#/./*/\@href/[0,1]
+                                             .:"https://"
+                                    .lambda
+
+                                       // Prepending base URL.
+                                       set-value:x:@.url
+                                          strings.concat
+                                             get-value:x:@.base
+                                             .:/
+                                             get-value:x:@.dp/#/./*/\@href/[0,1]
+                                 else
+
+                                    // URL is absolute.
+                                    set-value:x:@.url
+                                       get-value:x:@.dp/#/./*/\@href/[0,1]
+
+                                 // Adding URL as Markdown to completion
+                                 set-value:x:@.completion
+                                    strings.concat
+                                       get-value:x:@.completion
+                                       .:" "
+                                       .:[
+                                       strings.trim:x:@strings.replace
+                                          .:"  \r\n\t"
+                                       .:](
+                                       get-value:x:@.url
+                                       .:)
+                                       .:" "
+                           else
+
+                              // Anything BUT a hyperlink.
+                              set-value:x:@.completion
+                                 strings.concat
+                                    get-value:x:@.completion
+                                    strings.trim:x:@strings.replace
+                                       .:"  \r\n\t"
+                                    .:" "
+
+                  // Trimming completion. Notice, there's a non-breaking space in the following string (U+00A0).
+                  set-value:x:@.completion
+                     strings.trim:x:@.completion
+                        .:"  \r\n\t"
+
+                  // Replacing all occurrencies of double space with single space.
+                  .has-double-space:bool:true
+                  while:x:@.has-double-space
+
+                     // Checking if we've got more double spaces in completion, and if not, stopping while loop.
+                     if
+                        strings.contains:x:@.completion
+                           .:"  "
+                        .lambda
+                           set-value:x:@.completion
+                              strings.replace:x:@.completion
+                                 .:"  "
+                                 .:" "
+                     else
+                        set-value:x:@.has-double-space
+                           .:bool:false
+
+                  // Cleaning up punctuation.
+                  set-value:x:@.completion
+                     strings.replace:x:@.completion
+                        .:" ."
+                        .:"."
+                  set-value:x:@.completion
+                     strings.replace:x:@.completion
+                        .:" ,"
+                        .:","
+
+                  // Checking if this is a list of some sort, at which point we turn it into an unordered list.
+                  switch:x:@get-name
+                     case:li
+                        if
+                           neq:x:@.completion
+                              .:
+                           .lambda
+                              set-value:x:@.completion
+                                 strings.concat
+                                    .:"\r\n"
+                                    .:"- "
+                                    get-value:x:@.completion
+                     case:p
+                        set-value:x:@.completion
+                           strings.concat
+                              .:"\r\n\r\n"
+                              get-value:x:@.completion
+
+                  // Verifying that paragraph actually contained some content.
+                  if
+                     neq:x:@.completion
+                        .:
+                     .lambda
+
+                        // Checking if we need to append paragraph to existing completion or create new completion.
+                        if
+                           exists:x:@.snippets/0/-/*/completion
+                           .lambda
+
+                              // Appending to existing completion.
+                              set-value:x:@.snippets/0/-/*/completion
+                                 strings.concat
+                                    get-first-value
+                                       get-value:x:@.snippets/0/-/*/completion
+                                       .:
+                                    get-value:x:@.completion
+
+                        else
+
+                           // Adding new prompt to [.snippets] collection.
+                           unwrap:x:+/*/*
+                           add:x:@.snippets/0/-
+                              .
+                                 completion:x:@.completion
+
+   // Returning results to caller.
+   for-each:x:@.snippets/*
+
+      // Verifying both [prompt] and [completion] exists for snippet.
+      if
+         and
+            exists:x:@.dp/#/*/prompt
+            not-null:x:@.dp/#/*/prompt
+            mt
+               strings.length:x:@.dp/#/*/prompt
+               .:int:0
+            exists:x:@.dp/#/*/completion
+            not-null:x:@.dp/#/*/completion
+         .lambda
+
+            // Trimming both prompt and completion.
+            set-value:x:@.dp/#/*/prompt
+               strings.trim:x:@.dp/#/*/prompt
+            set-value:x:@.dp/#/*/completion
+               strings.trim:x:@.dp/#/*/completion
+
+            // Valid snippet, making sure we return it to caller.
+            add:x:../*/return
+               get-nodes:x:@.dp/#
+
+   // Returning result to caller.
+   return

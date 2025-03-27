@@ -1,0 +1,97 @@
+
+/*
+ * Applies the specified arguments and file comment description
+ * to the specified Hyperlambda.
+ */
+.arguments
+   hyperlambda:string
+   description:string
+   args:*
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Converting input Hyperlambda to lambda object.
+hyper2lambda:x:@.arguments/*/hyperlambda
+   comments:true
+
+// Removing old file comment description.
+remove-nodes:x:@hyper2lambda/0/\..
+
+// Removing old [.arguments] collection.
+remove-nodes:x:@hyper2lambda/0/.arguments
+
+// Creating supporting node at the end of lambda object.
+add:x:@hyper2lambda
+   .
+      .support
+
+// Checking if caller provided an [.arguments] collection for Hyperlambda.
+if
+   exists:x:@.arguments/*/args
+   .lambda
+
+      // Inserting arguments at top of lambda object.
+      add:x:+/*/*
+         get-nodes:x:@.arguments/*/args/*
+      insert-before:x:@hyper2lambda/0
+         .
+            .arguments
+
+else
+
+   // Checking if we've got a file level comment.
+   if
+      eq
+         get-name:x:@hyper2lambda/0
+         .:..
+      .lambda
+
+         // We have a file level comment, hence applying [.arguments] node after it.
+         insert-after:x:@hyper2lambda/0
+            .
+               .arguments
+
+   else
+
+      // We don't have a file level comment, applying [.arguments] as the first node in the file.
+      insert-before:x:@hyper2lambda/0
+         .
+            .arguments
+
+// Defaulting file [.type] to public.
+insert-after:x:@hyper2lambda/*/.arguments
+   .
+      .type:public
+
+// Checking if caller provided a [description] for Hyperlambda.
+if
+   and
+      exists:x:@.arguments/*/description
+      not-null:x:@.arguments/*/description
+   .lambda
+
+      // Normalising [description] CR/LF characters.
+      strings.replace:x:@.arguments/*/description
+         .:"\r\n"
+         .:"\n"
+      strings.replace:x:@strings.replace
+         .:"\n"
+         .:"\r\n"
+
+      // Inserting file comment / description at top of lambda object.
+      unwrap:x:+/*/*
+      insert-before:x:@hyper2lambda/0
+         .
+            ..:x:@strings.replace
+
+// Removing supporting node.
+remove-nodes:x:@hyper2lambda/0/-/.support
+
+// Converting lambda to Hyperlambda again.
+lambda2hyper:x:@hyper2lambda/*
+   comments:true
+
+// Returning updated Hyperlambda to caller.
+yield
+   result:x:@lambda2hyper

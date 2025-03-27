@@ -1,0 +1,34 @@
+
+/*
+ * Vectorises all training snippets in the specified model/type.
+ */
+.arguments
+   type:string
+   feedback-channel:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/type
+
+// Doing some basic logging.
+log.info:Started vectorising model
+   model:x:@.arguments/*/type
+
+// Creating a thread and invoking file doing the heavy lifting.
+insert-before:x:./*/fork/0
+   get-nodes:x:@.arguments
+fork
+   add:x:./*/signal
+      get-nodes:x:@.arguments/*
+   signal:magic.ai.vectorise
+      .onafter
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Done!
+               type:success
+
+// Returning success to caller.
+return
+   result:success
