@@ -6,9 +6,9 @@ This project allows you to fine tune OpenAI and their GPT models on Hyperlambda.
 
 Below are hyper parameters I've had success with in some example runs.
 
-1. Batch size 5
-2. LR multiplier set to 0.2
-3. 3 epochs
+1. 3 epochs
+2. Batch size 4
+3. LR multiplier set to 1
 
-If you're successful, you should have training loss around 0.3 to 0.6, and full validation loss at about 0.4 to 0.9, about 0.3 higher than training loss.
+If you're successful, you should have training loss around 0.5, and full validation loss at 0.3 higher than training loss.
 

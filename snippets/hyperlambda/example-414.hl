@@ -1,5 +1,5 @@
 
-// Counts unique and distinct items from your city table in your sakila database without authorization but with reCAPTCHA
+// Endpoint that counts unique and distinct items from your city table in your sakila database with filtering and caching
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
@@ -26,31 +26,6 @@ validators.enum:x:@.arguments/*/distinct_column
 // Adding Cache-Control HTTP header.
 response.headers.set
    Cache-Control:private, max-age=500
-
-// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
-config.get:"magic:auth:recaptcha:key"
-config.get:"magic:auth:recaptcha:secret"
-if
-   and
-      neq:x:@config.get
-         .
-      neq:x:@config.get
-         .:
-      neq:x:@config.get/@config.get
-         .
-      neq:x:@config.get/@config.get
-         .:
-   .lambda
-
-      // reCAPTCHA configuration settings found.
-      validators.mandatory:x:@.arguments/*/recaptcha
-      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
-         site-key:x:@config.get/@config.get
-         secret:x:@config.get
-         min:decimal:0.3
-
-// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
-remove-nodes:x:@.arguments/*/recaptcha/[0,1]
 
 // Opening up our database connection.
 data.connect:[generic|sakila]
