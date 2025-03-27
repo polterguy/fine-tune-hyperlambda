@@ -51,52 +51,43 @@ for-each:x:@execute/*
                   lambda2hyper:x:@hyper2lambda/*
                      comments:true
 
-                  // Checking if snippet is too big.
+                  // Checking if this is validation data.
+                  .validation:int:0
                   if
-                     mt
-                        openai.tokenize:x:@lambda2hyper
-                        .:int:1000
+                     strings.contains:x:@.dp/#
+                        .:/validation/
                      .lambda
-                        io.file.delete:x:@.dp/#
-                  else
+                        set-value:x:@.validation
+                           .:int:1
 
-                     // Checking if this is validation data.
-                     .validation:int:0
+                  // Saving above code snippet.
+                  data.connect:fine-tune
+
+                     // Making sure we avoid double inserts.
+                     data.read
+                        table:hyperlambda
+                        where
+                           and
+                              code.eq:x:@lambda2hyper
+
+                     // Making sure we avoid double inserts of the same snippets
                      if
-                        strings.contains:x:@.dp/#
-                           .:/validation/
+                        not-exists:x:@data.read/*
                         .lambda
-                           set-value:x:@.validation
-                              .:int:1
+                           data.create
+                              table:hyperlambda
+                              values
+                                 code:x:@lambda2hyper
+                                 prompt:x:@.prompt
+                                 validation:x:@.validation
 
-                     // Saving above code snippet.
-                     data.connect:fine-tune
+                           // Counting how many training snippets we're inserting
+                           math.increment:x:@.no
 
-                        // Making sure we avoid double inserts.
-                        data.read
-                           table:hyperlambda
-                           where
-                              and
-                                 code.eq:x:@lambda2hyper
+                     else
 
-                        // Making sure we avoid double inserts of the same snippets
-                        if
-                           not-exists:x:@data.read/*
-                           .lambda
-                              data.create
-                                 table:hyperlambda
-                                 values
-                                    code:x:@lambda2hyper
-                                    prompt:x:@.prompt
-                                    validation:x:@.validation
-
-                              // Counting how many training snippets we're inserting
-                              math.increment:x:@.no
-
-                        else
-
-                           // Cleaning up training data for duplicates.
-                           io.file.delete:x:@.dp/#
+                        // Cleaning up training data for duplicates.
+                        io.file.delete:x:@.dp/#
    .catch
    
       // This throws an exception being the name of the currently processed filename

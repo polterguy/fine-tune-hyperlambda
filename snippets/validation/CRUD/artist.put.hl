@@ -1,0 +1,35 @@
+
+/*
+ * How do I update one record only in SQLite?
+ *
+ * My database name is chinook and my table is named Artist.
+ *
+ * I want you to return ONLY Hyperlambda code, without any comments or such, and return how many records was affected by the operation.
+ */
+.arguments
+   ArtistId:long
+   Name:string
+validators.mandatory:x:@.arguments/*/ArtistId
+data.connect:[generic|chinook]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Artist
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   yield
+      affected:x:@data.update

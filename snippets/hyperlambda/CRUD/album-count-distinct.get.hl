@@ -1,0 +1,55 @@
+
+/*
+ * Endpoint that counts unique and distinct values from your [distinct_column].
+ *
+ * Returns distinct items in your specified column from your Album table in your
+ * chinook database. Database type is SQLite.
+ */
+.arguments
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Optional filter columns
+   Album.AlbumId.eq:long
+   Album.Title.like:string
+   Album.Title.eq:string
+   Album.ArtistId.eq:long
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Album.AlbumId
+   .:Album.Title
+   .:Album.ArtistId
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Dynamically changing the nsame of our [distinct_node] further down in file.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Selecting records from Album.
+   data.read
+      database-type:sqlite
+      table:Album
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning Albums to caller.
+   return-nodes:x:@data.read/*/*

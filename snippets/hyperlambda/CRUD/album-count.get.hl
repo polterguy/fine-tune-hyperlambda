@@ -1,0 +1,34 @@
+
+// Endpoint that counts items from your Album table in your chinook database with basic filtering
+.arguments
+
+   // Optional filtering arguments
+   Album.AlbumId.eq:long
+   Album.Title.like:string
+   Album.Title.eq:string
+   Album.ArtistId.eq:long
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   /*
+    * This will add all arguments given to endpoint into the [and] node further down,
+    * becoming filtering conditions resulting in only records matching filter will be returned.
+    */
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Album
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

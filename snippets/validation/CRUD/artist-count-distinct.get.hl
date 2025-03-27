@@ -1,0 +1,52 @@
+
+// Count unique and distinct items from your Artist table in your chinook database
+/*
+ * How do I create an HTTP web API endpoint that returns distinct items from Artist on either ArtistId or Name?
+ * 
+ * I need the enpoint to take optional filter arguments, and my database is SQLite and named chinook.
+ * I do NOT want authorization or authentication, since I want all users to be able to execute the endpoint.
+ */
+.arguments
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+   Artist.ArtistId.eq:long
+   Artist.Name.like:string
+   Artist.Name.eq:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Artist.ArtistId
+   .:Artist.Name
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Artist
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

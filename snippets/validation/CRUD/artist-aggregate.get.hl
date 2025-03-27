@@ -1,0 +1,48 @@
+
+/*
+ * How do I create an endpoint that allows me to calculate min, max, sum, and avg from my Artist
+ * table in my chinook database? My database type is SQLite, and I want to allow everyone to execute it,
+ * without requiring a JWT token.
+ *
+ * I want to be able to optionally filter on ArtistId and Name, and I want you to return the result as [rows].
+ *
+ * Return ONLY Hyperlambda code, WITHOUT comments!
+ */
+.arguments
+   aggregate_function:string
+   aggregate_column:string
+   Artist.ArtistId.eq:long
+   Artist.Name.like:string
+   Artist.Name.eq:string
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+validators.enum:x:@.arguments/*/aggregate_column
+   .:Artist.ArtistId
+   .:Artist.Name
+data.connect:[generic|chinook]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Artist
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   yield
+      rows:x:@data.read/*/*
