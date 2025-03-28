@@ -1,0 +1,80 @@
+
+/*
+ * Invokes OpenAI with the specifiec arguments.
+ */
+slots.create:openai.invoke-chatgpt
+
+   // Sanity checking invocation.
+   validators.mandatory:x:@.arguments/*/model
+   validators.mandatory:x:@.arguments/*/max_tokens
+   validators.mandatory:x:@.arguments/*/query
+   validators.enum:x:@.arguments/*/model
+      .:gpt-4o
+      .:gpt-4o-mini
+      .:gpt-4o-2024-05-13
+      .:gpt-3.5-turbo
+      .:gpt-3.5-turbo-16k
+      .:gpt-3.5-turbo-1106
+      .:gpt-3.5-turbo-0125
+      .:gpt-4
+      .:gpt-4-1106-preview
+      .:o3-mini
+      .:gpt-4.5-preview
+
+   // Retrieving OpenAI API token from configuration settings.
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+
+   // Checking if caller provided an [instruction].
+   if
+      exists:x:@.arguments/*/instruction
+      .lambda
+
+         // Adding [instruction].
+         insert-before:x:../*/http.post/*/payload/*/messages/0
+            .
+               .
+                  role:system
+                  content:x:@.arguments/*/instruction
+
+   // Invokes OpenAI.
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:x:@.arguments/*/model
+         max_tokens:x:@.arguments/*/max_tokens
+         temperature:decimal:0.3
+         messages
+            .
+               role:user
+               content:x:@.arguments/*/query
+
+   // Sanity checking above invocation.
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+
+         // Oops, error - Logging error and returning status 500 to caller.
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+         throw:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+
+   // Returning answer to caller.
+   return-value:x:@http.post/*/content/*/choices/0/*/message/*/content

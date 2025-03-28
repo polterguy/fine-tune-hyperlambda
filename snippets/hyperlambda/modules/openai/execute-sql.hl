@@ -1,0 +1,64 @@
+
+/*
+ * Executes the specified [sql] towards your [type] and returns the result
+ *
+ * Hyperlambda code is an HTTP web API endpoint file
+ *
+ * This AI function will execute any arbitrary SQL towards your training data database, and return a maximum of [max_tokens] training data context back to caller to use as context data for the AI. Any SQL statement executed this way must be constructed such that it only affects records in one specified type.
+ *
+ * The table name for the SQL should always be 'ml_training_snippets', and the where clause of the SQL must make sure only records with a type of 'YOUR_TYPE_NAME_HERE' is returned or affected. Unless caller explicitly tells you which columns to return, then assume the caller wants to have only prompt, completion, uri and id returned.
+ */
+.arguments
+
+   // Mandatory and is the SQL statement that will be executed
+   sql:string
+
+   // Optional and will default to 4000 if not specified
+   max_tokens:int
+
+.type:public
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/sql
+
+// Applying defaults.
+validators.default:x:@.arguments
+   max_tokens:int:4000
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Executing SQL as select statement.
+   data.select:x:@.arguments/*/sql
+
+   // Making sure we return total record count to caller.
+   set-value:x:../*/return/*/count
+      get-count:x:@data.select/*
+         
+   
+   // Making sure we do't return more context than what was requested.
+   .cont:bool:true
+   while:x:@.cont
+      lambda2hyper:x:@data.select/*
+      if
+         lt
+            openai.tokenize:x:@lambda2hyper
+            convert:x:@.arguments/*/max_tokens
+               type:int
+         .lambda
+            set-value:x:@.cont
+               .:bool:false
+            set-value:x:../*/return/*/complete_information
+               .:WARNING! We found more records than we could fit into the context!
+      else
+         remove-nodes:x:@data.select/0/-
+
+   // Making sure we return actual records to caller.
+   add:x:../*/return/*/records
+      get-nodes:x:@data.select/*
+
+// Return result to caller.
+return
+   count
+   records
+   complete_information:This was all the records we could find related to your query

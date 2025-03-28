@@ -1,0 +1,62 @@
+
+/*
+ * Invokes OpenAI's image generation API with the specified [query] and [model].
+ *
+ * Will use the default API key found from configurations.
+ */
+.arguments
+   query:string
+   model:string
+   size:string
+   style:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/query
+validators.default:x:@.arguments
+   model:dall-e-3
+   default:1024x1024
+
+// Retrieving OpenAI API token from configuration settings.
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:openai:key"
+
+// Invokes OpenAI.
+http.post:"https://api.openai.com/v1/images/generations"
+   convert:bool:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json
+   payload
+      model:x:@.arguments/*/model
+      prompt:x:@.arguments/*/query
+      n:int:1
+      size:x:@.arguments/*/size
+      style:x:@.arguments/*/style
+
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+
+      // Oops, error - Logging error and returning status 500 to caller.
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      throw:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+
+// Returning answer to caller.
+yield
+   images:x:@http.post/*/content/*/data/*

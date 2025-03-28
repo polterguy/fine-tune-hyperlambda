@@ -1,0 +1,48 @@
+
+/*
+ * Creates a new training snippet with the specified [prompt] and [completion]
+ *
+ * Hyperlambda code is an HTTP web API endpoint file
+ *
+ * This function will create a new training snippet the AI can use as context later as it's answering questions. Training snippets created with this function will become a part of your RAG / VSS database allowing the AI to later use these as context data when answering questions, arguably creating long term memory for the AI.
+ */
+.arguments
+   _type:string
+
+   // Mandatory and the title of the training snippet. This should be a short summary about the most important parts of the content with some keywords. Unless the user explicitly specified a prompt value, then generate a high quality prompt value describing the training snippet as a single sentence with some keywords that makes it easy to find using VSS
+   prompt:string
+
+   // Mandatory and the primary content of your training snippet
+   completion:string
+
+   // Optional and if supplied is the URL from where the information was found
+   uri:string
+
+.type:public
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/_type
+validators.mandatory:x:@.arguments/*/prompt
+validators.mandatory:x:@.arguments/*/completion
+
+// Opening up our database connection.
+data.connect:[generic|magic]
+
+   // Making sure snippet exists.
+   data.create
+      table:ml_training_snippets
+      return-id:bool:true
+      values
+         type:x:@.arguments/*/_type
+         prompt:x:@.arguments/*/prompt
+         completion:x:@.arguments/*/completion
+         uri:x:@.arguments/*/uri
+
+   // Re-vectorising the type.
+   execute:magic.ai.vectorise
+      type:x:@.arguments/*/_type
+
+   // Returning success to caller.
+   yield
+      result:success
+      id:x:@data.create

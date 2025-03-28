@@ -1,0 +1,104 @@
+
+/*
+ * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+ * [instruction] and [query].
+ *
+ * Will use the default API key found from configurations.
+ *
+ * [context] is additional data you can supply to OpenAI such that it responds using
+ * your data as its source for information. [instruction] is a system message allowing
+ * you to change how OpenAI responds.
+ */
+.arguments
+   model:string
+   max_tokens:int
+   context:string
+   instruction:string
+   query:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/model
+validators.mandatory:x:@.arguments/*/query
+validators.mandatory:x:@.arguments/*/max_tokens
+
+// Retrieving OpenAI API token from configuration settings.
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:openai:key"
+
+// Checking if caller provided a [context].
+if
+   exists:x:@.arguments/*/context
+   .lambda
+
+      // Adding [context].
+      insert-before:x:../*/http.post/*/payload/*/messages/0
+         .
+            .
+               role:user
+               content:x:@.arguments/*/context
+
+// Checking if caller provided an [instruction].
+if
+   exists:x:@.arguments/*/instruction
+   .lambda
+
+      // Adding [instruction].
+      insert-before:x:../*/http.post/*/payload/*/messages/0
+         .
+            .
+               role:system
+               content:x:@.arguments/*/instruction
+
+// Checking if model is o3 something, at which point we'll have to change [max_tokens] to [max_completion_tokens]
+if
+   strings.starts-with:x:@.arguments/*/model
+      .:o3-
+   .lambda
+
+      // Changing name of argument.
+      set-name:x:../*/http.post/*/payload/*/max_tokens
+         .:max_completion_tokens
+      remove-nodes:x:../*/http.post/*/payload/*/temperature
+
+// Invokes OpenAI.
+http.post:"https://api.openai.com/v1/chat/completions"
+   convert:bool:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json
+   payload
+      model:x:@.arguments/*/model
+      max_tokens:x:@.arguments/*/max_tokens
+      temperature:decimal:0.3
+      messages
+         .
+            role:user
+            content:x:@.arguments/*/query
+
+// Sanity checking above invocation.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+
+      // Oops, error - Logging error and returning status 500 to caller.
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      throw:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+
+// Returning answer to caller.
+yield
+   answer:x:@http.post/*/content/*/choices/0/*/message/*/content
