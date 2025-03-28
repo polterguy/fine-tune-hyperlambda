@@ -1,0 +1,33 @@
+
+/*
+ * Show me an HTTP API endpoint that deletes one record from my Shippers table in my northwind database according to ShipperID.
+ * Only allow admin users to execute it.
+ */
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   ShipperID:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin
+validators.mandatory:x:@.arguments/*/ShipperID
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Shippers
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

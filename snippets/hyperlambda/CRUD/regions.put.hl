@@ -1,0 +1,48 @@
+
+// Create an endpoint that updates one record in my Regions table in my northwind database. RegionID is my primary key, and I'll need to be able to change RegionDescription. Only allow adming and enterprise users to be able to execute it.
+.arguments
+
+   // RegionID column value being primary key of record to update, mandatory argument
+   RegionID:long
+
+   // RegionDescription column's new value
+   RegionDescription:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,enterprise
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Regions
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update
