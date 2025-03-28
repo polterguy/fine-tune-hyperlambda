@@ -1,0 +1,29 @@
+
+/*
+ * Can you generate an endpoint that deletes one record from my Carriers table in my logistics database?
+ * I want to be able to submit CarrierID which becomes the item deleted, and I want you to ONLY return code,
+ * and no comments or explanation!
+ *
+ * Allow only root and admin users to execute the endpoint
+ */
+.arguments
+   CarrierID:long
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/CarrierID
+data.connect:[generic|logistics]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:Carriers
+      where
+         and
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:logistics.Carriers.delete
+      args
+      roles:enterprise,guest
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

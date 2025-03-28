@@ -4,40 +4,28 @@
  * 
  * I need the enpoint to take optional filter arguments, and my database is SQLite and named chinook.
  * I do NOT want authorization or authentication, since I want all users to be able to execute the endpoint.
+ * I want you to return ONLY Hyperlambda code without comments or explanation!
+ * Have the endpoint return a list of all artists.
  */
 .arguments
-
-   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
    distinct_column:string
    Artist.ArtistId.eq:long
    Artist.Name.like:string
    Artist.Name.eq:string
-
-// Sanity checking that distinct column was passed in.
 validators.mandatory:x:@.arguments/*/distinct_column
-
-// Sanity checking distinct column's name.
 validators.enum:x:@.arguments/*/distinct_column
    .:Artist.ArtistId
    .:Artist.Name
-
-// Opening up our database connection.
 data.connect:[generic|chinook]
    database-type:sqlite
-
-   // Making sure we're using correct function.
    set-name:x:./*/data.read/*/columns/*/distinct_functor
       strings.concat
          .:"count(distinct "
          get-value:x:@.arguments/*/distinct_column
          .:)
-
-   // Removing distinct argument to simplify adding other arguments.
    remove-nodes:x:@.arguments/*/distinct_column
    add:x:+/*/where/*
       get-nodes:x:@.arguments/*
-
-   // Reading data from database.
    data.read
       database-type:sqlite
       table:Artist
@@ -46,6 +34,4 @@ data.connect:[generic|chinook]
             as:count
       where
          and
-
-   // Returning result of above read invocation to caller.
    return-nodes:x:@data.read/*/*

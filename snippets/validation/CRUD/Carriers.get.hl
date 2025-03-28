@@ -1,0 +1,43 @@
+
+/*
+ * How do I create an endpoint that selects records from the Carriers table in my logistics database?
+ * I want only root users to be able to exeute the endpoint, and I'll need paging and sorting.
+ * IMPORTANT! Return ONLY the code, and no comments!
+ *
+ * I only need filtering on Name, and please add HTTP cache for 50 seconds.
+ */
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   Carriers.Name.like:string
+   Carriers.Name.mt:string
+response.headers.set
+   Cache-Control:public, max-age=50
+auth.ticket.verify:root
+data.connect:[generic|logistics]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Carriers
+      columns
+         Carriers.CarrierID
+         Carriers.Name
+         Carriers.Phone
+         Carriers.Email
+      where
+         and
+   return-nodes:x:@data.read/*
