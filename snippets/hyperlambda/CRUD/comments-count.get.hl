@@ -1,0 +1,32 @@
+
+// Counts items from your comments table in your cms database
+.arguments
+   comments.id.eq:long
+   comments.post_id.eq:long
+   comments.user_id.eq:long
+   comments.content.like:string
+   comments.content.eq:string
+   comments.created_at.eq:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:comments
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*
