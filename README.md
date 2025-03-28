@@ -23,3 +23,7 @@ If you're successful, you should have training loss around 0.3 - 0.6, and full v
 * I've got a file at /etc/www/foo.zip. I want you to show me the code required to unzip it in the same folder it exists in
 * Create an HTTP endpoint that invokes Chuck Norris Joke API to generate a random joke and return to caller
 * Create an endpoint that executes Cat Fact Joke API to and returning a random fact about cats
+* I need an endpoint that's invoking Cat fact API and returns the fact to the caller
+* How do I update a record in my HR database and its employees table?
+* Show me an endpoint concatenating name and age with a greeting and returning the result to caller
+* Generate an HTTP endpoint for me that lists all files in /etc/www/ and returns this to the caller
