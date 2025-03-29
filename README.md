@@ -6,21 +6,27 @@ This project allows you to fine tune OpenAI and their GPT models on Hyperlambda.
 
 Below are hyper parameters I've had success with in some example runs.
 
-1. Epochs - **auto**
-2. Batch size - **auto**
-3. LR multiplier - 0.17
+1. Epochs - 5
+2. Batch size - 4
+3. LR multiplier - 0.10
 
 If you're successful, you should have training loss around 0.3 - 0.6, and full validation loss at 0.3 higher than training loss, between 0.6 and 0.9.
 
+Notice, during inference you should use around 0.0 and 0.1 in temperature to tighten its result better.
+
 ## Example test prompts
 
-* How do I send an email?
+* How do I convert a string to an integer?
+* How do I open a database connection?
 * How do I concatenate 2 strings?
-* Select contacts records from my ERP database. My database is SQLite, and I want to use CRUD slots.
+* How do I send an email?
+* Write an endpoint taking age and name, and responding with a personal greeting
+* Select contacts records from my ERP database.
 * Create an endpoint that allows me to return records from my employees table in my hr database with paging and sorting.
-* Create an endpoint allowing me to create new items in my contacts table in my CRM database. It's got name, email, and phone columns, and I want only admin users to be able to execute it.
+* Create an endpoint allowing me to create new items in my contacts table in my CRM database.
+* Generate an endpoint that only partner users can execute
 * Generate code for an endpoint allowing me to update items in my stock table in my logistics database
-* How do I delete a record from contacts in crm database using CRUD slots?
+* How do I delete a record from contacts in crm database?
 * Create an endpoint taking a name filter that's using SQL slots to return customers from my sales db
 * Create an endpoint that sends an email with subject, body, name and email as arguments
 * Create an endpoint that loads a file specified as an argument and returns its content back to caller.
@@ -32,3 +38,5 @@ If you're successful, you should have training loss around 0.3 - 0.6, and full v
 * Show me an endpoint concatenating name and age with a greeting and returning the result to caller
 * Generate an HTTP endpoint for me that lists all files in /etc/www/ and returns this to the caller
 * How do I concatenate two strings given to an endpoint as arguments?
+
+However, the best way to test is to take the file level comment from your validation data, and run through the model afterwards.
