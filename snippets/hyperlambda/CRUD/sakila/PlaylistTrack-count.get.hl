@@ -1,0 +1,44 @@
+
+// Counts items from your PlaylistTrack table in your chinook database
+.arguments
+   PlaylistTrack.PlaylistId.eq:long
+   PlaylistTrack.TrackId.eq:long
+   PlaylistId.Name.eq:string
+   PlaylistId.Name.like:string
+   TrackId.Name.eq:string
+   TrackId.Name.like:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:PlaylistTrack
+         join:Playlist
+            as:PlaylistId
+            type:left
+            on
+               and
+                  PlaylistTrack.PlaylistId:PlaylistId.PlaylistId
+         join:Track
+            as:TrackId
+            type:left
+            on
+               and
+                  PlaylistTrack.TrackId:TrackId.TrackId
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

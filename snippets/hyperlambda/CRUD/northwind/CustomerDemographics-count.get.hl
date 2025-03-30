@@ -1,0 +1,72 @@
+
+// Counts items from your CustomerDemographics table in your northwind database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   /*
+    * Optional filtering arguments, allowing you to filter what rows to consider.
+    *
+    * - .mt implies 'more than'
+    * - .lt implies 'less than'
+    * - .eq implies 'equal to'
+    * - .neq implies 'not equal to'
+    * - .mteq implies 'more than or equal to'
+    * - .lteq implies 'less than or equal to'
+    * - .like becomes a LIKE SQL condition
+    */
+   CustomerDemographics.CustomerTypeID.like:string
+   CustomerDemographics.CustomerTypeID.mt:string
+   CustomerDemographics.CustomerTypeID.lt:string
+   CustomerDemographics.CustomerTypeID.mteq:string
+   CustomerDemographics.CustomerTypeID.lteq:string
+   CustomerDemographics.CustomerTypeID.neq:string
+   CustomerDemographics.CustomerTypeID.eq:string
+   CustomerDemographics.CustomerDesc.like:string
+   CustomerDemographics.CustomerDesc.mt:string
+   CustomerDemographics.CustomerDesc.lt:string
+   CustomerDemographics.CustomerDesc.mteq:string
+   CustomerDemographics.CustomerDesc.lteq:string
+   CustomerDemographics.CustomerDesc.neq:string
+   CustomerDemographics.CustomerDesc.eq:string
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:CustomerDemographics
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

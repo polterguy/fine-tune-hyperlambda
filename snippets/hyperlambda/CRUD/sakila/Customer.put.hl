@@ -1,0 +1,81 @@
+
+// Update one record in your Customer table in your chinook database
+.arguments
+
+   // CustomerId column value being primary key of record to update, mandatory argument
+   CustomerId:long
+
+   // FirstName column's new value
+   FirstName:string
+
+   // LastName column's new value
+   LastName:string
+
+   // Company column's new value
+   Company:string
+
+   // Address column's new value
+   Address:string
+
+   // City column's new value
+   City:string
+
+   // State column's new value
+   State:string
+
+   // Country column's new value
+   Country:string
+
+   // PostalCode column's new value
+   PostalCode:string
+
+   // Phone column's new value
+   Phone:string
+
+   // Fax column's new value
+   Fax:string
+
+   // Email column's new value
+   Email:string
+
+   // SupportRepId column's new value
+   SupportRepId:long
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/CustomerId
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Customer
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

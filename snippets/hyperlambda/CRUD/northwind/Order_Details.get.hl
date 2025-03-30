@@ -1,0 +1,136 @@
+
+// Read or list records from your Order Details table in your northwind database
+.arguments
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   /*
+    * Optional filtering arguments, allowing you to filter what rows to consider.
+    *
+    * - .mt implies 'more than'
+    * - .lt implies 'less than'
+    * - .eq implies 'equal to'
+    * - .neq implies 'not equal to'
+    * - .mteq implies 'more than or equal to'
+    * - .lteq implies 'less than or equal to'
+    * - .like becomes a LIKE SQL condition
+    */
+   Order Details.OrderID.mt:long
+   Order Details.OrderID.lt:long
+   Order Details.OrderID.mteq:long
+   Order Details.OrderID.lteq:long
+   Order Details.OrderID.neq:long
+   Order Details.OrderID.eq:long
+   Order Details.ProductID.mt:long
+   Order Details.ProductID.lt:long
+   Order Details.ProductID.mteq:long
+   Order Details.ProductID.lteq:long
+   Order Details.ProductID.neq:long
+   Order Details.ProductID.eq:long
+   Order Details.UnitPrice.mt:decimal
+   Order Details.UnitPrice.lt:decimal
+   Order Details.UnitPrice.mteq:decimal
+   Order Details.UnitPrice.lteq:decimal
+   Order Details.UnitPrice.neq:decimal
+   Order Details.UnitPrice.eq:decimal
+   Order Details.Quantity.mt:long
+   Order Details.Quantity.lt:long
+   Order Details.Quantity.mteq:long
+   Order Details.Quantity.lteq:long
+   Order Details.Quantity.neq:long
+   Order Details.Quantity.eq:long
+   Order Details.Discount.mt:double
+   Order Details.Discount.lt:double
+   Order Details.Discount.mteq:double
+   Order Details.Discount.lteq:double
+   Order Details.Discount.neq:double
+   Order Details.Discount.eq:double
+   OrderID.CustomerID.eq:string
+   OrderID.CustomerID.like:string
+   ProductID.ProductName.eq:string
+   ProductID.ProductName.like:string
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Order Details
+         join:Orders
+            as:OrderID
+            type:left
+            on
+               and
+                  Order Details.OrderID:OrderID.OrderID
+         join:Products
+            as:ProductID
+            type:left
+            on
+               and
+                  Order Details.ProductID:ProductID.ProductID
+      columns
+         Order Details.OrderID
+         Order Details.ProductID
+         Order Details.UnitPrice
+         Order Details.Quantity
+         Order Details.Discount
+         OrderID.CustomerID
+            as:OrderID.CustomerID
+         ProductID.ProductName
+            as:ProductID.ProductName
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

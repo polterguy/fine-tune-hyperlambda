@@ -1,0 +1,97 @@
+
+// Create one record in your Employees table in your northwind database
+.arguments
+
+   // LastName column value
+   LastName:string
+
+   // FirstName column value
+   FirstName:string
+
+   // Title column value
+   Title:string
+
+   // TitleOfCourtesy column value
+   TitleOfCourtesy:string
+
+   // BirthDate column value
+   BirthDate:date
+
+   // HireDate column value
+   HireDate:date
+
+   // Address column value
+   Address:string
+
+   // City column value
+   City:string
+
+   // Region column value
+   Region:string
+
+   // PostalCode column value
+   PostalCode:string
+
+   // Country column value
+   Country:string
+
+   // HomePhone column value
+   HomePhone:string
+
+   // Extension column value
+   Extension:string
+
+   // Photo column value
+   Photo:string
+
+   // Notes column value
+   Notes:string
+
+   // ReportsTo column value
+   ReportsTo:long
+
+   // PhotoPath column value
+   PhotoPath:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:partner,professional
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:northwind.Employees entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Employees
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Employees.post
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

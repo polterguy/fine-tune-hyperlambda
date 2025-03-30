@@ -1,0 +1,137 @@
+
+// Counts items from your Products table in your northwind database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   /*
+    * Optional filtering arguments, allowing you to filter what rows to consider.
+    *
+    * - .mt implies 'more than'
+    * - .lt implies 'less than'
+    * - .eq implies 'equal to'
+    * - .neq implies 'not equal to'
+    * - .mteq implies 'more than or equal to'
+    * - .lteq implies 'less than or equal to'
+    * - .like becomes a LIKE SQL condition
+    */
+   Products.ProductID.mt:long
+   Products.ProductID.lt:long
+   Products.ProductID.mteq:long
+   Products.ProductID.lteq:long
+   Products.ProductID.neq:long
+   Products.ProductID.eq:long
+   Products.ProductName.like:string
+   Products.ProductName.mt:string
+   Products.ProductName.lt:string
+   Products.ProductName.mteq:string
+   Products.ProductName.lteq:string
+   Products.ProductName.neq:string
+   Products.ProductName.eq:string
+   Products.SupplierID.mt:long
+   Products.SupplierID.lt:long
+   Products.SupplierID.mteq:long
+   Products.SupplierID.lteq:long
+   Products.SupplierID.neq:long
+   Products.SupplierID.eq:long
+   Products.CategoryID.mt:long
+   Products.CategoryID.lt:long
+   Products.CategoryID.mteq:long
+   Products.CategoryID.lteq:long
+   Products.CategoryID.neq:long
+   Products.CategoryID.eq:long
+   Products.QuantityPerUnit.like:string
+   Products.QuantityPerUnit.mt:string
+   Products.QuantityPerUnit.lt:string
+   Products.QuantityPerUnit.mteq:string
+   Products.QuantityPerUnit.lteq:string
+   Products.QuantityPerUnit.neq:string
+   Products.QuantityPerUnit.eq:string
+   Products.UnitPrice.mt:decimal
+   Products.UnitPrice.lt:decimal
+   Products.UnitPrice.mteq:decimal
+   Products.UnitPrice.lteq:decimal
+   Products.UnitPrice.neq:decimal
+   Products.UnitPrice.eq:decimal
+   Products.UnitsInStock.mt:long
+   Products.UnitsInStock.lt:long
+   Products.UnitsInStock.mteq:long
+   Products.UnitsInStock.lteq:long
+   Products.UnitsInStock.neq:long
+   Products.UnitsInStock.eq:long
+   Products.UnitsOnOrder.mt:long
+   Products.UnitsOnOrder.lt:long
+   Products.UnitsOnOrder.mteq:long
+   Products.UnitsOnOrder.lteq:long
+   Products.UnitsOnOrder.neq:long
+   Products.UnitsOnOrder.eq:long
+   Products.ReorderLevel.mt:long
+   Products.ReorderLevel.lt:long
+   Products.ReorderLevel.mteq:long
+   Products.ReorderLevel.lteq:long
+   Products.ReorderLevel.neq:long
+   Products.ReorderLevel.eq:long
+   Products.Discontinued.like:string
+   Products.Discontinued.mt:string
+   Products.Discontinued.lt:string
+   Products.Discontinued.mteq:string
+   Products.Discontinued.lteq:string
+   Products.Discontinued.neq:string
+   Products.Discontinued.eq:string
+   ProductID.CategoryName.eq:string
+   ProductID.CategoryName.like:string
+   SupplierID.CompanyName.eq:string
+   SupplierID.CompanyName.like:string
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Products
+         join:Categories
+            as:ProductID
+            type:left
+            on
+               and
+                  Products.ProductID:ProductID.CategoryID
+         join:Suppliers
+            as:SupplierID
+            type:left
+            on
+               and
+                  Products.SupplierID:SupplierID.SupplierID
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

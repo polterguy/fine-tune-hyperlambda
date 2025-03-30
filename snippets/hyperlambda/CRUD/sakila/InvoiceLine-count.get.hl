@@ -1,0 +1,47 @@
+
+// Counts items from your InvoiceLine table in your chinook database
+.arguments
+   InvoiceLine.InvoiceLineId.eq:long
+   InvoiceLine.InvoiceId.eq:long
+   InvoiceLine.TrackId.eq:long
+   InvoiceLine.UnitPrice.eq:decimal
+   InvoiceLine.Quantity.eq:long
+   InvoiceId.BillingAddress.eq:string
+   InvoiceId.BillingAddress.like:string
+   TrackId.Name.eq:string
+   TrackId.Name.like:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:InvoiceLine
+         join:Invoice
+            as:InvoiceId
+            type:left
+            on
+               and
+                  InvoiceLine.InvoiceId:InvoiceId.InvoiceId
+         join:Track
+            as:TrackId
+            type:left
+            on
+               and
+                  InvoiceLine.TrackId:TrackId.TrackId
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

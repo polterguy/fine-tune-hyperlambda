@@ -1,0 +1,101 @@
+
+// Update one record in your Orders table in your northwind database
+.arguments
+
+   // OrderID column value being primary key of record to update, mandatory argument
+   OrderID:long
+
+   // CustomerID column's new value
+   CustomerID:string
+
+   // EmployeeID column's new value
+   EmployeeID:long
+
+   // OrderDate column's new value
+   OrderDate:date
+
+   // RequiredDate column's new value
+   RequiredDate:date
+
+   // ShippedDate column's new value
+   ShippedDate:date
+
+   // ShipVia column's new value
+   ShipVia:long
+
+   // ShipName column's new value
+   ShipName:string
+
+   // ShipAddress column's new value
+   ShipAddress:string
+
+   // ShipCity column's new value
+   ShipCity:string
+
+   // ShipRegion column's new value
+   ShipRegion:string
+
+   // ShipPostalCode column's new value
+   ShipPostalCode:string
+
+   // ShipCountry column's new value
+   ShipCountry:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/OrderID
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:northwind.Orders entry updated
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Orders
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Orders.put
+      args
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

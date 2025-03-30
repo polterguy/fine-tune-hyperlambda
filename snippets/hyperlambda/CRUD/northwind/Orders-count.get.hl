@@ -1,0 +1,165 @@
+
+// Counts items from your Orders table in your northwind database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   /*
+    * Optional filtering arguments, allowing you to filter what rows to consider.
+    *
+    * - .mt implies 'more than'
+    * - .lt implies 'less than'
+    * - .eq implies 'equal to'
+    * - .neq implies 'not equal to'
+    * - .mteq implies 'more than or equal to'
+    * - .lteq implies 'less than or equal to'
+    * - .like becomes a LIKE SQL condition
+    */
+   Orders.OrderID.mt:long
+   Orders.OrderID.lt:long
+   Orders.OrderID.mteq:long
+   Orders.OrderID.lteq:long
+   Orders.OrderID.neq:long
+   Orders.OrderID.eq:long
+   Orders.CustomerID.like:string
+   Orders.CustomerID.mt:string
+   Orders.CustomerID.lt:string
+   Orders.CustomerID.mteq:string
+   Orders.CustomerID.lteq:string
+   Orders.CustomerID.neq:string
+   Orders.CustomerID.eq:string
+   Orders.EmployeeID.mt:long
+   Orders.EmployeeID.lt:long
+   Orders.EmployeeID.mteq:long
+   Orders.EmployeeID.lteq:long
+   Orders.EmployeeID.neq:long
+   Orders.EmployeeID.eq:long
+   Orders.OrderDate.mt:date
+   Orders.OrderDate.lt:date
+   Orders.OrderDate.mteq:date
+   Orders.OrderDate.lteq:date
+   Orders.OrderDate.neq:date
+   Orders.OrderDate.eq:date
+   Orders.RequiredDate.mt:date
+   Orders.RequiredDate.lt:date
+   Orders.RequiredDate.mteq:date
+   Orders.RequiredDate.lteq:date
+   Orders.RequiredDate.neq:date
+   Orders.RequiredDate.eq:date
+   Orders.ShippedDate.mt:date
+   Orders.ShippedDate.lt:date
+   Orders.ShippedDate.mteq:date
+   Orders.ShippedDate.lteq:date
+   Orders.ShippedDate.neq:date
+   Orders.ShippedDate.eq:date
+   Orders.ShipVia.mt:long
+   Orders.ShipVia.lt:long
+   Orders.ShipVia.mteq:long
+   Orders.ShipVia.lteq:long
+   Orders.ShipVia.neq:long
+   Orders.ShipVia.eq:long
+   Orders.Freight.mt:decimal
+   Orders.Freight.lt:decimal
+   Orders.Freight.mteq:decimal
+   Orders.Freight.lteq:decimal
+   Orders.Freight.neq:decimal
+   Orders.Freight.eq:decimal
+   Orders.ShipName.like:string
+   Orders.ShipName.mt:string
+   Orders.ShipName.lt:string
+   Orders.ShipName.mteq:string
+   Orders.ShipName.lteq:string
+   Orders.ShipName.neq:string
+   Orders.ShipName.eq:string
+   Orders.ShipAddress.like:string
+   Orders.ShipAddress.mt:string
+   Orders.ShipAddress.lt:string
+   Orders.ShipAddress.mteq:string
+   Orders.ShipAddress.lteq:string
+   Orders.ShipAddress.neq:string
+   Orders.ShipAddress.eq:string
+   Orders.ShipCity.like:string
+   Orders.ShipCity.mt:string
+   Orders.ShipCity.lt:string
+   Orders.ShipCity.mteq:string
+   Orders.ShipCity.lteq:string
+   Orders.ShipCity.neq:string
+   Orders.ShipCity.eq:string
+   Orders.ShipRegion.like:string
+   Orders.ShipRegion.mt:string
+   Orders.ShipRegion.lt:string
+   Orders.ShipRegion.mteq:string
+   Orders.ShipRegion.lteq:string
+   Orders.ShipRegion.neq:string
+   Orders.ShipRegion.eq:string
+   Orders.ShipPostalCode.like:string
+   Orders.ShipPostalCode.mt:string
+   Orders.ShipPostalCode.lt:string
+   Orders.ShipPostalCode.mteq:string
+   Orders.ShipPostalCode.lteq:string
+   Orders.ShipPostalCode.neq:string
+   Orders.ShipPostalCode.eq:string
+   Orders.ShipCountry.like:string
+   Orders.ShipCountry.mt:string
+   Orders.ShipCountry.lt:string
+   Orders.ShipCountry.mteq:string
+   Orders.ShipCountry.lteq:string
+   Orders.ShipCountry.neq:string
+   Orders.ShipCountry.eq:string
+   EmployeeID.LastName.eq:string
+   EmployeeID.LastName.like:string
+   ShipVia.CompanyName.eq:string
+   ShipVia.CompanyName.like:string
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Orders
+         join:Employees
+            as:EmployeeID
+            type:left
+            on
+               and
+                  Orders.EmployeeID:EmployeeID.EmployeeID
+         join:Shippers
+            as:ShipVia
+            type:left
+            on
+               and
+                  Orders.ShipVia:ShipVia.ShipperID
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

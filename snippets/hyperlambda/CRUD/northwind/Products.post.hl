@@ -1,0 +1,73 @@
+
+// Create one record in your Products table in your northwind database
+.arguments
+
+   // ProductName column value
+   ProductName:string
+
+   // SupplierID column value
+   SupplierID:long
+
+   // CategoryID column value
+   CategoryID:long
+
+   // QuantityPerUnit column value
+   QuantityPerUnit:string
+
+   // UnitPrice column value
+   UnitPrice:decimal
+
+   // UnitsInStock column value
+   UnitsInStock:long
+
+   // UnitsOnOrder column value
+   UnitsOnOrder:long
+
+   // ReorderLevel column value
+   ReorderLevel:long
+
+   // Discontinued column value
+   Discontinued:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:partner,professional
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:northwind.Products entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Products
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Products.post
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

@@ -1,0 +1,116 @@
+
+// Update one record in your Employees table in your northwind database
+.arguments
+
+   // EmployeeID column value being primary key of record to update, mandatory argument
+   EmployeeID:long
+
+   // LastName column's new value
+   LastName:string
+
+   // FirstName column's new value
+   FirstName:string
+
+   // Title column's new value
+   Title:string
+
+   // TitleOfCourtesy column's new value
+   TitleOfCourtesy:string
+
+   // BirthDate column's new value
+   BirthDate:date
+
+   // HireDate column's new value
+   HireDate:date
+
+   // Address column's new value
+   Address:string
+
+   // City column's new value
+   City:string
+
+   // Region column's new value
+   Region:string
+
+   // PostalCode column's new value
+   PostalCode:string
+
+   // Country column's new value
+   Country:string
+
+   // HomePhone column's new value
+   HomePhone:string
+
+   // Extension column's new value
+   Extension:string
+
+   // Photo column's new value
+   Photo:string
+
+   // Notes column's new value
+   Notes:string
+
+   // ReportsTo column's new value
+   ReportsTo:long
+
+   // PhotoPath column's new value
+   PhotoPath:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/EmployeeID
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:northwind.Employees entry updated
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Employees
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Employees.put
+      args
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

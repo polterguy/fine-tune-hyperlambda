@@ -1,0 +1,90 @@
+
+// Update one record in your Employee table in your chinook database
+.arguments
+
+   // EmployeeId column value being primary key of record to update, mandatory argument
+   EmployeeId:long
+
+   // LastName column's new value
+   LastName:string
+
+   // FirstName column's new value
+   FirstName:string
+
+   // Title column's new value
+   Title:string
+
+   // ReportsTo column's new value
+   ReportsTo:long
+
+   // BirthDate column's new value
+   BirthDate:date
+
+   // HireDate column's new value
+   HireDate:date
+
+   // Address column's new value
+   Address:string
+
+   // City column's new value
+   City:string
+
+   // State column's new value
+   State:string
+
+   // Country column's new value
+   Country:string
+
+   // PostalCode column's new value
+   PostalCode:string
+
+   // Phone column's new value
+   Phone:string
+
+   // Fax column's new value
+   Fax:string
+
+   // Email column's new value
+   Email:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/EmployeeId
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Employee
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

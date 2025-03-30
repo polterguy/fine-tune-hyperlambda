@@ -1,0 +1,190 @@
+
+// Returns unique and distinct values from your Products table in your northwind database
+.arguments
+
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   /*
+    * Optional filtering arguments, allowing you to filter what rows to consider.
+    *
+    * - .mt implies 'more than'
+    * - .lt implies 'less than'
+    * - .eq implies 'equal to'
+    * - .neq implies 'not equal to'
+    * - .mteq implies 'more than or equal to'
+    * - .lteq implies 'less than or equal to'
+    * - .like becomes a LIKE SQL condition
+    */
+   Products.ProductID.mt:long
+   Products.ProductID.lt:long
+   Products.ProductID.mteq:long
+   Products.ProductID.lteq:long
+   Products.ProductID.neq:long
+   Products.ProductID.eq:long
+   Products.ProductName.like:string
+   Products.ProductName.mt:string
+   Products.ProductName.lt:string
+   Products.ProductName.mteq:string
+   Products.ProductName.lteq:string
+   Products.ProductName.neq:string
+   Products.ProductName.eq:string
+   Products.SupplierID.mt:long
+   Products.SupplierID.lt:long
+   Products.SupplierID.mteq:long
+   Products.SupplierID.lteq:long
+   Products.SupplierID.neq:long
+   Products.SupplierID.eq:long
+   Products.CategoryID.mt:long
+   Products.CategoryID.lt:long
+   Products.CategoryID.mteq:long
+   Products.CategoryID.lteq:long
+   Products.CategoryID.neq:long
+   Products.CategoryID.eq:long
+   Products.QuantityPerUnit.like:string
+   Products.QuantityPerUnit.mt:string
+   Products.QuantityPerUnit.lt:string
+   Products.QuantityPerUnit.mteq:string
+   Products.QuantityPerUnit.lteq:string
+   Products.QuantityPerUnit.neq:string
+   Products.QuantityPerUnit.eq:string
+   Products.UnitPrice.mt:decimal
+   Products.UnitPrice.lt:decimal
+   Products.UnitPrice.mteq:decimal
+   Products.UnitPrice.lteq:decimal
+   Products.UnitPrice.neq:decimal
+   Products.UnitPrice.eq:decimal
+   Products.UnitsInStock.mt:long
+   Products.UnitsInStock.lt:long
+   Products.UnitsInStock.mteq:long
+   Products.UnitsInStock.lteq:long
+   Products.UnitsInStock.neq:long
+   Products.UnitsInStock.eq:long
+   Products.UnitsOnOrder.mt:long
+   Products.UnitsOnOrder.lt:long
+   Products.UnitsOnOrder.mteq:long
+   Products.UnitsOnOrder.lteq:long
+   Products.UnitsOnOrder.neq:long
+   Products.UnitsOnOrder.eq:long
+   Products.ReorderLevel.mt:long
+   Products.ReorderLevel.lt:long
+   Products.ReorderLevel.mteq:long
+   Products.ReorderLevel.lteq:long
+   Products.ReorderLevel.neq:long
+   Products.ReorderLevel.eq:long
+   Products.Discontinued.like:string
+   Products.Discontinued.mt:string
+   Products.Discontinued.lt:string
+   Products.Discontinued.mteq:string
+   Products.Discontinued.lteq:string
+   Products.Discontinued.neq:string
+   Products.Discontinued.eq:string
+   ProductID.CategoryName.eq:string
+   ProductID.CategoryName.like:string
+   SupplierID.CompanyName.eq:string
+   SupplierID.CompanyName.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Products.ProductID
+   .:Products.ProductName
+   .:Products.SupplierID
+   .:Products.CategoryID
+   .:Products.QuantityPerUnit
+   .:Products.UnitPrice
+   .:Products.UnitsInStock
+   .:Products.UnitsOnOrder
+   .:Products.ReorderLevel
+   .:Products.Discontinued
+   .:ProductID.CategoryName
+   .:SupplierID.CompanyName
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Products
+         join:Categories
+            as:ProductID
+            type:left
+            on
+               and
+                  Products.ProductID:ProductID.CategoryID
+         join:Suppliers
+            as:SupplierID
+            type:left
+            on
+               and
+                  Products.SupplierID:SupplierID.SupplierID
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

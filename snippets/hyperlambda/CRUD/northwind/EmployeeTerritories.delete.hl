@@ -1,0 +1,51 @@
+
+// Delete one record from your EmployeeTerritories table in your northwind database
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   EmployeeID:long
+
+   // Primary key of record to delete, mandatory argument
+   TerritoryID:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:northwind.EmployeeTerritories entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/EmployeeID
+validators.mandatory:x:@.arguments/*/TerritoryID
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:EmployeeTerritories
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.EmployeeTerritories.delete
+      args
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

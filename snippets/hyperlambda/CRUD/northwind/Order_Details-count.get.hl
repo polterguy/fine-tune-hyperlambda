@@ -1,0 +1,104 @@
+
+// Counts items from your Order Details table in your northwind database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   /*
+    * Optional filtering arguments, allowing you to filter what rows to consider.
+    *
+    * - .mt implies 'more than'
+    * - .lt implies 'less than'
+    * - .eq implies 'equal to'
+    * - .neq implies 'not equal to'
+    * - .mteq implies 'more than or equal to'
+    * - .lteq implies 'less than or equal to'
+    * - .like becomes a LIKE SQL condition
+    */
+   Order Details.OrderID.mt:long
+   Order Details.OrderID.lt:long
+   Order Details.OrderID.mteq:long
+   Order Details.OrderID.lteq:long
+   Order Details.OrderID.neq:long
+   Order Details.OrderID.eq:long
+   Order Details.ProductID.mt:long
+   Order Details.ProductID.lt:long
+   Order Details.ProductID.mteq:long
+   Order Details.ProductID.lteq:long
+   Order Details.ProductID.neq:long
+   Order Details.ProductID.eq:long
+   Order Details.UnitPrice.mt:decimal
+   Order Details.UnitPrice.lt:decimal
+   Order Details.UnitPrice.mteq:decimal
+   Order Details.UnitPrice.lteq:decimal
+   Order Details.UnitPrice.neq:decimal
+   Order Details.UnitPrice.eq:decimal
+   Order Details.Quantity.mt:long
+   Order Details.Quantity.lt:long
+   Order Details.Quantity.mteq:long
+   Order Details.Quantity.lteq:long
+   Order Details.Quantity.neq:long
+   Order Details.Quantity.eq:long
+   Order Details.Discount.mt:double
+   Order Details.Discount.lt:double
+   Order Details.Discount.mteq:double
+   Order Details.Discount.lteq:double
+   Order Details.Discount.neq:double
+   Order Details.Discount.eq:double
+   OrderID.CustomerID.eq:string
+   OrderID.CustomerID.like:string
+   ProductID.ProductName.eq:string
+   ProductID.ProductName.like:string
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Order Details
+         join:Orders
+            as:OrderID
+            type:left
+            on
+               and
+                  Order Details.OrderID:OrderID.OrderID
+         join:Products
+            as:ProductID
+            type:left
+            on
+               and
+                  Order Details.ProductID:ProductID.ProductID
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,58 @@
+
+// Counts items from your Customer table in your chinook database
+.arguments
+   Customer.CustomerId.eq:long
+   Customer.FirstName.like:string
+   Customer.FirstName.eq:string
+   Customer.LastName.like:string
+   Customer.LastName.eq:string
+   Customer.Company.like:string
+   Customer.Company.eq:string
+   Customer.Address.like:string
+   Customer.Address.eq:string
+   Customer.City.like:string
+   Customer.City.eq:string
+   Customer.State.like:string
+   Customer.State.eq:string
+   Customer.Country.like:string
+   Customer.Country.eq:string
+   Customer.PostalCode.like:string
+   Customer.PostalCode.eq:string
+   Customer.Phone.like:string
+   Customer.Phone.eq:string
+   Customer.Fax.like:string
+   Customer.Fax.eq:string
+   Customer.Email.like:string
+   Customer.Email.eq:string
+   Customer.SupportRepId.eq:long
+   SupportRepId.LastName.eq:string
+   SupportRepId.LastName.like:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|chinook]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Customer
+         join:Employee
+            as:SupportRepId
+            type:left
+            on
+               and
+                  Customer.SupportRepId:SupportRepId.EmployeeId
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

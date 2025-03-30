@@ -1,0 +1,186 @@
+
+// Returns unique and distinct values from your Suppliers table in your northwind database
+.arguments
+
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+
+   /*
+    * Optional filtering arguments.
+    */
+   Suppliers.SupplierID.mt:long
+   Suppliers.SupplierID.lt:long
+   Suppliers.SupplierID.mteq:long
+   Suppliers.SupplierID.lteq:long
+   Suppliers.SupplierID.neq:long
+   Suppliers.SupplierID.eq:long
+   Suppliers.CompanyName.like:string
+   Suppliers.CompanyName.mt:string
+   Suppliers.CompanyName.lt:string
+   Suppliers.CompanyName.mteq:string
+   Suppliers.CompanyName.lteq:string
+   Suppliers.CompanyName.neq:string
+   Suppliers.CompanyName.eq:string
+   Suppliers.ContactName.like:string
+   Suppliers.ContactName.mt:string
+   Suppliers.ContactName.lt:string
+   Suppliers.ContactName.mteq:string
+   Suppliers.ContactName.lteq:string
+   Suppliers.ContactName.neq:string
+   Suppliers.ContactName.eq:string
+   Suppliers.ContactTitle.like:string
+   Suppliers.ContactTitle.mt:string
+   Suppliers.ContactTitle.lt:string
+   Suppliers.ContactTitle.mteq:string
+   Suppliers.ContactTitle.lteq:string
+   Suppliers.ContactTitle.neq:string
+   Suppliers.ContactTitle.eq:string
+   Suppliers.Address.like:string
+   Suppliers.Address.mt:string
+   Suppliers.Address.lt:string
+   Suppliers.Address.mteq:string
+   Suppliers.Address.lteq:string
+   Suppliers.Address.neq:string
+   Suppliers.Address.eq:string
+   Suppliers.City.like:string
+   Suppliers.City.mt:string
+   Suppliers.City.lt:string
+   Suppliers.City.mteq:string
+   Suppliers.City.lteq:string
+   Suppliers.City.neq:string
+   Suppliers.City.eq:string
+   Suppliers.Region.like:string
+   Suppliers.Region.mt:string
+   Suppliers.Region.lt:string
+   Suppliers.Region.mteq:string
+   Suppliers.Region.lteq:string
+   Suppliers.Region.neq:string
+   Suppliers.Region.eq:string
+   Suppliers.PostalCode.like:string
+   Suppliers.PostalCode.mt:string
+   Suppliers.PostalCode.lt:string
+   Suppliers.PostalCode.mteq:string
+   Suppliers.PostalCode.lteq:string
+   Suppliers.PostalCode.neq:string
+   Suppliers.PostalCode.eq:string
+   Suppliers.Country.like:string
+   Suppliers.Country.mt:string
+   Suppliers.Country.lt:string
+   Suppliers.Country.mteq:string
+   Suppliers.Country.lteq:string
+   Suppliers.Country.neq:string
+   Suppliers.Country.eq:string
+   Suppliers.Phone.like:string
+   Suppliers.Phone.mt:string
+   Suppliers.Phone.lt:string
+   Suppliers.Phone.mteq:string
+   Suppliers.Phone.lteq:string
+   Suppliers.Phone.neq:string
+   Suppliers.Phone.eq:string
+   Suppliers.Fax.like:string
+   Suppliers.Fax.mt:string
+   Suppliers.Fax.lt:string
+   Suppliers.Fax.mteq:string
+   Suppliers.Fax.lteq:string
+   Suppliers.Fax.neq:string
+   Suppliers.Fax.eq:string
+   Suppliers.HomePage.like:string
+   Suppliers.HomePage.mt:string
+   Suppliers.HomePage.lt:string
+   Suppliers.HomePage.mteq:string
+   Suppliers.HomePage.lteq:string
+   Suppliers.HomePage.neq:string
+   Suppliers.HomePage.eq:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Suppliers.SupplierID
+   .:Suppliers.CompanyName
+   .:Suppliers.ContactName
+   .:Suppliers.ContactTitle
+   .:Suppliers.Address
+   .:Suppliers.City
+   .:Suppliers.Region
+   .:Suppliers.PostalCode
+   .:Suppliers.Country
+   .:Suppliers.Phone
+   .:Suppliers.Fax
+   .:Suppliers.HomePage
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|northwind]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Suppliers
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*
