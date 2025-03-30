@@ -24,6 +24,7 @@ Below are some example prompts you can run through the model after fine tuning i
 * How do I send an email?
 * Write an endpoint taking age and name, and responding with a personal greeting
 * Select contacts records from my ERP database.
+* Create an endpoin taking a message only allowing admin users to execute it, then log the message
 * Create an endpoint that allows me to return records from my employees table in my hr database with paging and sorting.
 * Create an endpoint allowing me to create new items in my contacts table in my CRM database.
 * Generate an endpoint that only partner users can execute
