@@ -6,13 +6,13 @@ This project allows you to fine tune OpenAI and their GPT models on Hyperlambda.
 
 Below are hyper parameters I've had success with in some example runs for gpt-40-mini.
 
-1. Epochs - 3
-2. Batch size - 8
-3. LR multiplier - 0.17
+1. Epochs - 6
+2. Batch size - 5
+3. LR multiplier - 0.25
 
-If you're successful, you should have training loss around 0.1 - 0.6, and full validation loss at 0.3 higher than training loss, between 0.4 and 0.9.
+If you're successful, you should have training loss around 0.1 - 0.7, and full validation loss at 0.3 higher than training loss, between 0.4 and 1.0.
 
-Notice, during inference you should use around 0.0 and 0.1 in temperature to tighten its result better.
+Notice, during inference you should use around 0.0 and 0.1 in temperature to tighten results.
 
 ## Example test prompts
 
@@ -24,7 +24,7 @@ Below are some example prompts you can run through the model after fine tuning i
 * How do I send an email?
 * Write an endpoint taking age and name, and responding with a personal greeting
 * Select contacts records from my ERP database.
-* Create an endpoin taking a message only allowing admin users to execute it, then log the message
+* Create an endpoint taking a message only allowing admin users to execute it, then log the message
 * Create an endpoint that allows me to return records from my employees table in my hr database with paging and sorting.
 * Create an endpoint allowing me to create new items in my contacts table in my CRM database.
 * Generate an endpoint that only partner users can execute

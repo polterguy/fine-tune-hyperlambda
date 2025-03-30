@@ -1,0 +1,33 @@
+/*
+ * Endpoint accepting a list of recipients which it will send a welcome email to
+ */
+.arguments
+   recipient_list:*
+
+/*
+ * Notice, the list of recipients will be added into the same email invocation,
+ * allowing everybody to see who gets the email.
+ */
+
+// Loading the welcome message from /etc/welcome.txt
+.welcome-message
+set-value:x:@.welcome-message
+   io.file.load:/etc/welcome.txt
+
+// Forwarding [recipient_list] assuming it's a list of name/email type of object
+add:x:../*/mail.smtp.send/*/message/*/to
+   get-nodes:x:@.arguments/*/recipient_list
+
+/*
+ * Making sure we evaluate the expression leading to [.welcome-message]'s value,
+ * which is the content from the file
+ */
+unwrap:x:+/**
+
+// Sending the email.
+mail.smtp.send
+   message
+      to
+      subject:Welcome
+      entity:text/plain
+         content:x:@.welcome-message
