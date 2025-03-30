@@ -1,0 +1,34 @@
+/*
+ * Endpoint that sends an email with a CSV file attachment summarizing user activity.
+ * The file is assumed to exist on the server and contains user-specific data.
+ *
+ * Endpoint can handle [user-id] argument which it's using to lookup users from its database.
+ */
+.arguments
+   user-id:int
+
+data.connect:appdb
+   data.read
+      table:users
+      where
+         and
+            id.eq:x:@.arguments/*/user-id
+
+   // Transforming result of above [data.read] invocation to CSV
+   lambda2csv:x:@data.read/*
+
+   // Sending our email
+   mail.smtp.send
+      message
+         to
+            .
+               name:x:@data.connect/*/data.read/*/name
+               email:x:@data.connect/*/data.read/*/email
+         subject:Your Activity Summary
+         entity:multipart/mixed
+            entity:text/plain
+               content:Please find attached your activity summary in CSV format.
+            entity:text/csv
+               headers
+                  Content-Disposition:@"attachment; filename=""summary.csv"""
+               content:x:@lambda2csv

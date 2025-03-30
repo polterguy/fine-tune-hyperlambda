@@ -4,17 +4,19 @@ This project allows you to fine tune OpenAI and their GPT models on Hyperlambda.
 
 ## Hyper parameters
 
-Below are hyper parameters I've had success with in some example runs.
+Below are hyper parameters I've had success with in some example runs for gpt-40-mini.
 
-1. Epochs - 5
+1. Epochs - 6
 2. Batch size - 4
 3. LR multiplier - 0.10
 
-If you're successful, you should have training loss around 0.3 - 0.6, and full validation loss at 0.3 higher than training loss, between 0.6 and 0.9.
+If you're successful, you should have training loss around 0.1 - 0.6, and full validation loss at 0.3 higher than training loss, between 0.4 and 0.9.
 
 Notice, during inference you should use around 0.0 and 0.1 in temperature to tighten its result better.
 
 ## Example test prompts
+
+Below are some example prompts you can run through the model after fine tuning is done to test it.
 
 * How do I convert a string to an integer?
 * How do I open a database connection?
