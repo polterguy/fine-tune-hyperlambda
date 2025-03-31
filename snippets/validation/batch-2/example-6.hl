@@ -1,0 +1,37 @@
+/*
+ * First slot returns temperature data. Second slot conditionally logs a message
+ * based on temperature using [if], [else-if], and [else].
+ */
+slots.create:get-temperature
+   return-nodes
+      city:Oslo
+      temp:int:27
+
+slots.create:analyze-weather
+   if
+      gt:x:@.arguments/*/temp
+         .:int:30
+      .lambda
+         log.info:Heat alert
+            city:x:@.arguments/*/city
+
+   else-if
+      gt:x:@.arguments/*/temp
+         .:int:20
+      .lambda
+         log.info:Warm weather
+            city:x:@.arguments/*/city
+
+   else
+      log.info:Cool temperature
+         city:x:@.arguments/*/city
+
+// Execute the temperature slot
+execute:get-temperature
+
+// Pass returned values to the conditional analyzer slot
+add:x:+
+   get-nodes:x:@execute/*
+
+// Execute slot B to evaluate and log based on temperature
+execute:analyze-weather

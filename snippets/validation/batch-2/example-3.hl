@@ -1,0 +1,27 @@
+/*
+ * Define two dynamic slots. The first returns coordinates.
+ * The second logs the latitude and longitude, joins them with a comma, and returns them as [position].
+ */
+slots.create:generate-coordinates
+   return-nodes
+      latitude:59.91
+      longitude:10.75
+
+slots.create:log-coordinates
+   log.info:Received coordinates
+      lat:x:@.arguments/*/latitude
+      lon:x:@.arguments/*/longitude
+   strings.join:x:@.arguments/*
+      .:", "
+   yield
+      position:x:@strings.join
+
+// Run slot A to fetch the coordinate values
+execute:generate-coordinates
+
+// Add the returned values to the argument list of slot B
+add:x:+
+   get-nodes:x:@execute/*
+
+// Run slot B with the forwarded coordinate data
+execute:log-coordinates

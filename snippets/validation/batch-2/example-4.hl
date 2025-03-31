@@ -1,0 +1,37 @@
+/*
+ * Create two dynamic slots. The first returns a user's name and status.
+ * The second uses [if], [else-if], and [else] to log different messages based on the user's status.
+ */
+slots.create:get-user-status
+   return-nodes
+      name:Leo
+      status:active
+
+slots.create:evaluate-status
+   if
+      eq:x:@.arguments/*/status
+         .:active
+      .lambda
+         log.info:User is active
+            name:x:@.arguments/*/name
+
+   else-if
+      eq:x:@.arguments/*/status
+         .:pending
+      .lambda
+         log.info:User is pending approval
+            name:x:@.arguments/*/name
+
+   else
+      log.info:Unknown user status
+         name:x:@.arguments/*/name
+
+// Execute the first slot to get user data
+execute:get-user-status
+
+// Inject the returned nodes into the next execute block
+add:x:+
+   get-nodes:x:@execute/*
+
+// Execute slot B with injected status data
+execute:evaluate-status
