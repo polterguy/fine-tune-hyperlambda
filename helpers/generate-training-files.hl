@@ -63,7 +63,7 @@ data.connect:fine-tune
             .:"\n"
 
 // Adding static snippets
-io.file.list:/modules/fine-tune-hyperlambda/static-snippets/
+io.file.list:/modules/fine-tune-hyperlambda/static-snippets/training/
 for-each:x:@io.file.list/*
    if
       strings.ends-with:x:@.dp/#
@@ -147,6 +147,42 @@ data.connect:fine-tune
             get-value:x:@.validation
             lambda2json:x:@.data/*
             .:"\n"
+
+// Adding static snippets
+io.file.list:/modules/fine-tune-hyperlambda/static-snippets/validation/
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.md
+      .lambda
+         io.file.load:x:@.dp/#
+         strings.split:x:-
+            .:---
+         .prompt
+         set-value:x:@.prompt
+            get-value:x:@strings.split/0
+         .completion
+         set-value:x:@.completion
+            get-value:x:@strings.split/1
+         unwrap:x:+/**
+         .data
+            messages
+               .
+                  role:system
+                  content:x:@.system-message
+               .
+                  role:user
+                  content:x:@.prompt
+               .
+                  role:assistant
+                  content:x:@.completion
+
+         // Adding training data to above [.result].
+         set-value:x:@.validation
+            strings.concat
+               get-value:x:@.validation
+               lambda2json:x:@.data/*
+               .:"\n"
 
 // Saving files.
 io.file.save:/modules/fine-tune-hyperlambda/validation-material.jsonl
