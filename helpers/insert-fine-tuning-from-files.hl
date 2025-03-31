@@ -64,30 +64,16 @@ for-each:x:@execute/*
                   data.connect:fine-tune
 
                      // Making sure we avoid double inserts.
-                     data.read
+                     data.create
                         table:hyperlambda
-                        where
-                           and
-                              code.eq:x:@lambda2hyper
+                        values
+                           code:x:@lambda2hyper
+                           prompt:x:@.prompt
+                           validation:x:@.validation
 
-                     // Making sure we avoid double inserts of the same snippets
-                     if
-                        not-exists:x:@data.read/*
-                        .lambda
-                           data.create
-                              table:hyperlambda
-                              values
-                                 code:x:@lambda2hyper
-                                 prompt:x:@.prompt
-                                 validation:x:@.validation
+                     // Counting how many training snippets we're inserting
+                     math.increment:x:@.no
 
-                           // Counting how many training snippets we're inserting
-                           math.increment:x:@.no
-
-                     else
-
-                        // Cleaning up training data for duplicates.
-                        io.file.delete:x:@.dp/#
    .catch
    
       // This throws an exception being the name of the currently processed filename
