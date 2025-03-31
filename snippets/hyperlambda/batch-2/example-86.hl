@@ -1,0 +1,38 @@
+/*
+ * Create an HTTP endpoint allowing me to delete a record from contacts in crm database for root and admin users
+ */
+
+// Endpoints MUST have an [.arguments] node!
+.arguments
+
+   /*
+    * Filtering arguments must specify type of comparison
+    * The '.eq' parts of this argument below implies an 'equality' comparison, and
+    * will **only** consider items having a `contact_id` value being the same as
+    * the argument's value.
+    */
+   contact_id.eq:int
+
+// Making sure use belongs to either the root role or the admin role
+auth.ticket.verify:root,admin
+
+// Unless [contact_id.eq] argument is given, we will delete ALL records!
+validators.mandatory:x:@.arguments/*/contact_id.eq
+
+// Opening our database connection, executing our delete slot, and returning success to caller.
+data.connect:crm
+
+   /*
+    * This basically means "Add all arguments into the [and] node below",
+    * resulting in only deleting one item for this particular example.
+    */
+   add:x:+/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      table:contacts
+      where
+         and
+
+// Returning success from HTTP API endpoint!
+return
+   result:success
