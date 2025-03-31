@@ -1,0 +1,49 @@
+/*
+ * This Hyperlambda snippet demonstrates how to chain two dynamically created slots.
+ * The first slot returns system stats, and the second slot logs and joins those values.
+ * Data from the first slot is passed to the second slot using [add:x:+] and [get-nodes].
+ */
+
+slots.create:slot.a
+   /*
+    * Slot A returns two system-related metrics using [return-nodes],
+    * which outputs a structured node tree (not just a scalar value).
+    */
+   return-nodes
+      cpu:72%
+      memory:3.5GB
+
+slots.create:slot.b
+   /*
+    * Slot B expects the system stats as input via [.arguments].
+    * It logs the values using [log.info], and creates a string summary using [strings.join].
+    * The final output is returned to the caller using [yield].
+    */
+   log.info:System Stats
+      // Extract the 'cpu' value from arguments using an expression
+      cpu:x:@.arguments/*/cpu
+
+      // Extract the 'memory' value from arguments using an expression
+      memory:x:@.arguments/*/memory
+
+   strings.join:x:@.arguments/*
+      // Use " | " as a separator between the values
+      .:" | "
+
+   yield
+      // Return the concatenated result to the caller
+      summary:x:@strings.join
+
+// Execute slot A to get system metrics
+execute:slot.a
+
+/*
+ * Inject the nodes returned from slot A into the upcoming [execute:slot.b] call.
+ * [add:x:+] means "insert nodes into the next sibling node".
+ * [get-nodes:x:@execute/*] grabs the output children of the previous [execute] call.
+ */
+add:x:+
+   get-nodes:x:@execute/*
+
+// Execute slot B with the enriched argument list (injected by [add])
+execute:slot.b

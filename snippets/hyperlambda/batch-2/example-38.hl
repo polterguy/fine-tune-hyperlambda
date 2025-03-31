@@ -1,0 +1,23 @@
+/*
+ * Slot A returns config keys, slot B joins them into a log entry and yields the result.
+ */
+slots.create:slot.a
+   return-nodes
+      env:dev
+      region:us-east-1
+
+slots.create:slot.b
+   log.info:Environment config
+      env:x:@.arguments/*/env
+      region:x:@.arguments/*/region
+   strings.join:x:@.arguments/*
+      .:" | "
+   yield
+      full-config:x:@strings.join
+
+execute:slot.a
+
+// Inject the output from slot A directly into the argument list of slot B
+add:x:+
+   get-nodes:x:@execute/*
+execute:slot.b

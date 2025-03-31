@@ -1,0 +1,23 @@
+/*
+ * Slot A returns key-value attributes, slot B logs them and returns them concatenated.
+ */
+slots.create:slot.a
+   return-nodes
+      attr1:enabled
+      attr2:true
+
+slots.create:slot.b
+   log.info:Attributes
+      attr1:x:@.arguments/*/attr1
+      attr2:x:@.arguments/*/attr2
+   strings.join:x:@.arguments/*
+      .:" = "
+   yield
+      joined:x:@strings.join
+
+execute:slot.a
+
+// Push children of the returned nodes from execute into the argument space for the next slot
+add:x:+
+   get-nodes:x:@execute/*
+execute:slot.b
