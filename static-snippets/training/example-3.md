@@ -1,4 +1,4 @@
-How do I create an endpoint?
+How do I create an endpoint? Return an endpoint declaration with a detailed comment explaining the structure.
 ---
 /*
  * The [.arguments] node is MANDATORY for an HTTP endpoint since without it, any argument can
