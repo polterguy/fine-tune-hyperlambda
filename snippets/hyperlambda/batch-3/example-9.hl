@@ -1,0 +1,33 @@
+/*
+ * Loads movies from the [film] table in batches of 25.
+ * Uses a [while] loop to loop through paginated chunks from the [media] database.
+ * All film records are stored under [.movie-collection].
+ */
+.cursor:int:0
+.chunk-size:int:25
+.movie-collection
+
+data.connect:[generic|media]
+   .has-next:bool:true
+
+   while
+      get-value:x:@.has-next
+      .lambda
+         data.read
+            table:film
+            limit:x:@.chunk-size
+            offset:x:@.cursor
+
+         add:x:@.movie-collection
+            get-nodes:x:@data.read/*
+
+         if
+            lt
+               get-count:x:@data.read/*
+               get-value:x:@.chunk-size
+            .lambda
+               set-value:x:@.has-next
+                  .:bool:false
+
+         math.increment:x:@.cursor
+            get-value:x:@.chunk-size

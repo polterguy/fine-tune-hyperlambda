@@ -1,0 +1,33 @@
+/*
+ * Iterates through the [employees] table from the [hrms] database.
+ * Fetches 15 records per iteration until all employees are loaded.
+ * The result is accumulated under [.staff-records].
+ */
+.skip:int:0
+.limit:int:15
+.staff-records
+
+data.connect:[generic|hrms]
+   .more-records:bool:true
+
+   while
+      get-value:x:@.more-records
+      .lambda
+         data.read
+            table:employees
+            limit:x:@.limit
+            offset:x:@.skip
+
+         add:x:@.staff-records
+            get-nodes:x:@data.read/*
+
+         if
+            lt
+               get-count:x:@data.read/*
+               get-value:x:@.limit
+            .lambda
+               set-value:x:@.more-records
+                  .:bool:false
+
+         math.increment:x:@.skip
+            get-value:x:@.limit

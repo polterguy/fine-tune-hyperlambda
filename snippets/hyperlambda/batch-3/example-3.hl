@@ -1,0 +1,28 @@
+/*
+ * Load a PDF file and extract its text using [pdf2text].
+ * Search for the word "invoice" in the document.
+ * If the keyword is found, return a confirmation message.
+ * Otherwise, return a fallback response indicating the keyword was missing.
+ */
+.arguments
+.pdf-file:/inbox/latest-document.pdf
+.result
+
+try
+   pdf2text:x:@.pdf-file
+   if
+      strings.contains:x:@pdf2text
+         .:invoice
+      .lambda
+         set-value:x:@.result
+            .:"✅ Keyword 'invoice' found in PDF"
+   else
+      set-value:x:@.result
+         .:"❌ No mention of 'invoice' in PDF"
+   yield
+      status:x:@.result
+.catch
+   set-value:x:@.result
+      .:"⚠️ Error while reading PDF"
+   yield
+      error:x:@.result

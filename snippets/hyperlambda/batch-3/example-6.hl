@@ -1,0 +1,35 @@
+/*
+ * Iteratively reads records from the [contacts] table in chunks of 10.
+ * Uses a [while] loop inside [data.connect] to paginate results until no more data is found.
+ * Appends all retrieved chunks into [.results].
+ */
+.offset:int:0
+.batch-size:int:10
+.results
+
+data.connect:[generic|sakila]
+   .has-more:bool:true
+
+   while
+      get-value:x:@.has-more
+      .lambda
+         data.read
+            table:Actor
+            limit:x:@.batch-size
+            offset:x:@.offset
+
+         // Append current batch to result set
+         add:x:@.results
+            get-nodes:x:@data.read/*
+
+         // Check if fewer results than batch size
+         if
+            lt
+               get-count:x:@data.read/*
+               get-value:x:@.batch-size
+            .lambda
+               set-value:x:@.has-more
+                  .:bool:false
+
+         math.increment:x:@.offset
+            get-value:x:@.batch-size

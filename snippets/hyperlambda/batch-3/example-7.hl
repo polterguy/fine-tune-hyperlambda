@@ -1,0 +1,35 @@
+/*
+ * Loads all rows from the [books] table in pages of 20.
+ * Paginates using a [while] loop until no more data remains.
+ * Accumulates all books into [.book-list].
+ */
+.page:int:0
+.page-size:int:20
+.book-list
+
+data.connect:[generic|library]
+   .continue:bool:true
+
+   while
+      get-value:x:@.continue
+      .lambda
+         data.read
+            table:books
+            limit:x:@.page-size
+            offset:x:@.page
+
+         // Append the current set to the final collection
+         add:x:@.book-list
+            get-nodes:x:@data.read/*
+
+         // End loop if fewer results than a full page
+         if
+            lt
+               get-count:x:@data.read/*
+               get-value:x:@.page-size
+            .lambda
+               set-value:x:@.continue
+                  .:bool:false
+
+         math.increment:x:@.page
+            get-value:x:@.page-size
