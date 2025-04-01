@@ -1,0 +1,64 @@
+/*
+ * This script generates RAG data from Hyperlambda files.
+ */
+
+// Loading all files recursively
+execute:magic.io.file.load-recursively
+   .:/modules/fine-tune-hyperlambda/snippets/
+
+// Looping through all files.
+for-each:x:@execute/*
+
+   // Making sure we catch exceptions such that we can see which file fails.
+   try
+
+      // Verifying we're dealing with a Hyperlambda file.
+      if
+         and
+            strings.ends-with:x:@.dp/#
+               .:.hl
+            lt
+               strings.length:x:@.dp/#/0
+               .:int:1000
+         .lambda
+
+            // Transforming file to lambda object.
+            hyper2lambda:x:@.dp/#/0
+               comments:true
+            remove-nodes:x:-/*/.description
+            if
+               eq
+                  get-name:x:@hyper2lambda/0
+                  .:..
+               .lambda
+
+                  .prompt
+                  set-value:x:-
+                     get-value:x:@hyper2lambda/0
+                  remove-nodes:x:@hyper2lambda/0
+
+                  // Creating our code segment
+                  lambda2hyper:x:@hyper2lambda/*
+                     comments:true
+
+                  // Saving above code snippet.
+                  data.connect:magic
+
+                     // Making sure we avoid double inserts.
+                     data.create
+                        table:ml_training_snippets
+                        values
+                           prompt:x:@.prompt
+                           completion:x:@lambda2hyper
+                           type:hyperlambda-reference
+
+   .catch
+   
+      // This throws an exception being the name of the currently processed filename
+      throw:x:@.dp/#
+
+// House cleanups.
+remove-nodes:x:@execute/*
+
+yield
+   result:success!
