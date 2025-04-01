@@ -1,0 +1,23 @@
+/*
+ * Fetches crypto prices by [symbol] and stores them in the [prices] table in the [crypto] database.
+ */
+.arguments
+   symbol:string
+
+http.get:"https://api.coingecko.com/api/v3/coins/markets"
+   query
+      vs_currency:usd
+      ids:x:@.arguments/*/symbol
+   convert:true
+
+data.connect:crypto
+   for-each:x:@http.get/*/content/*
+      data.create
+         table:prices
+         values
+            name:x:@.dp/*/name
+            symbol:x:@.dp/*/symbol
+            current_price:x:@.dp/*/current_price
+   get-count:x:@http.get/*/content/*
+   yield
+      prices_inserted:x:@get-count

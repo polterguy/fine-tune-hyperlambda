@@ -1,0 +1,26 @@
+/*
+ * Fetches daily COVID-19 stats for a [country] and stores them in the [cases] table in the [health] database.
+ */
+.arguments
+   country:string
+
+strings.concat
+   .:"https://api.covid19api.com/dayone/country/"
+   get-value:x:@.arguments/*/country
+
+http.get:x:@strings.concat
+   convert:true
+
+data.connect:health
+   for-each:x:@http.get/*/content/*
+      data.create
+         table:cases
+         values
+            country:x:@.arguments/*/country
+            date:x:@.dp/*/Date
+            confirmed:int:@.dp/*/Confirmed
+            deaths:int:@.dp/*/Deaths
+            recovered:int:@.dp/*/Recovered
+   get-count:x:@http.get/*/content/*
+   yield
+      records_saved:x:@get-count

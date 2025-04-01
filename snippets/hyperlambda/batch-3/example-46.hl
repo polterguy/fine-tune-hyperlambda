@@ -1,0 +1,19 @@
+/*
+ * Deletes an invoice from the [invoices] table in the [finance] DB.
+ * Then sends an HTTP DELETE to an external accounting service using a URL path.
+ */
+.arguments
+   invoice_id:int
+
+data.connect:finance
+   data.delete
+      table:invoices
+      where
+         and
+            id.eq:x:@.arguments/*/invoice_id
+   strings.concat
+      .:"https://accounting.example.com/api/invoices/"
+      get-value:x:@.arguments/*/invoice_id
+   http.delete:x:@strings.concat
+   yield
+      status:invoice deletion synced

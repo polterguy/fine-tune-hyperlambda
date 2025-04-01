@@ -1,0 +1,22 @@
+/*
+ * Fetches users by [role] from a remote API, then inserts them into the [users] table in the [crm] database.
+ */
+.arguments
+   role:string
+
+http.get:"https://external.api.com/users"
+   query
+      role:x:@.arguments/*/role
+   convert:true
+
+data.connect:crm
+   for-each:x:@http.get/*/content/*
+      data.create
+         table:users
+         values
+            name:x:@.dp/*/name
+            email:x:@.dp/*/email
+            role:x:@.dp/*/role
+   get-count:x:@http.get/*/content/*
+   yield
+      imported:x:@get-count

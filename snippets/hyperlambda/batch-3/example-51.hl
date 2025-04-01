@@ -1,0 +1,23 @@
+/*
+ * Retrieves weather alerts for a given [city] and stores them in the [alerts] table in the [weather] database.
+ */
+.arguments
+   city:string
+
+http.get:"https://weatherapi.com/api/alerts"
+   query
+      city:x:@.arguments/*/city
+   convert:true
+
+data.connect:weather
+   for-each:x:@http.get/*/content/*
+      data.create
+         table:alerts
+         values
+            city:x:@.arguments/*/city
+            type:x:@.dp/*/type
+            severity:x:@.dp/*/severity
+            message:x:@.dp/*/message
+   get-count:x:@http.get/*/content/*
+   yield
+      alerts_saved:x:@get-count

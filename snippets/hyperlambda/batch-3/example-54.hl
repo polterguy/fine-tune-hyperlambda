@@ -1,0 +1,25 @@
+/*
+ * Retrieves public GitHub repos for a [username] and stores them in the [repos] table in the [devtools] database.
+ */
+.arguments
+   username:string
+
+strings.concat
+   .:"https://api.github.com/users/"
+   get-value:x:@.arguments/*/username
+   .:"/repos"
+
+http.get:x:@strings.concat
+   convert:true
+
+data.connect:devtools
+   for-each:x:@http.get/*/content/*
+      data.create
+         table:repos
+         values
+            name:x:@.dp/*/name
+            language:x:@.dp/*/language
+            url:x:@.dp/*/html_url
+   get-count:x:@http.get/*/content/*
+   yield
+      repos_saved:x:@get-count
