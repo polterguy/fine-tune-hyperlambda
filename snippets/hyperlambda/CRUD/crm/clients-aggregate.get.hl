@@ -1,0 +1,123 @@
+
+// Returns minimum, maximum, average or sum from your clients table in your crm database
+.arguments
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   clients.client_id.mt:long
+   clients.client_id.lt:long
+   clients.client_id.mteq:long
+   clients.client_id.lteq:long
+   clients.client_id.neq:long
+   clients.client_id.eq:long
+   clients.name.like:string
+   clients.name.mt:string
+   clients.name.lt:string
+   clients.name.mteq:string
+   clients.name.lteq:string
+   clients.name.neq:string
+   clients.name.eq:string
+   clients.email.like:string
+   clients.email.mt:string
+   clients.email.lt:string
+   clients.email.mteq:string
+   clients.email.lteq:string
+   clients.email.neq:string
+   clients.email.eq:string
+   clients.phone.like:string
+   clients.phone.mt:string
+   clients.phone.lt:string
+   clients.phone.mteq:string
+   clients.phone.lteq:string
+   clients.phone.neq:string
+   clients.phone.eq:string
+   clients.address.like:string
+   clients.address.mt:string
+   clients.address.lt:string
+   clients.address.mteq:string
+   clients.address.lteq:string
+   clients.address.neq:string
+   clients.address.eq:string
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:clients.client_id
+   .:clients.name
+   .:clients.email
+   .:clients.phone
+   .:clients.address
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:clients
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

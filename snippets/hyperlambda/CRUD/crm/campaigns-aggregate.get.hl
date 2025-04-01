@@ -1,0 +1,128 @@
+
+// Returns minimum, maximum, average or sum from your campaigns table in your crm database
+.arguments
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   campaigns.campaign_id.mt:long
+   campaigns.campaign_id.lt:long
+   campaigns.campaign_id.mteq:long
+   campaigns.campaign_id.lteq:long
+   campaigns.campaign_id.neq:long
+   campaigns.campaign_id.eq:long
+   campaigns.name.like:string
+   campaigns.name.mt:string
+   campaigns.name.lt:string
+   campaigns.name.mteq:string
+   campaigns.name.lteq:string
+   campaigns.name.neq:string
+   campaigns.name.eq:string
+   campaigns.start_date.mt:date
+   campaigns.start_date.lt:date
+   campaigns.start_date.mteq:date
+   campaigns.start_date.lteq:date
+   campaigns.start_date.neq:date
+   campaigns.start_date.eq:date
+   campaigns.end_date.mt:date
+   campaigns.end_date.lt:date
+   campaigns.end_date.mteq:date
+   campaigns.end_date.lteq:date
+   campaigns.end_date.neq:date
+   campaigns.end_date.eq:date
+   campaigns.budget.mt:double
+   campaigns.budget.lt:double
+   campaigns.budget.mteq:double
+   campaigns.budget.lteq:double
+   campaigns.budget.neq:double
+   campaigns.budget.eq:double
+   campaigns.status.like:string
+   campaigns.status.mt:string
+   campaigns.status.lt:string
+   campaigns.status.mteq:string
+   campaigns.status.lteq:string
+   campaigns.status.neq:string
+   campaigns.status.eq:string
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:campaigns.campaign_id
+   .:campaigns.name
+   .:campaigns.start_date
+   .:campaigns.end_date
+   .:campaigns.budget
+   .:campaigns.status
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:campaigns
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

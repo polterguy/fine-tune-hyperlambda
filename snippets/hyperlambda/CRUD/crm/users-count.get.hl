@@ -1,0 +1,67 @@
+
+// Counts items from your users table in your crm database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   users.user_id.mt:long
+   users.user_id.lt:long
+   users.user_id.mteq:long
+   users.user_id.lteq:long
+   users.user_id.neq:long
+   users.user_id.eq:long
+   users.password.like:string
+   users.password.mt:string
+   users.password.lt:string
+   users.password.mteq:string
+   users.password.lteq:string
+   users.password.neq:string
+   users.password.eq:string
+   users.email.like:string
+   users.email.mt:string
+   users.email.lt:string
+   users.email.mteq:string
+   users.email.lteq:string
+   users.email.neq:string
+   users.email.eq:string
+   users.role.like:string
+   users.role.mt:string
+   users.role.lt:string
+   users.role.mteq:string
+   users.role.lteq:string
+   users.role.neq:string
+   users.role.eq:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Making sure we retrieve lock value for column.
+auth.ticket.get
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:users
+      columns
+         count(*)
+            as:count
+      where
+         and
+
+            // Table is locked on the following field.
+            username.eq
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

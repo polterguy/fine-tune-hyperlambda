@@ -1,0 +1,93 @@
+
+// Counts items from your activities table in your crm database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   activities.activity_id.mt:long
+   activities.activity_id.lt:long
+   activities.activity_id.mteq:long
+   activities.activity_id.lteq:long
+   activities.activity_id.neq:long
+   activities.activity_id.eq:long
+   activities.client_id.mt:long
+   activities.client_id.lt:long
+   activities.client_id.mteq:long
+   activities.client_id.lteq:long
+   activities.client_id.neq:long
+   activities.client_id.eq:long
+   activities.type.like:string
+   activities.type.mt:string
+   activities.type.lt:string
+   activities.type.mteq:string
+   activities.type.lteq:string
+   activities.type.neq:string
+   activities.type.eq:string
+   activities.date.mt:date
+   activities.date.lt:date
+   activities.date.mteq:date
+   activities.date.lteq:date
+   activities.date.neq:date
+   activities.date.eq:date
+   activities.notes.like:string
+   activities.notes.mt:string
+   activities.notes.lt:string
+   activities.notes.mteq:string
+   activities.notes.lteq:string
+   activities.notes.neq:string
+   activities.notes.eq:string
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:activities
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  activities.client_id:client_id.client_id
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

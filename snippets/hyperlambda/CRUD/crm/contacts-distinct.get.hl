@@ -1,0 +1,149 @@
+
+// Returns unique and distinct values from your contacts table in your crm database
+.arguments
+
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   contacts.contact_id.mt:long
+   contacts.contact_id.lt:long
+   contacts.contact_id.mteq:long
+   contacts.contact_id.lteq:long
+   contacts.contact_id.neq:long
+   contacts.contact_id.eq:long
+   contacts.client_id.mt:long
+   contacts.client_id.lt:long
+   contacts.client_id.mteq:long
+   contacts.client_id.lteq:long
+   contacts.client_id.neq:long
+   contacts.client_id.eq:long
+   contacts.name.like:string
+   contacts.name.mt:string
+   contacts.name.lt:string
+   contacts.name.mteq:string
+   contacts.name.lteq:string
+   contacts.name.neq:string
+   contacts.name.eq:string
+   contacts.email.like:string
+   contacts.email.mt:string
+   contacts.email.lt:string
+   contacts.email.mteq:string
+   contacts.email.lteq:string
+   contacts.email.neq:string
+   contacts.email.eq:string
+   contacts.phone.like:string
+   contacts.phone.mt:string
+   contacts.phone.lt:string
+   contacts.phone.mteq:string
+   contacts.phone.lteq:string
+   contacts.phone.neq:string
+   contacts.phone.eq:string
+   contacts.position.like:string
+   contacts.position.mt:string
+   contacts.position.lt:string
+   contacts.position.mteq:string
+   contacts.position.lteq:string
+   contacts.position.neq:string
+   contacts.position.eq:string
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:contacts.contact_id
+   .:contacts.client_id
+   .:contacts.name
+   .:contacts.email
+   .:contacts.phone
+   .:contacts.position
+   .:client_id.name
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:contacts
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  contacts.client_id:client_id.client_id
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

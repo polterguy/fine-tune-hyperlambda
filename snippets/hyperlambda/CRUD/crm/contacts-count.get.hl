@@ -1,0 +1,101 @@
+
+// Counts items from your contacts table in your crm database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   contacts.contact_id.mt:long
+   contacts.contact_id.lt:long
+   contacts.contact_id.mteq:long
+   contacts.contact_id.lteq:long
+   contacts.contact_id.neq:long
+   contacts.contact_id.eq:long
+   contacts.client_id.mt:long
+   contacts.client_id.lt:long
+   contacts.client_id.mteq:long
+   contacts.client_id.lteq:long
+   contacts.client_id.neq:long
+   contacts.client_id.eq:long
+   contacts.name.like:string
+   contacts.name.mt:string
+   contacts.name.lt:string
+   contacts.name.mteq:string
+   contacts.name.lteq:string
+   contacts.name.neq:string
+   contacts.name.eq:string
+   contacts.email.like:string
+   contacts.email.mt:string
+   contacts.email.lt:string
+   contacts.email.mteq:string
+   contacts.email.lteq:string
+   contacts.email.neq:string
+   contacts.email.eq:string
+   contacts.phone.like:string
+   contacts.phone.mt:string
+   contacts.phone.lt:string
+   contacts.phone.mteq:string
+   contacts.phone.lteq:string
+   contacts.phone.neq:string
+   contacts.phone.eq:string
+   contacts.position.like:string
+   contacts.position.mt:string
+   contacts.position.lt:string
+   contacts.position.mteq:string
+   contacts.position.lteq:string
+   contacts.position.neq:string
+   contacts.position.eq:string
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:contacts
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  contacts.client_id:client_id.client_id
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

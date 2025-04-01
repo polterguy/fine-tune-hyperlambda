@@ -1,0 +1,93 @@
+
+// Counts items from your leads table in your crm database
+.arguments
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   leads.lead_id.mt:long
+   leads.lead_id.lt:long
+   leads.lead_id.mteq:long
+   leads.lead_id.lteq:long
+   leads.lead_id.neq:long
+   leads.lead_id.eq:long
+   leads.client_id.mt:long
+   leads.client_id.lt:long
+   leads.client_id.mteq:long
+   leads.client_id.lteq:long
+   leads.client_id.neq:long
+   leads.client_id.eq:long
+   leads.source.like:string
+   leads.source.mt:string
+   leads.source.lt:string
+   leads.source.mteq:string
+   leads.source.lteq:string
+   leads.source.neq:string
+   leads.source.eq:string
+   leads.status.like:string
+   leads.status.mt:string
+   leads.status.lt:string
+   leads.status.mteq:string
+   leads.status.lteq:string
+   leads.status.neq:string
+   leads.status.eq:string
+   leads.created_date.mt:date
+   leads.created_date.lt:date
+   leads.created_date.mteq:date
+   leads.created_date.lteq:date
+   leads.created_date.neq:date
+   leads.created_date.eq:date
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:leads
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  leads.client_id:client_id.client_id
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

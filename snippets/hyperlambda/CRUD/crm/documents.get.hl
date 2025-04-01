@@ -1,0 +1,123 @@
+
+// Read or list records from your documents table in your crm database
+.arguments
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   documents.document_id.mt:long
+   documents.document_id.lt:long
+   documents.document_id.mteq:long
+   documents.document_id.lteq:long
+   documents.document_id.neq:long
+   documents.document_id.eq:long
+   documents.client_id.mt:long
+   documents.client_id.lt:long
+   documents.client_id.mteq:long
+   documents.client_id.lteq:long
+   documents.client_id.neq:long
+   documents.client_id.eq:long
+   documents.title.like:string
+   documents.title.mt:string
+   documents.title.lt:string
+   documents.title.mteq:string
+   documents.title.lteq:string
+   documents.title.neq:string
+   documents.title.eq:string
+   documents.file_path.like:string
+   documents.file_path.mt:string
+   documents.file_path.lt:string
+   documents.file_path.mteq:string
+   documents.file_path.lteq:string
+   documents.file_path.neq:string
+   documents.file_path.eq:string
+   documents.uploaded_date.mt:date
+   documents.uploaded_date.lt:date
+   documents.uploaded_date.mteq:date
+   documents.uploaded_date.lteq:date
+   documents.uploaded_date.neq:date
+   documents.uploaded_date.eq:date
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:documents
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  documents.client_id:client_id.client_id
+      columns
+         documents.document_id
+         documents.client_id
+         documents.title
+         documents.file_path
+         documents.uploaded_date
+         client_id.name
+            as:client_id.name
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

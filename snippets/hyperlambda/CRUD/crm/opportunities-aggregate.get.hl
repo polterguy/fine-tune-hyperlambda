@@ -1,0 +1,137 @@
+
+// Returns minimum, maximum, average or sum from your opportunities table in your crm database
+.arguments
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+
+   // Optional logical operator for filtering arguments, can be either 'or' or 'and'. Defaults to and.
+   operator:string
+   opportunities.opportunity_id.mt:long
+   opportunities.opportunity_id.lt:long
+   opportunities.opportunity_id.mteq:long
+   opportunities.opportunity_id.lteq:long
+   opportunities.opportunity_id.neq:long
+   opportunities.opportunity_id.eq:long
+   opportunities.client_id.mt:long
+   opportunities.client_id.lt:long
+   opportunities.client_id.mteq:long
+   opportunities.client_id.lteq:long
+   opportunities.client_id.neq:long
+   opportunities.client_id.eq:long
+   opportunities.description.like:string
+   opportunities.description.mt:string
+   opportunities.description.lt:string
+   opportunities.description.mteq:string
+   opportunities.description.lteq:string
+   opportunities.description.neq:string
+   opportunities.description.eq:string
+   opportunities.value.mt:double
+   opportunities.value.lt:double
+   opportunities.value.mteq:double
+   opportunities.value.lteq:double
+   opportunities.value.neq:double
+   opportunities.value.eq:double
+   opportunities.stage.like:string
+   opportunities.stage.mt:string
+   opportunities.stage.lt:string
+   opportunities.stage.mteq:string
+   opportunities.stage.lteq:string
+   opportunities.stage.neq:string
+   opportunities.stage.eq:string
+   opportunities.close_date.mt:date
+   opportunities.close_date.lt:date
+   opportunities.close_date.mteq:date
+   opportunities.close_date.lteq:date
+   opportunities.close_date.neq:date
+   opportunities.close_date.eq:date
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:opportunities.opportunity_id
+   .:opportunities.client_id
+   .:opportunities.description
+   .:opportunities.value
+   .:opportunities.stage
+   .:opportunities.close_date
+   .:client_id.name
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Sanity checking invocation.
+validators.enum:x:@.arguments/*/operator
+   .:or
+   .:and
+
+/*
+ * Checking if user supplied an [operator] argument, and if so
+ * changing the boolean operator for comparison operations.
+ */
+if
+   exists:x:@.arguments/*/operator
+   .lambda
+
+      // User provided a boolean comparison [operator] argument.
+      set-name:x:../*/data.connect/*/data.read/*/where/0
+         get-value:x:@.arguments/*/operator
+      remove-nodes:x:@.arguments/*/operator
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:opportunities
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  opportunities.client_id:client_id.client_id
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

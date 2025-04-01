@@ -1,0 +1,58 @@
+
+// Create one record in your users table in your crm database
+.arguments
+
+   // password column value
+   password:string
+
+   // email column value
+   email:string
+
+   // role column value
+   role:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:crm.users entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Making sure we retrieve lock value for column.
+auth.ticket.get
+
+// Opening up database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:users
+      return-id:bool:true
+      values
+
+         // Table is locked on the following field.
+         username
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.users.post
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create
