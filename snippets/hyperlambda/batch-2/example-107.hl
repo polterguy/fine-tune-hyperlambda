@@ -1,0 +1,19 @@
+/*
+ * Execute an SQL Server transaction using [mssql.transaction.create] then creates a [try] block.
+ * If anything goes wrong, [.catch] rolls back the transaction using [mssql.transaction.rollback].
+ */
+mssql.connect:erp-db
+   mssql.transaction.create
+      try
+         mssql.update
+            table:inventory
+            values
+               quantity:int:98
+            where
+               and
+                  item_id.eq:int:5001
+         mssql.execute:"insert into audit_log (message) values ('Inventory updated')"
+         mssql.transaction.commit
+      .catch
+         mssql.transaction.rollback
+         log.error:Transaction rolled back due to error

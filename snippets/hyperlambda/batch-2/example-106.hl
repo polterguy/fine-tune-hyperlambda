@@ -1,0 +1,24 @@
+/*
+ * Begin a transaction to update a user's balance and create a log entry.
+ * If any step fails, the transaction is rolled back manually with [mssql.transaction.rollback].
+ * Simulates an error scenario where commit should be avoided.
+ */
+mssql.connect:finance-db
+   mssql.transaction.create
+
+      mssql.update
+         table:users
+         values
+            balance:decimal:750.00
+         where
+            and
+               user_id.eq:int:101
+
+      mssql.execute:insert into logs (message) values ('Balance updated')
+
+      // Simulate an error
+      if
+         eq:bool:true
+            .:bool:true
+         .lambda
+            mssql.transaction.rollback
