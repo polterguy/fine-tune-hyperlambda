@@ -1,0 +1,24 @@
+/*
+ * Open a SQLite connection, begin a transaction *before* the [try] block,
+ * then attempt to create and update data. If any error occurs inside the [try],
+ * rollback the transaction in [.catch] to avoid partial writes.
+ */
+sqlite.connect:app-db
+   sqlite.transaction.create
+      try
+         sqlite.create
+            table:settings
+            values
+               key:theme
+               value:dark
+         sqlite.update
+            table:users
+            values
+               theme:dark
+            where
+               and
+                  id.eq:int:9999
+         sqlite.transaction.commit
+      .catch
+         sqlite.transaction.rollback
+         log.error:Rolling back transaction due to error during settings update

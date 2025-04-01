@@ -1,0 +1,13 @@
+/*
+ * Start a transaction with an ODBC-connected database.
+ * If the update or insert fails, [odbc.transaction.rollback] ensures nothing is persisted.
+ */
+odbc.connect:legacy-finance
+   odbc.transaction.create
+      try
+         odbc.execute:update accounts set balance = balance - 100 where account_id = 202
+         odbc.execute:insert into transactions (account_id, amount) values (202, -100)
+         odbc.transaction.commit
+      .catch
+         odbc.transaction.rollback
+         log.error:Failed to process transaction, changes rolled back

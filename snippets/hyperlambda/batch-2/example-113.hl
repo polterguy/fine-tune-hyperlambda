@@ -1,0 +1,23 @@
+/*
+ * Connect to a PostgreSQL database, begin a transaction,
+ * attempt to update a record and insert an audit log.
+ * If anything fails, rollback the transaction using [pgsql.transaction.rollback].
+ */
+pgsql.connect:app-db
+   pgsql.transaction.create
+      try
+         pgsql.update
+            table:users
+            values
+               status:active
+            where
+               and
+                  id.eq:int:42
+         pgsql.create
+            table:logs
+            values
+               message:User 42 reactivated
+         pgsql.transaction.commit
+      .catch
+         pgsql.transaction.rollback
+         log.error:Failed to reactivate user, transaction rolled back

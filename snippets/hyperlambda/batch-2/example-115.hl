@@ -1,0 +1,23 @@
+/*
+ * Insert a new order and attempt to deduct balance from the customer.
+ * If the balance update fails, the entire order operation is rolled back.
+ */
+pgsql.connect:orders-db
+   pgsql.transaction.create
+      try
+         pgsql.create
+            table:orders
+            values
+               customer_id:int:555
+               total:decimal:79.99
+         pgsql.update
+            table:customers
+            values
+               balance:decimal:420.01
+            where
+               and
+                  id.eq:int:555
+         pgsql.transaction.commit
+      .catch
+         pgsql.transaction.rollback
+         log.error:Order placement failed, transaction rolled back

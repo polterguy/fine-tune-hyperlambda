@@ -1,0 +1,23 @@
+/*
+ * Attempt to deduct stock from a product and record a shipment entry.
+ * If the product ID is invalid, the rollback prevents inconsistent data changes.
+ */
+pgsql.connect:warehouse-db
+   pgsql.transaction.create
+      try
+         pgsql.update
+            table:products
+            values
+               stock:int:90
+            where
+               and
+                  product_id.eq:int:1001
+         pgsql.create
+            table:shipments
+            values
+               product_id:int:1001
+               quantity:int:10
+         pgsql.transaction.commit
+      .catch
+         pgsql.transaction.rollback
+         log.error:Inventory update failed, transaction rolled back

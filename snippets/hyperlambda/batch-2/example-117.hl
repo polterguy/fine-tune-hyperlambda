@@ -1,0 +1,13 @@
+/*
+ * Try to create a new order and update inventory in a legacy system using ODBC.
+ * If the product update fails (e.g., nonexistent product), rollback everything using [odbc.transaction.rollback].
+ */
+odbc.connect:erp-odbc
+   odbc.transaction.create
+      try
+         odbc.execute:insert into orders (customer_id, total) values (555, 249.99)
+         odbc.execute:update inventory set quantity = quantity - 1 where sku = 'INVALID_SKU'
+         odbc.transaction.commit
+      .catch
+         odbc.transaction.rollback
+         log.error:Order creation failed due to invalid inventory SKU
