@@ -1,0 +1,25 @@
+/*
+ * Adds a new product to the [products] table in the [inventory] database.
+ * Then synchronizes the product data with a remote inventory system via HTTP POST.
+ * The inventory sync response is returned in [sync_status].
+ */
+.arguments
+   name:string
+   price:decimal
+   sku:string
+
+data.connect:inventory
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:products
+      values
+   http.post:"https://inventory.example.com/api/sync-product"
+      convert:bool:true
+      payload
+         id:x:@data.create
+         name:x:@.arguments/*/name
+         price:x:@.arguments/*/price
+         sku:x:@.arguments/*/sku
+   yield
+      sync_status:x:@http.post/*/content

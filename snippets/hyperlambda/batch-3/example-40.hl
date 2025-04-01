@@ -1,0 +1,24 @@
+/*
+ * Deletes a user from the [users] table in the [accounts] database.
+ * Then sends an HTTP DELETE request to an external identity provider to remove the same user.
+ * Uses a Bearer token for authorization.
+ */
+.arguments
+   id:int
+   external_id:string
+
+data.connect:accounts
+   data.delete
+      table:users
+      where
+         and
+            id.eq:x:@.arguments/*/id
+   http.delete:"https://auth.example.com/api/users"
+      query
+         id:x:@.arguments/*/external_id
+      token:Bearer xyz123
+
+      // 5 seconds timeout max!
+      timeout:int:5
+   yield
+      result:deleted both local and remote user

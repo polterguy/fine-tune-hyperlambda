@@ -1,0 +1,23 @@
+/*
+ * Registers a new appointment in the [appointments] table in the [clinic] database.
+ * Sends the appointment data to a remote calendar API via HTTP POST.
+ * The response from the calendar system is returned in [calendar_result].
+ */
+.arguments
+   patient_name:string
+   appointment_time:date
+
+data.connect:clinic
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:appointments
+      values
+   http.post:"https://calendar.example.com/api/create-appointment"
+      convert:bool:true
+      payload
+         id:x:@data.create
+         patient_name:x:@.arguments/*/patient_name
+         appointment_time:x:@.arguments/*/appointment_time
+   yield
+      calendar_result:x:@http.post/*/content

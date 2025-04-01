@@ -1,0 +1,18 @@
+/*
+ * Deletes an expired session from the [sessions] table in the [security] DB.
+ * Also calls a remote session tracker service to ensure the session is terminated globally.
+ */
+.arguments
+   session_id:string
+
+data.connect:security
+   data.delete
+      table:sessions
+      where
+         and
+            id.eq:x:@.arguments/*/session_id
+   http.delete:"https://tracker.example.com/api/sessions"
+      query
+         id:x:@.arguments/*/session_id
+   yield
+      status:session removed locally and externally

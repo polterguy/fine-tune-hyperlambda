@@ -1,0 +1,23 @@
+/*
+ * Creates a new contact in the [contacts] table in the [crm] database.
+ * Then sends a notification to an external CRM service using HTTP POST.
+ * Returns the CRM API's response under [crm_response].
+ */
+.arguments
+   name:string
+   email:string
+
+data.connect:crm
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:contacts
+      values
+   http.post:"https://crm.example.com/api/notify-contact"
+      convert:bool:true
+      payload
+         id:x:@data.create
+         name:x:@.arguments/*/name
+         email:x:@.arguments/*/email
+   yield
+      crm_response:x:@http.post/*/content

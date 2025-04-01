@@ -1,0 +1,23 @@
+/*
+ * Inserts a new system event into the [events] table in the [monitoring] database.
+ * After logging, it sends the event data to an external monitoring system via HTTP POST.
+ * Returns the monitoring system’s response under [event_broadcast_result].
+ */
+.arguments
+   event_type:string
+   message:string
+
+data.connect:monitoring
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:events
+      values
+   http.post:"https://monitor.example.com/api/log-event"
+      convert:bool:true
+      payload
+         id:x:@data.create
+         event_type:x:@.arguments/*/event_type
+         message:x:@.arguments/*/message
+   yield
+      event_broadcast_result:x:@http.post/*/content

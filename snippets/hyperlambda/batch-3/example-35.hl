@@ -1,0 +1,25 @@
+/*
+ * Insert a new task into the [tasks] table in the [todo] database.
+ * Then use HTTP POST to notify an external microservice with the inserted task data.
+ * Returns the API response as [notification_result].
+ */
+.arguments
+   title:string
+   due_date:date
+
+data.connect:todo
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:tasks
+      values
+   http.post:"https://api.example.com/notify-task"
+      convert:bool:true
+      payload
+
+         // By default, [data.create] returns the ID of the newly inserted item
+         id:x:@data.create
+         title:x:@.arguments/*/title
+         due_date:x:@.arguments/*/due_date
+   yield
+      notification_result:x:@http.post/*/content
