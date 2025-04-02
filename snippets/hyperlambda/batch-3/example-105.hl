@@ -1,0 +1,24 @@
+/*
+ * Transfers inactive users from the 'users' table to 'users_archive' within the same 'users' database.
+ * Since both tables reside in the same database, only one connection is needed.
+ */
+data.connect:users
+   data.read
+      table:users
+      columns
+         user_id
+         email
+         deactivated_at
+      where
+         and
+            inactive.eq:bool:true
+
+   for-each:x:@data.read/*
+
+      // Working within the same DB scope — no second data.connect needed
+      data.create
+         table:users_archive
+         values
+            id:x:@.dp/#/*/user_id
+            email:x:@.dp/#/*/email
+            archived_at:x:@.dp/#/*/deactivated_at

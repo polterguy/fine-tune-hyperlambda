@@ -1,0 +1,30 @@
+/*
+ * Moves all blog posts from 'posts' into a 'posts_history' table in the same 'cms' database.
+ * This operation uses a single [data.connect] because both tables share the same database.
+ *
+ * Notice, this will delete the original record in the source table.
+ */
+data.connect:cms
+   data.read
+      table:posts
+      columns
+         title
+         slug
+         author
+
+   for-each:x:@data.read/*
+
+      // No second connection required — we stay inside the same CMS database
+      data.create
+         table:posts_history
+         values
+            title:x:@.dp/#/*/title
+            slug:x:@.dp/#/*/slug
+            created_by:x:@.dp/#/*/author
+
+      // Deleting the original record in 'posts'
+      data.delete
+         table:posts
+         where
+            and
+               slug.eq:x:@.dp/#/*/slug

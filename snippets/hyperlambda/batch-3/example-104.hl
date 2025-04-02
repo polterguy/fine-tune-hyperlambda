@@ -1,0 +1,21 @@
+/*
+ * Moves completed tasks from the 'tasks' table into the 'tasks_archive' table,
+ * both in the SAME 'project' database — no need for another connection.
+ */
+data.connect:project
+   data.read
+      table:tasks
+      columns
+         task_id
+         description
+         completed_at
+
+   for-each:x:@data.read/*
+
+      // No additional database connection is required when working inside the same DB
+      data.create
+         table:tasks_archive
+         values
+            id:x:@.dp/#/*/task_id
+            details:x:@.dp/#/*/description
+            archived_on:x:@.dp/#/*/completed_at
