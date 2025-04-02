@@ -1,0 +1,33 @@
+/*
+ * Copies all records from the [employees] table in the [hr] database
+ * to the same table in the [analytics] database, 10 records at a time using a [while] loop.
+ */
+.offset:int:0
+.count:int:10
+
+while
+   mt:x:@.count
+      .:int:0
+   .lambda
+      data.connect:hr
+         data.read
+            table:employees
+            limit:int:10
+            offset:x:@.offset
+            columns
+               name
+               email
+
+         set-value:x:@.count
+            get-count:x:@data.read/*
+
+         data.connect:analytics
+            for-each:x:@data.read/*
+               data.create
+                  table:employees
+                  values
+                     name:x:@.dp/#/*/name
+                     email:x:@.dp/#/*/email
+
+      math.increment:x:@.offset
+         .:int:10

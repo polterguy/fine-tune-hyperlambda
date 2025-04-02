@@ -1,0 +1,40 @@
+/*
+ * Transfers all records from the [orders] table in the [sales] database
+ * into the [orders] table in the [reporting] database in batches of 10.
+ */
+.offset:int:0
+.count:int:10
+
+while
+   mt:x:@.count
+      .:int:0
+   .lambda
+      data.connect:sales
+         data.read
+            table:orders
+            limit:int:10
+            offset:x:@.offset
+            columns
+               order_id
+               customer_id
+               total
+               status
+               created_at
+
+         get-count:x:@data.read/*
+         set-value:x:@.count
+            get-value:x:@get-count
+
+         data.connect:reporting
+            for-each:x:@data.read/*
+               data.create
+                  table:orders
+                  values
+                     id:x:@.dp/#/*/order_id
+                     customer_id:x:@.dp/#/*/customer_id
+                     amount:x:@.dp/#/*/total
+                     status:x:@.dp/#/*/status
+                     created:x:@.dp/#/*/created_at
+
+      math.increment:x:@.offset
+         .:int:10

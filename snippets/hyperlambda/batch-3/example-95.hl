@@ -1,0 +1,40 @@
+/*
+ * Migrates articles from the [cms] database to the [search_index] database.
+ * Fetches and inserts 10 records at a time using a [while] loop until all are copied.
+ */
+.offset:int:0
+.count:int:10
+
+while
+   gt:x:@.count
+      .:int:0
+   .lambda
+      data.connect:cms
+         data.read
+            table:articles
+            limit:int:10
+            offset:x:@.offset
+            columns
+               title
+               slug
+               author
+               summary
+               published_at
+
+         get-count:x:@data.read/*
+         set-value:x:@.count
+            get-value:x:@get-count
+
+         data.connect:search_index
+            for-each:x:@data.read/*
+               data.create
+                  table:articles
+                  values
+                     title:x:@.dp/#/*/title
+                     slug:x:@.dp/#/*/slug
+                     author:x:@.dp/#/*/author
+                     summary:x:@.dp/#/*/summary
+                     published_at:x:@.dp/#/*/published_at
+
+      math.increment:x:@.offset
+         .:int:10
