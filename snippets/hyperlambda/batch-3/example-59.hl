@@ -1,0 +1,33 @@
+// Uploads a customer invoice PDF to the [/mnt/finance/invoices/] directory for archiving
+.arguments
+   file:*
+
+.accept:multipart/form-data
+
+// Validate file and required fields
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+
+// Verifying file is PDF
+if
+   not
+      strings.end-with:x:@.arguments/*/file/*/name
+         .:.pdf
+   .lambda
+
+      throw:I can only deal with PDF files
+
+// Declare a variable [invoice-path] with the full destination file path
+.invoice-path
+set-value:x:@.invoice-path
+   strings.concat
+      .:/mnt/finance/invoices/
+      get-value:x:@.arguments/*/file/*/name
+
+// Save the invoice file to disk
+io.stream.save-file:x:@.invoice-path
+   get-value:x:@.arguments/*/file/*/stream
+
+yield
+   message:Invoice uploaded and archived

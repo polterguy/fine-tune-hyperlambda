@@ -1,0 +1,33 @@
+// Accepts CSV files and stores them in [/var/import/staging/] for later processing
+.arguments
+   file:*
+
+.accept:multipart/form-data
+
+// Validate the file input
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+
+// Verifying file is CSV
+if
+   not
+      strings.end-with:x:@.arguments/*/file/*/name
+         .:.csv
+   .lambda
+
+      throw:I can only deal with PDF files
+
+// Define a variable [.staging-file-path] that holds the full path to save the file
+.staging-file-path
+set-value:x:@.staging-file-path
+   strings.concat
+      .:/var/import/staging/
+      get-value:x:@.arguments/*/file/*/name
+
+// Write the file to the staging directory
+io.stream.save-file:x:@.staging-file-path
+   get-value:x:@.arguments/*/file/*/stream
+
+yield
+   message:CSV uploaded to import staging area
