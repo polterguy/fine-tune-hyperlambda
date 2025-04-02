@@ -1,0 +1,30 @@
+/*
+ * Provides a requested PDF course material file to the student.
+ */
+.arguments
+   file:string
+
+validators.mandatory:x:@.arguments/*/file
+
+// Building the full file path
+.filename-and-path
+set-value:x:-
+   strings.concat
+      .:"/srv/lms/materials/"
+      get-value:x:@.arguments/*/file
+
+// Constructing file name for download header
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@.arguments/*/file
+   .:"\""
+response.headers.set
+   Content-Type:application/pdf
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
+
+// Streaming the PDF to the client
+io.stream.open-file:x:@.filename-and-path
+
+// Returns stream raw back to coller on socket.
+return:x:-

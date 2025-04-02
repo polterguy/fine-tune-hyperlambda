@@ -1,0 +1,33 @@
+/*
+ * Updates an event's title in the [events] table in the [calendar] database.
+ * Only [id] is required, and [title] is optional.
+ * If no event was found matching the ID, the endpoint throws a descriptive error.
+ */
+.arguments
+   id:int
+   title:string
+
+validators.mandatory:x:@.arguments/*/id
+
+data.connect:calendar
+
+   add:x:+/*/values
+      get-nodes:x:@.arguments/*/title
+
+   data.update
+      table:events
+      values
+      where
+         and
+            id.eq:x:@.arguments/*/id
+
+   if
+      eq:x:@data.update
+         .:long:0
+      .lambda
+         throw
+            message:Event not found or nothing to update
+
+   yield
+      message:Event updated successfully
+      affected:x:@data.update

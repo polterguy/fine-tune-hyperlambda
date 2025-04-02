@@ -1,0 +1,28 @@
+/*
+ * Delivers a generated invoice PDF to the authenticated customer.
+ */
+.arguments
+   file:string
+
+validators.mandatory:x:@.arguments/*/file
+
+// Full path to invoice PDF
+.file
+set-value:x:@.file
+   strings.concat
+      .:"/var/invoices/generated/"
+      get-value:x:@.arguments/*/file
+
+// Header to control PDF download name
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@.arguments/*/file
+   .:"\""
+response.headers.set
+   Content-Type:application/pdf
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
+
+// Returning PDF stream to caller
+io.stream.open-file:x:@.file
+return:x:-

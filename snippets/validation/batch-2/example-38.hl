@@ -1,0 +1,32 @@
+/*
+ * Returns a downloadable PDF file containing a student's attendance report.
+ * The file is retrieved from the [/data/reports/attendance/] directory on the server and the filename is provided as a [file] argument.
+ */
+.arguments
+   file:string
+.description:Delivers the requested attendance report PDF to the client.
+
+validators.mandatory:x:@.arguments/*/file
+
+// Build the full path to the attendance report file
+.attendance-report-path
+set-value:x:-
+   strings.concat
+      .:"/data/reports/attendance/"
+      get-value:x:@.arguments/*/file
+
+// Create download header using provided filename
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@.arguments/*/file
+   .:"\""
+response.headers.set
+   Content-Type:application/pdf
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
+
+// Open the attendance report file for streaming
+io.stream.open-file:x:@.attendance-report-path
+
+// Return file stream to client
+return:x:-

@@ -1,0 +1,30 @@
+/*
+ * Provides a requested student transcript PDF file for download.
+ */
+.arguments
+   file:string
+
+validators.mandatory:x:@.arguments/*/file
+
+// Building the full path to the transcript file
+.filename-and-path
+set-value:x:-
+   strings.concat
+      .:"/data/students/transcripts/"
+      get-value:x:@.arguments/*/file
+
+// Creating Content-Disposition header with filename
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@.arguments/*/file
+   .:"\""
+response.headers.set
+   Content-Type:application/pdf
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
+
+// Open the file stream for returning the transcript
+io.stream.open-file:x:@.filename-and-path
+
+// Return the PDF file as a raw stream
+return:x:-

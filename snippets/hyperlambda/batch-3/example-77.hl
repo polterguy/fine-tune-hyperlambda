@@ -1,0 +1,30 @@
+/*
+ * Delivers a PDF certificate of completion for a course to the student.
+ */
+.arguments
+   file:string
+
+validators.mandatory:x:@.arguments/*/file
+
+// Constructing full file path for the certificate
+.filename-and-path
+set-value:x:-
+   strings.concat
+      .:"/certificates/completion/"
+      get-value:x:@.arguments/*/file
+
+// Setting filename in Content-Disposition for browser download
+strings.concat
+   .:"attachment; filename=\""
+   get-value:x:@.arguments/*/file
+   .:"\""
+response.headers.set
+   Content-Type:application/pdf
+   Content-Disposition:x:@strings.concat
+   Access-Control-Expose-Headers:Content-Disposition
+
+// Opening the certificate file stream
+io.stream.open-file:x:@.filename-and-path
+
+// Send the file stream to client
+return:x:-

@@ -1,0 +1,35 @@
+/*
+ * Updates a task in the [tasks] table in the [project] database.
+ * The [id] is mandatory. The [status] and [due_date] fields are optional.
+ * If no task is found with the given [id], the endpoint will throw an exception.
+ */
+.arguments
+   id:int
+   status:string
+   due_date:date
+
+validators.mandatory:x:@.arguments/*/id
+
+data.connect:project
+
+   add:x:+/*/values
+      get-nodes:x:@.arguments/*/status
+      get-nodes:x:@.arguments/*/due_date
+
+   data.update
+      table:tasks
+      values
+      where
+         and
+            id.eq:x:@.arguments/*/id
+
+   if
+      eq:x:@data.update
+         .:long:0
+      .lambda
+         throw
+            message:No task found with the provided ID
+
+   yield
+      message:Task updated successfully
+      affected:x:@data.update
