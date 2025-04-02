@@ -1,0 +1,28 @@
+/*
+ * Allows updating a calendar event in the [events] table.
+ * Only the [id] is required, while [title] and [start_time] can be optionally updated.
+ */
+.arguments
+   id:int
+   title:string
+   start_time:date
+
+// Ensure event ID is provided
+validators.mandatory:x:@.arguments/*/id
+
+data.connect:scheduler
+
+   // Dynamically build the [values] section based on what arguments were passed
+   add:x:+/*/values
+      get-nodes:x:@.arguments/*/title
+      get-nodes:x:@.arguments/*/start_time
+
+   data.update
+      table:events
+      values
+      where
+         and
+            id.eq:x:@.arguments/*/id
+
+   yield
+      message:Event updated successfully
