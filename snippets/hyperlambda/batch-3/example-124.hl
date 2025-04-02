@@ -1,0 +1,37 @@
+/*
+ * Role-restricted endpoint for HR to import candidate records from [/candidates/yaml/],
+ * send an interview invite, and insert [name] and [email] into the [candidates] table
+ * in the [recruitment] database.
+ */
+.arguments
+
+auth.ticket.verify:hr
+
+io.file.list:/candidates/yaml/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.yaml
+      .lambda
+
+         io.file.load:x:@.dp/#
+         yaml2lambda:x:@io.file.load
+
+         for-each:x:@yaml2lambda/*
+            mail.smtp.send
+               message
+                  to
+                     .
+                        name:x:@.dp/#/*/name
+                        email:x:@.dp/#/*/email
+                  subject:Interview Invitation
+                  entity:text/plain
+                     content:We’d love to meet you. Please confirm your interview time.
+
+            data.connect:recruitment
+               data.create
+                  table:candidates
+                  values
+                     name:x:@.dp/#/*/name
+                     email:x:@.dp/#/*/email

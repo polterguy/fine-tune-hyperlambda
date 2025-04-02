@@ -1,0 +1,56 @@
+/*
+ * Admin-only endpoint that loads customer `.yaml` files from [/customers/yaml/].
+ * For each customer:
+ * - Extracts [company_id] from the YAML
+ * - Builds a REST-style URL using [strings.concat] and performs [http.get]
+ * - Extracts [company_name] from the HTTP response
+ * - Sends a welcome email
+ * - Inserts customer [name], [email], and fetched [company_name] into [crm.customers]
+ */
+.arguments
+
+auth.ticket.verify:admin
+
+io.file.list:/customers/yaml/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.yaml
+      .lambda
+
+         io.file.load:x:@.dp/#
+         yaml2lambda:x:@io.file.load
+
+         for-each:x:@yaml2lambda/*
+
+            // Build REST-style URL: https://api.companyinfo.io/companies/{company_id}
+            .url
+            set-value:x:@.url
+               strings.concat
+                  .:"https://api.companyinfo.io/companies/"
+                  get-value:x:@.dp/#/*/company_id
+
+            // Fetch company info using the dynamic URL
+            http.get:x:@.url
+               convert:true
+
+            // Send a welcome email to the customer
+            mail.smtp.send
+               message
+                  to
+                     .
+                        name:x:@.dp/#/*/name
+                        email:x:@.dp/#/*/email
+                  subject:Welcome to Our Platform
+                  entity:text/plain
+                     content:Thanks for joining! You’ve been added to our CRM.
+
+            // Insert customer with resolved company name
+            data.connect:crm
+               data.create
+                  table:customers
+                  values
+                     name:x:@.dp/#/*/name
+                     email:x:@.dp/#/*/email
+                     company_name:x:@http.get/*/content/*/company_name

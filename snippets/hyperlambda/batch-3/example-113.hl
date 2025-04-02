@@ -1,0 +1,25 @@
+/*
+ * Reads `.json` subscriber files from [/data/subscribers/],
+ * converts each to lambda, and stores [name] and [email] into the [subscribers] table.
+ */
+.arguments
+
+io.file.list:/data/subscribers/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.json
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         json2lambda:x:@io.file.load
+
+         data.connect:newsletter
+            for-each:x:@json2lambda/*
+               data.create
+                  table:subscribers
+                  values
+                     name:x:@.dp/#/*/name
+                     email:x:@.dp/#/*/email

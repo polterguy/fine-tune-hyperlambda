@@ -1,0 +1,25 @@
+/*
+ * Reads `.yaml` server config files from [/etc/configs/servers/], converts each into lambda,
+ * and inserts [hostname] and [environment] into the [servers] table in the [infra] database.
+ */
+.arguments
+
+io.file.list:/etc/configs/servers/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.yaml
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         yaml2lambda:x:@io.file.load
+
+         data.connect:infra
+            for-each:x:@yaml2lambda/*
+               data.create
+                  table:servers
+                  values
+                     hostname:x:@.dp/#/*/host
+                     environment:x:@.dp/#/*/env

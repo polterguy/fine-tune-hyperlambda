@@ -1,0 +1,26 @@
+/*
+ * Scans [/zoo/records/] for `.yaml` files describing animals,
+ * converts them into lambda, and stores [species] and [nickname]
+ * into the [animals] table of the [zoo] database.
+ */
+.arguments
+
+io.file.list:/zoo/records/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.yaml
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         yaml2lambda:x:@io.file.load
+
+         data.connect:zoo
+            for-each:x:@yaml2lambda/*
+               data.create
+                  table:animals
+                  values
+                     species:x:@.dp/#/*/type
+                     nickname:x:@.dp/#/*/name

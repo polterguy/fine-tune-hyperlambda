@@ -1,0 +1,55 @@
+/*
+ * Admin-only endpoint that imports contact records from YAML files in [/contacts/yaml/].
+ * For each contact:
+ * - Fetches a random avatar from external API
+ * - Sends an onboarding email
+ * - Inserts full_name, email, and avatar_url into the [contacts] table of the [crm] database
+ */
+.arguments
+
+// Restrict access to admins only
+auth.ticket.verify:admin
+
+// List all YAML files in the /contacts/yaml/ folder
+io.file.list:/contacts/yaml/
+
+// Iterate over each file
+for-each:x:@io.file.list/*
+   // Filter only .yaml files
+   if
+      strings.ends-with:x:@.dp/#
+         .:.yaml
+      .lambda
+
+         // Load content of the YAML file
+         io.file.load:x:@.dp/#
+
+         // Convert YAML content into lambda structure
+         yaml2lambda:x:@io.file.load
+
+         // Loop over each top-level object in the converted YAML
+         for-each:x:@yaml2lambda/*
+
+            // Fetch a random user (including avatar) from external API
+            http.get:"https://randomuser.me/api/"
+               convert:true
+
+            // Send an email to the contact
+            mail.smtp.send
+               message
+                  to
+                     .
+                        name:x:@.dp/#/*/full_name
+                        email:x:@.dp/#/*/email
+                  subject:Your Contact Profile Is Ready
+                  entity:text/plain
+                     content:Hi, your contact profile has been created. You can now log in.
+
+            // Insert contact data into [crm.contacts]
+            data.connect:crm
+               data.create
+                  table:contacts
+                  values
+                     full_name:x:@.dp/#/*/full_name
+                     email:x:@.dp/#/*/email
+                     avatar_url:x:@http.get/*/content/*/results/*/picture/*/large

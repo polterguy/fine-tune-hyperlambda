@@ -1,0 +1,56 @@
+/*
+ * Admin-only endpoint that imports review `.yaml` files from [/reviews/yaml/].
+ * Each file contains a [product_id].
+ * - Uses [strings.concat] to build a REST-style API call to fetch product details
+ * - Extracts [title] from HTTP response
+ * - Sends a thank-you email
+ * - Inserts [reviewer_name], [email], and product [title] into the [reviews] table
+ */
+.arguments
+
+auth.ticket.verify:admin
+
+io.file.list:/reviews/yaml/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.yaml
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         yaml2lambda:x:@io.file.load
+
+         for-each:x:@yaml2lambda/*
+
+            // Build URL: https://products.api.io/v1/products/{product_id}
+            .url
+            set-value:x:@.url
+               strings.concat
+                  .:"https://products.api.io/v1/products/"
+                  get-value:x:@.dp/#/*/product_id
+
+            // Fetch product details using product_id
+            http.get:x:@.url
+               convert:true
+
+            // Send a thank-you email to the reviewer
+            mail.smtp.send
+               message
+                  to
+                     .
+                        name:x:@.dp/#/*/reviewer_name
+                        email:x:@.dp/#/*/email
+                  subject:Thanks for Your Review!
+                  entity:text/plain
+                     content:Your review has been recorded. Thanks for helping us improve!
+
+            // Insert review data along with resolved product title
+            data.connect:shop
+               data.create
+                  table:reviews
+                  values
+                     reviewer_name:x:@.dp/#/*/reviewer_name
+                     email:x:@.dp/#/*/email
+                     product_title:x:@http.get/*/content/*/title

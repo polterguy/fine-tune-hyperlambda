@@ -1,0 +1,67 @@
+/*
+ * Admin-only endpoint that performs a full onboarding flow:
+ *
+ * 1. Reads `.yaml` files from [/import/employees/]
+ * 2. Converts each file to lambda
+ * 3. For each employee record:
+ *    - Fetches city info from an external IP API using [http.get]
+ *    - Sends a welcome email
+ *    - Inserts the [name], [email], and [city] into the [employees] table
+ * 4. All steps are restricted to [admin] users only
+ */
+
+.arguments
+
+// Ensure only users with the [admin] role can execute this endpoint
+auth.ticket.verify:admin
+
+// Step 1: List all files inside the /import/employees/ directory
+// Each entry in the resulting list is a full file path (as a string)
+io.file.list:/import/employees/
+
+// Step 2: Iterate over each file found in the directory
+for-each:x:@io.file.list/*
+   // Step 2.1: Only process files ending in `.yaml`
+   if
+      strings.ends-with:x:@.dp/#
+         .:.yaml
+      .lambda
+
+         // Step 2.2: Load the YAML file content as a string
+         io.file.load:x:@.dp/#
+
+         // Step 2.3: Convert the YAML string into a lambda object
+         yaml2lambda:x:@io.file.load
+
+         // Step 2.4: Iterate over each root-level record in the YAML file (usually one)
+         for-each:x:@yaml2lambda/*
+
+            // Step 3: Fetch city data from an external IP-based geolocation API
+            // This simulates enriching the employee data with location information
+            http.get:"https://ipapi.co/json/"
+               convert:true
+
+            // Step 4: Send a welcome email to the employee using data from the YAML record
+            mail.smtp.send
+               message
+                  to
+                     .
+                        // Employee name from YAML
+                        name:x:@.dp/#/*/name
+                        // Employee email from YAML
+                        email:x:@.dp/#/*/email
+                  subject:Welcome to the Company
+                  entity:text/plain
+                     content:Hi, welcome aboard! Let us know if you need anything.
+
+            // Step 5: Insert the combined data into the database
+            data.connect:hr
+               data.create
+                  table:employees
+                  values
+                     // Name from the YAML file
+                     name:x:@.dp/#/*/name
+                     // Email from the YAML file
+                     email:x:@.dp/#/*/email
+                     // City pulled from the HTTP API response
+                     city:x:@http.get/*/content/*/city

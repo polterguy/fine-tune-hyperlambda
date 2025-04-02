@@ -1,0 +1,26 @@
+/*
+ * Scans the [/data/machines/] directory for `.xml` files.
+ * Each file is parsed into lambda, and [model] and [serial_number] are inserted
+ * into the [equipment] table in the [factory] database.
+ */
+.arguments
+
+io.file.list:/data/machines/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.xml
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         xml2lambda:x:@io.file.load
+
+         data.connect:factory
+            for-each:x:@xml2lambda/*
+               data.create
+                  table:equipment
+                  values
+                     model:x:@.dp/#/*/model
+                     serial_number:x:@.dp/#/*/serial

@@ -1,0 +1,25 @@
+/*
+ * Reads all `.json` vendor info files from [/vendors/incoming/], converts them into lambda,
+ * and inserts [company_name] and [primary_email] into the [vendors] table in the [supply_chain] database.
+ */
+.arguments
+
+io.file.list:/vendors/incoming/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.json
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         json2lambda:x:@io.file.load
+
+         data.connect:supply_chain
+            for-each:x:@json2lambda/*
+               data.create
+                  table:vendors
+                  values
+                     company_name:x:@.dp/#/*/company
+                     primary_email:x:@.dp/#/*/email

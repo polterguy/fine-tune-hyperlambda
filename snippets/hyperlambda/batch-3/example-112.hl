@@ -1,0 +1,25 @@
+/*
+ * Loads all `.json` files from [/data/employees/], converts each file into a lambda object,
+ * and inserts [name] and [email] into the [employees] table in the [hr] database.
+ */
+.arguments
+
+io.file.list:/data/employees/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.json
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         json2lambda:x:@io.file.load
+
+         data.connect:hr
+            for-each:x:@json2lambda/*
+               data.create
+                  table:employees
+                  values
+                     name:x:@.dp/#/*/name
+                     email:x:@.dp/#/*/email

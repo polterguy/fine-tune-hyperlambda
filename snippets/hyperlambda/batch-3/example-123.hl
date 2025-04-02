@@ -1,0 +1,37 @@
+/*
+ * Admin-only endpoint that loads `.yaml` files from [/data/clients/],
+ * sends a welcome email to each person listed, and inserts [full_name] and [email]
+ * into the [clients] table in the [crm] database.
+ */
+.arguments
+
+auth.ticket.verify:admin
+
+io.file.list:/data/clients/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.yaml
+      .lambda
+
+         io.file.load:x:@.dp/#
+         yaml2lambda:x:@io.file.load
+
+         for-each:x:@yaml2lambda/*
+            mail.smtp.send
+               message
+                  to
+                     .
+                        name:x:@.dp/#/*/full_name
+                        email:x:@.dp/#/*/email
+                  subject:Welcome to Our CRM
+                  entity:text/plain
+                     content:Welcome! We're excited to work with you.
+
+            data.connect:crm
+               data.create
+                  table:clients
+                  values
+                     full_name:x:@.dp/#/*/full_name
+                     email:x:@.dp/#/*/email

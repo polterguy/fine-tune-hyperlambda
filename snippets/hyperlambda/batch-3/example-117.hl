@@ -1,0 +1,25 @@
+/*
+ * Reads `.xml` book metadata files from [/catalog/books/], converts each to lambda,
+ * and inserts [title] and [isbn] into the [books] table in the [library] database.
+ */
+.arguments
+
+io.file.list:/catalog/books/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.xml
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         xml2lambda:x:@io.file.load
+
+         data.connect:library
+            for-each:x:@xml2lambda/*
+               data.create
+                  table:books
+                  values
+                     title:x:@.dp/#/*/title
+                     isbn:x:@.dp/#/*/isbn

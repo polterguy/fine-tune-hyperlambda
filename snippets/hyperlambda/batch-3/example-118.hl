@@ -1,0 +1,26 @@
+/*
+ * Looks for `.xml` patient files in the [/incoming/patients/] directory.
+ * Each file is loaded and parsed, and [full_name] and [birthdate] are inserted
+ * into the [patients] table of the [clinic] database.
+ */
+.arguments
+
+io.file.list:/incoming/patients/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.xml
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         xml2lambda:x:@io.file.load
+
+         data.connect:clinic
+            for-each:x:@xml2lambda/*
+               data.create
+                  table:patients
+                  values
+                     full_name:x:@.dp/#/*/name
+                     birthdate:x:@.dp/#/*/dob

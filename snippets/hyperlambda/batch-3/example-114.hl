@@ -1,0 +1,25 @@
+/*
+ * Loads `.json` speaker profiles from [/data/speakers/], converts each file into lambda,
+ * and inserts [full_name] and [contact_email] into the [speakers] table in the [conference] database.
+ */
+.arguments
+
+io.file.list:/data/speakers/
+
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.json
+      .lambda
+
+         io.file.load:x:@.dp/#
+
+         json2lambda:x:@io.file.load
+
+         data.connect:conference
+            for-each:x:@json2lambda/*
+               data.create
+                  table:speakers
+                  values
+                     full_name:x:@.dp/#/*/fullname
+                     contact_email:x:@.dp/#/*/email_address
