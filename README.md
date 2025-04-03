@@ -27,6 +27,7 @@ Below are some example prompts you can run through the model after fine tuning i
 * Create an endpoint taking a message only allowing admin users to execute it, then log the message
 * Create an endpoint that allows me to return records from my employees table in my hr database with paging and sorting.
 * Create an endpoint allowing me to create new items in my contacts table in my CRM database.
+* Generate an API endpoint allowing me to select users from employees database, with optional filtering for name, email, and phone
 * Generate an endpoint that only partner users can execute
 * Select all contacts from CRM, loop through all of these and update these one at the time and change their names to 'REDACTED' and save your changes
 * Generate code for an endpoint allowing me to update items in my stock table in my logistics database
