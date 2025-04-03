@@ -42,5 +42,6 @@ Below are some example prompts you can run through the model after fine tuning i
 * Show me an endpoint concatenating name and age with a greeting and returning the result to caller
 * Generate an HTTP endpoint for me that lists all files in /etc/www/ and returns this to the caller
 * How do I concatenate two strings given to an endpoint as arguments?
+* Generate an AI function allowing me to send emails. Assume the user ID is the user's email address
 
 However, the best way to test is to take the file level comment from your validation data, and run through the model afterwards.
