@@ -1,4 +1,4 @@
-Wrap this into a [while] loop that continues until [.count] equals 3
+Wrap this code into a [while] loop that continues until [.count] equals 3
 
 ```hyperlambda
 log.info:Hello World
