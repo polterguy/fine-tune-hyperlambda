@@ -1,4 +1,4 @@
-Use math.decrement instead
+Use [math.decrement] instead
 
 ```hyperlambda
 .count:int:0
