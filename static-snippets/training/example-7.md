@@ -1,4 +1,6 @@
-Change the following code:
+Change the following code such that it also created a log entry
+
+```hyperlambda
 .arguments
    name:string
    age:int
@@ -10,8 +12,7 @@ strings.concat
    .:" years old"
 yield
    result:x:@strings.concat
-
-Such that it also created a log entry
+```
 ---
 .arguments
    name:string

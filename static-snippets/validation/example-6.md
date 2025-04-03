@@ -1,0 +1,30 @@
+Modify this code such that only users belonging to the partners role can execute it
+
+```hyperlambda
+.arguments
+   to:string
+   subject:string
+   body:string
+mail.smtp.send
+   message
+      to
+         .
+            email:x:@.arguments/*/to
+      subject:x:@.arguments/*/subject
+      entity:text/plain
+         content:x:@.arguments/*/body
+```
+---
+.arguments
+   to:string
+   subject:string
+   body:string
+auth.ticket.verify:partner
+mail.smtp.send
+   message
+      to
+         .
+            email:x:@.arguments/*/to
+      subject:x:@.arguments/*/subject
+      entity:text/plain
+         content:x:@.arguments/*/body

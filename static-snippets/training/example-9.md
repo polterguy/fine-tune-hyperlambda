@@ -1,4 +1,4 @@
-Modify this code such that it requires the user to be authenticated
+Add authorization requirements for admin and partner users
 
 ```hyperlambda
 .arguments
@@ -12,8 +12,6 @@ strings.concat
    get-value:x:@.arguments/*/age
    .:" years old"
 
-log.info:Endpoint invoked!
-
 yield
    result:x:@strings.concat
 ```
@@ -22,7 +20,7 @@ yield
    name:string
    age:int
 
-auth.ticket.verify
+auth.ticket.verify:admin,partners
 
 strings.concat
    .:"Hello "
@@ -30,8 +28,6 @@ strings.concat
    .:" you are "
    get-value:x:@.arguments/*/age
    .:" years old"
-
-log.info:Endpoint invoked!
 
 yield
    result:x:@strings.concat

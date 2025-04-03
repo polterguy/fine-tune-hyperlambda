@@ -1,0 +1,31 @@
+Change Hyperlambda such that it accepts a [name] argument
+
+```hyperlambda
+.arguments
+   to:string
+   subject:string
+   body:string
+mail.smtp.send
+   message
+      to
+         .
+            email:x:@.arguments/*/to
+      subject:x:@.arguments/*/subject
+      entity:text/plain
+         content:x:@.arguments/*/body
+```
+---
+.arguments
+   name:string
+   to:string
+   subject:string
+   body:string
+mail.smtp.send
+   message
+      to
+         .
+            name:x:@.arguments/*/name
+            email:x:@.arguments/*/to
+      subject:x:@.arguments/*/subject
+      entity:text/plain
+         content:x:@.arguments/*/body

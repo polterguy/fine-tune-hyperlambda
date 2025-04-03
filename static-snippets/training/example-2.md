@@ -1,5 +1,6 @@
 Change the following code such that only partners users can execute it:
 
+```hyperlambda
 .arguments
    to:string
    subject:string
@@ -20,6 +21,7 @@ mail.smtp.send
       subject:x:@.arguments/*/subject
       entity:text/plain
          content:x:@.arguments/*/body
+```
 ---
 .arguments
    to:string
