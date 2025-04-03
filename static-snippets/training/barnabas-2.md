@@ -1,7 +1,9 @@
 /*
  * Wrap this into a [while] loop that runs 4 times
  */
+```hyperlambda
 log.info:Running iteration
+```
 ---
 .count:int:0
 while

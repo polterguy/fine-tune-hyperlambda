@@ -1,6 +1,7 @@
 /*
  * Change the log message to 'Looping started'
  */
+```hyperlambda
 .count:int:0
 while
    lt
@@ -9,6 +10,7 @@ while
    .lambda
       log.info:Init loop
       math.increment:x:@.count
+```
 ---
 .count:int:0
 while

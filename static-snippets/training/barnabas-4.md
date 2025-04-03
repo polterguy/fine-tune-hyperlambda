@@ -1,6 +1,7 @@
 /*
  * Rename the [.count] variable to [.total]
  */
+```hyperlambda
 .count:int:0
 while
    lt
@@ -9,6 +10,7 @@ while
    .lambda
       log.info:Tick
       math.increment:x:@.count
+```
 ---
 .total:int:0
 while

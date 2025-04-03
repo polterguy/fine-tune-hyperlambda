@@ -1,6 +1,7 @@
 /*
  * Log an info message after the loop completes
  */
+```hyperlambda
 .count:int:0
 while
    lt
@@ -8,6 +9,7 @@ while
       .:int:2
    .lambda
       math.increment:x:@.count
+```
 ---
 .count:int:0
 while
