@@ -3,7 +3,7 @@ Change the folder to /system/
 ```hyperlambda
 /*
  * This script counts the number of Hyperlambda files, in addition to the combined
- * number of nodes, within the specified folder.
+ * number of nodes, within the '/' folder.
  */
 .folder:/
 .loc:int:0
@@ -25,7 +25,7 @@ remove-nodes:x:@signal/*
 ---
 /*
  * This script counts the number of Hyperlambda files, in addition to the combined
- * number of nodes, within the specified folder.
+ * number of nodes, within the '/system/' folder.
  */
 .folder:/system/
 .loc:int:0
