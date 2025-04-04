@@ -1,34 +1,79 @@
-Change Hyperlambda such that we validate its direction argument
+Remove logging
 
 ```hyperlambda
-.arguments
-   order:string
-   direction:string
-data.connect:crm
-   data.read
-      table:contacts
-      columns
-         name
-         email
-         phone
-      order:x:@.arguments/*/limit
-      direction:x:@.arguments/*/offset
+/*
+ * Default global exception handler, invoked if no other overrides exists
+ * at the module level.
+ *
+ * If you want to create a custom exception handler
+ * for a specific module, you can do so by creating a file called "exceptions.hl"
+ * inside a folder in your module.
+ */
+log.error:x:@.arguments/*/message
+   url:x:@.arguments/*/path
+   exception:x:@.arguments/*/stack
+
+/*
+ * Notice, unless the [public] argument exists, and is true,
+ * we return a "generic" error to caller to make sure we don't
+ * disclose any security information originating from exceptions.
+ */
+if
+   or
+      auth.ticket.in-role:root
+      and
+         exists:x:@.arguments/*/public
+         or
+            get-value:x:@.arguments/*/public
+            convert:x:@.arguments/*/public
+               type:bool
+   .lambda
+
+      // Exception message is supposed to propagate to client.
+      set-value:x:../*/return/*/message
+         get-value:x:@.arguments/*/message
+
+// Parametrizing return invocation.
+add:x:+
+   get-nodes:x:@.arguments/*/status
+   get-nodes:x:@.arguments/*/field
+return
+   message:Guru meditation, come back when Universe is in order!
 ```
 ---
-.arguments
-   order:string
-   direction:string
 
-// This throws an exception if the argument is given and does not have either 'asc' or 'desc' as its value
-validators.enum:x:@.arguments/*/direction
-   .:asc
-   .:desc
-data.connect:crm
-   data.read
-      table:contacts
-      columns
-         name
-         email
-         phone
-      order:x:@.arguments/*/limit
-      direction:x:@.arguments/*/offset
+/*
+ * Default global exception handler, invoked if no other overrides exists
+ * at the module level.
+ *
+ * If you want to create a custom exception handler
+ * for a specific module, you can do so by creating a file called "exceptions.hl"
+ * inside a folder in your module.
+ */
+
+/*
+ * Notice, unless the [public] argument exists, and is true,
+ * we return a "generic" error to caller to make sure we don't
+ * disclose any security information originating from exceptions.
+ */
+if
+   or
+      auth.ticket.in-role:root
+      and
+         exists:x:@.arguments/*/public
+         or
+            get-value:x:@.arguments/*/public
+            convert:x:@.arguments/*/public
+               type:bool
+   .lambda
+
+      // Exception message is supposed to propagate to client.
+      set-value:x:../*/return/*/message
+         get-value:x:@.arguments/*/message
+
+// Parametrizing return invocation.
+add:x:+
+   get-nodes:x:@.arguments/*/status
+   get-nodes:x:@.arguments/*/field
+return
+   message:Guru meditation, come back when Universe is in order!
