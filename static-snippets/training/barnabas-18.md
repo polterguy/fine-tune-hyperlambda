@@ -18,7 +18,7 @@ while
    .lambda
       if
          eq
-            math.mod
+            math.modulo
                get-value:x:@.count
                .:int:2
             .:int:0

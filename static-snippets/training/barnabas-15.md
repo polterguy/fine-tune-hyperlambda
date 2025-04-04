@@ -1,8 +1,9 @@
 /*
- * Modify this to return a 404 error using [return]
+ * Modify this to return a 404 HTTP status code
  */
-.result:Not found
----
 return
-   status:int:404
-   message:string:Not found
+   message:Not found
+---
+response.status.set:404
+return
+   message:Not found

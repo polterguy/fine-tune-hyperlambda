@@ -1,5 +1,5 @@
 /*
- * Add a conditional that only performs addition if [.add-mode] is true
+ * Add a condition that only performs addition if [.add-mode] is true
  */
 math.add
    get-value:int:5

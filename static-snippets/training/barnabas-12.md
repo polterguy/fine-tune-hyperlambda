@@ -1,5 +1,5 @@
 /*
- * Create a loop that multiplies a value by 2 on each iteration, starting from 1 and looping 4 times
+ * Create a loop that multiplies my result node by 2 on each iteration, starting from 1 and looping 4 times
  */
 .result:int:1
 ---

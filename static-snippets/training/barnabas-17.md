@@ -1,8 +1,8 @@
 /*
- * Convert this into a reusable slot named 'math.double'
+ * Convert this into a reusable slot named 'math.double' taking a number argument it doubles
  */
 math.multiply
-   get-value:int:4
+   .:int:4
    .:int:2
 ---
 slots.create:math.double
