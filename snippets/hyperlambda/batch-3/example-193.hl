@@ -1,0 +1,44 @@
+/*
+ * Create an endpoint that inspects the client's [Accept] HTTP header.
+ * It splits the header by comma (`,`), then evaluates the first media type using a [switch] block.
+ * Based on the first item in the [Accept] list, it returns a [response-type] indicating how the server might respond.
+ * Defaults to [Unknown media type] if no match is found.
+ */
+.arguments
+
+// Fetch Accept header and store in [.temp]
+.temp
+set-value:x:@.temp
+   request.headers.get:Accept
+
+// Split the Accept header on comma to get individual media types
+strings.split:x:@.temp
+   .:,
+.first-accept
+set-value:x:@.first-accept
+   get-value:x:@strings.split/0
+
+// Switch based on the first accepted media type
+.response-type
+switch:x:@.first-accept
+
+   case:text/html
+      set-value:x:@.response-type
+         .:Rendering HTML content
+
+   case:application/json
+      set-value:x:@.response-type
+         .:Returning JSON payload
+
+   case:application/xml
+      set-value:x:@.response-type
+         .:Returning XML data
+
+   default
+      set-value:x:@.response-type
+         .:Unknown media type
+
+// Return the detected Accept value and corresponding response message
+yield
+   accept-header:x:@.temp
+   response-type:x:@.response-type
