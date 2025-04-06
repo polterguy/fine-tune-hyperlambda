@@ -1,0 +1,23 @@
+/*
+ * Retrieve HTTP headers and insert each into the [http_logs] table
+ * inside the 'audit-db' database.
+ */
+
+request.headers.list
+
+data.connect:audit-db
+
+   for-each:x:@request.headers.list/*
+
+      // This retrieves the name of the HTTP header
+      get-name:x:@.dp/#
+      data.create
+         table:http_logs
+         values
+
+            // Making sure we store the HTTP header's name correctly
+            name:x:@get-name
+            value:x:@.dp/#
+
+yield
+   result:Stored all request headers in audit database
