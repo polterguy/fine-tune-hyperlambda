@@ -1,0 +1,106 @@
+/*
+ * Registers a new user into 'YOUR_AUTH_DATABASE' and its 'YOUR_AUTH_TABLE' and sends a verification email
+ * with a link the user must click in order to verify his or her email address.
+ *
+ * The password must be at least 12 characters in length, and it will be securely stored as a blowfish hash
+ * in the database.
+ */
+.arguments
+   lastname:string
+   password:string
+   email:string
+   firstname: string
+
+// Verify mandatory arguments
+validators.mandatory:x:@.arguments/*/lastname
+validators.mandatory:x:@.arguments/*/firstname
+validators.mandatory:x:@.arguments/*/password
+validators.mandatory:x:@.arguments/*/email
+
+// Verify email
+validators.email:x:@.arguments/*/email
+
+// Verify password length
+validators.string:x:@.arguments/*/password
+   min: 12
+
+// Hash the password
+crypto.password.hash:x:@.arguments/*/password
+
+// Throw error if email already exists
+data.connect:YOUR_AUTH_DATABASE
+   data.read
+      table:YOUR_AUTH_TABLE
+      where
+         and
+            email.eq:x:@.arguments/*/email
+   if
+      exists:x:@data.read/*
+      .lambda
+         throw:Email already exists!
+            status:403
+            public:true
+   
+   // Save user in the database
+   data.create
+      table:users
+      values
+         lastname:x:@.arguments/*/lastname
+         email:x:@.arguments/*/email
+         firstname:x:@.arguments/*/firstname
+         password_hash:x:@crypto.password.hash
+
+         // We change this once the user clicks the link.
+         isEmailVerified:0
+
+// Make token for verification link
+.token
+config.get:"auth:secret"
+strings.concat
+   .email:x:@.arguments/*/email
+   .secret:x:@config.get
+set-value:x:@.token
+   crypto.hash.sha256:x:@strings.concat
+         
+// Create the link for the verifycation email
+.url
+set-value:x:-
+   strings.concat
+      .:"https://YOUR_CLOUDLET_URL.us.ainiro.io/magic/modules/YOUR_MODULE_CALLBACK_VERIFY_EMAIL_ENDPOINT"
+      .:"?email="
+      .:x:@.arguments/*/email
+      .:"&token="
+      .:x:@.token
+
+// Make name
+.name
+set-value:x:-
+   strings.concat
+      .:x:@.arguments/*/firstname
+      .:" "
+      .:x:@.arguments/*/lastname
+
+// Add the link to the text
+.body
+set-value:x:@-
+   strings.concat
+      .:@"Please click on the link below to verify your email!
+                                           
+"
+      .url:x:@.url
+               
+// Send verification email
+unwrap:x:./*/mail.smtp.send/**
+mail.smtp.send
+   message
+      to
+         .
+            name:x:@.name
+            email:x:@.arguments/*/email
+      subject:Please verify your email!
+      entity:text/plain
+         content:x:@.body
+
+// Returning success
+return
+   message:OK

@@ -1,0 +1,53 @@
+/*
+ * Logs in a registered user using 'YOUR_AUTH_DATABASE' database and 'YOUR_AUTH_TABLE' table.
+ *
+ * If the username and password matches the record in the database it returns a valid JWTO token,
+ * otherwise it throws an exception.
+ *
+ * Assumes username is stored as 'username' and password as 'password'.
+ */
+.arguments
+   username:string
+   password:string
+
+// username and password are mandatory arguments
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
+
+// read user details from the database
+data.connect:YOUR_AUTH_DATABASE
+   data.read
+      table:YOUR_AUTH_TABLE
+      where
+         and
+            username.eq:x:@.arguments/*/username
+
+   // if no hash value found throw exception
+   if
+      not-exists:x:@data.read/*/*/password
+      .lambda
+         throw:Invalid credentials
+            status:403
+            public:true
+
+   // verify the password if hash value found
+   crypto.password.verify:x:@.arguments/*/password
+      hash:x:@data.read/*/*/password
+   if
+      get-value:x:@crypto.password.verify
+
+      // password is correct, return jwt
+      .lambda
+         auth.ticket.create
+            username:x:@.arguments/*/username
+            roles
+               .:guest
+
+         yield
+            token:x:@auth.ticket.create
+                        
+   // throw exception if password is incorrect
+   else
+      throw:Invalid credentials
+         status:403
+         public:true

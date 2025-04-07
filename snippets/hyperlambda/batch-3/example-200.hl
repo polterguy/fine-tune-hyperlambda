@@ -1,0 +1,79 @@
+/*
+ * Changes the password of the currently authenticated user.
+ *
+ * Assumes you've got a 'YOUR_AUTH_DATABASE' database with a 'YOUR_AUTH_TABLE' table where you store users,
+ * in addition to a 'YOUR_AUTH_TABLE_RESET_TOKENS' table where you store reset tokens that are sent  to the
+ * user's email, only allowing the owner of the email address to change the password of the user owning the email.
+ *
+ * This endpoint will then be executed if you construct your 'send password change email' correctly and provide the
+ * token to the user typically as a clickable link, for then to pass the token into this endpoint.
+ *
+ * When the endpoint has been executed, the password has been changed.
+ */
+.arguments
+   token:string
+   newPassword:string
+
+// Validate password length
+if
+   lt
+      strings.length:x:@.arguments/*/newPassword
+      .int:12
+   .lambda
+
+      throw:Password must be at least 12 characters long
+         status:400
+         public:true
+         field:newPassword
+
+// Get date now
+date.now
+
+// Check token validity
+data.connect:YOUR_AUTH_DATABASE
+   data.read
+      table:YOUR_AUTH_TABLE_RESET_TOKENS
+      where
+         and
+            token.eq:x:@.arguments/*/token
+            expires.mt:x:@date.now
+
+   // Check if valid token exists
+   if
+      exists:x:@data.read/*
+
+      .lambda
+
+         // Retrieve associated email
+         .email:x:@data.read/*/*/email
+
+         // Hash new password
+         crypto.password.hash:x:@.arguments/*/newPassword
+
+         // Update user password
+         data.update
+            table:YOUR_AUTH_TABLE
+            values
+               password_hash:x:@crypto.password.hash
+            where
+               and
+                  email.eq:x:@.email
+
+         // Delete used token to prevent reuse
+         data.delete
+            table:YOUR_AUTH_TABLE_RESET_TOKENS
+            where
+               and
+                  token.eq:x:@.arguments/*/token
+
+         // Return success
+         return-value
+            result:Password successfully changed
+
+   else
+
+      // Invalid or expired token
+      throw:Invalid or expired token
+         status:403
+         public:true
+         field:token

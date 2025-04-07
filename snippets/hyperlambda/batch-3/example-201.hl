@@ -1,0 +1,85 @@
+/*
+ * Generate password reset token and send email allowing users to change their passwords without knowing their existing password.
+ *
+ * Assumes you've got a database named 'YOUR_AUTH_DATABASE' with two tables named 'YOUR_AUTH_TABLE' where you store your
+ * usernames and passwords (usernames as emails), and another table called 'YOUR_AUTH_TABLE_RESET_TOKENS' where you store
+ * reset tokens, that are cryptographically created by combining the auth secret with the email address and generating a hash.
+ *
+ * This function will create a record and store into its reset tokens table,
+ * for then to send a token in an email to the user's email address, allowing the user to click the link in the email,
+ * for then to change his or her password at at that URL which must capture the token and pass it into the endpoint
+ * that actually changes the password.
+ */
+.arguments
+   email:string
+
+// Validate email exists
+data.connect:YOUR_AUTH_DATABASE
+   data.read
+      table:YOUR_AUTH_TABLE
+      where
+         and
+            email.eq:x:@.arguments/*/email
+
+   // Check if user exists
+   if
+      exists:x:@data.read/*
+      .lambda
+
+         // Generate a secure random token
+         crypto.random
+            length:48
+         set-value:x:@crypto.random
+            strings.replace:x:@crypto.random
+               .:/
+               .:-
+
+         // Calculate expiration (1 hour from now)
+         math.add
+            date.now
+            time
+               hours:1
+
+         // Store token in dedicated table
+         data.connect:YOUR_AUTH_DATABASE
+            data.create
+               table:YOUR_AUTH_TABLE_RESET_TOKENS
+               values
+                  token:x:@crypto.random
+                  email:x:@.arguments/*/email
+                  expires:x:@math.add
+
+         // Construct reset link
+         strings.concat
+            .:"https://YOUR_CLOUDLET_URL.us.ainiro.io/magic/modules/YOUR_MODULE_CALLBACK_VERIFY_EMAIL_ENDPOINT?token="
+            get-value:x:@crypto.random
+         .url:x:-
+
+         // Add the link to the text
+         strings.concat
+            .:@"Please click the following link to reset your password. This link will expire in 1 hour.
+
+         "
+            .url:x:@.url
+
+         // Send email with reset link
+         unwrap:x:./*/mail.smtp.send/**
+         mail.smtp.send
+            message
+               to
+                  .
+                     email:x:@.arguments/*/email
+               subject:Password Reset Request
+               entity:text/plain
+                  content:x:@strings.concat
+
+         // Return success response
+         return-value:Password reset link sent
+
+   else
+
+      // User not found
+      throw:Email not found in system
+         status:404
+         public:true
+         field:email
