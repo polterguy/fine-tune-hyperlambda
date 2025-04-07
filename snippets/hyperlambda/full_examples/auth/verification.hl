@@ -1,0 +1,47 @@
+/*
+ * Verifies a newly registered user's email address.
+ *
+ * This endpoint will be executed after the user has registered in the system and when the user has clicked
+ * the "verify email address hyperlink" in his welcome email.
+ *
+ * The endpoint will make sure the user is marked as a verified user.
+ */
+.arguments
+   email:string
+   token:string
+
+// Create a new token to verify the token passed into endpoint is valid.
+strings.concat
+   .:x:@.arguments/*/email
+   config.get:"auth:secret"
+.token
+set-value:x:@.token
+   crypto.hash.sha256:x:@strings.concat 
+
+// Check that token specified as an argument matches token we created from hashing email + auth secret
+if
+   neq
+      .:x:@.arguments/*/token
+      .:x:@.token
+   .lambda
+
+      // Not a valid request.
+      throw:Bogus token, go home!
+         status:403
+         public:true
+         field:token
+
+// Update email_verified in database
+data.connect:YOUR_AUTH_DATABASE
+   data.update
+      table:YOUR_AUTH_TABLE
+      values
+         isEmailVerified:int:1
+      where
+         and
+            email.eq:x:@.arguments/*/email
+
+// Redirecting client after verification succeeded.
+response.status.set:302
+response.headers.set
+   Location:"https://WHATEVER_PAGE_YOU_WANT_USER_TO_REDIRECT_TO_AFTER_VERIFICATION"

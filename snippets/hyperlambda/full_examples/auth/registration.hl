@@ -1,21 +1,22 @@
 /*
  * Registers a new user into 'YOUR_AUTH_DATABASE' and its 'YOUR_AUTH_TABLE' and sends a verification email
- * with a link the user must click in order to verify his or her email address.
+ * with a link the user must click in order to verify his or her email address. The user's email address
+ * will become the username.
  *
  * The password must be at least 12 characters in length, and it will be securely stored as a blowfish hash
  * in the database.
  */
 .arguments
-   lastname:string
-   password:string
-   email:string
    firstname: string
+   lastname:string
+   email:string
+   password:string
 
 // Verify mandatory arguments
-validators.mandatory:x:@.arguments/*/lastname
 validators.mandatory:x:@.arguments/*/firstname
-validators.mandatory:x:@.arguments/*/password
+validators.mandatory:x:@.arguments/*/lastname
 validators.mandatory:x:@.arguments/*/email
+validators.mandatory:x:@.arguments/*/password
 
 // Verify email
 validators.email:x:@.arguments/*/email
@@ -24,7 +25,7 @@ validators.email:x:@.arguments/*/email
 validators.string:x:@.arguments/*/password
    min: 12
 
-// Hash the password
+// Hash the password using blowfish
 crypto.password.hash:x:@.arguments/*/password
 
 // Throw error if email already exists
@@ -43,46 +44,44 @@ data.connect:YOUR_AUTH_DATABASE
    
    // Save user in the database
    data.create
-      table:users
+      table:YOUR_AUTH_TABLE
       values
+         firstname:x:@.arguments/*/firstname
          lastname:x:@.arguments/*/lastname
          email:x:@.arguments/*/email
-         firstname:x:@.arguments/*/firstname
          password_hash:x:@crypto.password.hash
+         verified:int:0
 
-         // We change this once the user clicks the link.
-         isEmailVerified:int:0
-
-// Make token for verification link
-.token
+// Create token for verification link
 config.get:"auth:secret"
 strings.concat
    .email:x:@.arguments/*/email
    .secret:x:@config.get
+.token
 set-value:x:@.token
    crypto.hash.sha256:x:@strings.concat
          
-// Create the link for the verifycation email
+// Create the link for the verification email
 .url
-set-value:x:-
+set-value:x:@.url
    strings.concat
-      .:"https://YOUR_CLOUDLET_URL.us.ainiro.io/magic/modules/YOUR_MODULE_CALLBACK_VERIFY_EMAIL_ENDPOINT"
+      .:"https://URL_TO_ENDPOINT_VERIFYING_USER"
       .:"?email="
       .:x:@.arguments/*/email
       .:"&token="
       .:x:@.token
 
-// Make name
+// Create full name from firstname and lastname
 .name
-set-value:x:-
+set-value:x:@.name
    strings.concat
       .:x:@.arguments/*/firstname
       .:" "
       .:x:@.arguments/*/lastname
 
-// Add the link to the text
+// Add the link to the body of our email
 .body
-set-value:x:@-
+set-value:x:@.body
    strings.concat
       .:@"Please click on the link below to verify your email!
                                            
@@ -90,14 +89,14 @@ set-value:x:@-
       .url:x:@.url
                
 // Send verification email
-unwrap:x:./*/mail.smtp.send/**
+unwrap:x:+/**
 mail.smtp.send
    message
       to
          .
             name:x:@.name
             email:x:@.arguments/*/email
-      subject:Please verify your email!
+      subject:Please verify your email address!
       entity:text/plain
          content:x:@.body
 
