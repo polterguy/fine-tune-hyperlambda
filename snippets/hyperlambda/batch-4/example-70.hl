@@ -1,0 +1,38 @@
+/*
+ * Uses OpenAI’s Whisper model through the chat completion endpoint to process text and turn it into speech.
+ *
+ * Basically, the [prompt] argument will be transformed into an mp3 file that can be played speaking
+ * out the text given as input. This mp3 file is saved at '/audio-transcript.mp3'.
+ */
+.arguments
+   prompt:string
+
+// POST request to OpenAI Whisper-style endpoint
+http.post:"https://api.openai.com/v1/chat/completions"
+   convert:true
+   headers
+      Authorization:Bearer YOUR_OPENAI_API_KEY_HERE
+      Content-Type:application/json
+   payload
+      model:gpt-4o-audio-preview
+      max_tokens:int:4000
+      temperature:double:0.3
+      messages
+         .
+            role:system
+            content:You are a transcription assistant. Transcribe the audio content.
+         .
+            role:user
+            content:x:@.arguments/*/prompt
+      audio
+         voice:alloy
+         format:mp3
+      modalities
+         .:audio
+         .:text
+
+// Decode base64 audio response and save to file
+convert:x:@http.post/*/content/*/choices/0/*/message/*/audio/*/data
+   type:from-base64
+io.file.save.binary:/audio-transcript.mp3
+   get-value:x:@convert
