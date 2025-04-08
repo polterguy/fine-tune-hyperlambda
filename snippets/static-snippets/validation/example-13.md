@@ -1,4 +1,4 @@
-Add a [.finally] block that always logs 'Done'
+Change it such that it always logs 'Done', even if an exception is thrown
 
 ```hyperlambda
 try

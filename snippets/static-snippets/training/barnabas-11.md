@@ -1,6 +1,5 @@
-/*
- * Add a dynamic calculation where the result is base^exponent
- */
+Add a dynamic calculation where the result is base exponent
+
 ```hyperlambda
 .base:int:2
 .exponent:int:3

@@ -1,6 +1,5 @@
-/*
- * Add a [yield] block that returns the final value of [.count]
- */
+Add a [yield] block that returns the final value of [.count]
+
 ```hyperlambda
 .count:int:0
 while

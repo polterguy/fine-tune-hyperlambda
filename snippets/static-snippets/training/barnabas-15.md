@@ -1,6 +1,5 @@
-/*
- * Modify this to return a 404 HTTP status code
- */
+Modify this to return a 404 HTTP status code
+
 ```hyperlambda
 return
    message:Not found

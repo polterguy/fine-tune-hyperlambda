@@ -1,6 +1,5 @@
-/*
- * Rename the [.count] variable to [.total]
- */
+Rename the [.count] variable to [.total]
+
 ```hyperlambda
 .count:int:0
 while

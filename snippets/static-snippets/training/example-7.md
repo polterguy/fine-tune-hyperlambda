@@ -24,5 +24,6 @@ strings.concat
    get-value:x:@.arguments/*/age
    .:" years old"
 log.info:Endpoint invoked!
+   greeting:x:@strings.concat
 yield
    result:x:@strings.concat

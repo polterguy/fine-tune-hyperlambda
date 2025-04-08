@@ -1,6 +1,5 @@
-/*
- * Replace hardcoded [true] condition with [.should-run] variable
- */
+Replace hardcoded [true] condition with [.should-run] variable
+
 ```hyperlambda
 .result
 if

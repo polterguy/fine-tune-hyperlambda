@@ -1,4 +1,4 @@
-I have the following code:
+Wrap the following code into an endpoint and return the result. Do NOT add any comments or explanation
 
 ```hyperlambda
 strings.concat
@@ -8,8 +8,6 @@ strings.concat
    get-value:x:@.arguments/*/age
    .:" years old"
 ```
-
-Wrap the above code into an endpoint and return the result. Do NOT add any comments or explanation
 ---
 .arguments
    name:string

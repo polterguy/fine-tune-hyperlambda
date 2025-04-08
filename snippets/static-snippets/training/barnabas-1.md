@@ -1,6 +1,5 @@
-/*
- * Convert this into an endpoint that returns a [message] after inserting a contact
- */
+Convert this into an endpoint that returns a [message] after inserting a contact
+
 ```hyperlambda
 data.connect:crm
    data.create

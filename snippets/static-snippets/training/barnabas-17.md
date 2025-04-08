@@ -1,6 +1,5 @@
-/*
- * Convert this into a reusable slot named 'math.double' taking a number argument it doubles
- */
+Convert this into a reusable slot named 'math.double' taking a number argument it doubles
+
 ```hyperlambda
 math.multiply
    .:int:4

@@ -1,6 +1,5 @@
-/*
- * Change the loop so it logs every even number between 0 and 6
- */
+Change the loop so it logs every even number between 0 and 6
+
 ```hyperlambda
 .count:int:0
 while

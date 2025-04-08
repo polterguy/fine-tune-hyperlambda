@@ -1,6 +1,5 @@
-/*
- * Wrap this logic so that it only runs if [.execute] is true
- */
+Wrap this logic so that it only runs if [.execute] is true
+
 ```hyperlambda
 set-value:x:@.status
    .:complete

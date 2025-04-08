@@ -1,6 +1,5 @@
-/*
- * Change the log message to 'Looping started'
- */
+Change the log message to 'Looping started'
+
 ```hyperlambda
 .count:int:0
 while

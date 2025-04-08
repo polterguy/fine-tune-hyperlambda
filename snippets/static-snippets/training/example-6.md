@@ -1,4 +1,4 @@
-Wrap the above code into an endpoint
+Wrap the following code into an endpoint
 
 ```hyperlambda
 strings.concat

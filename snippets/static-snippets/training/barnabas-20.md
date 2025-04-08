@@ -1,6 +1,5 @@
-/*
- * Wrap the logic in a [try] block and add [.catch] that logs 'Something went wrong'
- */
+Wrap the logic in a [try] block and add [.catch] that logs 'Something went wrong'
+
 ```hyperlambda
 throw:Oops
 ```

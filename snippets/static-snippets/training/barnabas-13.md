@@ -1,6 +1,5 @@
-/*
- * Replace log.info with log.error and include an exception message
- */
+Replace log.info with log.error and include an exception message
+
 ```hyperlambda
 log.info:Something went wrong
 ```

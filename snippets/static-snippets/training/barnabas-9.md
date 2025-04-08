@@ -1,6 +1,5 @@
-/*
- * Log an info message after the loop completes
- */
+Log an info message after the loop completes
+
 ```hyperlambda
 .count:int:0
 while

@@ -1,6 +1,5 @@
-/*
- * Change the comparison from 'less than' to 'greater than or equal'
- */
+Change the comparison from 'less than' to 'greater than or equal'
+
 ```hyperlambda
 .value:int:10
 if

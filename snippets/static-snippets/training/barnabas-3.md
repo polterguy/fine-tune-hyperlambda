@@ -1,6 +1,5 @@
-/*
- * Add an [else] clause that handles when .is-admin is false
- */
+Add an [else] clause that handles when .is-admin is false
+
 ```hyperlambda
 .is-admin:bool:true
 .response
