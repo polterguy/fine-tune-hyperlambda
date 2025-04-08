@@ -1,6 +1,7 @@
 /*
  * Change the loop so it logs every even number between 0 and 6
  */
+```hyperlambda
 .count:int:0
 while
    lt
@@ -9,6 +10,7 @@ while
    .lambda
       log.info:Logging
       math.increment:x:@.count
+```
 ---
 .count:int:0
 while

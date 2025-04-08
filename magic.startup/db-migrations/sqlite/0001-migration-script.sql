@@ -1,0 +1,1 @@
+alter table hyperlambda add column "is_static" numeric not null default 0; 

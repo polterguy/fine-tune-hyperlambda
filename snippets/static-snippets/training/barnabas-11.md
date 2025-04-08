@@ -1,8 +1,10 @@
 /*
  * Add a dynamic calculation where the result is base^exponent
  */
+```hyperlambda
 .base:int:2
 .exponent:int:3
+```
 ---
 .base:int:2
 .exponent:int:3

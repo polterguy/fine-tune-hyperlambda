@@ -1,7 +1,9 @@
 /*
  * Create a loop that multiplies my result node by 2 on each iteration, starting from 1 and looping 4 times
  */
+```hyperlambda
 .result:int:1
+```
 ---
 .count:int:0
 .result:int:1

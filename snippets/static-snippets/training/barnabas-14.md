@@ -1,6 +1,7 @@
 /*
  * Change the comparison from 'less than' to 'greater than or equal'
  */
+```hyperlambda
 .value:int:10
 if
    lt
@@ -8,6 +9,7 @@ if
       .:int:20
    .lambda
       log.info:Low value
+```
 ---
 .value:int:10
 if
