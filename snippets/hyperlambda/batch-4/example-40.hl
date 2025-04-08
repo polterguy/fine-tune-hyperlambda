@@ -1,0 +1,20 @@
+/*
+ * Connects to the 'cms' database, reads blog articles, and updates each article's metadata
+ * to 'https://publisher.api.io/articles/{slug}' using HTTP PUT.
+ */
+data.connect:cms
+   data.read
+      table:articles
+      columns
+         slug
+         title
+         published
+for-each:x:@data.connect/*/data.read/*
+   strings.concat
+      .:"https://publisher.api.io/articles/"
+      get-value:x:@.dp/#/*/slug
+   http.put:x:@strings.concat
+      convert:bool:true
+      payload
+         title:x:@.dp/#/*/title
+         published:x:@.dp/#/*/published

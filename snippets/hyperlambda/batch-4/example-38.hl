@@ -1,0 +1,18 @@
+/*
+ * Connects to the HR system, reads employee salary adjustments,
+ * and patches updates to 'https://payroll.core.io/employees/{employeeId}'.
+ */
+data.connect:hr
+   data.read
+      table:adjustments
+      columns
+         employeeId
+         newSalary
+   for-each:x:@data.read/*
+      strings.concat
+         .:"https://payroll.core.io/employees/"
+         get-value:x:@.dp/#/*/employeeId
+      http.patch:x:@strings.concat
+         convert:bool:true
+         payload
+            salary:x:@.dp/#/*/newSalary

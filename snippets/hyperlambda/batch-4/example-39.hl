@@ -1,0 +1,22 @@
+/*
+ * Connects to the IoT database, reads all online devices, and patches firmware version
+ * to 'https://iot.cloudsync.com/device-config/{deviceId}' using HTTP PATCH.
+ */
+data.connect:iot
+   data.read
+      table:devices
+      columns
+         deviceId
+         firmwareVersion
+         status
+      where
+         and
+            status.eq:online
+   for-each:x:@data.read/*
+      strings.concat
+         .:"https://iot.cloudsync.com/device-config/"
+         get-value:x:@.dp/#/*/deviceId
+      http.patch:x:@strings.concat
+         convert:bool:true
+         payload
+            firmwareVersion:x:@.dp/#/*/firmwareVersion
