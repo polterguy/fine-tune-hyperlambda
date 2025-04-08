@@ -33,7 +33,6 @@ data.connect:[generic|crm]
    data.create
       database-type:sqlite
       table:contacts
-      return-id:bool:true
       values
 
    // Returning the correct status code.
@@ -50,8 +49,7 @@ data.connect:[generic|crm]
       args
 
    // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
+   yield
       id:x:@data.create
 ```
 ---
@@ -87,13 +85,11 @@ data.connect:[generic|crm]
    data.create
       database-type:sqlite
       table:contacts
-      return-id:bool:true
       values
 
    // Returning the correct status code.
    response.status.set:201
 
    // Returning result of above invocation to caller.
-   unwrap:x:+/*
-   return
+   yield
       id:x:@data.create

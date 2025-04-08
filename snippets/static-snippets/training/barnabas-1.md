@@ -20,4 +20,4 @@ data.connect:crm
          name:Jane Doe
          email:jane.doe@example.com
    yield
-      message:string:Contact inserted successfully
+      message:Contact inserted successfully
