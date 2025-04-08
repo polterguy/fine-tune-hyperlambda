@@ -1,0 +1,24 @@
+/*
+ * Fetches the first 12 books from the 'library' database and includes all reviews for each book.
+ */
+.arguments
+data.connect:library
+   data.read
+      table:books
+      limit:int:12
+   for-each:x:@data.read/*
+      include:x:@.dp/#
+         data.read
+            table:reviews
+            where
+               and
+                  book_id.eq:x:@.dp/#/*/id
+
+         /*
+          * This [yield] statement returns the reviews from [include], which again ensures it's included on the
+          * currently iterated book
+          */
+         yield
+            reviews:x:@data.read/*
+yield
+   books:x:@data.connect/*/data.read/*

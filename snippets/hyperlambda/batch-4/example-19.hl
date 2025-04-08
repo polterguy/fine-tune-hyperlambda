@@ -1,0 +1,23 @@
+/*
+ * Queries the 'hrdb' database for all employees whose department contains 'tech'.
+ * For each employee, fetches their public GitHub profile based on their username.
+ * The profile data is included in the response as [github-profile].
+ */
+.arguments
+data.connect:hrdb
+   data.read
+      table:employees
+      where
+         and
+            department.like:%tech%
+   for-each:x:@data.read/*
+      include:x:@.dp/#
+         strings.concat
+            .:"https://api.github.com/users/"
+            get-value:x:@.dp/#/*/github_username
+         http.get:x:@strings.concat
+            convert:bool:true
+         yield
+            github-profile:x:@http.get/*/content
+yield
+   employees:x:@data.connect/*/data.read/*

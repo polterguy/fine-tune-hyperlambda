@@ -1,0 +1,23 @@
+/*
+ * Queries the 'library' database for all books with titles containing 'data'.
+ * For each book, it performs an HTTP GET request to a mock metadata service using the book ID.
+ * The fetched metadata is added as a [metadata] node on each book.
+ */
+.arguments
+data.connect:library
+   data.read
+      table:books
+      where
+         and
+            title.like:%data%
+   for-each:x:@data.read/*
+      include:x:@.dp/#
+         strings.concat
+            .:"https://example.com/api/books/"
+            get-value:x:@.dp/#/*/id
+         http.get:x:@strings.concat
+            convert:bool:true
+         yield
+            metadata:x:@http.get/*/content
+yield
+   books:x:@data.connect/*/data.read/*

@@ -1,0 +1,23 @@
+/*
+ * Finds all employees from the 'hrdb' database with job titles containing 'manager'.
+ * For each employee, loads a contract file from disk using their ID as the filename.
+ * Attaches the file content as [contract] on each employee node.
+ */
+.arguments
+data.connect:hrdb
+   data.read
+      table:employees
+      where
+         and
+            job_title.like:%manager%
+   for-each:x:@data.read/*
+      include:x:@.dp/#
+         strings.concat
+            .:/files/contracts/employees/
+            get-value:x:@.dp/#/*/id
+            .:.txt
+         io.file.load:x:@strings.concat
+         yield
+            contract:x:@io.file.load
+yield
+   employees:x:@data.connect/*/data.read/*

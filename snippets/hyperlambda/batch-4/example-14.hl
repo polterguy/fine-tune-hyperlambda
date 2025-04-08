@@ -1,0 +1,28 @@
+/*
+ * Returns a graph of all customers from the 'crm' database whose names contain the substring 'tech'.
+ *
+ * Then retrieves all their associated orders and returns everything as a graph structure.
+ */
+.arguments
+data.connect:crm
+   data.read
+      table:customer
+      where
+         and
+            name.like:%tech%
+   for-each:x:@data.read/*
+      include:x:@.dp/#
+         data.read
+            table:orders
+            where
+               and
+                  customer_id.eq:x:@.dp/#/*/ID
+
+         /*
+          * This [yield] statement returns the orders from [include], which again ensures it's included on the
+          * currently iterated customer.
+          */
+         yield
+            order-history:x:@data.read/*
+yield
+   customers:x:@data.connect/*/data.read/*
