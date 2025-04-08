@@ -23,7 +23,6 @@ data.connect:employees
 
    // Return the result of the read operation to the caller.
    return-nodes:x:@data.read/*
-
 ```
 ---
 .arguments
