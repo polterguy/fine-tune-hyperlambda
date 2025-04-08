@@ -1,0 +1,28 @@
+/*
+ * Connects to the "library" database and selects all Authors, then for each author,
+ * selects their Books, attaches the list of books to the author record under "works",
+ * and returns the complete data structure to the caller.
+ */
+.arguments
+.payload
+data.connect:library
+   data.read
+      table:Authors
+      columns
+         FullName
+         AuthorId
+   for-each:x:@data.read/*
+      data.read
+         table:Books
+         where
+            and
+               AuthorId.eq:x:@.dp/#/*/AuthorId
+      add:x:+/*/*
+         get-nodes:x:@data.read/*
+      add:x:@.dp/#
+         .
+            works
+      add:x:@.payload
+         get-nodes:x:@.dp/#
+yield
+   result:x:@.payload/*

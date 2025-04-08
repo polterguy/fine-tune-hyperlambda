@@ -1,0 +1,28 @@
+/*
+ * Queries the "education" database to get all Courses, then for each course,
+ * retrieves the associated Enrollments, attaches them as "registrations" to the course,
+ * and returns the full course-enrollment mapping to the caller.
+ */
+.arguments
+.courseList
+data.connect:education
+   data.read
+      table:Courses
+      columns
+         CourseName
+         CourseId
+   for-each:x:@data.read/*
+      data.read
+         table:Enrollments
+         where
+            and
+               CourseId.eq:x:@.dp/#/*/CourseId
+      add:x:+/*/*
+         get-nodes:x:@data.read/*
+      add:x:@.dp/#
+         .
+            registrations
+      add:x:@.courseList
+         get-nodes:x:@.dp/#
+yield
+   result:x:@.courseList/*

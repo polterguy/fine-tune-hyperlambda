@@ -1,0 +1,28 @@
+/*
+ * Retrieves all Departments from the "hr" database and for each department,
+ * fetches the Employees that belong to it, then adds them as a "staff" property
+ * on the department object before returning the enriched results.
+ */
+.arguments
+.output
+data.connect:hr
+   data.read
+      table:Departments
+      columns
+         DepartmentId
+         DeptName
+   for-each:x:@data.read/*
+      data.read
+         table:Employees
+         where
+            and
+               DepartmentId.eq:x:@.dp/#/*/DepartmentId
+      add:x:+/*/*
+         get-nodes:x:@data.read/*
+      add:x:@.dp/#
+         .
+            staff
+      add:x:@.output
+         get-nodes:x:@.dp/#
+yield
+   result:x:@.output/*
