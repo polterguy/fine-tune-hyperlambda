@@ -1,0 +1,51 @@
+/*
+ * Creates a new contact in HubSpot with first name, last name, and email, assuming the JWT token can be
+ * found as a configuration setting with the key 'magic:hubspot:token'.
+ *
+ * All arguments are mandatory.
+ */
+.arguments
+   first_name:string
+   last_name:string
+   email:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/first_name
+validators.mandatory:x:@.arguments/*/last_name
+validators.mandatory:x:@.arguments/*/email
+
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:hubspot:token"
+
+// Creating contact in HubSpot.
+http.post:"https://api.hubapi.com/crm/v3/objects/contacts"
+   convert:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json; charset=utf8
+   payload
+      properties
+         firstname:x:@.arguments/*/first_name
+         lastname:x:@.arguments/*/last_name
+         email:x:@.arguments/*/email
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+
+      // Logging result
+      lambda2hyper:x:@http.post
+      log.info:x:-
+      throw:Something went wrong while trying to create contact in HubSpot, please check your log for details.
+
+// Returning success to caller.
+return
+   result:success
+
