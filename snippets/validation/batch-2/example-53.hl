@@ -1,0 +1,40 @@
+/*
+ * Creates a new contact in HubSpot using first name, last name, and email as arguments.
+ * Uses a bearer token from the configuration key 'magic:hubspot:token' and sends an HTTP POST request.
+ * If the request fails (i.e., response code is not 2xx), the response is logged and an exception is thrown.
+ */
+.arguments
+   first_name:string
+   last_name:string
+   email:string
+validators.mandatory:x:@.arguments/*/first_name
+validators.mandatory:x:@.arguments/*/last_name
+validators.mandatory:x:@.arguments/*/email
+.token
+set-value:x:@.token
+   strings.concat
+      .:"Bearer "
+      config.get:"magic:hubspot:token"
+http.post:"https://api.hubapi.com/crm/v3/objects/contacts"
+   convert:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json; charset=utf8
+   payload
+      properties
+         firstname:x:@.arguments/*/first_name
+         lastname:x:@.arguments/*/last_name
+         email:x:@.arguments/*/email
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.info:x:-
+      throw:Something went wrong while trying to create contact in HubSpot, please check your log for details.
+return
+   result:success
