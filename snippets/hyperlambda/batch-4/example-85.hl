@@ -1,10 +1,9 @@
 /*
- * HTTP endpoint taking a file argument, loads the specified file, and return it as [content] to caller.
- *
- * Endpoint can only be executed by root users, and the [file] argument is mandatory.
+ * Upload file HTTP endpoint that saves files to /etc/temp/ folder.
  */
 .arguments
-   file:string
+   file:*
+.accept:multipart/form-data
 
 // Ensures user is authorized to access endpoint.
 auth.ticket.verify:root
@@ -12,10 +11,18 @@ auth.ticket.verify:root
 // Sanity checking invocation.
 validators.mandatory:x:@.arguments/*/file
 
-// Loading file.
-io.file.load:x:@.arguments/*/file
+// Creating a our filename.
+.filepath
+set-value:x:@.filepath
+   strings.concat
+      .:/etc/www/
+      get-value:x:@.arguments/*/file/*/name
 
-// Returning result to caller.
-yield
-   content:x:@io.file.load
+// Saving file to /etc/temp/ folder.
+io.stream.save-file:x:@.filepath
+   get-value:x:@.arguments/*/file/*/stream
+
+// Returning success to caller.
+return
+   result:File was successfully saved
 
