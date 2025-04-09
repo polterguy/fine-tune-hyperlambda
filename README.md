@@ -8,7 +8,7 @@ Below are hyper parameters I've had success with in some example runs for gpt-40
 
 1. Epochs - **AUTO**
 2. Batch size - **AUTO**
-3. LR multiplier - 1.6
+3. LR multiplier - **AUTO**
 
 If you're successful, you should have training loss around 0.1 - 0.7, and full validation loss at 0.3 higher than training loss, between 0.4 and 1.0. But you'll need to test the model to make sure it's performing.
 
