@@ -46,4 +46,3 @@ Below are some example prompts you can run through the model after fine tuning i
 * Generate an AI function allowing me to send emails. Assume the user ID is the user's email address
 * Create an API endpoint that allows me to insert a contact into HubSpot
 
-However, the best way to test is to take the file level comment from your validation data, and run through the model afterwards.
