@@ -1,5 +1,41 @@
+/*
+ * Returns a count of records in the [questions] table in the "magic" database,
+ * optionally filtered by one or more criteria.
+ *
+ * This endpoint is used to determine how many question records exist, typically
+ * for administrative dashboards, pagination, or reporting purposes. Access is restricted
+ * to users with root privileges.
+ *
+ * INPUT PARAMETERS (optional filters):
+ * - [questions.question_id.eq:long]: Exact match on the question's ID.
+ * - [questions.question.like:string]: Fuzzy match on the question's content.
+ * - [questions.question.eq:string]: Exact match on the question's content.
+ * - [questions.questionnaire.like:string]: Fuzzy match on the questionnaire name this question belongs to.
+ * - [questions.questionnaire.eq:string]: Exact match on the questionnaire name.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization**:
+ *    - Ensures the caller has root-level access using [auth.ticket.verify:root].
+ *
+ * 2. **Database Connection**:
+ *    - Establishes a connection to the SQLite-based "magic" database using [data.connect].
+ *
+ * 3. **Filter Application**:
+ *    - Dynamically adds any provided filtering arguments to the [where] clause of the query.
+ *    - This enables flexible and precise querying without hardcoding filter logic.
+ *
+ * 4. **Data Query**:
+ *    - Executes a [data.read] query on the [questions] table.
+ *    - Selects a single aggregate field: [count(*) as count], limited to one row.
+ *
+ * 5. **Response**:
+ *    - Returns the count of matching records using [return-nodes:x:@data.read/*/*].
+ *
+ * This endpoint is useful in managing dynamic questionnaires and provides a simple
+ * yet secure way to assess the number of configured questions based on flexible filters.
+ */
 
-// HTTP endpoint counting items in your questions table in your magic database
 .arguments
    questions.question_id.eq:long
    questions.question.like:string

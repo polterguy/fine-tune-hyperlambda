@@ -1,13 +1,36 @@
-
 /*
  * Endpoint that asks OpenAI a question using the specified machine learning [type],
  * returning the answer to the caller.
  *
- * This endpoint serves as a legacy alias for the actual chat handler. It forwards the request
- * to the main [/system/openai/chat.get.hl] file, preserving compatibility for existing integrations.
- * All arguments such as [prompt], [type], [references], [chat], [recaptcha_response], [session],
- * and [user_id] are transparently passed through.
+ * This endpoint acts as a **legacy wrapper** around the main AI chat logic located at
+ * [/system/openai/chat.get.hl], ensuring backward compatibility for older integrations and clients.
+ *
+ * INPUT PARAMETERS:
+ * - [prompt:string]: The user’s message or query to be answered by the AI model.
+ * - [type:string]: Logical model type (e.g., "faq", "support") that determines AI behavior and training data.
+ * - [references:bool]: Optional flag to enable retrieval-augmented generation (RAG) using contextual snippets.
+ * - [chat:bool]: Indicates if the prompt is part of a multi-turn conversation.
+ * - [recaptcha_response:string]: Optional value for Google reCAPTCHA validation.
+ * - [session:string]: WebSocket session ID for real-time communication.
+ * - [user_id:string]: User identifier for tracking or personalization.
+ *
+ * EXECUTION LOGIC:
+ *
+ * 1. **Argument Forwarding**:
+ *    - All provided arguments are forwarded as-is to the main handler using [get-nodes:x:@.arguments/*].
+ *
+ * 2. **Delegation to Chat Handler**:
+ *    - Calls [io.file.execute:/system/openai/chat.get.hl], which handles prompt analysis, AI model invocation,
+ *      context integration, and any special logic associated with the [type].
+ *
+ * 3. **Response Relay**:
+ *    - Passes the result directly back to the caller using [return:x:-/*].
+ *
+ * This alias is retained purely for legacy reasons to support integrations that were built before the
+ * consolidated chat architecture. Internally, it behaves identically to the main chat endpoint and should
+ * eventually be deprecated once all dependencies are migrated.
  */
+
 .arguments
    prompt:string
    type:string

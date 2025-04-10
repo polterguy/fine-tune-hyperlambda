@@ -1,14 +1,52 @@
 
 /*
- * Create an endpoint that accepts an [instruction] and a [query] and returns an AI-generated result based on internet or webpage context.
+ * Executes a web-enhanced AI query using OpenAI with real-time SSE (Server-Sent Events) streaming.
  *
- * - If the [query] is a **search term**, it performs a DuckDuckGo search, scrapes the top results, and uses the scraped content as context for OpenAI.
- * - If the [query] is a **URL**, it directly scrapes that page and extracts useful snippets from its HTML.
- * - The [instruction] is then submitted to OpenAI along with the gathered context to generate a response.
+ * This endpoint accepts a natural language [instruction] and a [query], and generates a response based on context from the internet.
+ * It automatically determines whether the [query] is a URL or a search term, and either scrapes the webpage or performs a DuckDuckGo search
+ * before generating a completion using OpenAI's GPT models. Results are streamed back to the frontend via WebSocket events.
  *
- * The context is streamed back to the client in real-time using Server-Sent Events (SSE).
- * Supports optional reCAPTCHA validation and enforces input validation for safety.
+ * INPUT PARAMETERS:
+ * - [session:string]: WebSocket session ID used for streaming responses.
+ * - [query:string]: Either a URL (e.g. https://example.com) or a search term (e.g. "What is quantum computing?").
+ * - [instruction:string]: A natural language instruction passed to the AI (e.g. "Summarize this page").
+ * - [recaptcha_response:string]: Optional reCAPTCHA validation if enabled on the backend.
+ *
+ * FUNCTIONALITY OVERVIEW:
+ *
+ * 1. **Validation**:
+ *    - Ensures [session], [query], and [instruction] are present and meet length constraints.
+ *    - If reCAPTCHA is configured, verifies [recaptcha_response] using the backend's site and secret keys.
+ *
+ * 2. **Content Acquisition**:
+ *    - If [query] starts with "http://" or "https://":
+ *        - Treats it as a URL.
+ *        - Scrapes the page using [magic.ai.url.get] and extracts meaningful content using [magic.ai.html.extract].
+ *    - Otherwise:
+ *        - Treats it as a search term.
+ *        - Performs a DuckDuckGo search using [magic.ai.create-search-context] and extracts contextual snippets.
+ *    - All extracted content is accumulated into a [.context] buffer, trimmed, and capped to avoid token overflows.
+ *
+ * 3. **User Notification & Token Count Logging**:
+ *    - Notifies the client over the WebSocket about the number of tokens used for context and instruction.
+ *
+ * 4. **AI Completion with SSE Streaming**:
+ *    - Forks a background thread to invoke OpenAI's `chat/completions` endpoint using GPT-4o.
+ *    - Uses SSE (Server-Sent Events) to stream tokens back to the client via the WebSocket channel.
+ *    - Handles both normal streaming and special cases like `[DONE]` or finish reasons.
+ *    - If a message fails or an error is returned, logs it and notifies the client.
+ *
+ * 5. **Streaming Output**:
+ *    - Messages are streamed in real time as tokens are received from OpenAI.
+ *    - Final result and finish status are emitted to signal completion.
+ *
+ * 6. **Final Response**:
+ *    - The endpoint itself returns a static `{ result: success }` while the actual interaction happens asynchronously over the socket.
+ *
+ * This endpoint enables a conversational assistant to answer web-related queries by combining real-time scraping or search results
+ * with OpenAI's language model capabilities, making it ideal for knowledge lookups, summarization, fact-checking, and browsing assistance.
  */
+
 .arguments
    session:string
    query:string

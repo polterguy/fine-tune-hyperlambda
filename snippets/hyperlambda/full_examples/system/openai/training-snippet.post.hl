@@ -1,7 +1,38 @@
-
 /*
- * Creates a new training snippet.
+ * Creates a new training snippet to be used for fine-tuning an OpenAI model.
+ * This endpoint allows authorized users to store new prompt-completion pairs for supervised learning purposes.
+ *
+ * INPUT PARAMETERS:
+ * - [uri:string] (optional): A reference URL or citation associated with the training snippet.
+ * - [prompt:string]: A short description or input to the model. Mandatory.
+ * - [completion:string]: The desired output or response associated with the prompt. Mandatory.
+ * - [type:string]: Identifier used to categorize the snippet and associate it with a specific training type or model. Mandatory.
+ *
+ * EXECUTION STEPS:
+ *
+ * 1. **Authorization**:
+ *    Uses [auth.ticket.verify:root,service] to ensure only users with elevated privileges (root or service accounts) can invoke this endpoint.
+ *
+ * 2. **Database Connection**:
+ *    Establishes a database connection using the generic or magic connection string.
+ *
+ * 3. **Permission Check**:
+ *    - Appends the [type] argument to the signal's context.
+ *    - Calls [try-signal:magic.ai.can-create-snippet] to validate whether the user is allowed to create additional training data of the given type.
+ *      This may enforce limits or quotas.
+ *
+ * 4. **Snippet Creation**:
+ *    - Adds all input arguments (prompt, completion, type, uri) into the [values] section of the [data.create] block.
+ *    - Inserts a new row into the `ml_training_snippets` table containing the provided data.
+ *
+ * 5. **Response Handling**:
+ *    - Sets the HTTP response status to 201 (Created) to indicate successful creation.
+ *    - Returns the [id] of the newly created record to the client for confirmation or further processing.
+ *
+ * This endpoint is foundational for building and managing ML training datasets programmatically,
+ * and is typically used in admin interfaces or automated ML pipelines to continuously evolve training corpora.
  */
+
 .arguments
 
    // Optional URL for citations

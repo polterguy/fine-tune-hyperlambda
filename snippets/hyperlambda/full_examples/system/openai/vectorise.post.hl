@@ -1,7 +1,38 @@
 
 /*
- * Vectorises all training snippets in the specified model/type.
+ * Vectorizes all training snippets associated with the specified model type.
+ *
+ * This endpoint queues a background process to generate vector embeddings for each training snippet
+ * of the given [type], and optionally provides real-time progress feedback to the frontend via WebSocket.
+ *
+ * INPUT PARAMETERS:
+ * - [type:string]: The logical model or dataset name whose snippets should be vectorized.
+ * - [feedback-channel:string]: WebSocket channel name used to notify the user when processing is complete.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Verifies that the user has root access using [auth.ticket.verify:root].
+ *    - Ensures the [type] parameter is provided via [validators.mandatory].
+ *
+ * 2. **Initial Logging**:
+ *    - Logs the start of the vectorization process using [log.info] for system visibility.
+ *
+ * 3. **Background Processing (Async Thread)**:
+ *    - Moves the vectorization task into a new [fork] block to avoid blocking the main request.
+ *    - Inside the thread:
+ *        - Signals [magic.ai.vectorise] with the provided arguments.
+ *        - When vectorization completes, uses [sockets.signal] to notify the frontend via the given [feedback-channel].
+ *        - Sends a success message like `"Done!"` to confirm completion.
+ *
+ * 4. **Immediate Response**:
+ *    - Returns `{ result: success }` immediately to the caller, confirming that vectorization has been scheduled and is running in the background.
+ *
+ * This endpoint is ideal for use in administrative tools or automated pipelines,
+ * where bulk vectorization of a model’s training data is needed to enable similarity search, clustering,
+ * or retrieval-augmented generation (RAG) functionality.
  */
+
 .arguments
    type:string
    feedback-channel:string

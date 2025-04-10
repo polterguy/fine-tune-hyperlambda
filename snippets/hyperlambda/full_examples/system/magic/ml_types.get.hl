@@ -1,5 +1,50 @@
 
-// CRUD HTTP read endpoint with paging, sorting, filtering selecting records from your ml_types table in your magic database returning type, model, max_tokens, temperature filtering on type, model, max_tokens, temperature with authentication and authorisation for root roles
+/*
+ * Returns a filtered, paginated, and sorted list of records from the [ml_types] table in the "magic" database.
+ *
+ * This endpoint provides authorized users with flexible access to machine learning model type definitions.
+ * It supports pagination, ordering, dynamic filtering, and access control based on user roles defined in the model's [auth] field.
+ *
+ * INPUT PARAMETERS:
+ * - [limit:long] (optional): Maximum number of records to return.
+ * - [offset:long] (optional): Starting offset for pagination.
+ * - [order:string] (optional): Column name to sort by.
+ * - [direction:string] (optional): Sort direction: `asc` or `desc`.
+ * - Optional filters on:
+ *     - [ml_types.type], [ml_types.model], [ml_types.max_tokens], [ml_types.max_context_tokens], [ml_types.max_request_tokens], [ml_types.temperature]
+ *     - [ml_types.base_url], [contact_us], [lead_email], [api_key], [twilio_account_sid]
+ *     - [system_message] — All filterable by either `.eq` (exact) or `.like` (fuzzy match).
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization**:
+ *    - Uses [auth.ticket.verify] to ensure only authenticated users can access the data.
+ *
+ * 2. **Paging & Sorting**:
+ *    - If provided, applies [limit], [offset], [order], and [direction] to control result size and order.
+ *
+ * 3. **Filtering**:
+ *    - Dynamically constructs the [where] clause using all applicable filter parameters from the arguments.
+ *
+ * 4. **Database Query**:
+ *    - Queries the [ml_types] table using [data.read], selecting a rich set of model configuration fields including:
+ *      [type, model, max_tokens, temperature, auth, base_url, greeting, contact details, webhook settings, system prompts, etc.]
+ *
+ * 5. **Access Control Logic (Role-Based Filtering)**:
+ *    - Retrieves the user's auth ticket.
+ *    - If the user is authenticated:
+ *        - Allows full access for `root` users or for models with no [auth] field.
+ *        - If the model requires roles (comma-separated list), checks whether the user belongs to at least one allowed role.
+ *    - If the user is not authenticated:
+ *        - Filters out all models that require authentication, only showing public ones with [auth:null] or empty.
+ *
+ * 6. **Response**:
+ *    - Returns the filtered model list as a structured node array using [return-nodes:x:@.models/*].
+ *
+ * This endpoint is ideal for powering admin panels, configuration dashboards, or other secured interfaces
+ * where model metadata needs to be browsed, filtered, and controlled based on access rights.
+ */
+
 .arguments
    limit:long
    offset:long

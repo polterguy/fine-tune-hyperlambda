@@ -1,18 +1,62 @@
-
 /*
- * Create a slot that does the following;
+ * Imports training data from a ZIP archive of source code and plain text files into `ml_training_snippets`.
  *
- * Accepts a ZIP file containing source code and plain text, extracts it, and inserts the content
- * as machine learning training data into the `ml_training_snippets` table. It handles the following:
+ * This slot handles developer-uploaded ZIP files containing raw documentation, code, or text and transforms
+ * their content into machine learning training data. It is ideal for building contextual AI assistants or
+ * documentation-based GPTs using your own source files.
  *
- * 1. Validates and stores the ZIP file under `/etc/system/openai/temp/`.
- * 2. Unzips the content and deletes the ZIP archive.
- * 3. Recursively processes supported file types including `.py`, `.js`, `.ts`, `.css`, `.html`, `.sql`, `.md`, etc.
- * 4. Optionally invokes OpenAI (if [massage] is supplied and content is less than 15,000 tokens) to summarize the file before inserting it.
- * 5. Falls back to using the filename and metadata as the prompt if no summarization is performed.
- * 6. Inserts prompt/completion pairs into `ml_training_snippets` with `type`, `prompt`, `completion`, and `filename`.
- * 7. Communicates progress using socket signals via a feedback channel.
+ * BEHAVIOR OVERVIEW:
+ *
+ * 1. **Validates Inputs**:
+ *    - Requires a multipart file with `name` and `stream`.
+ *    - Ensures the `/etc/system/openai/temp/` folder exists and is cleaned before each import.
+ *
+ * 2. **Stores and Unzips Archive**:
+ *    - Saves the ZIP file temporarily.
+ *    - Unzips its contents and deletes the original archive.
+ *
+ * 3. **Recursively Processes Files**:
+ *    - Accepts these extensions: `.py`, `.js`, `.ts`, `.css`, `.html`, `.sql`, `.md`, `.vb`, `.cs`, `.scss`, `.sass`, `.txt`.
+ *    - Ignores unsupported files and logs a message to the frontend via socket.
+ *    - Associates file type metadata with each file.
+ *
+ * 4. **Summarizes Content (Optional)**:
+ *    - If a [massage] instruction is provided and content is below ~15,000 tokens:
+ *      - Sends the file to OpenAI ChatGPT to generate a summary or refined prompt.
+ *      - Uses the summary as the `prompt` and raw file as the `completion`.
+ *    - If massage fails or isn’t used:
+ *      - Uses metadata (e.g., filename and language type) as the prompt.
+ *
+ * 5. **Inserts into Database**:
+ *    - Each file is saved into `ml_training_snippets` with the fields:
+ *      - `type`: Specified ML type.
+ *      - `prompt`: Either AI-generated or based on metadata.
+ *      - `completion`: Full file content.
+ *      - `filename`: Original source filename.
+ *      - `cached`: Set to 0 (not pre-cached).
+ *
+ * 6. **Feedback & Logging**:
+ *    - Uses `sockets.signal` to stream progress updates to the frontend (upload status, ignored files, completions).
+ *    - If an error occurs, logs it and informs the user.
+ *
+ * 7. **Runs in Background Thread**:
+ *    - Heavy processing (unzipping, parsing, summarization, DB insertions) is offloaded via `[fork]` to avoid blocking.
+ *    - The slot returns `result:pending` immediately to indicate async processing.
+ *
+ * 8. **Frontend Completion Signal**:
+ *    - Once all snippets are processed, a final message is broadcast over sockets with `type:done_crawling`.
+ *
+ * TYPICAL USAGE:
+ * - Upload ZIP file of your entire source code or documentation to quickly train a custom GPT assistant.
+ * - Use [massage] to enhance summaries with semantic clarity, like “Summarize file purpose in one sentence”.
+ * - Automatically adds RAG-compatible prompt/completion pairs to your dataset.
+ *
+ * SECURITY & PERFORMANCE NOTES:
+ * - Skips processing of oversized files to avoid hitting OpenAI limits.
+ * - Reads and processes files from a contained folder (`/etc/system/openai/temp/`) to isolate execution.
+ * - Threaded operation ensures the system remains responsive even during large imports.
  */
+
 slots.create:magic.ai.import-zip-file
 
    // Sanity checking invocation.

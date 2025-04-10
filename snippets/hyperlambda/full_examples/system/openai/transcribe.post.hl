@@ -1,7 +1,42 @@
-
 /*
- * Transcribes the specified file using OpenAI Whisper API.
+ * Transcribes an uploaded audio file using OpenAI's Whisper API, then uses the transcribed content as input
+ * to the chat system. This endpoint is designed for voice-to-text interactions followed by natural language processing.
+ *
+ * INPUT PARAMETERS:
+ * - [file:*]: The uploaded audio file to transcribe (binary stream expected).
+ * - [type:string]: Type of processing to perform (typically used in downstream logic).
+ * - [mediaType:string]: MIME type of the audio file (e.g., audio/mp4). Defaults to 'audio/mp4' if not specified.
+ * - [language:string]: Optional hint for the spoken language in the file (e.g., "en").
+ * - [references:bool], [chat:bool], [recaptcha_response:string], [user_id:string], [session:string],
+ *   [stream:bool], [data:string], [referrer:string], [whisper:*]: Additional fields used by the downstream chat system.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **API Key Retrieval**:
+ *    Reads the OpenAI API key from the server's configuration using [config.get].
+ *
+ * 2. **Default Media Type Setup**:
+ *    Ensures [mediaType] has a default value of "audio/mp4" if not provided using [validators.default].
+ *
+ * 3. **Stream Extraction**:
+ *    Extracts the binary stream from the uploaded file via [io.stream.read], preparing it for transcription.
+ *
+ * 4. **Whisper API Invocation**:
+ *    Sends the audio stream to OpenAI's Whisper API through [openai.whisper], passing along the media type and optional language hint.
+ *    If Whisper fails or returns null/empty, the request is aborted with a public error message and a 400 status code.
+ *
+ * 5. **Passing Transcription to Chat System**:
+ *    - Removes the [file] node from arguments, since it's no longer needed.
+ *    - Adds all sanitized arguments and the Whisper result as [prompt] to the [chat.get.hl] file execution call.
+ *    - Invokes [/system/openai/chat.get.hl] to simulate a chat response based on the transcribed input.
+ *
+ * 6. **Returning Results**:
+ *    Returns both the transcription ([prompt]) and the response from the chat system using [yield].
+ *
+ * This endpoint is ideal for applications that require real-time or batch audio transcription followed by AI-assisted interpretation,
+ * such as voice assistants, meeting summarizers, or customer service bots.
  */
+
 .arguments
    file:*
    type:string

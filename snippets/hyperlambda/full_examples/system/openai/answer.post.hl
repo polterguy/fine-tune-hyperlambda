@@ -1,12 +1,46 @@
 
 /*
- * Create an HTTP endpoint that allows users to answer a single question in a questionnaire.
+ * HTTP endpoint allowing a user to submit a single answer to a questionnaire question.
  *
- * The endpoint takes [type], [session], [user_id], [question], and [answer] as arguments.
- * If the model is configured with a reCAPTCHA threshold, the [recaptcha_response] is validated.
- * It deletes any previous answer to the same question by the same user/session, and then inserts
- * the new answer into the [ml_requests] table with the correct metadata to mark it as a questionnaire response.
+ * ### Parameters:
+ * - **[type]** *(required)*: The machine learning type (model) this questionnaire belongs to.
+ * - **[session]** *(required)*: Session ID for grouping answers under the same questionnaire session.
+ * - **[user_id]** *(optional but used for deduplication)*: Unique identifier of the user submitting the answer.
+ * - **[question]** *(required)*: The specific question being answered.
+ * - **[answer]** *(required)*: The user's answer to the question.
+ * - **[context]** *(optional)*: Integer flag indicating context relevance or group logic (can be used for filtering).
+ * - **[recaptcha_response]** *(conditionally required)*: A reCAPTCHA token if the ML type is configured with a threshold.
+ *
+ * ### reCAPTCHA Flow:
+ * - Checks if the specified [type] requires reCAPTCHA validation.
+ * - If yes, verifies server-side reCAPTCHA config.
+ * - Validates the [recaptcha_response] against the configured threshold using either:
+ *    - External Google reCAPTCHA verification (preferred).
+ *    - Internal fallback CAPTCHA verification using `magic.auth.captcha-verify`.
+ *
+ * ### Deduplication Logic:
+ * - Deletes any previously submitted answer by the same user for the same question in the same type,
+ *   ensuring one answer per user-question combination.
+ *
+ * ### Data Insertion:
+ * - Inserts a new row into the `ml_requests` table to record the user's answer.
+ * - Marks the record with:
+ *    - `finish_reason = "questionnaire"`
+ *    - `questionnaire = 1` to distinguish questionnaire answers from normal chat prompts.
+ *
+ * ### Use Cases:
+ * - Used by embedded widgets or admin forms to collect structured questionnaire answers.
+ * - Enables AI onboarding forms, contextual interview workflows, and knowledge profiling.
+ *
+ * ### Output:
+ * - Always returns `{"result":"success"}` on valid submissions.
+ *
+ * ### Security:
+ * - reCAPTCHA or custom CAPTCHA validation protects the endpoint from spam/bots.
+ * - User identity and session grouping ensure clean, deduplicated datasets.
  */
+
+
 .arguments
    type:string
    session:string

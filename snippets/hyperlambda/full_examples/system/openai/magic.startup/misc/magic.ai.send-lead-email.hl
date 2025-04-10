@@ -1,10 +1,56 @@
-
 /*
- * Generate a dynamic slot that sends a lead email if possible and SMTP settings have been configured.
+ * Sends a lead email containing the full chatbot session if SMTP settings are properly configured.
  *
- * This slow will send the entire conversation the user had with the AI chatbot to the lead generation
- * email the system has been configured to use.
+ * This slot is designed to forward qualified chatbot conversations to a configured lead generation inbox.
+ * It compiles all messages exchanged during the session and emails them in an HTML-formatted thread,
+ * along with a contact prompt from the user. It also logs the submission and stores it in the [ml_requests] table.
+ *
+ * ARGUMENTS:
+ * - [type:string] (required): The machine learning model type used in the conversation.
+ * - [prompt:string] (required): The last prompt entered by the user, typically a contact or lead form message.
+ * - [session:string] (required): Unique session ID for the conversation, used to fetch historical context.
+ * - [user_id:string] (required): Identifier for the user initiating the request.
+ * - [lead_email:string] (required): One or more comma-separated email addresses to send the lead to.
+ * - [contact_us:string] (required): The message or response representing the final contact information or user intent.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Validation**:
+ *    - Validates all required arguments including [lead_email] and [contact_us].
+ *    - Verifies that SMTP settings are configured via [config.get:"magic:smtp:host"].
+ *
+ * 2. **Email Extraction**:
+ *    - Attempts to extract a reply-to email address from the user's prompt using basic heuristics and email validation.
+ *
+ * 3. **Conversation History Compilation**:
+ *    - Connects to the database and retrieves all [ml_requests] entries from the same session.
+ *    - Assembles a threaded HTML conversation, with each prompt rendered as a bold block followed by its completion.
+ *    - Appends the final contact message from the user as the conclusion to the conversation.
+ *
+ * 4. **Email Dispatch**:
+ *    - Parses [lead_email] into a list of trimmed email addresses.
+ *    - Sends an HTML email using [mail.smtp.send], setting the user’s email (if detected) as [reply-to].
+ *    - Subject line: "Chatbot lead".
+ *
+ * 5. **Audit Trail**:
+ *    - Inserts the lead as a new row in [ml_requests] with [finish_reason] set to "lead".
+ *    - Logs the fact that a lead was successfully submitted.
+ *
+ * 6. **Error Handling**:
+ *    - If no SMTP settings are present or an exception occurs, logs a warning and returns `false`.
+ *    - Fails gracefully while alerting the system administrator via logs.
+ *
+ * USAGE SCENARIOS:
+ * - Website lead generation through AI chatbots.
+ * - Contact capture and CRM integration workflows.
+ * - Forwarding qualified user interest to a sales or support team.
+ *
+ * NOTE:
+ * - This slot assumes the AI is embedded in a lead-generation or support workflow.
+ * - Proper SMTP setup is required for this feature to function. If SMTP is not configured,
+ *   the operation returns `false` without raising an exception.
  */
+
 slots.create:magic.ai.send-lead-email
 
    // Sanity checking invocation.

@@ -1,5 +1,52 @@
 
-// HTTP endpoint counting items in your ml_types table in your magic database
+/*
+ * Returns a count of records in the [ml_types] table from the "magic" database,
+ * applying optional filtering based on a wide set of supported fields.
+ *
+ * This endpoint is restricted to root-level users and provides the ability to count
+ * matching machine learning type configurations, which are used to control behavior
+ * and parameters for different AI deployments.
+ *
+ * INPUT PARAMETERS:
+ * - The following filters can be used (all optional):
+ *   - [ml_types.type.eq] or [ml_types.type.like]
+ *   - [ml_types.model.eq] or [ml_types.model.like]
+ *   - [ml_types.greeting.eq] or [ml_types.greeting.like]
+ *   - [ml_types.max_tokens.eq], [ml_types.max_context_tokens.eq], [ml_types.max_request_tokens.eq]
+ *   - [ml_types.temperature.eq]
+ *   - [ml_types.base_url.eq] or [ml_types.base_url.like]
+ *   - [ml_types.contact_us.eq] or [ml_types.contact_us.like]
+ *   - [ml_types.lead_email.eq] or [ml_types.lead_email.like]
+ *   - [ml_types.api_key.eq] or [ml_types.api_key.like]
+ *   - [ml_type.twilio_account_sid.eq] or [ml_type.twilio_account_sid.like]
+ *   - [ml_types.webhook_incoming.eq], [ml_types.webhook_outgoing.eq]
+ *   - [ml_types.webhook_incoming_url.eq], [ml_types.webhook_outgoing_url.eq]
+ *   - [ml_types.initial_questionnaire.eq] or [ml_types.initial_questionnaire.like]
+ *   - [ml_types.system_message.eq] or [ml_types.system_message.like]
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization**:
+ *    - Ensures only users with root access can invoke this endpoint using [auth.ticket.verify:root].
+ *
+ * 2. **Database Connection**:
+ *    - Opens a connection to the "magic" database using [data.connect:[generic|magic]].
+ *
+ * 3. **Dynamic Filter Application**:
+ *    - Gathers all provided filter arguments from [.arguments].
+ *    - Adds them to the [where] clause of the [data.read] operation using an [AND] operator.
+ *
+ * 4. **Query Execution**:
+ *    - Executes a [data.read] query on the [ml_types] table.
+ *    - Requests a single aggregate column: `count(*)` with alias [count], limited to 1 row.
+ *
+ * 5. **Response**:
+ *    - Returns the result to the caller using [return-nodes], structured as a single node with the count value.
+ *
+ * This endpoint is particularly useful for administrative dashboards, pagination logic, or monitoring
+ * how many AI type configurations exist and match specific filters.
+ */
+
 .arguments
    ml_types.type.like:string
    ml_types.type.eq:string

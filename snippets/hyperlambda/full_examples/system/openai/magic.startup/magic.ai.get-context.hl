@@ -1,21 +1,84 @@
 
 /*
- * Create a slot that does the following;
+ * Retrieves semantically relevant training snippets from the `ml_training_snippets` table using vector similarity search (VSS).
  *
- * Retrieves relevant ML context from your `ml_training_snippets` table using vector similarity search.
+ * This dynamic slot enables retrieval-augmented generation (RAG) for AI models by finding the most relevant training data
+ * using OpenAI's embedding API and SQLite’s vector similarity search. The resulting context is returned as a Markdown-formatted
+ * string that can be used to enhance model responses with domain-specific knowledge.
  *
- * Given a [type], a semantic [prompt], a [threshold] and a [max_tokens] limit:
+ * ARGUMENTS:
+ * - [type:string] (required): The machine learning model type to scope vector results and configuration.
+ * - [prompt:string] (required): The user’s question or query for which to retrieve relevant context.
+ * - [threshold:decimal] (required): Dot-product similarity threshold to filter weak matches (values closer to 1 are more similar).
+ * - [max_tokens:long] (required): Maximum total token count allowed for the resulting context block.
+ * - [session:string] (optional): A session ID used to cache already-used snippet IDs to avoid repetition.
+ * - [session_timeout:timespan] (optional): Time-to-live for snippet cache tied to session.
+ * - [search_postfix:string] (optional): Additional keyword appended to prompt before embedding for better relevance.
  *
- * 1. It ensures that the `ml_training_snippets` table has at least one vectorized row for the type.
- * 2. Retrieves the appropriate `vector_model` for the type from the `ml_types` table.
- * 3. Sends the prompt to OpenAI’s embedding API using the correct vector model.
- * 4. Searches your SQLite VSS index (`vss_ml_training_snippets`) for close matches using dot product and the threshold.
- * 5. Skips IDs that have already been used in the current [session] (stored in a session-based cache).
- * 6. Executes any mixins if a matched snippet has mixin content and is the first match.
- * 7. Collects the top semantic matches, making sure their cumulative token count doesn't exceed [max_tokens].
- * 8. Collects [snippets] with their [uri], [prompt], and [distance] as references.
- * 9. Trims and returns a [context] string with Markdown-formatted snippets, plus the full list of used snippets.
+ * EXECUTION FLOW:
+ *
+ * 1. **Validation and Setup**:
+ *    - Ensures all required arguments are provided and valid.
+ *    - Confirms that at least one snippet for the given [type] has been vectorized.
+ *    - Retrieves the appropriate [vector_model] from the [ml_types] table.
+ *
+ * 2. **Prompt Embedding**:
+ *    - Sends the user’s [prompt] (plus optional [search_postfix]) to OpenAI’s `/v1/embeddings` API.
+ *    - Converts the resulting float array to binary format compatible with SQLite’s VSS index.
+ *
+ * 3. **Session-Based Cache Filtering**:
+ *    - If a [session] is provided, retrieves previously used snippet IDs from cache.
+ *    - Excludes those IDs from the current query to avoid redundant context.
+ *
+ * 4. **VSS Query and Snippet Retrieval**:
+ *    - Executes a vector similarity search against `vss_ml_training_snippets` joined with `ml_training_snippets`.
+ *    - Returns the top 20 highest-ranked results whose dot-product distance is within the configured [threshold].
+ *
+ * 5. **Early Return if Cached Snippet Found**:
+ *    - If the top result contains a non-null `cached` value, its content is treated as a final answer and returned immediately.
+ *    - If the `completion` contains a Hyperlambda mixin (`{{ ... }}`), it's executed using [strings.mixin] before returning.
+ *
+ * 6. **Building the Context**:
+ *    - Iterates over the returned snippets, adding Markdown-formatted prompt-completion pairs.
+ *    - Skips mixin-enabled snippets (unless they’re the top result).
+ *    - Stops adding snippets once the cumulative token count exceeds [max_tokens].
+ *
+ * 7. **Snippet References**:
+ *    - Collects [uri], [prompt], and [distance] of used snippets as a [snippets] array for reference tracking.
+ *    - Ensures no duplicate URIs are added.
+ *
+ * 8. **Caching Used Snippet IDs**:
+ *    - If a [session] is provided, saves the snippet IDs used to prevent future reuse.
+ *    - Truncates the list to 20 entries to preserve cache size.
+ *
+ * 9. **Return Result**:
+ *    - Returns the formatted [context:string] and an array of [snippets:*].
+ *    - Also includes [db_time:string] to show how long the VSS operation took (in seconds.milliseconds).
+ *
+ * RETURN STRUCTURE:
+ * ```json
+ * {
+ *   "context": "<Markdown-formatted content>",
+ *   "snippets": [
+ *     { "prompt": "...", "uri": "...", "distance": "..." },
+ *     ...
+ *   ],
+ *   "db_time": "0.142"
+ * }
+ * ```
+ *
+ * USE CASES:
+ * - Augmenting GPT responses with proprietary knowledge or training examples.
+ * - Performing AI search over FAQs, documentation, or contextual datasets.
+ * - Building intelligent chatbots that adapt responses using vector-matched training data.
+ *
+ * NOTE:
+ * - Cached snippets take priority and can override other RAG logic.
+ * - Mixins allow dynamic content rendering via Hyperlambda expressions embedded in completions.
+ * - Token counting uses OpenAI tokenizer to precisely match limits.
  */
+
+
 slots.create:magic.ai.get-context
 
    // Sanity checking invocation.

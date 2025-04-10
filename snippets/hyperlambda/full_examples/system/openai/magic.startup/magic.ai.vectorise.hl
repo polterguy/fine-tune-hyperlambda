@@ -1,13 +1,45 @@
-
 /*
- * Create a slot that does the following;
+ * Vectorizes all training snippets for the specified machine learning [type] by generating semantic embeddings
+ * using OpenAI's embedding API, storing them in the `ml_training_snippets` table and a vector similarity index.
  *
- * Iterates through training snippets for a given [type], generates embeddings for each using OpenAI's embeddings API,
- * and updates the database with the generated vectors. Embeddings are inserted into a VSS index for vector search.
+ * ### Parameters:
+ * - **[type]** *(required)*: The model type whose training snippets will be vectorized.
+ * - **[feedback-channel]** *(optional)*: A socket channel where progress and status updates will be broadcasted to the client.
+ * - **[.onafter]** *(optional)*: A lambda node executed once vectorization and indexing is complete.
  *
- * Vectorization is done in batches of 20, and each snippet is skipped if its token count exceeds 8191 tokens.
- * Emits socket signals to the frontend with progress information.
+ * ### Workflow:
+ * 1. **Fetch configuration and vector model** for the given [type], including override API keys if present.
+ * 2. **Paginated iteration (20 at a time)** through `ml_training_snippets` for the specified [type].
+ *    - Skips rows that already have embeddings.
+ *    - Ignores records whose prompt+completion token count exceeds 8191.
+ * 3. **Sends text to OpenAI’s embeddings endpoint**, generates an embedding vector, and updates the record.
+ * 4. **Handles failures** with retry logic and status-aware error handling (e.g., 429, 500).
+ * 5. **Broadcasts progress updates** via socket signals using the provided [feedback-channel].
+ * 6. Once all embeddings are generated, inserts them into `vss_ml_training_snippets` for SQLite VSS indexing in batches of 500.
+ * 7. **Optionally invokes** any [onafter] lambda logic after all processing completes.
+ *
+ * ### Database Effects:
+ * - Updates `ml_training_snippets.embedding` field with JSON-encoded embeddings.
+ * - Populates `vss_ml_training_snippets` VSS table for fast semantic search via dot-product scoring.
+ *
+ * ### Output:
+ * - Emits a success message to the frontend via `magic.backend.message`.
+ * - Logs how many embeddings succeeded vs. failed.
+ *
+ * ### Edge Case Handling:
+ * - If token count exceeds 8191, snippet is skipped and logged.
+ * - Embedding failures result in error logging and user notification.
+ * - If OpenAI responds with throttling or transient errors (429, 500), the process waits before continuing.
+ *
+ * ### Real-Time Feedback:
+ * - Socket messages are sent during processing to update the UI on progress and results.
+ *
+ * ### Use Cases:
+ * - Enables semantic search and retrieval-augmented generation (RAG) by embedding prompt/completion pairs.
+ * - Allows building AI assistants and GPTs capable of contextual lookups.
+ * - Supports dataset preparation for AI fine-tuning, classification, and clustering.
  */
+
 slots.create:magic.ai.vectorise
 
    // Sanity checking invocation.

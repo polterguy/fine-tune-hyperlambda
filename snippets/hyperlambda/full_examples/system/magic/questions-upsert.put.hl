@@ -1,5 +1,50 @@
 
-// Upsert HTTP endpoint upserting questions for questionnaire, assumes [questions] is Markdown with list items.
+/*
+ * Upserts (deletes and reinserts) questions for a given questionnaire based on Markdown-formatted input.
+ *
+ * This endpoint allows root users to redefine the questions in a questionnaire by submitting a string of Markdown content.
+ * Each list item in the Markdown represents a new question to be inserted. Meta fields can also be embedded in the Markdown.
+ *
+ * INPUT PARAMETERS:
+ * - [name:string]: The unique identifier of the questionnaire these questions belong to.
+ * - [questions:string]: A Markdown string where each list item represents a question.
+ *   - Example format:
+ *     - What is your name?
+ *     - What is your email? => type=email, required=true
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Ensures root-level access using [auth.ticket.verify:root].
+ *    - Validates that both [name] and [questions] arguments are provided using [validators.mandatory].
+ *
+ * 2. **Clear Existing Questions**:
+ *    - Deletes all previously stored questions associated with the specified [name] in the [questions] table.
+ *    - Ensures a full replace/upsert behavior.
+ *
+ * 3. **Markdown Processing**:
+ *    - Converts the [questions] Markdown string into HTML using [markdown2html].
+ *    - Parses the resulting HTML into a lambda structure with [html2lambda].
+ *    - Iterates over all `<li>` list items (representing questions).
+ *
+ * 4. **Question Extraction**:
+ *    - Splits each `<li>` element using the delimiter `=>` to separate the question from optional metadata.
+ *    - The question text is extracted, trimmed, and stored.
+ *    - If metadata is present:
+ *       - It is further split by commas and parsed into key-value pairs.
+ *       - These meta fields are added to the database entry as dynamic fields.
+ *
+ * 5. **Insertion into Database**:
+ *    - Each question (and optional metadata) is inserted into the [questions] table,
+ *      along with its associated [questionnaire] name.
+ *
+ * 6. **Response**:
+ *    - Returns `{ result: success }` to confirm the upsert was completed.
+ *
+ * This endpoint is ideal for backend-driven or markdown-powered CMS interfaces where admins
+ * define questionnaire content using a user-friendly syntax, enabling bulk updates with structured data.
+ */
+
 .arguments
    name:string
    questions:string

@@ -1,5 +1,58 @@
 
-// CRUD HTTP update endpoint updating one record in your ml_types table in your magic database filtering which item to update with type updating model, max_tokens, temperature fields with authentication and authorisation for root roles
+/*
+ * Updates an existing machine learning model configuration in the [ml_types] table of the "magic" database,
+ * using the [type] as the unique identifier for targeting the specific record.
+ *
+ * This secured endpoint allows root users to modify any property of a model configuration, including
+ * its base model, token limits, prompt behaviors, vector settings, and more.
+ *
+ * INPUT PARAMETERS:
+ * - Required:
+ *   - [type:string]: Primary key used to identify which model configuration to update.
+ * - Optional/Updatable:
+ *   - [model:string], [max_tokens:long], [max_context_tokens:long], [max_request_tokens:long]
+ *   - [temperature:double], [recaptcha:decimal], [auth:string], [supervised:int], [cached:int], [prefix:string]
+ *   - [use_embeddings:int], [threshold:decimal], [vector_model:string], [greeting:string], [base_url:string]
+ *   - [contact_us:string], [lead_email:string], [api_key:string]
+ *   - [twilio_account_id:string], [twilio_account_sid:string]
+ *   - [webhook_incoming:string], [webhook_outgoing:string]
+ *   - [webhook_incoming_url:string], [webhook_outgoing_url:string]
+ *   - [system_message:string], [conversation_starters:string]
+ *   - [initial_questionnaire:string], [no_requests:int], [max_requests:int]
+ *   - [search_postfix:string], [max_function_invocations:int], [max_session_items:int]
+ *   - [completion_slot:string]
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Validation**:
+ *    - Validates that the [type] argument is present using [validators.mandatory].
+ *    - Ensures that token-related fields fall within safe operating bounds using [validators.integer].
+ *
+ * 2. **Authorization**:
+ *    - Verifies the user has root-level access using [auth.ticket.verify:root].
+ *
+ * 3. **Database Connection**:
+ *    - Opens a connection to the "magic" database using [data.connect:[generic|magic]].
+ *
+ * 4. **Dynamic Update Preparation**:
+ *    - Constructs the [values] section from all arguments except [type].
+ *    - Applies the [type] argument as the filter in the [where] clause to target the correct row.
+ *
+ * 5. **Twilio Default Handling**:
+ *    - If [twilio_account_id] is missing or empty, it defaults to the value of [type] to ensure integration continuity.
+ *
+ * 6. **Update Execution**:
+ *    - Executes a [data.update] operation on the [ml_types] table.
+ *    - If no records were affected (i.e., the specified [type] does not exist), returns HTTP 404 with a not-found result.
+ *
+ * 7. **Response**:
+ *    - Returns HTTP status 202 (Accepted) on success.
+ *    - Responds with the number of affected rows under [affected:x:@data.update].
+ *
+ * This endpoint is essential for administrative tools that manage and maintain AI configurations,
+ * allowing secure updates to deployed model behavior, access controls, and integration settings.
+ */
+
 .arguments
    type:string
    model:string

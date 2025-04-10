@@ -1,22 +1,39 @@
-
 /*
- * Create an endpoint that returns a CSS file used for styling an embedded ChatGPT UI.
+ * Returns a CSS file used for styling an embedded ChatGPT UI widget.
  *
- * The endpoint accepts the following parameters:
- * - [file]      - Required. The base name of the CSS file to load (without extension).
- * - [position]  - Optional. Passed through to support conditional styling based on widget location.
- * - [color]     - Optional. Used as a CSS variable to dynamically set the primary theme color.
- * - [link]      - Optional. Used to style hyperlinks inside the widget.
- * - [start]     - Optional. Used to define the start of a background gradient.
- * - [end]       - Optional. Used to define the end of a background gradient.
- * - [v]         - Optional. Version token to allow cache busting by modifying request URL.
+ * This endpoint dynamically loads and returns a CSS file with optional theming,
+ * allowing flexible styling of the ChatGPT widget based on runtime parameters.
+ * It delegates the actual CSS generation and resolution to a reusable handler file
+ * located at [/system/openai/include-style.css.get.hl].
  *
- * The logic passes all provided arguments into a reusable CSS generator Hyperlambda file located
- * at [/system/openai/include-style.css.get.hl], which handles resolving the correct file, injecting
- * CSS variables, and applying fallback logic for minified and default files.
+ * INPUT PARAMETERS:
+ * - [file:string]: Required. Base name (without `.css` extension) of the stylesheet to load.
+ * - [position:string]: Optional. Used to conditionally style the widget based on its screen position (e.g., "bottom-right").
+ * - [color:string]: Optional. Defines the primary theme color via CSS custom properties.
+ * - [link:string]: Optional. Sets a color for hyperlinks inside the widget.
+ * - [start:string]: Optional. Start color for a background gradient.
+ * - [end:string]: Optional. End color for a background gradient.
+ * - [v:string]: Optional. A version hash or token used for cache busting.
  *
- * The resulting CSS is returned to the caller with appropriate HTTP headers.
+ * EXECUTION FLOW:
+ *
+ * 1. **Argument Forwarding**:
+ *    - Passes all received arguments to the underlying CSS generation file via [execute-file].
+ *    - Allows the inner file to handle advanced logic such as minification fallback, default theming,
+ *      or applying overrides through CSS variables.
+ *
+ * 2. **Delegation**:
+ *    - Executes the logic defined in [/system/openai/include-style.css.get.hl], which is responsible
+ *      for resolving and rendering the final CSS.
+ *
+ * 3. **Response**:
+ *    - Returns the CSS file with appropriate HTTP headers (e.g., `Content-Type: text/css`),
+ *      ready to be served as a public asset or embedded in `<link>` or `<style>` tags.
+ *
+ * This endpoint is useful for scenarios where a ChatGPT-style widget is injected into a host website
+ * and requires theming consistency with the host's branding or layout positioning.
  */
+
 .arguments
    file:string
    position:string

@@ -1,5 +1,45 @@
 
-// CRUD update endpoint updating one record in your questions table in your magic database filtering which item to update with question_id updating question, questionnaire fields with authentication and authorisation for root,admin roles
+/*
+ * Updates a single record in the [questions] table of the "magic" SQLite database,
+ * using [question_id] as the primary key to identify which question to update.
+ *
+ * This endpoint is secured and restricted to users with root or admin privileges.
+ * It allows the caller to update the content of a question as well as its associated questionnaire metadata.
+ *
+ * INPUT PARAMETERS:
+ * - [question_id:long]: Required. The unique identifier of the question to update.
+ * - [question:string]: Optional. The updated question text.
+ * - [questionnaire:string]: Optional. The name of the questionnaire this question is part of.
+ * - [type:string]: Optional. The expected data type (e.g., text, email, number) for UI rendering or validation.
+ * - [name:string]: Optional. Field name used for internal mapping or client-side referencing.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Validation**:
+ *    - Ensures [question_id] is present using [validators.mandatory] to prevent accidental broad updates.
+ *
+ * 2. **Authorization**:
+ *    - Verifies the caller has [root] privileges using [auth.ticket.verify:root].
+ *      *(Note: To allow both `root` and `admin` roles, change this to `auth.ticket.verify:root,admin`.)*
+ *
+ * 3. **Database Connection**:
+ *    - Opens a connection to the "magic" SQLite database using [data.connect] with `database-type:sqlite`.
+ *
+ * 4. **Dynamic Update Construction**:
+ *    - Extracts all updateable fields except the primary key ([question_id]) into the [values] node.
+ *    - Uses [question_id] to target the correct row in the [where] clause.
+ *
+ * 5. **Update Execution**:
+ *    - Executes the update with [data.update].
+ *    - If no rows were affected (i.e., invalid [question_id]), returns a 404 Not Found response.
+ *
+ * 6. **Response**:
+ *    - On success, returns HTTP status 202 (Accepted) with the number of affected rows under [affected].
+ *
+ * This endpoint is essential for administrative tools, questionnaire editors, and dynamic form builders
+ * that need to modify existing questions in real-time.
+ */
+
 .arguments
    question_id:long
    question:string

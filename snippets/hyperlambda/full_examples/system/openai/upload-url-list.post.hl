@@ -1,10 +1,57 @@
 
 /*
- * Scrapes all URLs given in the specified CSV file.
+ * Scrapes all URLs listed in an uploaded CSV file and optionally vectorizes the resulting training data.
  *
- * Contrary to normal scraping and crawling, this will use the "Spice" feature and
- * only import all URLs specified in the given file.
+ * This endpoint uses the "Spice" feature to import **only the explicitly listed URLs**, bypassing typical crawler behavior.
+ * It supports optional post-processing using vectorization and provides real-time frontend feedback through a websocket channel.
+ *
+ * INPUT PARAMETERS:
+ * - [type:string]: Logical model category to associate scraped content with.
+ * - [feedback-channel:string]: WebSocket channel name to stream feedback messages during scraping/vectorization.
+ * - [vectorize:bool]: If true, triggers vectorization after scraping (default: false).
+ * - [file:*]: CSV file containing URLs. Must be multipart form data with the following subfields:
+ *     - [name]: Filename of the uploaded CSV.
+ *     - [stream]: Binary stream representing the CSV file.
+ *
+ * ENDPOINT BEHAVIOR:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Ensures only root users can invoke this endpoint.
+ *    - Validates that [type], [file.name], and [file.stream] are all present.
+ *    - Defaults [vectorize] to false if not provided.
+ *
+ * 2. **File Handling**:
+ *    - Reads and parses the uploaded CSV file into a lambda structure using [csv2lambda].
+ *    - Performs basic validation to ensure:
+ *       - Each row has exactly one column.
+ *       - The column contains valid HTTP/HTTPS URLs.
+ *    - If validation fails, notifies the frontend via [feedback-channel] and aborts.
+ *
+ * 3. **Logging & Preparation**:
+ *    - Logs the number of URLs successfully parsed.
+ *    - Pushes arguments and URL data into a [fork] block for background asynchronous processing.
+ *
+ * 4. **Scraping Logic (Asynchronous)**:
+ *    - Iterates through all URLs.
+ *    - For each URL:
+ *       - Calls [magic.ai.url.scrape] with scraping options:
+ *           - [lists], [images], and [code] all set to false.
+ *           - Ensures only page content is captured.
+ *       - Signals the frontend after each scrape for progress updates.
+ *       - Catches and logs any errors individually without interrupting the full process.
+ *
+ * 5. **Post-Scraping Actions**:
+ *    - Notifies root users and frontend channel that scraping is completed.
+ *    - If [vectorize:true], invokes [magic.ai.vectorise] on the specified [type].
+ *       - Signals the frontend when vectorization is complete.
+ *
+ * 6. **Final Response**:
+ *    Returns a [success] result along with the number of URLs processed.
+ *
+ * This endpoint is ideal for scenarios requiring curated web content ingestion from a known list of URLs—
+ * such as bulk FAQ imports, product pages, or long-form documentation—combined with real-time monitoring and optional embedding generation.
  */
+
 .arguments
    type:string
    feedback-channel:string

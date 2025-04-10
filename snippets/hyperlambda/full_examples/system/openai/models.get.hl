@@ -1,15 +1,48 @@
-
 /*
- * Create an endpoint that returns all available OpenAI models, including fine-tuned models.
+ * Returns a list of available OpenAI models, including fine-tuned and public models,
+ * with additional metadata about token limits and feature support (e.g. chat or vector embedding).
  *
- * The endpoint does the following:
- * - Verifies that the caller is authenticated as root.
- * - Uses a provided API key or the configured key to call OpenAI's /v1/models endpoint.
- * - Processes the returned list of models by attaching additional metadata such as token limits
- *   and chat/vector support for known models.
- * - Applies a 3-minute HTTP cache policy to reduce unnecessary API calls.
- * - Returns the enriched list of models to the caller.
+ * This endpoint simplifies client-side logic by enriching the OpenAI `/v1/models` response
+ * with contextual information about each model's capabilities. It also supports optional
+ * use of a custom API key and caches results for 3 minutes to reduce load and latency.
+ *
+ * INPUT PARAMETERS:
+ * - [api_key:string] (optional): A user-supplied API key used to override the system default.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization**:
+ *    - Ensures that only root users can invoke this endpoint using [auth.ticket.verify:root].
+ *
+ * 2. **Bearer Token Setup**:
+ *    - Retrieves the OpenAI API key from either the user-supplied [api_key] or from configuration ([magic:openai:key]).
+ *    - Constructs the proper Bearer token required to authenticate with OpenAI's API.
+ *
+ * 3. **Model Fetching**:
+ *    - Sends an authenticated HTTP GET request to `https://api.openai.com/v1/models`.
+ *    - Parses and converts the response into a lambda-compatible structure.
+ *    - If the request fails (non-200 status), logs the issue and returns a 500 error with a generic message.
+ *
+ * 4. **Model Metadata Enrichment**:
+ *    - Iterates through the returned list of models.
+ *    - For known models (by ID), adds relevant metadata such as:
+ *        - [tokens]: Maximum token context size.
+ *        - [chat:bool]: Whether the model supports chat-style prompting.
+ *        - [vector:bool]: Whether the model supports embedding/vectorization.
+ *    - These enhancements help consumers choose the correct model for their needs.
+ *
+ * 5. **Caching Policy**:
+ *    - Applies an HTTP cache control header to allow private caching of the result for up to 180 seconds (3 minutes).
+ *    - This prevents unnecessary re-fetching of the model list for frequently accessed tools like UIs or dashboards.
+ *
+ * 6. **Response**:
+ *    - Returns the enriched model list to the caller as a structured node set, ready for consumption by frontends or API clients.
+ *
+ * This endpoint is useful for UI dropdowns, automation pipelines, and dashboards that need to display
+ * available OpenAI models along with their usage characteristics without hardcoding model knowledge client-side.
  */
+
+
 .arguments
    api_key:string
 

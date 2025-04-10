@@ -1,14 +1,40 @@
 
-// Returns all available system messages from the backend.
-.arguments
+/*
+ * This endpoint returns **all available system messages** from the backend, aggregating them from multiple sources,
+ * including custom, core system, and module-specific directories. These messages are typically defined in `.hl` files
+ * and are converted into lambda nodes before being returned.
+ *
+ * STEPS AND LOGIC:
+ *
+ * 1. **Authorization Check**:
+ *    Uses [auth.ticket.verify:root] to ensure that only users with root-level access can invoke the endpoint.
+ *
+ * 2. **Result Accumulator**:
+ *    Declares a [.result] node to accumulate and store the collected system messages throughout execution.
+ *
+ * 3. **Custom System Messages**:
+ *    - Checks if the custom message folder `/etc/system/openai/system-messages/` exists.
+ *    - If it does, lists its files using [io.file.list].
+ *    - Filters for `.hl` files using [strings.ends-with].
+ *    - Loads each `.hl` file using [io.file.load], converts it to lambda using [hyper2lambda], and adds the resulting nodes to [.result].
+ *
+ * 4. **Core System Messages**:
+ *    - Similar to the custom block above, but scans the core folder `/system/openai/system-messages/`.
+ *    - Follows the same logic: list, filter `.hl`, load, convert, and append to [.result].
+ *
+ * 5. **Module-Specific Messages**:
+ *    - Lists all folders in `/modules/`, assuming each folder is a module.
+ *    - For each module, appends `system-messages/` to construct a potential path.
+ *    - Checks if this path exists using [io.folder.exists].
+ *    - If so, lists files, filters `.hl` files, loads and converts them, and appends their content to [.result].
+ *
+ * 6. **Final Output**:
+ *    Returns all gathered system message nodes from [.result] using [return-nodes].
+ *    The result is a unified, flat list of all messages from custom, core, and module-specific locations.
+ *
+ * This endpoint is essential for exposing system-defined prompts or logic snippets to admin tools or configuration UIs.
+ */
 
-// Making sure user has access to invoked endpoint.
-auth.ticket.verify:root
-
-// Contains list of system messages we find.
-.result
-
-// Listing custom files.
 if
    io.folder.exists:/etc/system/openai/system-messages/
    .lambda

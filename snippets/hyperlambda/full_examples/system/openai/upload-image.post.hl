@@ -1,7 +1,50 @@
 
 /*
- * Stores the specified image file as training data for the specified model.
+ * Stores an uploaded image file as training data for a specified model type.
+ * The endpoint saves the image to disk, generates a Markdown-style prompt and completion pair referencing the image,
+ * and stores the resulting snippet in the machine learning training database—ensuring no duplicates are added.
+ *
+ * INPUT PARAMETERS:
+ * - [type:string]: Logical type used to categorize the training snippet (e.g., "visual-aid", "product-catalog").
+ * - [file:*]: Image file to be uploaded, provided via multipart/form-data. Required sub-fields:
+ *    - [name]: Original filename of the image.
+ *    - [stream]: Binary stream containing the file content.
+ *
+ * ENDPOINT BEHAVIOR:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Ensures the user is authorized via [auth.ticket.verify:root].
+ *    - Validates the presence of all required fields: [type], [file], [file.name], and [file.stream].
+ *
+ * 2. **Folder Preparation**:
+ *    - Checks for existence of `/etc/www/assets/` and `/etc/www/assets/images/`.
+ *    - Creates these directories if they do not exist, ensuring proper file storage paths.
+ *
+ * 3. **File Handling**:
+ *    - Constructs the full path of the image using the original filename.
+ *    - Deletes any existing file with the same name to prevent duplication or overwrite issues.
+ *    - Saves the uploaded file to `/etc/www/assets/images/` using [io.stream.save-file].
+ *
+ * 4. **URL Generation**:
+ *    - Constructs the public-facing URL to the uploaded image using [request.scheme] and [request.host].
+ *    - This enables referencing the image directly in prompt-completion pairs for training or frontend display.
+ *
+ * 5. **Prompt and Completion Construction**:
+ *    - [prompt]: `"Image - <filename>"`
+ *    - [completion]: A Markdown-style image link using the filename and public URL:
+ *      `![<filename>](<url>)`
+ *
+ * 6. **Database Insertion**:
+ *    - Connects to the database and checks whether a snippet with the same prompt, completion, and type already exists.
+ *    - If not found, inserts a new training record into `ml_training_snippets`.
+ *
+ * 7. **Response**:
+ *    Returns a simple success result to indicate that the image was successfully stored and (potentially) inserted into the training dataset.
+ *
+ * This endpoint is ideal for scenarios where visual content is part of the model's training context,
+ * such as computer vision-assisted prompt generation, AI documentation systems, or educational datasets that pair text with imagery.
  */
+
 .arguments
    type:string
    file:*

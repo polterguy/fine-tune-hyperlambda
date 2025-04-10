@@ -1,5 +1,38 @@
 
-// Deletes all existing vectors for specified model.
+/*
+ * Deletes all existing vector embeddings for training snippets associated with a specified model type.
+ *
+ * This endpoint is used to fully reset or clean up the vector representation (VSS) layer for a model.
+ * It removes both the stored embeddings from the VSS table and clears the `embedding` field in the main training data table.
+ *
+ * INPUT PARAMETERS:
+ * - [type:string]: The logical training model or type whose associated vectors should be removed.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Ensures only users with root-level access can invoke the endpoint via [auth.ticket.verify:root].
+ *    - Validates the presence of the required [type] parameter using [validators.mandatory].
+ *
+ * 2. **Database Connection**:
+ *    - Connects to the database using the configured [generic|magic] connection string.
+ *
+ * 3. **Vector Deletion (VSS Cleanup)**:
+ *    - Executes a SQL command to delete all rows from `vss_ml_training_snippets` where the [rowid] matches the IDs
+ *      of training snippets from the `ml_training_snippets` table having the specified [type].
+ *    - This removes the actual vector embedding data from the vector search storage layer.
+ *
+ * 4. **Embedding Field Reset**:
+ *    - Runs an update on `ml_training_snippets` to set the `embedding` field to `null` for all snippets of the given type.
+ *    - This ensures that any metadata indicating that a snippet was vectorized is cleared.
+ *
+ * 5. **Final Response**:
+ *    Returns `{ result: success }` to the caller, confirming that the cleanup was completed.
+ *
+ * This endpoint is essential for maintenance, debugging, or retraining workflows where all existing embeddings
+ * need to be discarded before regenerating new ones—particularly when switching vector models or correcting corrupt data.
+ */
+
 .arguments
    type:string
 

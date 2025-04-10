@@ -1,5 +1,57 @@
+/*
+ * Creates a new machine learning model configuration in the [ml_types] table of the "magic" database.
+ *
+ * This secured endpoint allows root users to register a new ML model type with custom settings, limits,
+ * behavior, and integrations. It also auto-generates a default training snippet to seed the new model with
+ * introductory content for use in OpenAI fine-tuning or contextual retrieval.
+ *
+ * INPUT PARAMETERS:
+ * - Required:
+ *   - [type:string]: Unique identifier for the new model type.
+ *   - [model:string]: Base model name (e.g. gpt-4o, gpt-3.5-turbo).
+ *   - [max_tokens:long]: Maximum tokens per response.
+ *   - [max_context_tokens:long]: Maximum context tokens per request.
+ *   - [max_request_tokens:long]: Maximum allowable tokens in an input request.
+ *   - [temperature:double]: Randomness level (0.0–1.0) for AI output generation.
+ * - Optional (with defaults or extended behavior):
+ *   - [vector_model:string] (default: text-embedding-ada-002)
+ *   - [threshold:decimal] (default: 0.3)
+ *   - [recaptcha:decimal], [auth:string], [supervised:int], [cached:int], [prefix:string], [use_embeddings:int]
+ *   - [greeting, base_url, contact_us, lead_email, api_key, system_message, initial_questionnaire]
+ *   - Twilio: [twilio_account_sid, twilio_account_id] — defaults to [type] if not provided
+ *   - Webhooks: [webhook_incoming, webhook_outgoing, webhook_incoming_url, webhook_outgoing_url]
+ *   - Limits: [no_requests:int], [max_requests:int], [max_function_invocations:int], [max_session_items:int]
+ *   - Other: [search_postfix, completion_slot, conversation_starters]
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Verifies the user has root privileges using [auth.ticket.verify:root].
+ *    - Ensures required fields are provided and within valid ranges using [validators.mandatory] and [validators.integer].
+ *    - Applies sane default values to optional fields where appropriate.
+ *
+ * 2. **Database Connection & Rule Enforcement**:
+ *    - Connects to the "magic" database using [data.connect:[generic|magic]].
+ *    - Signals [magic.ai.can-create-machine-learning-model] to check quota, licensing, or permission constraints.
+ *
+ * 3. **Twilio Fallback Logic**:
+ *    - If [twilio_account_id] is missing or empty, it is automatically set to the value of [type].
+ *
+ * 4. **Record Insertion**:
+ *    - Inserts the new model record into the [ml_types] table using [data.create].
+ *
+ * 5. **Default Training Snippet Injection**:
+ *    - Immediately adds a default [ml_training_snippets] record to seed the model with a basic Q&A pair.
+ *    - This provides new models with at least one searchable/fine-tunable entry.
+ *
+ * 6. **Response**:
+ *    - Sets HTTP response status to 201 (Created).
+ *    - Returns `{ result: success }` to confirm the operation was completed successfully.
+ *
+ * This endpoint is essential for system administrators creating new AI chatbot configurations
+ * and serves as the foundation for onboarding new OpenAI fine-tuning types with full backend control.
+ */
 
-// CRUD HTTP create endpoint inserting one record into your ml_types table in your magic database taking type, model, max_tokens, temperature with authentication and authorisation for root roles
 .arguments
    type:string
    model:string

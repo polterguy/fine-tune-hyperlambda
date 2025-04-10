@@ -1,14 +1,48 @@
-
 /*
- * Show me a dynamic slot that does the following;
+ * Intercepts incoming chat requests to prevent abuse by enforcing IP bans and request quotas per user.
  *
- * Creates the slot that avoids abuse of AI chatbot if configuration setting is turned on.
+ * This dynamic slot is executed automatically by the AI chatbot platform before processing every incoming chat message.
+ * It acts as a security gatekeeper by enforcing daily usage limits per user and permanently blocking abusive IP addresses
+ * if those limits are exceeded or if abuse is detected.
  *
- * This allows you to create a maximum number of chat requests each unique user ID can perform per day.
- * The slot will be automatically executed by the platform upon every single chat message the system
- * is given, and if the user has been blocked due to abuse or something, it will create a log entry
- * and throw an exception.
+ * CONFIGURATION:
+ * - [magic:openai:max-daily-requests]: Optional configuration key. If present, limits how many messages
+ *   a single user ID may send within a 24-hour window.
+ *
+ * BEHAVIOR:
+ *
+ * 1. **Retrieve IP Address**:
+ *    - Uses the [cf-connecting-ip] header to identify the user's original IP address.
+ *    - Continues only if a valid IP address is present.
+ *
+ * 2. **Check If IP Is Already Blocked**:
+ *    - Queries the [ml_blocked_ips] table to check if the IP is permanently blocked.
+ *    - If blocked, logs the request headers for traceability and throws an HTTP 401 error to deny access.
+ *
+ * 3. **Enforce Daily Usage Quota**:
+ *    - Checks if the [magic:openai:max-daily-requests] configuration is set.
+ *    - If enabled:
+ *       - Retrieves the max allowed requests per day.
+ *       - Counts how many times the current [user_id] has sent requests in the past 24 hours.
+ *       - If the user has exceeded their quota, sets a flag to block them.
+ *
+ * 4. **Block Offending User and IP**:
+ *    - If abuse is detected or quota exceeded:
+ *       - Permanently inserts the IP address and user ID into the [ml_blocked_ips] table.
+ *       - Logs the incident, including request headers.
+ *       - Throws a public HTTP 401 error with a clear message.
+ *
+ * SECURITY & ABUSE PREVENTION:
+ * - This slot provides critical protection against spam, bot abuse, or accidental overuse of the chatbot interface.
+ * - Ensures users can't circumvent limits by creating too many requests in a short period of time.
+ * - Blocks both by user ID and IP address for maximum coverage.
+ *
+ * NOTES:
+ * - Logs are generated for each abuse case, providing full visibility into blocked attempts.
+ * - Admins can unblock users by removing them manually from the [ml_blocked_ips] table.
+ * - For non-SaaS installations, IP-based blocking is especially helpful in the absence of per-user tracking.
  */
+
 slots.create:magic.openai.chat-interceptor.avoid-abuse
 
    // Getting original IP address of request.

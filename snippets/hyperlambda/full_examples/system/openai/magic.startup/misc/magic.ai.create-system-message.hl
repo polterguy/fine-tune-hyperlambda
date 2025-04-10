@@ -1,21 +1,54 @@
-
 /*
- * Generate Hyperlambda that does the following;
+ * Creates a system message using OpenAI GPT-4, dynamically populating a template based on scraped website content.
  *
- * Creates a slot that creates a system message using OpenAI and GPT-4 based upon the specified template.
+ * This slot enables programmatic generation of contextualized system messages by merging structured templates with
+ * real-world content. It uses a specified [url] as the source for context, a [template] containing placeholders (e.g., [XYZ]),
+ * and an [instruction] that tells GPT-4 how to interpret and fill the template.
  *
- * Notice, any [XYZ] fields in the specified template will be dynamically substituted by
- * OpenAI according to the instruction you provide.
+ * ARGUMENTS:
+ * - [url:string] (required): The website URL to scrape for contextual data.
+ * - [template:string] (required): A string containing placeholder fields (e.g., [TITLE], [SUMMARY], etc.).
+ * - [instruction:string] (required): A directive telling GPT-4 how to process the template using the content from [url].
  *
- * Arguments:
+ * EXECUTION FLOW:
  *
- * - [url] - URL from where to find context data used to populate template fields.
- * - [template] - The starting template containing your template fields.
- * - [instruction] - How to deal with the template.
+ * 1. **Validation**:
+ *    - Ensures that [url], [template], and [instruction] are present and that [url] is valid.
  *
- * Basically, the [url] will be scraped, and the [instruction] will be used to modify the
- * [template] according to the information found at [url] and the [instruction] provided.
+ * 2. **Scraping Website Content**:
+ *    - Uses [magic.http.scrape-url] to retrieve RAG-style prompt-completion pairs from the specified [url].
+ *    - If scraping fails, throws a public 400/500 error.
+ *
+ * 3. **Context Building**:
+ *    - Iteratively compiles a [context] string using available prompt-completion pairs.
+ *    - Stops appending once the token count exceeds 4000 (to stay within GPT-4 context limits).
+ *
+ * 4. **Preparing GPT-4 Request**:
+ *    - Retrieves the OpenAI API key from configuration.
+ *    - Builds a prompt sequence using:
+ *       - [instruction] as the system prompt.
+ *       - [template] as user input (providing structure).
+ *       - [context] as additional user input (providing content).
+ *    - Sends a streaming-enabled POST request to OpenAI's `/v1/chat/completions` endpoint using the `gpt-4o` model.
+ *
+ * 5. **Error Handling**:
+ *    - Validates that the response is in the 200–299 range.
+ *    - Logs and throws a detailed error if OpenAI returns an error or invalid response.
+ *
+ * 6. **Formatting and Response**:
+ *    - Cleans up the GPT-generated message by normalizing newlines.
+ *    - Returns the final system message to the caller as a single string.
+ *
+ * USE CASES:
+ * - Automatically create system prompts for chatbots based on page content.
+ * - Convert structured templates into personalized messages using real content.
+ * - Build contextual onboarding or help messages by scraping support pages.
+ *
+ * This slot enables dynamic generation of highly contextualized system messages,
+ * ideal for use in GPT fine-tuning, AI onboarding flows, or dynamic assistant configuration.
  */
+
+
 slots.create:magic.ai.create-system-message
 
    // Sanity checking invocation.

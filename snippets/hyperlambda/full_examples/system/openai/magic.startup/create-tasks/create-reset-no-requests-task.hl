@@ -1,14 +1,36 @@
-
 /*
- * Generate Hyperlambda that does the following;
+ * Creates a scheduled task that resets the [no_requests] count for all machine learning models on the first day of each month.
  *
- * Creates scheduled task that deletes all cached questions / answers
- * from machine learning models that are older than 2 weeks, to preserve
- * storage space.
+ * The logic is conditional and only executes if the system's default database is SQLite, ensuring that task management
+ * remains the responsibility of the DBA for production-grade databases like PostgreSQL or SQL Server.
  *
- * Notice, task ONLY executes if default database is SQLite, since database
- * management is up to db-admin for serious databases.
+ * BEHAVIOR OVERVIEW:
+ *
+ * 1. **Environment Check**:
+ *    - Checks whether the default database engine is `sqlite` using [config.get:"magic:databases:default"].
+ *    - Skips task creation entirely for non-SQLite environments.
+ *
+ * 2. **Task Creation**:
+ *    - Wraps logic in a [try] block to gracefully handle duplicate task creation.
+ *    - Attempts to delete any existing task named `reset-no_requests` before creating a new one.
+ *    - Creates a scheduled task named `reset-no_requests` that:
+ *        - Executes at midnight on the first day of every month ([**.01.01.01.01]).
+ *        - Connects to the SQLite "magic" database.
+ *        - Resets the `no_requests` column for all rows in the [ml_types] table to `0`.
+ *        - Logs a success message for auditability.
+ *
+ * 3. **Error Handling**:
+ *    - If the task already exists or an error occurs, the system logs a console message but does not crash.
+ *
+ * PURPOSE:
+ * - Helps preserve data integrity and manage quotas by resetting request counters monthly.
+ * - Prevents accumulation of stale usage data in developer environments where SQLite is often used.
+ *
+ * NOTES:
+ * - This is especially useful for environments where [no_requests] is used to throttle usage or track limits.
+ * - In production, database administrators should handle this using their own infrastructure (e.g., cron, SQL jobs).
  */
+
 if
    eq
       config.get:"magic:databases:default"

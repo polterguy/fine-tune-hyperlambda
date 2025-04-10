@@ -1,19 +1,58 @@
-
 /*
- * Write a slot that does the following;
+ * Performs a semantic vector similarity search against ML training snippets for a specific [type].
  *
- * Performs a vector search against the training snippet database using a semantic embedding model.
- * It accepts the following parameters:
+ * This slot is used to retrieve training data that is semantically similar to a provided [prompt]
+ * using vector embeddings and SQLite's VSS (vector similarity search) extension. It returns the top
+ * matches ranked by relevance (dot product) and includes metadata like their URI and prompt content.
  *
- * - [type]: The type/category of training data to search in.
- * - [prompt]: The search query text.
- * - [threshold]: The cosine distance threshold for filtering relevant matches.
- * - [max]: The maximum number of results to return.
- * - [vector_model]: The OpenAI embeddings model to use.
- * - [prefix-url] (optional): If specified, limits matches to rows where [uri] starts with this prefix.
+ * ### Parameters:
+ * - **[type]**: *(required)* The training snippet category to search within.
+ * - **[prompt]**: *(required)* The user-provided semantic query or natural language search text.
+ * - **[threshold]**: *(required)* Cosine distance threshold for vector similarity (e.g., 0.7).
+ * - **[max]**: *(required)* Maximum number of matching results to return.
+ * - **[vector_model]**: *(required)* OpenAI embeddings model used for encoding the prompt (e.g. `text-embedding-3-small`).
+ * - **[prefix-url]**: *(optional)* If specified, restricts search to snippets where the URI starts with this prefix.
  *
- * The slot returns matched snippets including their prompt and URI, sorted by similarity.
+ * ### Behavior:
+ * 1. **Validates input parameters** to ensure required fields are present and properly formatted.
+ * 2. **Retrieves an embedding vector** for the given [prompt] by calling OpenAI's embedding API using the provided [vector_model].
+ * 3. **Handles OpenAI errors** gracefully by logging and returning a meaningful error message and status code if the API call fails.
+ * 4. **Constructs an SQL query** using SQLite's `vss_search()` syntax, applying:
+ *    - Semantic vector matching using dot product.
+ *    - Threshold filtering using cosine distance.
+ *    - Optional URI prefix filtering if [prefix-url] is provided.
+ *    - Grouping by URI to avoid duplicate results.
+ *    - Ordering by similarity (distance).
+ * 5. **Limits results** to the specified [max] number of matches.
+ * 6. **Returns matched snippets** (each with `prompt`, `uri`, and `distance`) along with `db_time` to indicate execution duration.
+ *
+ * ### Output:
+ * ```json
+ * {
+ *   "snippets": [
+ *     {
+ *       "prompt": "...",
+ *       "uri": "...",
+ *       "distance": 0.12
+ *     },
+ *     ...
+ *   ],
+ *   "db_time": "00.153"
+ * }
+ * ```
+ *
+ * ### Use Cases:
+ * - Finding semantically similar training examples.
+ * - Enabling AI assistants to look up relevant facts using semantic search.
+ * - Implementing context-aware chat retrieval pipelines.
+ *
+ * ### Notes:
+ * - Uses SQLite VSS, which requires prior vectorization of the training data.
+ * - Compatible with OpenAI's latest embedding models like `text-embedding-3-small`.
+ * - Optimized for speed with support for `limit` and `prefix-url` filtering.
  */
+
+
 slots.create:magic.ai.search
 
    // Sanity checking invocation.

@@ -1,5 +1,46 @@
+/*
+ * Updates a single record in the [ml_training_snippets] table of the "magic" database.
+ *
+ * This authenticated, root-protected endpoint allows administrators to update existing training snippets
+ * by specifying the [id] of the record and modifying fields such as [prompt], [completion], and [uri].
+ *
+ * INPUT PARAMETERS:
+ * - [id:long]: Required. The unique identifier of the snippet to update.
+ * - [uri:string]: Optional. Updated URI reference for the training snippet.
+ * - [prompt:string]: Optional. Updated prompt content.
+ * - [completion:string]: Optional. Updated completion text.
+ * - [meta:string]: Optional. Additional metadata about the snippet (e.g., filename or notes).
+ * - [type:string]: Optional. Type/category this snippet belongs to.
+ * - [pushed:long]: Optional. Indicates if the snippet has been pushed to OpenAI.
+ * - [cached:int]: Optional. Cache status indicator.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Validation**:
+ *    - Verifies the presence of [id] using [validators.mandatory], as it's required to identify the record to update.
+ *
+ * 2. **Authorization**:
+ *    - Restricts access to root users using [auth.ticket.verify:root].
+ *
+ * 3. **Database Connection**:
+ *    - Opens a connection to the "magic" database using [data.connect:[generic|magic]].
+ *
+ * 4. **Update Construction**:
+ *    - Uses the [id] as the filter condition to locate the target record.
+ *    - Gathers all remaining arguments to be updated into the [values] clause.
+ *
+ * 5. **Record Update Execution**:
+ *    - Calls [data.update] to apply changes to the target row.
+ *    - If no records were affected (i.e., [id] not found), returns HTTP status 404 with a not-found message.
+ *
+ * 6. **Response**:
+ *    - Returns HTTP status 202 (Accepted) on success.
+ *    - Responds with the number of records affected using [affected:x:@data.update].
+ *
+ * This endpoint is useful for maintaining and correcting fine-tuning data, especially in workflows that
+ * involve human review or iterative refinement of prompt-completion pairs.
+ */
 
-// CRUD HTTP update API endpoint updating one record in your ml_training_snippets table in your magic database filtering which item to update with id updating uri, prompt, completion fields with authentication and authorisation for root roles
 .arguments
    id:long
    uri:string

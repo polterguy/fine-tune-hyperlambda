@@ -1,16 +1,34 @@
+/*
+ * This endpoint retrieves all available CSS-based themes from the backend system.
+ * It scans both custom and system-level directories for `.css` files representing theme definitions
+ * and returns a deduplicated list of theme names to the caller.
+ *
+ * NOTE: This endpoint explicitly accepts **no input arguments**, as defined by the empty [.arguments] declaration.
+ *
+ * EXECUTION STEPS:
+ *
+ * 1. **Access Control**:
+ *    Uses [auth.ticket.verify:root] to ensure only root-authorized users can call this endpoint.
+ *    Prevents unauthorized access to system-level theme information.
+ *
+ * 2. **Custom Themes Collection**:
+ *    - Checks if the custom theme folder `/etc/system/openai/css/search/` exists.
+ *    - If it does, lists its contents using [io.file.list].
+ *    - Filters all `.css` files using [strings.ends-with].
+ *    - Splits the full path using [strings.split] to isolate the filename, and further splits by dot (`.`) to remove the `.css` extension.
+ *    - The base filename (without extension) is added to [.result] as a theme identifier.
+ *
+ * 3. **System Themes Collection**:
+ *    - Mirrors the logic of the custom block, but scans the core system directory `/system/openai/front.files/search/`.
+ *    - After isolating the base filename, checks if it already exists in [.result] using [not-exists] to avoid duplicates.
+ *    - If it doesn’t exist, it adds the theme name to [.result].
+ *
+ * 4. **Return Results**:
+ *    The endpoint returns all collected theme names via [return-nodes:x:@.result/*], representing the full list of available backend themes.
+ *
+ * This endpoint is typically used by frontend UIs that need to dynamically list available themes for user customization or branding purposes.
+ */
 
-// Returns all available themes from the backend.
-
-// Endpoint syntax with explicit [.arguments] collection prohibiting any arguments but those mention here, which are none!
-.arguments
-
-// Making sure user has access to invoked endpoint.
-auth.ticket.verify:root
-
-// Checking if custom CSS file exists.
-.result
-
-// Listing custom files.
 if
    io.folder.exists:/etc/system/openai/css/search/
    .lambda

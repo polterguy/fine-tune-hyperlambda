@@ -1,5 +1,42 @@
+/*
+ * Creates a new training snippet in the [ml_training_snippets] table of the "magic" database.
+ *
+ * This authenticated and root-protected endpoint supports insertion of a single training record
+ * with structured fields used in OpenAI fine-tuning and vector-based learning workflows.
+ *
+ * INPUT PARAMETERS:
+ * - [type:string]: Logical model category to associate the snippet with.
+ * - [pushed:long]: Flag indicating whether the snippet has been uploaded to OpenAI (typically 0 or 1).
+ * - [uri:string]: Optional reference URI (e.g., source document or origin).
+ * - [prompt:string]: The input text used to train the model.
+ * - [completion:string]: The expected output text that completes the prompt.
+ * - [meta:string]: Optional metadata about the snippet, such as filename or origin.
+ * - [cached:int]: Optional flag indicating caching status or usage.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization**:
+ *    - Ensures only root users can call this endpoint using [auth.ticket.verify:root].
+ *
+ * 2. **Database Connection**:
+ *    - Connects to the "magic" database using [data.connect:[generic|magic]].
+ *
+ * 3. **Business Rule Enforcement**:
+ *    - Uses [try-signal:magic.ai.can-create-snippet] to verify that snippet creation is allowed for the given [type].
+ *    - This can enforce limits, quotas, or other backend policies.
+ *
+ * 4. **Data Insertion**:
+ *    - Assembles the provided arguments and inserts them into the [ml_training_snippets] table.
+ *    - Uses [data.create] to persist the record in the database.
+ *
+ * 5. **Response Handling**:
+ *    - Sets HTTP status code to 201 (Created) on success.
+ *    - Returns the ID of the newly created record for downstream reference.
+ *
+ * This endpoint is essential for any UI or backend process that collects new prompt-completion examples
+ * for fine-tuning LLMs, creating contextual embeddings, or storing human feedback data.
+ */
 
-// CRUD HTTP create HTTP API endpoint inserting one record into your ml_training_snippets table in your magic database taking type, pushed, uri, prompt, completion with authentication and authorisation for root roles
 .arguments
    pushed:long
    uri:string

@@ -1,15 +1,43 @@
 
 /*
- * Create an endpoint that returns the initial questionnaire configuration for a specified machine learning [type].
+ * Returns the initial questionnaire configuration associated with a given machine learning [type].
  *
- * The endpoint:
- * - Validates that the [type] argument is provided.
- * - Retrieves all questions associated with the initial questionnaire linked to the given [type] from the database.
- * - Also retrieves metadata about the questionnaire such as its name, type, and optional [action].
- * - If there are no questions, the [questions] node is removed from the result.
+ * This endpoint retrieves both the metadata and the list of questions for the initial questionnaire defined for the specified type.
+ * It is useful for UI applications that dynamically generate onboarding or profiling workflows for AI models based on pre-defined questions.
  *
- * Returns both the questionnaire metadata and its list of questions to the caller.
+ * INPUT PARAMETERS:
+ * - [type:string]: The logical model type whose initial questionnaire configuration should be retrieved.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Validation**:
+ *    - Uses [validators.mandatory] to ensure that the [type] argument is provided.
+ *
+ * 2. **Database Connection**:
+ *    - Establishes a connection to the database using the default [generic|magic] provider.
+ *
+ * 3. **Querying for Questions**:
+ *    - Executes a SQL query that retrieves all questions associated with the questionnaire linked to the provided [type].
+ *    - Joins the [questions], [questionnaires], and [ml_types] tables.
+ *    - Returns fields: [question], [type], [context], and [name], ordered by [question_id].
+ *
+ * 4. **Querying for Questionnaire Metadata**:
+ *    - Executes a second SQL query to fetch metadata about the questionnaire itself: [name], [type], and optional [action].
+ *    - Uses an inner join between [questionnaires] and [ml_types] based on [initial_questionnaire].
+ *
+ * 5. **Constructing the Response**:
+ *    - Combines metadata and questions into a single return object.
+ *    - Adds the retrieved questions under a [questions] node inside the result.
+ *    - If the questionnaire contains no questions, the [questions] node is removed entirely from the output to avoid sending empty data structures.
+ *
+ * 6. **Response**:
+ *    - Returns both the questionnaire metadata and its associated list of questions (if any) to the caller.
+ *
+ * This endpoint is critical for dynamic configuration of ML-driven user experiences,
+ * enabling runtime generation of forms, onboarding flows, or data collection tasks tailored to each model type.
  */
+
+
 .arguments
    type:string
 

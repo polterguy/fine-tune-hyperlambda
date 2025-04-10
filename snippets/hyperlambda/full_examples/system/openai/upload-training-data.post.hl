@@ -1,7 +1,52 @@
 
+
 /*
- * Stores the specified file as training data for the specified model.
+ * Uploads a file and extracts training data for a specific machine learning model type.
+ *
+ * This endpoint supports a wide range of file types—including CSV, XML, JSON, YAML, PDF, TXT, and ZIP—and converts their content
+ * into prompt-completion training snippets. It supports advanced options like massaging completions using OpenAI,
+ * auto-generating prompts, and managing file overwrites and formatting modes.
+ *
+ * INPUT PARAMETERS:
+ * - [file:*]: Multipart file to be uploaded. Required subfields: [name] and [stream].
+ * - [type:string]: Logical category used to associate the training data with a specific model type.
+ * - [prompt:string] (optional): Name of the column or field to use as prompt (defaults to "prompt").
+ * - [completion:string] (optional): Name of the column or field to use as completion (defaults to "completion").
+ * - [massage:string] (optional): Identifier for post-processing logic (e.g., summarization or chunking).
+ * - [massagePrompt:string] (optional): System prompt used to reformat content using the OpenAI API.
+ * - [preservePages:bool]: Relevant for PDFs—if true, keeps each page as its own snippet (default: false).
+ * - [overwrite:bool]: If false, prevents overwriting existing files (default: false).
+ * - [forceAsText:bool]: If true, forces `.csv` or `.txt` files to be processed as plain text (default: false).
+ *
+ * SUPPORTED FILE FORMATS & HANDLING:
+ * 1. **ZIP**: Signals [magic.ai.import-zip-file] for custom decompression and processing.
+ * 2. **CSV**: Converts using [csv2lambda] unless [forceAsText] is true.
+ * 3. **XML**: Converts using [xml2lambda] and maps configured prompt and completion fields.
+ * 4. **JSON/YAML**: Converts using [json2lambda] or [yaml2lambda] respectively.
+ * 5. **PDF**:
+ *    - Stored under `/etc/system/openai/pdf/`.
+ *    - Extracts text using [pdf2text].
+ *    - Supports optional page-wise snippet creation ([preservePages]) or transformation via [magic.ai.massage].
+ *    - If [massagePrompt] is provided, uses OpenAI's Chat API to auto-generate improved prompts for each snippet.
+ *    - Adds downloadable hyperlink references for traceability.
+ * 6. **TXT/MD**:
+ *    - Stored as plain text and processed using [magic.ai.massage].
+ *    - Supports [massagePrompt]-based prompt enhancement like the PDF handler.
+ *
+ * POST-PROCESSING LOGIC:
+ * - Snippets are optionally enhanced using the [massagePrompt] via OpenAI’s `chat/completions` endpoint.
+ * - Ensures valid snippet format by checking for presence of both prompt and completion fields.
+ * - Standardizes snippet field names by mapping them to [prompt] and [completion].
+ *
+ * FINAL STORAGE:
+ * - Adds training snippets to the system by invoking [magic.ai.import-snippets].
+ * - Adds file-specific metadata like [uri] and [filename] for traceability.
+ * - Returns a success status along with the count of successfully created training snippets.
+ *
+ * This endpoint is designed for maximum flexibility, allowing teams to upload large or complex datasets in various formats
+ * and convert them into structured training material for fine-tuning OpenAI models.
  */
+```
 .arguments
    file:*
    type:string

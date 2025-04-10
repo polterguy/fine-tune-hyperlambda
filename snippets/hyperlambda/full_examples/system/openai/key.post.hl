@@ -1,15 +1,38 @@
 
 /*
- * Create an endpoint that allows a root user to configure the OpenAI API integration
- * by setting a new API key into the system configuration.
+ * Allows a root user to configure the OpenAI API integration by setting a new API key.
  *
- * The endpoint performs the following:
- * - Ensures the user is authenticated with root access.
- * - Validates that the provided key is a valid string between 20 and 500 characters.
- * - Loads the current configuration, removes any previously configured OpenAI key,
- *   and sets the new key under [magic:openai:key].
- * - Saves the updated configuration and returns a success response to the caller.
+ * This endpoint securely updates the OpenAI API key stored in the system configuration,
+ * replacing any previously defined key. It enforces authentication and key format validation,
+ * and ensures the configuration is properly updated and persisted.
+ *
+ * INPUT PARAMETERS:
+ * - [key:string]: The new OpenAI API key. Must be a valid string between 20 and 500 characters.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Requires the user to be authenticated with [root] privileges via [auth.ticket.verify:root].
+ *    - Ensures the [key] argument is present using [validators.mandatory].
+ *    - Validates the key length using [validators.string] with a minimum of 20 and a maximum of 500 characters.
+ *
+ * 2. **Configuration Loading & Modification**:
+ *    - Loads the current system configuration using [config.load] and converts it to lambda format with [json2lambda].
+ *    - Removes any previously configured OpenAI key under the node path [magic.openai.key] using [remove-nodes].
+ *    - Inserts the new key into the configuration at the same location using [add].
+ *
+ * 3. **Persistence**:
+ *    - Converts the updated configuration back to JSON format using [lambda2json].
+ *    - Saves the updated configuration using [config.save].
+ *
+ * 4. **Response**:
+ *    - Returns a simple `{ result: success }` to indicate that the new key has been stored successfully.
+ *
+ * This endpoint is critical for initial setup or secure rotation of OpenAI credentials, and should be
+ * protected via strict access control. It ensures that the backend will use the updated key
+ * for all subsequent OpenAI API interactions.
  */
+
 .arguments
    key:string
 

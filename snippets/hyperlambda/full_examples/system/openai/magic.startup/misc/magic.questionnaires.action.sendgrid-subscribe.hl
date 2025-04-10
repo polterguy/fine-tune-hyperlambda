@@ -1,9 +1,51 @@
 
 /*
- * Show me a Hyperlambda slot that does the following;
+ * Subscribes a user to a SendGrid-managed newsletter by adding their name and email
+ * to a predefined contact list using the SendGrid Marketing API.
  *
- * Subscribes the specified [name] and [email] to a newsletter using SendGrid API.
+ * This dynamic slot is designed to be invoked during form submissions, such as newsletter
+ * opt-ins or onboarding questionnaires. It securely forwards subscriber details to SendGrid,
+ * leveraging dynamic configuration for API credentials and list targeting.
+ *
+ * ARGUMENTS:
+ * - [name:string] (required): The full name of the subscriber.
+ * - [email:string] (required): The subscriber's email address. Must be a valid email.
+ *
+ * CONFIGURATION:
+ * - [magic:sendgrid:api-key]: Your SendGrid API key used to authenticate requests.
+ * - [magic:sendgrid:chatbot-list]: The ID of the marketing list the subscriber should be added to.
+ * - [magic:sendgrid:full_name_id]: Custom field ID for storing the user's full name in SendGrid (e.g., `e1_T`).
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Validation**:
+ *    - Ensures both [name] and [email] are provided.
+ *    - Validates the email format with [validators.email].
+ *
+ * 2. **Authentication & API Key Handling**:
+ *    - Constructs the SendGrid Bearer token using the configured API key.
+ *    - Loads the configured contact list ID and custom field ID for full name.
+ *
+ * 3. **SendGrid API Call**:
+ *    - Sends an HTTP PUT request to [https://api.sendgrid.com/v3/marketing/contacts].
+ *    - Adds the user to the specified list using the provided [email] and [name].
+ *    - Uses [convert:true] to ensure the response is parsed for validation.
+ *
+ * 4. **Response Handling**:
+ *    - If SendGrid does not return HTTP status 202 (Accepted), logs the full response and stack trace as an error.
+ *    - On success, logs an informational message confirming the subscription.
+ *
+ * USE CASES:
+ * - Newsletter signup forms embedded in AI chatbot workflows.
+ * - Lead generation and email capture during quizzes, onboarding, or surveys.
+ * - Any automation that pushes users into a SendGrid contact list for marketing purposes.
+ *
+ * NOTES:
+ * - This slot assumes your SendGrid account has custom fields configured.
+ * - List and field IDs must be pre-configured and stored as settings.
+ * - Logging is built-in for auditability and debugging failed requests.
  */
+
 slots.create:magic.questionnaires.action.sendgrid-subscribe
 
    // Sanity checking invocation.

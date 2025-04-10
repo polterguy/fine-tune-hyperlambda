@@ -1,16 +1,47 @@
 
 /*
- * Create an endpoint that generates a permanent URL for the current chat conversation session.
+ * Generates a permanent URL (permalink) for the current chat conversation session.
  *
- * The endpoint performs the following steps:
- * - Verifies that the user is authenticated.
- * - Retrieves the cached chat session using the provided session ID.
- * - If the session cache has expired, it returns an error.
- * - Checks if a permalink already exists for this session content in the database and reuses it if found.
- * - If not, it uses OpenAI to generate an SEO-friendly title and description based on the conversation.
- * - Stores the permalink, chat messages, title, and description into the database.
- * - Returns the unique permalink URL to the caller.
+ * This endpoint is used to preserve and share the content of a chat session in a readable and searchable format.
+ * It stores the conversation along with a generated SEO-friendly title and description,
+ * ensuring consistent access via a unique URL that can be embedded or linked from anywhere.
+ *
+ * INPUT PARAMETERS:
+ * - [session:string]: The WebSocket session ID used to reference the in-memory chat conversation.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Verifies the user is authenticated using [auth.ticket.verify].
+ *    - Ensures the required [session] argument is provided using [validators.mandatory].
+ *
+ * 2. **Session Retrieval from Cache**:
+ *    - Attempts to retrieve the conversation messages from the cache using the provided [session] ID.
+ *    - If the cache has expired or is empty, throws a 500 public error indicating session data is no longer available.
+ *
+ * 3. **Check for Existing Permalink**:
+ *    - Queries the database (`ml_permalinks` table) to check if a permalink already exists for the exact same chat content.
+ *    - If found, returns the existing [id] as the permalink URL to avoid duplicate storage.
+ *
+ * 4. **OpenAI Integration (Title & Description Generation)**:
+ *    - Uses OpenAI’s `chat/completions` endpoint (model: `o3-mini`) to:
+ *        - Generate a concise, SEO-optimized **title** based on the chat content.
+ *        - Generate a short, SEO-friendly **description** suitable for use in HTML `<meta>` tags.
+ *    - Trims and sanitizes the AI-generated outputs to remove extraneous characters like quotes or line breaks.
+ *    - If any OpenAI call fails, logs the error and throws an exception to halt the process.
+ *
+ * 5. **Persisting the Permalink**:
+ *    - Generates a 20-character random string to serve as a unique permalink ID.
+ *    - Stores the conversation messages, generated title, and description into the `ml_permalinks` table.
+ *
+ * 6. **Response**:
+ *    - Returns the newly created or previously found permalink ID as a response, which can be used to construct a full public URL.
+ *
+ * This endpoint allows users to capture the outcome of an AI interaction in a format that can be
+ * shared externally, indexed by search engines, or stored for future reference—ideal for knowledge base generation,
+ * documentation workflows, or collaborative Q&A use cases.
  */
+
 .arguments
    session:string
 

@@ -1,11 +1,50 @@
-
 /*
- * Stores the specified file as training data for the specified model.
+ * Stores a CSV file as training data associated with a specified model type.
  *
- * Contrary to the other upload endpoint, this assumes it's given a CSV file, and
- * it will also use ALL columns in the file. It will assume the first column is
- * the prompt though.
+ * This endpoint is designed to accept structured CSV training files where each row represents a
+ * single training sample. Unlike other upload endpoints, this one:
+ * - Assumes **CSV format** exclusively.
+ * - Utilizes **all columns** in the file.
+ * - Assumes the **first column is the "prompt"** and the remaining columns form the "completion".
+ * - Formats completions in a human-readable, multi-line format using column names as labels.
+ *
+ * INPUT PARAMETERS:
+ * - [type:string]: Logical training type (e.g. "faq", "support", "sales"), used to group and organize snippets.
+ * - [file:*]: The uploaded CSV file, passed as a multipart/form-data payload.
+ *
+ * EXECUTION OVERVIEW:
+ *
+ * 1. **Authorization and Validation**:
+ *    - Uses [auth.ticket.verify:root] to ensure only root users can invoke the endpoint.
+ *    - Enforces presence of [type] and [file], including nested file metadata like [name] and [stream].
+ *
+ * 2. **File Reading and Conversion**:
+ *    - Reads the raw binary stream of the uploaded file using [io.stream.read].
+ *    - Converts the CSV content into a lambda node structure using [csv2lambda].
+ *      Each record (row) becomes a node containing child nodes for each column.
+ *
+ * 3. **Database Connection**:
+ *    Opens a connection to the underlying database using the default [generic|magic] connection string.
+ *
+ * 4. **Training Data Transformation**:
+ *    Iterates over each row of the CSV and constructs:
+ *    - [prompt]: Derived from the first column, with format `"ColumnName: ColumnValue"`.
+ *    - [completion]: Built from all subsequent columns, formatted with line breaks and labeled values (e.g. `"Column2: Value2"`).
+ *      - Null or empty fields are skipped to keep the completion clean.
+ *      - Multiple fields are separated by double line breaks for visual clarity.
+ *
+ * 5. **Data Insertion**:
+ *    - Each transformed prompt-completion pair is stored in the `ml_training_snippets` table.
+ *    - Also stores the original filename as metadata via the [meta] field for traceability.
+ *
+ * 6. **Response Output**:
+ *    Returns a [success] result along with the number of rows successfully imported from the file.
+ *
+ * This endpoint streamlines the ingestion of structured training data from spreadsheets or export files,
+ * making it ideal for bulk-upload scenarios such as importing customer FAQs, helpdesk conversations, or
+ * categorized dialog flows for supervised fine-tuning.
  */
+
 .arguments
    type:string
    file:*

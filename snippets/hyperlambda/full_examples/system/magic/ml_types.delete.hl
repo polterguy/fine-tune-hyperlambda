@@ -1,5 +1,45 @@
+/*
+ * Deletes a single record from the [ml_types] table in the "magic" database
+ * using the specified [type] as the primary key.
+ *
+ * This endpoint is protected and can only be invoked by users with root access.
+ * It ensures safe deletion by also cleaning up any associated vector records in
+ * the [vss_ml_training_snippets] table that reference training snippets linked
+ * to the specified [type].
+ *
+ * INPUT PARAMETERS:
+ * - [type:string]: The unique identifier of the model type to delete.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization**:
+ *    - Verifies that the caller has root-level access using [auth.ticket.verify:root].
+ *
+ * 2. **Validation**:
+ *    - Ensures that the [type] argument is provided using [validators.mandatory].
+ *    - Prevents accidental or incomplete deletions due to missing primary keys.
+ *
+ * 3. **Database Connection**:
+ *    - Opens a connection to the "magic" database using [data.connect:[generic|magic]].
+ *
+ * 4. **Cascade Cleanup**:
+ *    - Deletes all rows in [vss_ml_training_snippets] where the [rowid] matches any
+ *      snippet in [ml_training_snippets] that belongs to the specified [type].
+ *    - This prevents orphaned vector entries in the vector store.
+ *
+ * 5. **Main Deletion**:
+ *    - Adds the [type] argument to the [where] clause of the delete statement.
+ *    - Executes [data.delete] on the [ml_types] table to remove the specified type.
+ *
+ * 6. **Response**:
+ *    - Unwraps the result and returns the number of affected rows under [affected].
+ *    - Provides clear feedback on whether the deletion was successful.
+ *
+ * This endpoint is essential for lifecycle management of AI configurations,
+ * ensuring that types can be safely removed along with their associated vector data
+ * without leaving behind incomplete or inconsistent system state.
+ */
 
-// CRUD HTTP delete endpoint deleting one record from your ml_types table in your magic database with type matching argument with authentication and authorisation for root roles
 .arguments
    type:string
 

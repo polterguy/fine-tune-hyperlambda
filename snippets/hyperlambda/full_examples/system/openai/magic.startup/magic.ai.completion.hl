@@ -1,8 +1,74 @@
 
 /*
- * Completion type of slot for non-GPT type of models.
- * Similar to the [magic.ai.chat] slot, but no longer used since it's mostly a legacy slot for older versions.
+ * Executes a completion-style OpenAI request using a legacy completion model (non-chat), such as `text-davinci-003`.
+ *
+ * This slot mimics the behavior of [magic.ai.chat] but is designed for backward compatibility with older OpenAI completion models
+ * that do not support role-based conversations. It's primarily used for fine-tuned models or simpler prompt/response setups.
+ *
+ * ⚠️ This is a **legacy slot**, largely deprecated in favor of chat-based slots such as [magic.ai.chat], and only preserved for
+ * support with older fine-tuned models and APIs.
+ *
+ * ARGUMENTS:
+ * - [prompt:string]: The question or instruction for the model.
+ * - [type:string]: The model type (used for embedding, logging, caching, etc.).
+ * - [model:string]: OpenAI model ID (e.g., text-davinci-003 or a fine-tuned model).
+ * - [temperature:double]: Model creativity/variance.
+ * - [max_tokens:long]: Max token count for the response.
+ * - [prefix:string] (optional): Optional prefix added to the prompt (can include [QUESTION], [CONTEXT], [ANSWER]).
+ * - [cached:int] (optional): Enables result caching if supported.
+ * - [references:bool] (optional): Whether to return RAG snippets as references.
+ * - [use_embeddings:int] (optional): Enables retrieval-augmented generation from a vector store.
+ * - [threshold:decimal], [max_context_tokens:long]: Used for filtering relevant snippets.
+ * - [session:string], [user_id:string], [referrer:string]: Metadata used for session tracking and supervised logging.
+ * - [supervised:int]: If true (1), stores conversation in [ml_requests].
+ * - [api_key:string] (optional): Overrides the OpenAI API key for the request.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Cache Check (if enabled)**:
+ *    - If caching is enabled and the user hasn't requested references, the slot checks for an existing response
+ *      for the same [prompt] and [type]. If a cached match is found, it is returned immediately.
+ *
+ * 2. **Embedding/RAG Context Retrieval**:
+ *    - If [use_embeddings] is enabled, the slot fetches relevant snippets via [magic.ai.get-context].
+ *    - The context is injected into the prompt using either a structured [prefix] (with placeholders) or a default format.
+ *    - If [references:true] is set, it returns the associated context snippets in the response.
+ *
+ * 3. **Prompt Preparation (Non-RAG Models)**:
+ *    - If the model name contains a colon (`:`), the system assumes it is fine-tuned and adds `->` and `END` stop patterns.
+ *    - Otherwise, the raw [prompt] is sent as-is.
+ *
+ * 4. **OpenAI Completion Invocation**:
+ *    - Calls the OpenAI Completion API (`/v1/completions`) with the constructed [prompt], [model], and other settings.
+ *    - Handles errors gracefully by logging and returning a structured error response.
+ *
+ * 5. **Post-Processing**:
+ *    - Trims the returned completion text.
+ *    - Adds `finish_reason` and (if applicable) `references` and `db_time` to the response payload.
+ *
+ * 6. **Session Logging (if supervised)**:
+ *    - If [supervised:1] and no error occurred, stores the full exchange (prompt, completion, metadata) into [ml_requests].
+ *
+ * 7. **Response Caching Headers**:
+ *    - Sets `Cache-Control: max-age=30` to reduce redundant completions for identical requests.
+ *
+ * 8. **Return**:
+ *    - Returns a clean structure with:
+ *        - [result:string]: The AI's response.
+ *        - [finish_reason:string]: OpenAI's signal for why it stopped.
+ *        - [references:*] (optional): Snippets used for RAG (if applicable).
+ *        - [db_time:string] (optional): Duration of vector DB lookup.
+ *
+ * USAGE SCENARIOS:
+ * - Legacy integrations using fine-tuned completion models.
+ * - Non-chat-based Q&A systems where prompt injection is controlled externally.
+ * - Situations requiring caching or lightweight RAG support for non-conversational models.
+ *
+ * DEPRECATION NOTICE:
+ * - Use [magic.ai.chat] for all GPT-style or chat-capable models (gpt-4, gpt-3.5, etc.).
+ * - This slot is retained for backward compatibility only.
  */
+
 slots.create:magic.ai.completion
 
    /*

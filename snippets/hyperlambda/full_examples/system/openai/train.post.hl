@@ -1,8 +1,61 @@
-
 /*
- * Uploads training data to your OpenAI API account,
- * and starts training the model using the default training data.
+ * Uploads custom training data to OpenAI and initiates a fine-tuning process for a specified model.
+ * This endpoint handles everything from formatting the training data to monitoring training progress
+ * and updating backend references once training is complete.
+ *
+ * INPUT PARAMETERS:
+ * - [type:string]: Identifier used to categorize training data and final model association.
+ * - [model:string]: Base OpenAI model to fine-tune (e.g. "gpt-3.5-turbo").
+ * - [epochs:int]: Optional. Number of training epochs.
+ * - [batch_size:int]: Optional. Batch size for training.
+ * - [learning_rate_multiplier:decimal]: Optional. Learning rate modifier.
+ * - [prompt_loss_weight:decimal]: Optional. Relative importance of prompt loss.
+ *
+ * PROCESS OVERVIEW:
+ *
+ * 1. **Authorization and Validation**:
+ *    Ensures only root users can invoke the endpoint and requires [type] and [model] as mandatory inputs.
+ *
+ * 2. **Data Preparation**:
+ *    - Connects to the database to fetch training snippets from `ml_training_snippets` that match the given type and haven't been pushed.
+ *    - Each record is transformed into OpenAI-compatible format: `"prompt ->"` and `"completion END"`.
+ *    - The transformed snippets are stored in a [.snippets] buffer.
+ *
+ * 3. **JSONL File Creation**:
+ *    - Converts [.snippets] to JSON, then transforms it into a JSONL string by replacing delimiters and trimming brackets.
+ *    - Constructs a unique filename using a generated GUID.
+ *
+ * 4. **File Upload to OpenAI**:
+ *    - Uploads the training file as multipart/form-data to OpenAI's `/v1/files` endpoint with the purpose `fine-tune`.
+ *    - If upload fails (non-2xx status), logs the error and returns an HTTP 500 response.
+ *
+ * 5. **Fine-Tune Job Creation**:
+ *    - Extracts the file ID from the upload response.
+ *    - Constructs the payload for the fine-tuning job and conditionally includes any optional tuning parameters provided.
+ *    - Sends a POST request to `/v1/fine-tunes` to start training.
+ *    - On failure, logs the issue and responds with HTTP 500.
+ *
+ * 6. **Task Creation for Monitoring**:
+ *    - Creates a repeating background task (every 30 seconds) to monitor training progress.
+ *    - Uses the OpenAI API to fetch the current training status.
+ *    - On "succeeded":
+ *        - Updates the `ml_types` table with the new fine-tuned model ID.
+ *        - Marks related training snippets as pushed.
+ *        - Deletes the monitoring task.
+ *        - Notifies root users via WebSocket signal.
+ *    - On "failed":
+ *        - Logs the failure, deletes the task, and sends an error signal to root users.
+ *    - On API failure:
+ *        - Logs the error for debugging purposes.
+ *
+ * 7. **Final Response**:
+ *    Returns `{result: success}` immediately after scheduling the training and monitoring task,
+ *    even though the full training may take several minutes to complete in the background.
+ *
+ * This endpoint is designed for automation pipelines where users want to feed fresh data into OpenAI,
+ * fine-tune a model, and ensure that results are automatically integrated into the system when complete.
  */
+
 .arguments
    type:string
    model:string

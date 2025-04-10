@@ -1,17 +1,60 @@
-
 /*
- * Create a slot that does the following;
+ * Crawls a website and generates OpenAI-compatible machine learning training data using RAG (retrieval-augmented generation).
  *
- * Crawls the specified website generating training data for machine learning in the process.
- * Optionally supply [summarize] argument, which if given will create summaries of snippets that
- * are too long for the machine learning type's configuration. Defaults to `true`.
- * 
- * The slot will first try to load the robots.txt file, from there find the sitemap, and crawl
- * the URLs it finds in the sitemap and generate RAG data for the specified machine learning type
- * from the content it finds during scraping.
+ * This slot is used to automate data collection from a public-facing website. It follows best practices by first inspecting the site's
+ * `robots.txt` and `sitemap.xml`, and scrapes content accordingly to generate prompt-completion pairs stored in the backend database.
+ * The slot also supports summarization for long content and provides real-time feedback via SignalR/WebSockets to the frontend.
  *
- * The slot is using web sockets and SignalR to communicate progress back to the client.
+ * ARGUMENTS:
+ * - [url]: The root URL of the website to crawl (e.g. https://example.com).
+ * - [type]: The machine learning model type to associate the generated training data with.
+ * - [feedback-channel]: The WebSocket channel for streaming progress back to the client.
+ * - [summarize:bool] (optional, default: true): If enabled, long pages will be summarized automatically.
+ * - [max:int] (optional): Maximum number of pages to crawl.
+ * - [delay:int] (optional): Crawl delay in milliseconds between requests (can be overridden by robots.txt).
+ * - [threshold:decimal] (optional): Semantic similarity threshold for text inclusion.
+ * - [images:bool], [lists:bool], [code:bool] (optional): Toggles for including specific content types in the scraping.
+ * - [insert_url:bool] (optional): If true, the URL will be embedded in the training snippet.
+ * - [.onafter] (optional): Lambda node executed after crawling is complete.
+ *
+ * BEHAVIOR OVERVIEW:
+ *
+ * 1. **Defaults and Initialization**:
+ *    - Sets default [summarize] to `true`.
+ *    - Attempts to load `robots.txt` and parse `sitemap` and crawl rules (allow/disallow, crawl-delay).
+ *    - Notifies frontend of findings using [sockets.signal].
+ *
+ * 2. **Sitemap-Based Crawling**:
+ *    - If a sitemap is found:
+ *      - Loads all URLs listed in the sitemap using [magic.ai.load-sitemap].
+ *      - Deletes any existing training data related to the specified [url] and [type].
+ *      - Scrapes all valid URLs found in the sitemap.
+ *      - Each page is processed via [magic.ai.url.scrape], which generates and stores prompt-completion pairs.
+ *      - Observes delay between requests and supports crawl limiting via the [max] argument.
+ *
+ * 3. **Fallback to Manual Crawling**:
+ *    - If no sitemap is found:
+ *      - Begins crawling from the root [url], recursively discovering more links during scraping.
+ *      - Avoids re-scraping URLs and enforces domain boundaries.
+ *      - Continues crawling until the [max] limit is reached or no more URLs are discovered.
+ *
+ * 4. **Summarization Support**:
+ *    - If [summarize] is true, long text segments are summarized to fit token limits of the specified model type.
+ *
+ * 5. **Completion and Post-Processing**:
+ *    - Sends a success message to frontend when crawling completes.
+ *    - Optionally evaluates a provided [.onafter] lambda block after all URLs have been processed.
+ *
+ * 6. **Storage**:
+ *    - Training snippets are inserted into [ml_training_snippets].
+ *    - Vectorized content is also deleted and refreshed in [vss_ml_training_snippets] as part of pre-cleanup.
+ *
+ * USAGE SCENARIOS:
+ * - Train a chatbot using website content for RAG (retrieval-augmented generation).
+ * - Auto-populate fine-tuning datasets from product documentation, blogs, or FAQ pages.
+ * - Build searchable embeddings for later use with OpenAI, GPTs, or vector search APIs.
  */
+
 slots.create:magic.ai.crawl-site-on-thread
 
    // Ensuring defaults.

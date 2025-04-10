@@ -1,7 +1,45 @@
-
 /*
- * Speaks the specified content using OpenAI TTS.
+ * This endpoint converts text to speech using OpenAI's TTS API and streams the audio back to a specified WebSocket session.
+ *
+ * INPUT PARAMETERS:
+ * - [content:string]: The text message that will be converted to speech.
+ * - [session:string]: The WebSocket session ID for sending the resulting audio stream to the client.
+ *
+ * The endpoint workflow includes the following steps:
+ *
+ * 1. **Validation**:
+ *    Ensures that both [content] and [session] arguments are provided using [validators.mandatory].
+ *
+ * 2. **Threading**:
+ *    Inserts the argument nodes before a [fork] operation to ensure they are available inside the new thread.
+ *    The [fork] block runs asynchronously, allowing the outer endpoint to return quickly while processing continues in the background.
+ *
+ * 3. **Token Retrieval and Setup**:
+ *    Retrieves the OpenAI API key from configuration using [config.get].
+ *    If an API key is passed in the arguments under [api_key], it overrides the default key.
+ *    The final token is prefixed with `"Bearer "` and stored in [.token] for use in the authorization header.
+ *
+ * 4. **Calling OpenAI's Text-to-Speech API**:
+ *    Performs an HTTP POST to `https://api.openai.com/v1/audio/speech` using:
+ *    - `model: tts-1`
+ *    - `input: content from arguments`
+ *    - `voice: alloy` (a specific OpenAI TTS voice model)
+ *    - `response_format: mp3`
+ *    - `speed: 1.0` (normal playback speed)
+ *    The request is JSON-based and sets appropriate headers including Authorization and Accept types.
+ *
+ * 5. **Audio Conversion and Delivery**:
+ *    - Converts the MP3 binary response into base64 using [convert] with type:base64.
+ *    - Uses [unwrap] to flatten the node structure for easier access.
+ *    - Sends the resulting base64 audio via [sockets.signal] to the WebSocket client specified by the [session] argument.
+ *      The audio is passed as an [args.audio] parameter to the client.
+ *
+ * 6. **Final Response**:
+ *    Returns a result node with value "success" using [yield], signaling that the request was accepted and is being processed in the background.
+ *
+ * This endpoint is optimized for non-blocking, real-time TTS audio streaming, and is ideal for chat applications or voice assistants.
  */
+
 .arguments
    content:string
    session:string

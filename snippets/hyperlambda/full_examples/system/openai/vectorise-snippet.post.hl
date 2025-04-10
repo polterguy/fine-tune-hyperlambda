@@ -1,7 +1,46 @@
-
 /*
- * Vectorises the specified training snippet.
+ * Vectorizes a single training snippet by creating an embedding using OpenAI's embeddings API,
+ * and stores the resulting vector in the backend vector storage for similarity search (VSS).
+ *
+ * This endpoint is part of the training pipeline and ensures that training data can be indexed and searched
+ * efficiently via vector embeddings.
+ *
+ * INPUT PARAMETERS:
+ * - [id:long]: ID of the training snippet in the `ml_training_snippets` table to be vectorized.
+ *
+ * ENDPOINT LOGIC:
+ *
+ * 1. **Authorization & Validation**:
+ *    - Ensures the user has root-level access using [auth.ticket.verify:root].
+ *    - Validates that the required [id] parameter is present using [validators.mandatory].
+ *
+ * 2. **API Token Setup**:
+ *    - Retrieves the OpenAI API key from configuration.
+ *    - Prepares a Bearer token for API authentication.
+ *
+ * 3. **Data Retrieval**:
+ *    - Connects to the database using the default [generic|magic] connection.
+ *    - Reads the training snippet with the given ID, joining with the `ml_types` table to also fetch the associated [vector_model] (e.g., `text-embedding-ada-002`).
+ *    - Concatenates the `prompt` and `completion` fields with line breaks to form the [input] for the embedding model.
+ *
+ * 4. **Embedding Request**:
+ *    - Sends a POST request to `https://api.openai.com/v1/embeddings` with:
+ *        - [input]: The combined prompt and completion.
+ *        - [model]: The embedding model specified in the associated `ml_type`.
+ *    - On failure (non-2xx status), logs the error and throws a public exception.
+ *
+ * 5. **Storage of Embedding**:
+ *    - Deletes any existing embedding vector for the same snippet ID from `vss_ml_training_snippets`.
+ *    - Converts the returned float array into binary format using [floatArray2bytes].
+ *    - Stores the new embedding vector in the VSS table with the corresponding row ID.
+ *
+ * 6. **Response**:
+ *    Returns `{ result: success }` upon successful embedding creation and storage.
+ *
+ * This endpoint is crucial for enabling semantic search or retrieval-augmented generation (RAG) features,
+ * allowing the system to find relevant training snippets by similarity rather than just keyword matching.
  */
+
 .arguments
    id:long
 

@@ -1,5 +1,46 @@
 
-// HTTP endpoint that endpoint counting items in my ml_requests table in my magic database
+/*
+ * Returns a count of rows in the [ml_requests] table from the "magic" database.
+ *
+ * This endpoint allows root users to query the number of request records based on a combination
+ * of optional filters. It supports both direct column filtering and a full-text-style search via
+ * the [filter] parameter. The result is returned as a single value representing the total count.
+ *
+ * INPUT PARAMETERS:
+ * - [filter:string] (optional): If provided, performs a fuzzy search across the [prompt] and [user_id] columns.
+ * - [ml_requests.id.eq:long] (optional): Exact match filter for the [id] field.
+ * - [ml_requests.created.eq:date] (optional): Exact match filter for the [created] timestamp.
+ * - [ml_requests.type.eq:string], [ml_requests.type.like:string] (optional): Filters for request type.
+ * - [ml_requests.prompt.eq:string], [ml_requests.prompt.like:string] (optional): Filters for prompt content.
+ * - [ml_requests.completion.eq:string], [ml_requests.completion.like:string] (optional): Filters for completions.
+ * - [ml_requests.finish_reason.eq:string], [ml_requests.finish_reason.like:string] (optional): Filters for finish reason values.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Authorization**:
+ *    - Uses [auth.ticket.verify:root] to restrict access to root users.
+ *
+ * 2. **Database Connection**:
+ *    - Connects to the "magic" database using [data.connect:[generic|magic]].
+ *
+ * 3. **Dynamic Filter Handling**:
+ *    - If a general-purpose [filter] is provided:
+ *        - Constructs a `LIKE` clause with wildcards around the filter value (e.g., `%foo%`).
+ *        - Applies the filter across [prompt] and [user_id] fields using an `OR` condition.
+ *        - Removes the [filter] node after processing to avoid duplication.
+ *    - Remaining filter parameters are added directly as AND conditions for precise querying.
+ *
+ * 4. **Data Retrieval**:
+ *    - Executes a [data.read] statement on the [ml_requests] table.
+ *    - Returns a single column `count(*)` with alias [count], representing the number of matching rows.
+ *
+ * 5. **Response**:
+ *    - Returns the count as a node structure via [return-nodes:x:@data.read/*/*], which can be consumed by UIs or analytics tools.
+ *
+ * This endpoint is useful for administrative dashboards or analytics features where users need to
+ * view statistics about incoming ML-related requests, especially with support for both precise and fuzzy filtering.
+ */
+
 .arguments
    filter:string
    ml_requests.id.eq:long

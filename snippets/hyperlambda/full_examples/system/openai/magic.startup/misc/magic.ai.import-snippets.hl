@@ -1,17 +1,49 @@
-
 /*
- * Generate a dynamic Hyperlambda slot that does the following;
+ * Dynamically imports a list of training snippets into the [ml_training_snippets] table.
  *
- * Imports a list of training snippets as [snippets].
+ * This slot allows bulk ingestion of structured training data used for fine-tuning or retrieval-augmented generation (RAG).
+ * It is designed to be flexible and intelligent by allowing optional metadata and fallback logic while ensuring required fields are present.
  *
- * Will use [prompt] and [completion] for training snippets, but you can optionally
- * supply [uri], [filename] and [type]. If you don't provide a [type] argument, snippets will
- * be imported into the 'default' type. If you supply a [filename] it will be used to determine
- * what file the snippet originated from, typically only useful for PDF files.
+ * ARGUMENTS:
+ * - [snippets:*]: A collection of training snippet objects. Each object can include:
+ *     - [prompt:string] (required): The prompt text. Only records with a non-null prompt are imported.
+ *     - [completion:string] (optional): The corresponding completion text.
+ *     - [uri:string] (optional): URL or origin reference.
+ *     - [filename:string] (optional): Original file source (e.g., PDF name).
+ *     - [type:string] (optional): Logical grouping for this snippet. Falls back to [type] from arguments or "default".
+ * - [type:string] (optional): Default type to assign to all snippets unless overridden by individual entries.
  *
- * Ths slot will check to verify that [prompt] is not null, and only import training snippets
- * that has a non-null value for [prompt].
+ * EXECUTION FLOW:
+ *
+ * 1. **Database Connection**:
+ *    - Establishes connection to the "magic" database using [data.connect:[generic|magic]].
+ *
+ * 2. **Looping Through Snippets**:
+ *    - Iterates through all entries in the [snippets] collection.
+ *
+ * 3. **Prompt Validation**:
+ *    - Only processes entries where [prompt] exists and is non-null.
+ *
+ * 4. **Quota Enforcement**:
+ *    - Calls [magic.ai.can-create-snippet] to validate creation rights before each insert.
+ *
+ * 5. **Metadata Resolution**:
+ *    - Sets the [type] field in order of precedence: arguments-level > snippet-level > default.
+ *    - Builds a [uri] value either from snippet field or as an empty fallback.
+ *    - If [filename] is present, it is included in the insert for traceability.
+ *
+ * 6. **Insertion**:
+ *    - Adds a record to the [ml_training_snippets] table with fields: [type], [prompt], [completion], [uri], and static [meta:imported].
+ *
+ * USE CASES:
+ * - Backend ingestion pipelines for PDF/CSV training data.
+ * - Importing cleaned, chunked text for fine-tuning or retrieval.
+ * - Creating snippet records during custom RAG workflows.
+ *
+ * This slot ensures consistent schema, graceful fallback behavior, and per-record safety checks,
+ * making it suitable for dynamic data ingestion across varied sources.
  */
+
 slots.create:magic.ai.import-snippets
 
    // Connecting to database.

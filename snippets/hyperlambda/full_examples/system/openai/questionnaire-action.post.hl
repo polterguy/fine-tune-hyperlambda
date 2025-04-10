@@ -1,13 +1,39 @@
-
 /*
- * Create an endpoint that dynamically invokes a slot based on the provided [action] argument,
- * and passes the [values] object as arguments to that slot.
+ * Dynamically invokes a slot under the `magic.questionnaires.action.` namespace,
+ * using the provided [action] and [values] arguments.
  *
- * - The [action] argument determines which slot inside the "magic.questionnaires.action." namespace to invoke.
- * - The [values] collection is unpacked and used as input parameters for the target slot.
+ * This endpoint is designed to allow flexible execution of predefined questionnaire-related logic
+ * by mapping action names to slot invocations at runtime.
  *
- * Returns a simple success response to the caller after slot invocation.
+ * INPUT PARAMETERS:
+ * - [action:string]: The action to perform, used to construct the slot name. For example,
+ *   if [action] is `"store-response"`, the slot `magic.questionnaires.action.store-response` will be invoked.
+ * - [values:*]: A wildcard object containing named arguments to be passed to the target slot.
+ *
+ * EXECUTION FLOW:
+ *
+ * 1. **Validation**:
+ *    - Ensures that the [action] argument is provided using [validators.mandatory].
+ *
+ * 2. **Slot Construction**:
+ *    - Concatenates the static namespace prefix `magic.questionnaires.action.` with the dynamic [action] value
+ *      to build the fully-qualified slot name to be invoked.
+ *
+ * 3. **Argument Injection**:
+ *    - Unpacks the [values] object and inserts its key-value pairs as arguments into the upcoming [signal] call.
+ *
+ * 4. **Slot Invocation**:
+ *    - Signals the dynamically resolved slot using [signal:x:@.slot], passing along the unpacked [values] arguments.
+ *
+ * 5. **Final Response**:
+ *    - Returns `{ result: success }` to the caller once the slot has been successfully invoked.
+ *
+ * This endpoint is ideal for implementing a modular and extensible questionnaire engine,
+ * where different actions (e.g., saving answers, triggering workflows, performing validations) can be mapped
+ * to specific reusable logic blocks without hardcoding each endpoint individually.
  */
+
+
 .arguments
    action:string
    values:*
