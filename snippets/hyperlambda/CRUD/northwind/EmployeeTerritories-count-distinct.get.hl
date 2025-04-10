@@ -1,5 +1,31 @@
 
-// Count unique and distinct items from your EmployeeTerritories table in your northwind database
+/*
+ * This is an API endpoint that returns the count of unique and distinct values from a specified column 
+ * in the EmployeeTerritories table of the Northwind database. The user must specify the target column 
+ * using the `distinct_column` argument, which is validated to ensure it matches an allowed set of 
+ * fully-qualified table column names such as EmployeeTerritories.EmployeeID, EmployeeTerritories.TerritoryID, 
+ * or EmployeeID.LastName.
+ *
+ * Before executing the query, the code verifies that the distinct_column is both present and valid 
+ * through mandatory and enum validators. After validation, the code opens a connection to the 
+ * SQLite-based Northwind database using [data.connect].
+ *
+ * The SQL query is dynamically built by creating a `count(distinct [COLUMN])` expression via 
+ * [strings.concat], which is assigned to a node named `distinct_functor`. This node will be used as 
+ * the selected column in the final query.
+ *
+ * The `distinct_column` node is removed from the arguments to clean up the payload before further 
+ * processing. Any additional filter parameters passed to the endpoint are extracted and added into 
+ * the WHERE clause using [add] and [get-nodes], allowing flexible filtering of the rows prior to 
+ * aggregation.
+ *
+ * The core database operation is handled by [data.read], which joins the EmployeeTerritories table 
+ * with the Employees table using a LEFT JOIN on EmployeeID. This allows the query to filter or 
+ * aggregate based on joined data, such as Employee last names.
+ *
+ * The resulting count of distinct values is aliased as `count` and returned to the client using 
+ * [return-nodes].
+ */
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

@@ -1,5 +1,41 @@
 
-// Count unique and distinct items from your Employees table in your northwind database
+/*
+ * Counts the number of distinct values for a specified column in the Employees table of the Northwind database.
+ *
+ * The following steps outline how the logic is implemented:
+ *
+ * 1. **Input arguments**:
+ *    - Requires a mandatory `distinct_column` argument (e.g., `Employees.City`).
+ *    - Supports a wide range of optional filters using suffixes like `.eq`, `.lt`, `.like`, etc.
+ *
+ * 2. **Validation**:
+ *    - Ensures the `distinct_column` is present using `[validators.mandatory]`.
+ *    - Validates the `distinct_column` is within a set of allowed fields via `[validators.enum]`.
+ *
+ * 3. **Database connection**:
+ *    - Connects to the SQLite-based `northwind` database using `[data.connect]`.
+ *
+ * 4. **Construct SQL expression for distinct count**:
+ *    - Builds a SQL expression `count(distinct <column>)` dynamically using `[strings.concat]`.
+ *    - Assigns the generated expression to a node named `distinct_functor`.
+ *
+ * 5. **Argument cleanup**:
+ *    - Removes the `distinct_column` from the input arguments to avoid duplication in the filtering logic.
+ *
+ * 6. **Filtering logic**:
+ *    - Applies all other remaining arguments as `WHERE` conditions in the SQL statement.
+ *
+ * 7. **SQL JOIN logic**:
+ *    - Performs a LEFT JOIN of `Employees` with itself using `ReportsTo` as the alias.
+ *    - Joins based on `Employees.ReportsTo = ReportsTo.EmployeeID`.
+ *
+ * 8. **Read from database**:
+ *    - Executes `[data.read]` with the distinct count expression as the single result column.
+ *    - The query is scoped using the provided filters and the self-join.
+ *
+ * 9. **Return results**:
+ *    - The result of the distinct count is returned as a field named `count`.
+ */
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

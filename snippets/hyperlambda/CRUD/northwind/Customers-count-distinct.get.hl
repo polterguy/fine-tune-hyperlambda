@@ -1,5 +1,36 @@
 
-// Count unique and distinct items from your Customers table in your northwind database
+/*
+ * Count unique and distinct items from your Customers table in your northwind database.
+ *
+ * 1. Accepts one **mandatory argument**:
+ *    - `distinct_column`: Must be a fully qualified column name like `Customers.Country`.
+ *
+ * 2. Supports **optional filtering arguments**:
+ *    - Includes all columns from the `Customers` table with operators like `.eq`, `.like`, `.lt`, `.gteq`, etc.
+ *    - These allow fine-grained filtering of the rows that should be considered during the count.
+ *
+ * 3. Applies validation using [validators.mandatory] to ensure:
+ *    - `distinct_column` is provided.
+ *
+ * 4. Applies enumeration validation using [validators.enum] to ensure:
+ *    - The provided `distinct_column` matches one of the accepted column names from the `Customers` table.
+ *
+ * 5. Opens a connection to the **SQLite Northwind database** using [data.connect] with the `[generic]` provider.
+ *
+ * 6. Constructs the aggregation SQL dynamically:
+ *    - Uses [strings.concat] to produce a SQL fragment like `count(distinct Customers.City)`.
+ *    - This is assigned to the node `distinct_functor`, which [data.read] later executes as part of the SQL.
+ *
+ * 7. Removes the original `distinct_column` argument using [remove-nodes] to avoid redundant or invalid data in the invocation.
+ *
+ * 8. Adds any optional filtering arguments into the `where` clause using [add] + [get-nodes].
+ *
+ * 9. Executes the query using [data.read] against the `Customers` table with:
+ *    - The dynamic aggregate column `distinct_functor` returned as `count`.
+ *    - All filters applied under the `where/and` node.
+ *
+ * 10. Returns the result of the read invocation using [return-nodes], returning the distinct count under `count`.
+ */
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

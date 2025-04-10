@@ -1,5 +1,44 @@
 
-// Returns minimum, maximum, average or sum from your Employees table in your northwind database
+/*
+ * Calculates an aggregate value (min, max, sum, or avg) on a column from the Employees table in the Northwind database.
+ *
+ * The following ordered steps explain the logic:
+ *
+ * 1. **Input arguments**:
+ *    - Requires `aggregate_function` (min, max, sum, avg).
+ *    - Requires `aggregate_column` in the format `TABLE_NAME.COLUMN_NAME` (e.g., `Employees.HireDate`).
+ *    - Optional filtering arguments support various operators like `.eq`, `.like`, `.lt`, `.mt`, etc.
+ *
+ * 2. **Validation**:
+ *    - Ensures both required arguments are present using `[validators.mandatory]`.
+ *    - Validates the function and column names against allowed values using `[validators.enum]`.
+ *
+ * 3. **Database connection**:
+ *    - Opens a connection to the `northwind` database via `[data.connect]` with SQLite backend.
+ *
+ * 4. **Prepare the SQL aggregate function**:
+ *    - Uses `[strings.concat]` to build the aggregate SQL expression, such as `avg(Employees.HireDate)`.
+ *    - Renames the resulting node to `aggregate_functor`, which will be interpreted as SQL code.
+ *
+ * 5. **Cleanup**:
+ *    - Removes the processed `aggregate_function` and `aggregate_column` from the arguments list.
+ *    - Simplifies further filtering by removing already-handled inputs.
+ *
+ * 6. **Apply filters**:
+ *    - Dynamically adds remaining arguments as filter conditions to the SQL `WHERE` clause.
+ *
+ * 7. **SQL JOIN logic**:
+ *    - Performs a self-join on the `Employees` table:
+ *      - Joins `Employees` as `ReportsTo` using a LEFT JOIN.
+ *      - On condition: `Employees.ReportsTo = ReportsTo.EmployeeID`.
+ *
+ * 8. **Read operation**:
+ *    - Executes `[data.read]` with the specified aggregate column and filters.
+ *    - Limits the result to a single row.
+ *
+ * 9. **Return result**:
+ *    - The final result (e.g., `min(HireDate)`) is returned under the field `result`.
+ */
 .arguments
 
    // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg

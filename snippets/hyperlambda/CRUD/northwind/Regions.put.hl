@@ -1,5 +1,44 @@
 
-// Update one record in your Regions table in your northwind database
+/*
+ * HTTP API endpoint for **updating an existing record** in the `Regions` table of the Northwind database.
+ * This endpoint is protected and requires administrative privileges to ensure only authorized users can perform updates.
+ * It allows modification of a region’s description by specifying its primary key (`RegionID`) and new value (`RegionDescription`).
+ *
+ * The endpoint includes validation, conditional response handling, and real-time socket notifications.
+ *
+ * Below is a detailed breakdown of what the endpoint does:
+ *
+ * 1. **Input Parameters**:
+ *    - `RegionID` (mandatory): The primary key of the region to be updated.
+ *    - `RegionDescription` (optional): The new description for the specified region.
+ *
+ * 2. **Validation and Authorization**:
+ *    - Checks that the `RegionID` argument is present (`validators.mandatory`).
+ *    - Requires a valid admin-level authentication ticket (`auth.ticket.verify:admin`) to access the endpoint.
+ *
+ * 3. **Database Connection Setup**:
+ *    - Connects to the Northwind SQLite database using the `[generic|northwind]` data source.
+ *
+ * 4. **Update Query Construction**:
+ *    - Adds `RegionDescription` to the `values` section of the update query.
+ *    - Adds `RegionID` to the `WHERE` clause, ensuring only the correct record is targeted.
+ *
+ * 5. **Execution of Update Operation**:
+ *    - Performs the update using `data.update`.
+ *    - Checks if the update affected any records.
+ *      - If no records were updated (`affected == 0`), returns a `404 Not Found` status with a relevant message.
+ *
+ * 6. **HTTP Status and Response Handling**:
+ *    - If the update is successful, returns a `202 Accepted` HTTP status.
+ *    - Responds with the number of affected rows via the `affected` field.
+ *
+ * 7. **Real-Time Notification via Socket Signal**:
+ *    - Emits a `northwind.Regions.put` socket event containing the updated data and user role metadata.
+ *    - Helps synchronize changes across real-time clients or downstream systems.
+ *
+ * This endpoint provides a **secure**, **validated**, and **real-time aware** mechanism for updating records,
+ * making it well-suited for administrative tools and collaborative systems requiring data integrity and responsiveness.
+ */
 .arguments
 
    // RegionID column value being primary key of record to update, mandatory argument

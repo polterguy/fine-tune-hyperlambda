@@ -1,5 +1,41 @@
 
-// Update one record in your Customers table in your northwind database
+/*
+ * Updates a record in the Customers table of the Northwind database.
+ *
+ * The following steps describe the update flow:
+ *
+ * 1. **Input arguments**:
+ *    - Receives all possible fields of a customer including the mandatory primary key `CustomerID`.
+ *    - Fields like `CompanyName`, `City`, `Phone`, etc., are optional and contain the new values to apply.
+ *
+ * 2. **Validation**:
+ *    - Ensures the `CustomerID` is provided using `[validators.mandatory]`, as it is necessary to locate the record.
+ *
+ * 3. **Authorization check**:
+ *    - Restricts access to users with the `admin` role using `[auth.ticket.verify]`.
+ *
+ * 4. **Database connection**:
+ *    - Opens a connection to the `northwind` database with SQLite as the database type using `[data.connect]`.
+ *
+ * 5. **Preparation for update**:
+ *    - Adds update values from all fields (excluding the primary key) using slicing `[1,1000]`.
+ *    - Injects the `CustomerID` as a filtering condition under the `where` clause to identify the correct record.
+ *
+ * 6. **Update invocation**:
+ *    - Executes `[data.update]` to modify the specified customer row in the `Customers` table.
+ *
+ * 7. **Existence check**:
+ *    - Checks whether any row was actually updated. If not, returns HTTP `404` with message `"Record not found"`.
+ *
+ * 8. **Success response setup**:
+ *    - If update was successful, responds with HTTP `202 Accepted`.
+ *
+ * 9. **Broadcasting changes**:
+ *    - Emits a socket message (`northwind.Customers.put`) with the update arguments and user roles to notify listeners.
+ *
+ * 10. **Final result**:
+ *    - Returns the number of affected rows under the key `affected`.
+ */
 .arguments
 
    // CustomerID column value being primary key of record to update, mandatory argument

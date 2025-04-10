@@ -1,5 +1,47 @@
 
-// Returns unique and distinct values from your Regions table in your northwind database
+/*
+ * HTTP API endpoint that retrieves **distinct (unique) values** from a specified column in the `Regions` table
+ * of the Northwind database. This endpoint supports filtering, pagination, and sorting for flexible client-side consumption.
+ *
+ * It is designed to return a deduplicated list of values from a given column, making it ideal for populating dropdowns,
+ * building filter panels, or exploring categorical data from the database.
+ *
+ * Below is a detailed explanation of the main operations performed by the endpoint:
+ *
+ * 1. **Input Parameters**:
+ *    - **Required**:
+ *      - `distinct_column`: Specifies the fully qualified column (e.g., `Regions.RegionID`) to return distinct values for.
+ *        Only `Regions.RegionID` and `Regions.RegionDescription` are allowed.
+ *    - **Optional**:
+ *      - `limit`: Specifies how many records to return. Defaults to 25 if not explicitly set. Pass `-1` to return all results.
+ *      - `offset`: Indicates how many records to skip from the beginning of the result set.
+ *      - `order`: Column to sort by, must be in `TABLE_NAME.COLUMN_NAME` format.
+ *      - `direction`: Sort direction, must be either `asc` or `desc`.
+ *      - Filtering conditions on both `RegionID` (numeric) and `RegionDescription` (text) using operators like `.mt`, `.lt`, `.eq`, `.like`, etc.
+ *
+ * 2. **Validation**:
+ *    - Verifies that `distinct_column` is provided.
+ *    - Ensures that `distinct_column` is one of the allowed columns (`Regions.RegionID`, `Regions.RegionDescription`).
+ *
+ * 3. **Database Connection**:
+ *    - Opens a connection to the Northwind database using the `[generic|northwind]` data connector with SQLite backend.
+ *
+ * 4. **Query Construction**:
+ *    - Dynamically builds the `SELECT distinct(<column>)` SQL expression.
+ *    - Removes `distinct_column` from the argument list to avoid confusion during filtering and query assembly.
+ *    - Injects `limit`, `offset`, `order`, and `direction` arguments directly into the query.
+ *    - Applies all available filter arguments into the `WHERE` clause using `AND` logic.
+ *
+ * 5. **Database Query Execution**:
+ *    - Executes a `data.read` operation that returns a list of unique values for the specified column.
+ *    - Supports result pagination and custom sorting based on provided input parameters.
+ *
+ * 6. **Response Handling**:
+ *    - Returns the list of distinct values as-is to the HTTP client.
+ *
+ * This endpoint offers a powerful and reusable mechanism to expose column-level distinct data from a database table,
+ * while remaining fully filterable, sortable, and pageable, ensuring efficient and tailored data retrieval.
+ */
 .arguments
 
    // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

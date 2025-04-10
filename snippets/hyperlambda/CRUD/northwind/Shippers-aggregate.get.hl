@@ -1,5 +1,46 @@
 
-// Returns minimum, maximum, average or sum from your Shippers table in your northwind database
+/*
+ * HTTP API endpoint for performing **aggregate calculations** (`min`, `max`, `sum`, or `avg`)
+ * on a specified column in the `Shippers` table of the Northwind database.
+ * This endpoint supports optional row filtering, allowing clients to tailor the aggregation result
+ * based on various conditions.
+ *
+ * The endpoint is useful for generating summary statistics or quick analytics across the `Shippers` dataset.
+ *
+ * Here’s a detailed breakdown of its behavior:
+ *
+ * 1. **Input Parameters**:
+ *    - **Required**:
+ *      - `aggregate_function`: The aggregation operation to perform. Accepted values are `min`, `max`, `sum`, and `avg`.
+ *      - `aggregate_column`: The fully qualified column name (e.g., `Shippers.ShipperID`) to aggregate on.
+ *    - **Optional**:
+ *      - Filtering arguments on columns such as `ShipperID`, `CompanyName`, and `Phone` using a wide range of conditional operators:
+ *        - Numeric: `.mt`, `.lt`, `.eq`, `.neq`, `.mteq`, `.lteq`
+ *        - String/Text: `.like`, `.eq`, `.neq`, and relational variants like `.lt`, `.mt`, etc.
+ *
+ * 2. **Validation Logic**:
+ *    - Ensures that both `aggregate_function` and `aggregate_column` are provided.
+ *    - Validates that `aggregate_function` is one of the allowed operations.
+ *    - Verifies that the specified `aggregate_column` is a valid column from the `Shippers` table.
+ *
+ * 3. **Database Connection**:
+ *    - Opens a connection to the Northwind database via the `[generic|northwind]` data source using SQLite as the backend.
+ *
+ * 4. **Dynamic Query Assembly**:
+ *    - Constructs a SQL function call in the form `<function>(<column>)`, such as `avg(Shippers.ShipperID)`, and assigns it to a column alias.
+ *    - Removes the aggregation-related arguments from the argument list to simplify the inclusion of filtering parameters.
+ *    - Injects all filtering conditions into a dynamically built `WHERE` clause using logical `AND`.
+ *
+ * 5. **Query Execution**:
+ *    - Executes a `data.read` operation on the `Shippers` table with the dynamically constructed aggregation expression.
+ *    - Limits the result to a single row containing the aggregated result.
+ *
+ * 6. **Response Handling**:
+ *    - Returns the result of the aggregation back to the client under the `result` key.
+ *
+ * This endpoint provides a **flexible, validated, and filterable mechanism** for performing aggregation operations
+ * over business-critical fields, offering an efficient way to generate summary metrics from the `Shippers` table.
+ */
 .arguments
 
    // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg

@@ -1,5 +1,36 @@
 
-// Delete one record from your Regions table in your northwind database
+/*
+ * HTTP API endpoint for **deleting a single record** from the `Regions` table
+ * in the Northwind database. This endpoint is protected and requires administrative authorization
+ * to ensure only permitted users can perform deletions.
+ *
+ * It executes a secure, filtered delete operation based on the record’s primary key and also
+ * emits a socket signal to notify connected clients or systems about the deletion.
+ *
+ * Here's a detailed breakdown of the functionality:
+ *
+ * 1. **Authorization and Input Validation**:
+ *    - Requires a valid admin-level authentication ticket (`auth.ticket.verify:admin`) before proceeding.
+ *    - Expects a **mandatory** argument: `RegionID`, representing the primary key of the record to be deleted.
+ *
+ * 2. **Database Connection Setup**:
+ *    - Establishes a connection to the Northwind database using the `[generic|northwind]` connector with a SQLite backend.
+ *
+ * 3. **Delete Operation Construction**:
+ *    - Dynamically injects the `RegionID` into the `WHERE` clause to ensure only the specified record is targeted.
+ *    - Executes a `data.delete` call against the `Regions` table with the constructed filter condition.
+ *
+ * 4. **Socket Notification Broadcasting**:
+ *    - After a successful deletion, the endpoint constructs a real-time socket event.
+ *    - The signal (`northwind.Regions.delete`) includes the deleted record’s `RegionID` as arguments and includes authorization metadata.
+ *    - This can be used by frontends or external systems to update UIs or trigger related logic upon data changes.
+ *
+ * 5. **Response Handling**:
+ *    - Returns the number of affected rows (typically `1`) back to the HTTP client, confirming whether the deletion was successful.
+ *
+ * This endpoint provides a **secure**, **targeted**, and **real-time-aware** mechanism for deleting rows from the database,
+ * ensuring that only authorized users can perform destructive actions while keeping systems synchronized.
+ */
 .arguments
 
    // Primary key of record to delete, mandatory argument

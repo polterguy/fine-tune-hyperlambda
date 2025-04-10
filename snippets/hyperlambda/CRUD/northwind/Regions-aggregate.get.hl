@@ -1,5 +1,44 @@
 
-// Returns minimum, maximum, average or sum from your Regions table in your northwind database
+/*
+ * HTTP API endpoint for retrieving aggregate values from the `Regions` table in the Northwind database.
+ *
+ * This endpoint dynamically computes an aggregate function—`min`, `max`, `sum`, or `avg`—on a specified column,
+ * with optional support for multiple filtering arguments, allowing fine-grained control over the aggregation result.
+ *
+ * Below is a detailed breakdown of the functionality implemented:
+ *
+ * 1. **Endpoint Input Parameters**:
+ *    - Requires two **mandatory arguments**:
+ *      - `aggregate_function`: Specifies the type of aggregation (`min`, `max`, `sum`, or `avg`).
+ *      - `aggregate_column`: Specifies which column to aggregate on, with supported values limited to
+ *        `Regions.RegionID` and `Regions.RegionDescription`.
+ *    - Accepts multiple **optional filtering arguments**, using suffix-based operators (e.g. `.mt`, `.lt`, `.like`, etc.),
+ *      which are dynamically used to construct SQL `WHERE` conditions.
+ *
+ * 2. **Validation Logic**:
+ *    - Ensures both `aggregate_function` and `aggregate_column` are provided.
+ *    - Verifies `aggregate_function` belongs to an allowed set of operations.
+ *    - Verifies `aggregate_column` targets a supported column within the `Regions` table.
+ *
+ * 3. **Database Connection Setup**:
+ *    - Establishes a connection to the Northwind database via the `[generic|northwind]` data source, using SQLite as the backend.
+ *
+ * 4. **Query Preparation**:
+ *    - Constructs a dynamic SQL function call in the form of `<function>(<column>)`, e.g., `sum(Regions.RegionID)`,
+ *      and sets it as the column to be retrieved during the query.
+ *    - Filters out aggregate-specific arguments before processing filter conditions.
+ *    - Adds all applicable filtering arguments to the SQL `WHERE` clause to restrict which rows are considered.
+ *
+ * 5. **Database Query Execution**:
+ *    - Executes the SQL query using `data.read` with the dynamically built aggregate expression.
+ *    - The result is returned with a limit of 1 row, under the alias `result`.
+ *
+ * 6. **Output Handling**:
+ *    - Returns the result of the aggregation operation back to the HTTP client.
+ *
+ * This endpoint is a flexible and reusable way to expose server-side data aggregation logic as a simple HTTP interface,
+ * supporting both numerical and text-based fields in the `Regions` table.
+ */
 .arguments
 
    // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg

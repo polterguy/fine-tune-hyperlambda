@@ -1,5 +1,42 @@
 
-// Create one record in your Regions table in your northwind database
+/*
+ * HTTP API endpoint for **creating a new record** in the `Regions` table of the Northwind database.
+ * This endpoint is **restricted to authenticated users** with either `partner` or `professional` roles.
+ * It allows clients to insert a new region entry by specifying both the `RegionID` and `RegionDescription`.
+ *
+ * The endpoint also emits a real-time socket signal to notify other clients or systems of the newly created record.
+ *
+ * Detailed explanation of what this endpoint does:
+ *
+ * 1. **Authorization Check**:
+ *    - Requires the caller to present a valid authentication ticket.
+ *    - The ticket must belong to a user with either the `partner` or `professional` role (`auth.ticket.verify:partner,professional`).
+ *
+ * 2. **Input Parameters**:
+ *    - `RegionID`: The primary key of the new record.
+ *    - `RegionDescription`: A textual description of the region.
+ *
+ * 3. **Database Connection**:
+ *    - Connects to the Northwind database via the `[generic|northwind]` data source using SQLite as the backend engine.
+ *
+ * 4. **Record Creation**:
+ *    - Dynamically adds the provided arguments to the `values` block of the `data.create` slot.
+ *    - Executes an insert operation into the `Regions` table with the specified column values.
+ *
+ * 5. **HTTP Response Handling**:
+ *    - Sets the HTTP response status code to `201 Created`, indicating successful resource creation.
+ *
+ * 6. **Real-Time Socket Notification**:
+ *    - Publishes a `northwind.Regions.post` socket event with:
+ *        - All arguments (`RegionID`, `RegionDescription`) as the event payload.
+ *        - The user's role(s) attached to the signal metadata for authorization-aware downstream logic.
+ *
+ * 7. **Final Response**:
+ *    - Returns a simple success message to the client under the `result` key.
+ *
+ * This endpoint offers a secure and reactive method for inserting data into the database,
+ * while keeping distributed clients informed in real time through socket-based event propagation.
+ */
 .arguments
 
    // RegionID column value

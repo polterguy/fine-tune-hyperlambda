@@ -1,5 +1,50 @@
 
-// Returns minimum, maximum, average, sum or count from your Regions table in your northwind database grouped by a column
+/*
+ * HTTP API endpoint for retrieving **aggregated values grouped by a specified column**
+ * from the `Regions` table in the Northwind database. This endpoint supports aggregation functions such as `min`, `max`, `sum`, `avg`, and `count`,
+ * while also allowing result ordering, pagination, and row filtering.
+ *
+ * The endpoint is ideal for summarizing data across categories, such as totals or averages grouped by region.
+ *
+ * Here's a detailed breakdown of what this endpoint does:
+ *
+ * 1. **Input Parameters**:
+ *    - **Mandatory**:
+ *      - `group_column`: Column to group the data by (must be in `TABLE_NAME.COLUMN_NAME` format).
+ *      - `aggregate_function`: Aggregation to apply—must be one of `min`, `max`, `sum`, `avg`, or `count`.
+ *      - `aggregate_column`: Column on which the aggregation function is performed.
+ *    - **Optional**:
+ *      - `limit`: Maximum number of grouped results to return (default is 25; `-1` returns all).
+ *      - `offset`: Number of grouped records to skip from the result set.
+ *      - `order`: Column used to sort the grouped results.
+ *      - `direction`: Sort direction, either `asc` or `desc`.
+ *      - Filter conditions on `Regions.RegionID` and `Regions.RegionDescription`, using suffixes like `.mt`, `.lt`, `.eq`, `.like`, etc.
+ *
+ * 2. **Validation Logic**:
+ *    - Ensures all required arguments are present.
+ *    - Validates that `group_column`, `aggregate_column`, and `aggregate_function` use supported values.
+ *
+ * 3. **Database Connection**:
+ *    - Connects to the Northwind database using `[generic|northwind]`, with SQLite as the backend engine.
+ *
+ * 4. **Query Construction**:
+ *    - Sets up grouping using the `group_column` and includes it in the final result.
+ *    - Dynamically builds the aggregation expression (e.g., `avg(Regions.RegionID)`) and aliases it to the function name (`avg`, `sum`, etc.).
+ *    - Inserts the grouping column explicitly into the result set to ensure visibility in output.
+ *    - Removes processed arguments from the input list to prevent redundancy.
+ *    - Adds pagination and ordering logic if the corresponding arguments are provided.
+ *    - Incorporates all filter conditions into the `WHERE` clause using `AND` logic.
+ *
+ * 5. **Data Retrieval**:
+ *    - Executes the SQL query using `data.read`, grouping the data and applying the aggregate function to each group.
+ *
+ * 6. **Response Construction**:
+ *    - Returns the grouped aggregation results back to the client.
+ *    - Each record includes the group identifier and the calculated aggregate value.
+ *
+ * This endpoint is particularly useful for analytics, reporting, and dashboards where clients need categorized summaries of data
+ * with full control over filtering, ordering, and paging.
+ */
 .arguments
 
    // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME

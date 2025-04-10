@@ -1,5 +1,51 @@
 
-// Returns minimum, maximum, average, sum or count from your Shippers table in your northwind database grouped by a column
+/*
+ * HTTP API endpoint for retrieving **grouped aggregate results** from the `Shippers` table
+ * in the Northwind database. This endpoint supports aggregation functions such as `min`, `max`, `sum`, `avg`, and `count`,
+ * grouped by a user-defined column, and includes optional filtering, ordering, and pagination capabilities.
+ *
+ * This type of endpoint is ideal for analytics and dashboards where data needs to be summarized across categories,
+ * such as counting shippers by company or finding the average shipper ID grouped by phone number.
+ *
+ * Here’s a detailed breakdown of its functionality:
+ *
+ * 1. **Input Parameters**:
+ *    - **Mandatory**:
+ *      - `group_column`: Column by which the results should be grouped. Must be fully qualified (e.g., `Shippers.CompanyName`) and one of the allowed fields.
+ *      - `aggregate_function`: The aggregation function to apply, restricted to `min`, `max`, `sum`, `avg`, or `count`.
+ *      - `aggregate_column`: The column to apply the aggregation function to, must be in `TABLE_NAME.COLUMN_NAME` format.
+ *    - **Optional**:
+ *      - `limit`: Limits the number of grouped results returned (default is 25, `-1` returns all).
+ *      - `offset`: Skips a number of grouped rows in the result set.
+ *      - `order`: Specifies which column to order the grouped results by.
+ *      - `direction`: Sort order, must be either `asc` or `desc`.
+ *      - Filtering arguments on `ShipperID`, `CompanyName`, and `Phone`, supporting `.mt`, `.lt`, `.mteq`, `.lteq`, `.eq`, `.neq`, and `.like`.
+ *
+ * 2. **Validation**:
+ *    - Validates that all mandatory fields are present and contain supported values.
+ *    - Ensures the `group_column` and `aggregate_column` belong to an approved list of fields from the `Shippers` table.
+ *    - Confirms the aggregation function is one of the allowed keywords.
+ *
+ * 3. **Database Connection Setup**:
+ *    - Establishes a connection to the Northwind SQLite database via the `[generic|northwind]` connector.
+ *
+ * 4. **Query Construction**:
+ *    - Constructs a SQL `GROUP BY` query with a dynamic aggregation clause (e.g., `avg(Shippers.ShipperID)`).
+ *    - Ensures the grouping column is explicitly included in the result set.
+ *    - Applies aliasing to the aggregated result for clarity (`as:result`).
+ *    - Injects optional arguments like `limit`, `offset`, `order`, and `direction` to support pagination and sorting.
+ *    - Removes used arguments to prevent re-processing and simplify the query context.
+ *    - All valid filtering arguments are applied as `WHERE` conditions using logical `AND`.
+ *
+ * 5. **Query Execution**:
+ *    - Executes a `data.read` command on the `Shippers` table using the dynamically generated group and aggregate configuration.
+ *
+ * 6. **Response**:
+ *    - Returns the grouped results to the client, each containing the grouping key and its corresponding aggregated value.
+ *
+ * This endpoint provides a **robust and configurable aggregation utility**, enabling advanced reporting and grouped summaries
+ * over categorical and numerical fields in the `Shippers` dataset.
+ */
 .arguments
 
    // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME

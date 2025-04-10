@@ -1,9 +1,29 @@
 
 /*
- * Distinct Keyword Search from EmployeeTerritories table in northwind database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * This file defines an HTTP API endpoint that performs a full-text style keyword search on the 
+ * EmployeeTerritories table in the Northwind database. The endpoint supports multiple keyword 
+ * inputs and returns matching records ranked by distinct keyword presence and density.
+ *
+ * The implementation starts by ensuring a query string is provided and defaults the limit of 
+ * results to 10 if not explicitly specified. It splits the query into individual keywords and 
+ * normalizes them to lowercase to ensure case-insensitive search and minimize injection risk.
+ *
+ * A dynamic SQL query is constructed to compute two custom metrics for ranking results:
+ * - Keyword density: Measures how often keywords appear in the concatenated text of searchable fields.
+ * - Keyword count: Counts how many distinct keywords are matched per row.
+ *
+ * For each keyword, the SQL is expanded with expressions that calculate its frequency and binary 
+ * presence. These expressions are added up across all keywords to produce final ranking scores.
+ *
+ * The query then filters out rows that match none of the keywords by requiring a non-zero keyword 
+ * count. It applies ordering based on the distinct keyword count (descending) and then keyword 
+ * density (descending), which prioritizes results that match more unique keywords more frequently.
+ *
+ * Optionally, an offset is added to the SQL query for pagination. Once the query is complete, 
+ * it is executed against the SQLite database. The resulting metadata fields (keyword_density 
+ * and keyword_count) are removed from the response before returning the result set to the caller.
+ *
+ * This design enables flexible, relevance-ranked search capabilities over one or more text columns.
  */
 .arguments
 

@@ -1,5 +1,35 @@
 
-// Returns minimum, maximum, average or sum from your Customers table in your northwind database
+/*
+ * Returns minimum, maximum, average or sum from your Customers table in your northwind database.
+ *
+ * 1. Accepts two **mandatory arguments**:
+ *    - `aggregate_function`: Must be one of `min`, `max`, `sum`, or `avg`.
+ *    - `aggregate_column`: Must be a fully qualified column name in the format `Customers.ColumnName`.
+ *
+ * 2. Performs validation:
+ *    - Ensures that both `aggregate_function` and `aggregate_column` are provided using [validators.mandatory].
+ *    - Validates allowed values using [validators.enum] for:
+ *      - `aggregate_function`: Can only be one of `min`, `max`, `sum`, or `avg`.
+ *      - `aggregate_column`: Must be one of the permitted columns from the `Customers` table.
+ *
+ * 3. Establishes a connection to the SQLite `northwind` database using [data.connect] and the `[generic]` provider.
+ *
+ * 4. Constructs a valid SQL aggregate expression using:
+ *    - [strings.concat] to dynamically generate the SQL function: e.g., `avg(Customers.PostalCode)`.
+ *    - Stores the result in the node named `aggregate_functor` inside the [data.read] invocation.
+ *
+ * 5. Removes the original aggregate function and column arguments using [remove-nodes] to clean up the invocation.
+ *
+ * 6. Adds any optional filter arguments (e.g., `.eq`, `.like`, `.lt`, etc.) into the `where` clause to restrict which rows to aggregate.
+ *
+ * 7. Invokes [data.read] to perform the actual aggregation:
+ *    - From the `Customers` table.
+ *    - Adds the dynamic aggregate column as `result`.
+ *    - Applies filtering conditions via the `where` clause.
+ *    - Limits the result set to 1 record using `limit:long:1`.
+ *
+ * 8. Returns the result of the aggregation to the caller using [return-nodes], outputting the value as `result`.
+ */
 .arguments
 
    // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg

@@ -1,5 +1,38 @@
 
-// Read or list records from your Customers table in your northwind database
+/*
+ * Read or list records from the Customers table in the Northwind database.
+ *
+ * This endpoint supports pagination, ordering, and filtering on any column of the Customers table.
+ * Below is an ordered breakdown of each step in the logic:
+ *
+ * 1. **Defines input arguments**:
+ *    - `limit` and `offset` control pagination.
+ *    - `order` and `direction` determine sorting.
+ *    - Filtering arguments (e.g., `.eq`, `.like`, `.mt`) allow the caller to narrow the result set on any field.
+ *
+ * 2. **Establishes database connection**:
+ *    - Connects to the `northwind` database using the `[data.connect]` slot, with `sqlite` as the backend.
+ *
+ * 3. **Adds ordering parameters**:
+ *    - If `order` and `direction` are provided, they're injected into the `[data.read]` invocation to sort the result.
+ *    - These arguments are removed afterward to prevent duplication during later steps.
+ *
+ * 4. **Adds pagination parameters**:
+ *    - `limit` and `offset` are conditionally added to `[data.read]` for limiting how many records to return and where to start.
+ *    - These are also removed from arguments post-injection.
+ *
+ * 5. **Adds filtering conditions**:
+ *    - All filtering-related arguments are added to the `where` clause of the `[data.read]` invocation using `[add]` and `[get-nodes]`.
+ *    - This enables dynamic SQL WHERE clauses to be constructed based on client input.
+ *
+ * 6. **Reads from database**:
+ *    - Executes `[data.read]` targeting the `Customers` table.
+ *    - Specifies which columns to return: `CustomerID`, `CompanyName`, `ContactName`, `ContactTitle`, `Address`, `City`, `Region`, `PostalCode`, `Country`, `Phone`, and `Fax`.
+ *    - All filtering conditions are evaluated inside the `where -> and` clause.
+ *
+ * 7. **Returns the results**:
+ *    - Uses `[return-nodes]` to send the query result back to the client.
+ */
 .arguments
 
    // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.

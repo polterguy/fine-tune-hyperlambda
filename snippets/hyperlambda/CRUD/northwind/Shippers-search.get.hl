@@ -1,9 +1,36 @@
 
 /*
- * Distinct Keyword Search from Shippers table in northwind database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * HTTP API endpoint for performing a **distinct keyword search** on the `Shippers` table
+ * in the Northwind database. It allows users to search across multiple text-based columns using
+ * one or more keywords, returning rows that contain at least one of the provided terms.
+ * Results are ranked based on how many unique keywords each row contains and the density of those keywords.
+ *
+ * The endpoint starts by verifying that the required `query` argument has been provided. If a `limit` is not specified, it defaults to returning 10 records.
+ * It then splits the input search string into individual lowercase keywords, using space as the delimiter,
+ * and sanitizes the data to minimize SQL injection risk.
+ *
+ * The columns to be searched are explicitly defined — `CompanyName` and `Phone` — and all values from these columns are combined
+ * into a single string using SQL `coalesce` and string concatenation logic. This merged string becomes the target of a dynamic SQL
+ * full-text-like search operation.
+ *
+ * The SQL constructed by this endpoint performs two key calculations for each row:
+ * - **Keyword density**: Measures how frequently all keywords appear in the row relative to the full text length.
+ * - **Keyword count**: Tallies how many of the distinct search terms are present in the row.
+ * These calculations ensure that rows matching more unique keywords are ranked higher, followed by those with higher term density.
+ *
+ * Once the SQL is assembled, it executes a query that selects all fields from the `Shippers` table,
+ * adds both `keyword_density` and `keyword_count` as temporary fields, and filters out any rows that do not contain at least one match.
+ * Results are then sorted by `keyword_count` in descending order, followed by `keyword_density` in descending order,
+ * which ensures that rows with more diverse and concentrated keyword matches appear first.
+ *
+ * Optional support for pagination is included via the `offset` parameter, allowing the caller to request
+ * additional result batches beyond the initial page.
+ *
+ * Before returning the final result to the caller, the endpoint removes internal helper fields (`keyword_density`, `keyword_count`)
+ * to ensure the output contains only relevant business data.
+ *
+ * This endpoint provides a **lightweight, ranking-aware, and fully dynamic keyword search mechanism**
+ * over structured database content, delivering intelligent and sorted results from a traditional SQL dataset.
  */
 .arguments
 

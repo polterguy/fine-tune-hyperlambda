@@ -1,5 +1,45 @@
 
-// Count unique and distinct items from your Shippers table in your northwind database
+/*
+ * HTTP API endpoint that performs a **count of unique (distinct) values** from a specified column
+ * in the `Shippers` table of the Northwind database. The endpoint also supports optional filtering conditions
+ * to control which records are included in the count.
+ *
+ * This is ideal for analytics and reporting scenarios where deduplication of column values is needed,
+ * such as counting the number of unique phone numbers or company names among shippers.
+ *
+ * Here's a detailed breakdown of the logic and flow:
+ *
+ * 1. **Input Parameters**:
+ *    - **Required**:
+ *      - `distinct_column`: Specifies the fully qualified column name (e.g., `Shippers.CompanyName`) to perform the distinct count on.
+ *        Only `Shippers.ShipperID`, `Shippers.CompanyName`, and `Shippers.Phone` are allowed.
+ *    - **Optional Filtering**:
+ *      - A wide variety of filters are supported for `ShipperID`, `CompanyName`, and `Phone` using suffix-based operators:
+ *        - `.mt`, `.lt`, `.mteq`, `.lteq`, `.eq`, `.neq` for numeric and string comparisons.
+ *        - `.like` for SQL LIKE-style pattern matching on string fields.
+ *
+ * 2. **Validation**:
+ *    - Ensures that the `distinct_column` argument is provided.
+ *    - Validates that the provided column is within the accepted list for distinct counting.
+ *
+ * 3. **Database Connection Setup**:
+ *    - Establishes a connection to the Northwind database using the `[generic|northwind]` connector with SQLite backend.
+ *
+ * 4. **Query Assembly**:
+ *    - Dynamically creates a SQL expression in the form `count(distinct <column>)`.
+ *    - Removes the `distinct_column` from the arguments list to prevent overlap with filtering logic.
+ *    - Incorporates all filtering arguments into the `WHERE` clause using logical `AND`.
+ *
+ * 5. **Execution**:
+ *    - Executes a `data.read` call against the `Shippers` table, retrieving a single result
+ *      with the alias `count` representing the number of unique values found.
+ *
+ * 6. **Response**:
+ *    - Returns the final count to the caller under the `count` key.
+ *
+ * This endpoint provides a **streamlined and flexible way** to compute distinct counts from the database,
+ * making it highly useful for UI components, validation routines, or reporting dashboards.
+ */
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
