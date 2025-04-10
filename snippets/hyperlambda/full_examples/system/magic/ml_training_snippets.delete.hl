@@ -1,5 +1,51 @@
 
-// Generate a CRUD delete endpoint deleting one record from your ml_training_snippets table in your magic database with id matching argument with authentication and authorisation for root roles
+/*
+ * Deletes a single record from the `ml_training_snippets` table based on the provided `id`, and performs associated cleanup.
+ *
+ * This Hyperlambda HTTP `DELETE` endpoint allows root users to delete one training snippet from the database
+ * by matching its `id`. It also checks for any associated `filename` value to delete the corresponding file
+ * and ensures cleanup of the corresponding entry in the VSS (vector similarity search) shadow table.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `id` (long): Required. The primary key of the record to delete.
+ *
+ * ### Behavior:
+ * 1. Verifies that `id` is provided and the user is authorized as a root user.
+ * 2. Connects to the `magic` database.
+ * 3. Checks if the target record includes a `filename` field:
+ *    - If present and valid, deletes the associated file from the file system using [io.file.delete].
+ * 4. Deletes the record from the `ml_training_snippets` table.
+ * 5. Executes a raw SQL statement to delete the corresponding record from the `vss_ml_training_snippets` shadow table.
+ * 6. Returns the number of affected rows to the caller.
+ *
+ * ### Returns:
+ * - On success:
+ *   ```
+ *   affected:1
+ *   ```
+ * - If the `id` does not exist or no deletion occurred, `affected` will be `0`.
+ *
+ * ### Example Request:
+ * ```json
+ * {
+ *   "id": 842
+ * }
+ * ```
+ * Example Response:
+ * ```json
+ * {
+ *   "affected": 1
+ * }
+ * ```
+ *
+ * ### Notes:
+ * - This endpoint performs cascading cleanup across the primary data table, associated files, and vector search index.
+ * - It is useful for administrative interfaces or moderation tools managing large training datasets.
+ */
 .arguments
    id:long
 

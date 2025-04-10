@@ -1,7 +1,20 @@
 
 /*
- * Slot that returns context and references for the specified [type], given the
- * specified [threshold], the specified [prompt], and the specified [max_tokens].
+ * Create a slot that does the following;
+ *
+ * Retrieves relevant ML context from your `ml_training_snippets` table using vector similarity search.
+ *
+ * Given a [type], a semantic [prompt], a [threshold] and a [max_tokens] limit:
+ *
+ * 1. It ensures that the `ml_training_snippets` table has at least one vectorized row for the type.
+ * 2. Retrieves the appropriate `vector_model` for the type from the `ml_types` table.
+ * 3. Sends the prompt to OpenAI’s embedding API using the correct vector model.
+ * 4. Searches your SQLite VSS index (`vss_ml_training_snippets`) for close matches using dot product and the threshold.
+ * 5. Skips IDs that have already been used in the current [session] (stored in a session-based cache).
+ * 6. Executes any mixins if a matched snippet has mixin content and is the first match.
+ * 7. Collects the top semantic matches, making sure their cumulative token count doesn't exceed [max_tokens].
+ * 8. Collects [snippets] with their [uri], [prompt], and [distance] as references.
+ * 9. Trims and returns a [context] string with Markdown-formatted snippets, plus the full list of used snippets.
  */
 slots.create:magic.ai.get-context
 

@@ -1,5 +1,43 @@
 
-// Endpoint that verifies the specified [token] as a valid CAPTCHA token.
+/*
+ * Verifies the specified CAPTCHA token for validity using Magic CAPTCHA proof-of-work.
+ *
+ * This HTTP endpoint accepts a single `token` argument and validates it using the system’s
+ * proof-of-work CAPTCHA logic. It relies on the [magic.auth.captcha-verify] dynamic slot, which
+ * performs cryptographic checks such as:
+ * - Token expiration or challenge match
+ * - Required trailing zeroes (workload)
+ * - Server-generated HMAC integrity
+ *
+ * If the token is **invalid**, the underlying verification method will throw an exception with
+ * appropriate HTTP status and public error messaging. If the token is valid, the endpoint will
+ * return HTTP 200 with no payload.
+ *
+ * ### Arguments:
+ * - `token` (string, required): A challenge-based or age-based Magic CAPTCHA token previously issued to the client.
+ *
+ * ### Behavior:
+ * 1. Delegates verification to `[execute:magic.auth.captcha-verify]`, passing the token directly.
+ * 2. If the token is:
+ *    - **Valid**: The request proceeds successfully (no output required).
+ *    - **Invalid**: The system throws with a 400-series HTTP status (typically 400 or 401), including public error details.
+ *
+ * ### Example:
+ * ```json
+ * {
+ *   "token": "c_abc123..."
+ * }
+ * ```
+ *
+ * ### Use Cases:
+ * - CAPTCHA verification in public forms, user signups, comment sections, etc.
+ * - Preventing spam or bot interactions using a cryptographic proof-of-work.
+ * - Should be used after obtaining a token from the challenge endpoint and solving it client-side.
+ *
+ * ### Notes:
+ * - Tokens are one-time use and short-lived (e.g. 30 seconds for challenge-based).
+ * - If verification fails, ensure client is solving with the correct CAPTCHA library and token version.
+ */
 .arguments
    token:string
 

@@ -1,9 +1,49 @@
 
 /*
- * Create a Hyperlambda web API endpoint that does the following:
- * Returns all dynamic HTTP endpoints in the system,
- * with their associated verb(s), and roles that are
- * allowed to access the endpoint.
+ * Returns all dynamic HTTP web API endpoints with their verbs and access control roles.
+ *
+ * This Hyperlambda endpoint retrieves a list of all registered dynamic HTTP endpoints in the system,
+ * along with their associated HTTP verb(s) and any role-based access control (RBAC) restrictions.
+ * It is useful for diagnostics, access auditing, and administration of the system's public API surface.
+ *
+ * The operation leverages [endpoints.list] to enumerate available dynamic endpoints, and inspects each
+ * endpoint's metadata to identify configured authentication and authorization requirements.
+ *
+ * ### Caching:
+ * - The result of the [endpoints.list] operation is cached for 5 minutes (300 seconds) by default
+ *   to optimize performance, as this operation is relatively expensive.
+ * - If the data is already cached, the cached result is returned.
+ * - Otherwise, the data is collected, normalized into a Hyperlambda structure, and stored in cache
+ *   under the key "magic.auth.endpoints".
+ *
+ * ### Arguments:
+ * - This endpoint does not require any arguments, but the `.cache-seconds` node controls how long the result
+ *   is cached for (default is 300 seconds).
+ *
+ * ### Returns:
+ * - An array of endpoint definitions. Each entry includes:
+ *   - `path` (string): The route/path of the dynamic endpoint.
+ *   - `verb` (string|array): The HTTP verb(s) associated with the endpoint (e.g., GET, POST).
+ *   - `auth` (array, optional): If RBAC restrictions exist, an array of roles allowed to access the endpoint.
+ *
+ * Example response:
+ * ```
+ * [
+ *    {
+ *       path: "/user/info",
+ *       verb: "GET",
+ *       auth: ["user"]
+ *    },
+ *    {
+ *       path: "/admin/dashboard",
+ *       verb: ["GET", "POST"],
+ *       auth: ["admin"]
+ *    }
+ * ]
+ * ```
+ *
+ * This endpoint provides essential insights into the exposed API surface and its access requirements,
+ * and is typically used in dashboards or administrative tools.
  */
 .arguments
 

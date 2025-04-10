@@ -1,16 +1,50 @@
 
 /*
- * Create a Hyperlambda endpoint that does the following:
- * Setup your system, changing its default JWT secret, create the magic database,
- * and insert a root user - Unless the database, and/or root user exists from before.
- * 
- * Notice, if the root user exists from before, this file will change its password.
- * However, you cannot setup the system twice, unless you manually change the JWT secret to a value
- * that's less than 50 characters in length.
+ * Performs initial system setup by generating a secure JWT secret, creating the Magic database,
+ * and inserting or updating the root user account.
  *
- * Since the setup process always create a JWT secret that's longer than 50 character, this allows you
- * to "reset" your root password by removing the JWT secret, at which point you can login with
- * root/root again to your backend.
+ * This endpoint is intended to be executed once after deploying a new instance of Magic.
+ * It sets a new secure JWT secret in `appsettings.json`, ensures the Magic database exists,
+ * and provisions or updates a root user. Once the system has been setup, it cannot be configured again
+ * unless the JWT secret is manually reset to a value shorter than 50 characters.
+ *
+ * ### Access Control:
+ * - Only authenticated users with the `root` role may invoke this endpoint.
+ *   This is enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `username` (string): Optional. Defaults to `"root"`. Username of the system administrator.
+ * - `password` (string): Required. Password for the root user. Can be plain text or a hashed value.
+ * - `is_hashed` (bool): Optional. Defaults to `false`. Set to `true` if the password is already hashed.
+ * - `name` (string): Optional. Will be stored as additional metadata for the root user.
+ * - `email` (string): Optional. Will be stored as additional metadata for the root user.
+ *
+ * ### Behavior:
+ * 1. Checks if a JWT secret already exists and is at least 50 characters long.
+ *    - If so, the system has already been configured and a `401 Unauthorized` exception is thrown.
+ * 2. If not yet configured:
+ *    - Loads the current configuration from `appsettings.json`.
+ *    - Generates a new cryptographically secure JWT secret (100–200 characters long).
+ *    - Persists the new configuration using [config.save].
+ *    - Sleeps for 2 seconds to allow the updated configuration to propagate in thread-local caches.
+ * 3. Ensures that the Magic database is created by invoking `/system/ensure-magic-database.hl`.
+ * 4. Checks if the root user exists:
+ *    - If the user exists, their password is updated using [magic.auth.change-password].
+ *    - If not, a new root user is created via [magic.auth.create-user], including roles and extra metadata.
+ * 5. Issues a new JWT token for the root user and returns it to the client.
+ *
+ * ### Returns:
+ * - `ticket` (string): A freshly issued JWT token for the root user after successful setup.
+ *
+ * ### Notes:
+ * - To **reconfigure or reset** the system, manually edit `appsettings.json` and reduce the JWT secret length to below 50 characters.
+ *   This re-enables setup mode and allows password reset via this endpoint or via root/root credentials.
+ * - This endpoint should be executed only once per deployment and must be secured from unauthorized access.
+ *
+ * ### Example Response:
+ * ```
+ * ticket:eyJhbGciOiJIUzI1NiIsInR5cCI6...
+ * ```
  */
 .arguments
    username:string

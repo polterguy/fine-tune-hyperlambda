@@ -1,13 +1,44 @@
 
 /*
- * Create a dynamic slot that does the following;
- * Ensures the specified [role] exists from before, and if not,
- * creates it.
- * 
- * Arguments.
- * 
- * - [role] - Name of role to create.
- * - [description] - Description of role.
+ * Ensures the existence of a specific role in the `roles` table, creating it if it does not already exist.
+ *
+ * This dynamic slot, `magic.auth.ensure-role`, verifies whether the specified role is already present
+ * in the `roles` table of the Magic database. If it is not found, the slot inserts a new role entry.
+ * This is useful for system initialization, plugin setup, or conditional role creation during runtime.
+ *
+ * ### Arguments:
+ * - `role` (string): **Required**. The name of the role to ensure exists.
+ * - `description` (string): **Required**. A textual description of the role.
+ *
+ * ### Behavior:
+ * 1. **Validation**:
+ *    - Ensures that both `role` and `description` arguments are provided.
+ * 2. **Database Connection**:
+ *    - Connects to the `magic` database using a generic connection adapter.
+ * 3. **Role Check**:
+ *    - Executes a [data.read] query against the `roles` table to check if a role with the specified name exists.
+ * 4. **Role Creation (if missing)**:
+ *    - If the role does not exist, it inserts a new record into the `roles` table with the given `name` and `description`.
+ * 5. **Error Handling**:
+ *    - The entire logic is wrapped in a [try] block.
+ *    - If the system hasn't been fully initialized (e.g., database schema not set up yet), errors are silently caught to prevent application crashes.
+ *
+ * ### Use Cases:
+ * - Used in deployment automation scripts to bootstrap required roles.
+ * - Safeguards against duplicate inserts by checking existence first.
+ * - Allows plugins or modules to ensure their required roles exist without modifying schema manually.
+ *
+ * ### Notes:
+ * - If the system is not fully configured (e.g., `roles` table missing), this slot will fail silently.
+ * - It does **not** update an existing role's description—only inserts it if not present.
+ *
+ * ### Example Usage:
+ * ```json
+ * {
+ *   "role": "editor",
+ *   "description": "Can edit content"
+ * }
+ * ```
  */
 slots.create:magic.auth.ensure-role
 

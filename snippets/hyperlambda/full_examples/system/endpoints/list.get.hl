@@ -1,5 +1,53 @@
 
-// Create an endpoint that returns all endpoints in the system that only root users can execute.
+/*
+ * Returns a list of all HTTP endpoints in the system that require `root` access.
+ *
+ * This Hyperlambda endpoint allows administrative users to query and list all registered dynamic HTTP endpoints
+ * that are explicitly protected and only executable by users with the `root` role.
+ * This is useful for auditing access control and verifying endpoint-level role restrictions.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role are allowed to invoke this endpoint.
+ *   This is enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - This endpoint takes **no arguments**.
+ *
+ * ### Behavior:
+ * 1. Calls [endpoints.list] to retrieve all registered HTTP endpoints in the system.
+ * 2. Filters and returns only those endpoints that include the `root` role under their access control definition.
+ *    This is typically located under `auth.roles` within the endpoint configuration metadata.
+ *
+ * ### Returns:
+ * - A list of endpoint definitions where `root` is among the allowed roles.
+ *   Each item includes metadata such as:
+ *   - `path` (string): The URL path of the endpoint.
+ *   - `verb` (string|array): The HTTP method(s) associated.
+ *   - `auth` (object): Role-based access control information, including a `roles` array containing `root`.
+ *
+ * Example response:
+ * ```
+ * [
+ *    {
+ *       path: "/admin/system/setup",
+ *       verb: "POST",
+ *       auth: {
+ *          roles: ["root"]
+ *       }
+ *    },
+ *    {
+ *       path: "/admin/settings/update",
+ *       verb: ["POST", "PUT"],
+ *       auth: {
+ *          roles: ["root"]
+ *       }
+ *    }
+ * ]
+ * ```
+ *
+ * This endpoint provides a system-level overview of privileged endpoints
+ * and can be used to generate dashboards or audit reports related to elevated-access features.
+ */
 .arguments
 
 // Ensures user is authorized to access endpoint.

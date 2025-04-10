@@ -1,10 +1,63 @@
 
 /*
- * Create a dynamic slot that does the following;
- * Scrapes the spcified [url] and returns the result as Markdown to caller.
+ * Scrapes the specified URL and returns extracted content as structured Markdown-style prompt/completion snippets.
  *
- * If you specify [semantics] as true, the scraper will try to return only
- * results from semantic tags such as "article" and "main".
+ * This dynamic slot, `magic.http.scrape-url`, retrieves the content of a webpage and extracts meaningful content blocks
+ * from its HTML. It transforms the HTML into Markdown-style formatting, optionally filtering to semantic tags such as
+ * `<article>` or `<main>` if [semantics] is true. The resulting output is structured into "prompt" and "completion"
+ * pairs, suitable for training data, summaries, or LLM ingestion.
+ *
+ * ### Arguments:
+ * - `url` (string, required): The absolute URL of the HTML page to scrape.
+ * - `semantics` (bool, optional): If true, restricts scraping to semantic regions of the page (e.g., `<article>`, `<main>`).
+ *   Defaults to true if not specified.
+ *
+ * ### Behavior:
+ * 1. **Validation and Request**:
+ *    - Verifies the URL and performs an HTTP GET request with a custom User-Agent (`AINIRO-Crawler 2.0`).
+ *    - Ensures the response is HTML content.
+ *
+ * 2. **Semantic Targeting**:
+ *    - If `semantics` is true (or unspecified), prioritizes scraping content inside `<article>` or `<main>` tags.
+ *    - Falls back to scraping the `<body>` tag if no semantic tags are found.
+ *
+ * 3. **Markdown Content Extraction**:
+ *    - Extracts the following and converts them to Markdown:
+ *      - Paragraphs (`<p>`, `<li>`) as completion text.
+ *      - Headers (`<h1>`–`<h6>`) as prompts.
+ *      - Preformatted text (`<pre>`) as Markdown code blocks.
+ *      - Images (`<img>`) as `![alt](url)` syntax, with relative path resolution.
+ *      - Hyperlinks (`<a>`) are preserved in Markdown format if embedded in text.
+ *    - Cleans up spacing, trims text, normalizes links, and avoids duplicate or malformed data.
+ *    - Tracks embedded links (e.g., relative or absolute), converting them to full URLs based on the page’s origin or `<base>` tag.
+ *
+ * 4. **Output Format**:
+ *    - Returns a list of objects, each with a `prompt` and `completion` field.
+ *    - If only `completion` is present (e.g., isolated code or image blocks), it is still returned.
+ *    - Only includes non-empty, meaningful content in the final output.
+ *
+ * ### Example Return:
+ * ```json
+ * [
+ *   {
+ *     "prompt": "Getting Started with Hyperlambda",
+ *     "completion": "To use Hyperlambda, you can create .hl files and define tree-based structures..."
+ *   },
+ *   {
+ *     "completion": "![Diagram](https://docs.example.com/img/hyperlambda-flow.png)"
+ *   }
+ * ]
+ * ```
+ *
+ * ### Use Cases:
+ * - Converting webpages into fine-tuning datasets for LLMs.
+ * - Auto-summarizing technical content or documentation.
+ * - Building automated content ingestion pipelines for knowledge bases.
+ *
+ * ### Notes:
+ * - Content is processed in a human-readable way and converted to Markdown-compatible formatting.
+ * - Heuristics are applied to minimize noisy or irrelevant data (e.g., navigation links, empty headers).
+ * - Absolute and relative URLs are handled correctly using the `<base>` tag or page origin.
  */
 slots.create:magic.http.scrape-url
 

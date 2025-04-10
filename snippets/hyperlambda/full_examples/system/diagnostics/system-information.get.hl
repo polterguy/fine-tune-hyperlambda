@@ -1,13 +1,78 @@
 
 /*
- * Create an endpoint that returns system information to caller.
+ * Returns detailed system-level KPI information for the Magic backend.
  *
- * This endpoint will check if the magic cloudlet is configured, and if yes, it will return KPI information
- * about the system by executing all pre-defined plugins, allowing us to dynamically 'inject' new KPIs
- * into the system's dashboard.
+ * This Hyperlambda endpoint is used to inspect and monitor key performance indicators (KPIs),
+ * logs, module statistics, cache state, and other system-level metrics from the backend.
+ * It dynamically executes all registered plugins that match the naming convention
+ * [magic.system-information.*], allowing modules to inject their own KPIs into the system's dashboard.
  *
- * The endpoint will store this information in its server cache for 300 seconds (5 minutes), since it's
- * an expensive operation, and we don't want to run the operation every time the user is invoking this endpoint.
+ * To improve performance, the full result is cached on the server for 300 seconds (5 minutes)
+ * using [cache.try-get], and HTTP clients are instructed to cache responses using the
+ * `Cache-Control` response header. This is important since calculating KPIs can be an expensive operation.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint. This is enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - This endpoint takes **no arguments**.
+ *
+ * ### Behavior:
+ * 1. Checks whether the system has been properly initialized by inspecting the JWT secret.
+ *    If the secret is equal to the default placeholder (`THIS-IS-NOT-A-GOOD-SECRET-PLEASE-CHANGE-IT`),
+ *    the endpoint short-circuits and returns nothing (no KPIs).
+ * 2. If properly configured:
+ *    - Sets HTTP cache headers for client-side caching.
+ *    - Caches the result of the KPI analysis internally for 300 seconds using [cache.try-get].
+ *    - Executes all slots starting with [magic.system-information.] and merges their results into the response.
+ *    - Adds core system information including:
+ *       - Magic platform version
+ *       - Persisted tasks count
+ *       - Log entry counts (including log timeshifts: logins, access denials, OpenAI usage, leads, etc.)
+ *       - Endpoint count
+ *       - Slot and dynamic slot counts
+ *       - Cache item count
+ *       - Default DB adapter and timezone
+ *       - Last 10 log entries
+ *       - Module-specific metrics (files and lines of code per module)
+ *    - If the log provider supports it, timeshift data for key activity types is also included.
+ *
+ * ### Returns:
+ * - A large KPI object structure containing the following fields:
+ *   - `version` (string)
+ *   - `persisted_tasks` (int)
+ *   - `log_items` (int)
+ *   - `endpoints`, `slots`, `dynamic_slots` (int)
+ *   - `cache_items` (int)
+ *   - `default_db` (string)
+ *   - `default_timezone` (string)
+ *   - `last_log_items` (array of recent log entries)
+ *   - `modules` (object): Each module's file and LOC count
+ *   - `timeshifts` (optional): Grouped log data for specific activities over time
+ *
+ * Example (partial) response:
+ * ```
+ * {
+ *    "version": "11.4.2",
+ *    "persisted_tasks": 14,
+ *    "log_items": 3499,
+ *    "endpoints": 42,
+ *    "modules": {
+ *       "users": {
+ *          "loc": 782,
+ *          "files": 13
+ *       }
+ *    },
+ *    "timeshifts": {
+ *       "logins": {
+ *          "items": [...]
+ *       }
+ *    }
+ * }
+ * ```
+ *
+ * This endpoint powers administrative dashboards and health monitors for Magic Cloudlets,
+ * and supports plugin-based extensibility for dynamic KPI injection.
  */
 .arguments
 

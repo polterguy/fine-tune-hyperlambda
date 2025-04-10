@@ -1,10 +1,50 @@
 
 /*
- * Create a Hyperlambda endpoint that does the following:
- * Installs the specified Bazar module into the local server.
- * 
- * Notice, this will download the specified ZIP file, extract
- * it, and correctly rename it - For then to install the plugin.
+ * Installs a Bazar module or frontend plugin from a specified URL.
+ *
+ * This Hyperlambda endpoint allows administrators to dynamically install either backend modules
+ * or frontend plugins into the Magic Cloudlet platform by downloading and extracting a ZIP file.
+ * Depending on the [type] provided (`module` or `frontend`), it will install backend functionality
+ * under `/modules/`, or unpackage frontend resources into the web root (`/etc/www/`).
+ *
+ * The endpoint supports module replacement (uninstalls an existing module if already present),
+ * folder renaming, and runs the necessary initialization logic (e.g., `/uninstall.hl`, `install-module`).
+ * It also sends real-time notifications to `root` users using `sockets.signal` to indicate success or failure.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role are allowed to invoke this endpoint. This is enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `url` (string): The full URL pointing to the ZIP file to download and install. Required.
+ * - `name` (string): The desired name of the module or plugin. Used to name folders and lookup modules. Required.
+ * - `type` (string): Optional, defaults to `"module"`. Allowed values:
+ *   - `"module"`: Installs a backend module (e.g., a slot library).
+ *   - `"frontend"`: Installs static frontend content into the web server directory.
+ *
+ * ### Backend Module Installation (type: "module"):
+ * 1. Checks if the module already exists by looking for an `/uninstall.hl` file, and runs it to uninstall.
+ * 2. Downloads the ZIP file using [http.get].
+ * 3. Saves the file to the `/modules/` folder and unzips it.
+ * 4. If the folder structure doesn't match the [name] provided, the folder is renamed accordingly.
+ * 5. Calls [magic.modules.install-module] to complete installation.
+ * 6. Sends a `success` WebSocket signal to root users.
+ *
+ * ### Frontend Plugin Installation (type: "frontend"):
+ * 1. Downloads the ZIP file with `&type=frontend` appended to the URL.
+ * 2. Saves and unzips the file directly into the `/etc/www/` directory (web root).
+ * 3. Sends a `success` WebSocket signal to root users.
+ *
+ * ### Error Handling:
+ * - Any exception encountered during the process is caught and:
+ *   - Logged via [log.error]
+ *   - Reported to clients via a WebSocket signal with type `error`.
+ *
+ * ### Returns:
+ * - `result:success` on successful initiation of the installation process.
+ *   Note that installation happens in a background thread via [fork], so errors may still occur post-return.
+ *
+ * This endpoint is intended for use in backend administration panels or DevOps tooling
+ * and allows powerful dynamic extension of the platform.
  */
 .arguments
    url:string

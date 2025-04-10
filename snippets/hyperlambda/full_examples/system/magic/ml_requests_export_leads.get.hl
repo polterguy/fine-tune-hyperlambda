@@ -1,5 +1,48 @@
 
-// Create an endpoint that exports all leads from training requests and returns as a CSV file.
+/*
+ * Exports all training request leads as a downloadable CSV file.
+ *
+ * This Hyperlambda endpoint allows root users to export collected "leads" from the training request system.
+ * Leads are defined as requests where `finish_reason = 'lead'`. The output is formatted as a CSV file,
+ * with each lead represented by its associated `prompt` field (renamed to `lead` in the export).
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `type` (string): Optional. If provided, only leads with this specific request type will be included.
+ *
+ * ### Behavior:
+ * 1. Connects to the `magic` database.
+ * 2. Constructs a conditional [data.read] query:
+ *    - Filters for rows where `finish_reason = 'lead'`.
+ *    - If `type` is provided, also filters by `type = [value]`.
+ * 3. Retrieves the `prompt` column from each matching row, aliased as `lead`.
+ * 4. If no matching records are found:
+ *    - Returns a 404 status and a message indicating no records were found.
+ * 5. Converts the result into CSV format using [lambda2csv].
+ * 6. Sets HTTP headers for `text/csv` download and exposes `Content-Disposition` for frontend access.
+ * 7. Returns the generated CSV file to the caller.
+ *
+ * ### Returns:
+ * - A CSV file with the following structure:
+ * ```
+ * lead
+ * "I'd like to know more about your AI offerings."
+ * "Please contact me about custom integrations."
+ * ```
+ *
+ * ### Example Response Headers:
+ * ```
+ * Content-Type: text/csv
+ * Content-Disposition: attachment; filename="leads.csv"
+ * ```
+ *
+ * ### Use Case:
+ * - Exporting leads for use in CRM systems, follow-up workflows, or sales/marketing pipelines.
+ * - Automatically generating lead exports from training workflows without manual queries.
+ */
 .arguments
    type:string
 

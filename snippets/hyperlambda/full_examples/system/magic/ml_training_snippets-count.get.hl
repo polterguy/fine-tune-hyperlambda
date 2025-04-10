@@ -1,5 +1,55 @@
 
-// Write an endpoint counting items in your ml_training_snippets table in your magic database
+/*
+ * Counts records in the `ml_training_snippets` table based on optional filters.
+ *
+ * This Hyperlambda HTTP endpoint allows root users to retrieve the total number of records
+ * in the `ml_training_snippets` table that match specified filter conditions.
+ * It's designed for dashboards, analytics, or pre-query operations like pagination.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * All arguments are optional and used to filter which rows are included in the count:
+ * - `ml_training_snippets.type.eq` (string): Matches exact type.
+ * - `ml_training_snippets.pushed.eq` (long): Matches pushed state (`0` or `1`).
+ * - `ml_training_snippets.uri.like` / `eq` (string): Filters by URI (pattern or exact match).
+ * - `ml_training_snippets.prompt.like` / `eq` (string): Filters by prompt (pattern or exact match).
+ * - `ml_training_snippets.completion.like` / `eq` (string): Filters by completion text (pattern or exact match).
+ * - `not_embedded` (bool): If `true`, restricts results to rows where `embedding` is null or not present.
+ *
+ * ### Behavior:
+ * 1. Authenticates the caller and ensures root access.
+ * 2. If `not_embedded` is `true`, adds a filter to match rows where `embedding` is `null` (i.e., not yet embedded).
+ * 3. Constructs dynamic `WHERE` conditions based on supplied arguments:
+ *    - `prompt`, `completion`, and `uri` filters are grouped using an `OR` clause.
+ *    - All other filters are added with `AND` logic.
+ * 4. Uses [data.read] to select a single row with `count(*)` as `count`.
+ * 5. Returns the result to the caller as:
+ *    ```
+ *    count: <number-of-matching-rows>
+ *    ```
+ *
+ * ### Example Request:
+ * ```json
+ * {
+ *   "ml_training_snippets.prompt.like": "%chatbot%",
+ *   "ml_training_snippets.type.eq": "faq",
+ *   "not_embedded": true
+ * }
+ * ```
+ *
+ * ### Example Response:
+ * ```
+ * count: 124
+ * ```
+ *
+ * ### Notes:
+ * - This endpoint is optimized for flexible queries and works well with frontends that
+ *   support filtering/search and need accurate result counts for pagination or reports.
+ * - Unused filters are safely ignored.
+ */
 .arguments
    ml_training_snippets.type.eq:string
    ml_training_snippets.pushed.eq:long

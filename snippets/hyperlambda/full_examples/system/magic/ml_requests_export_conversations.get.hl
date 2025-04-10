@@ -1,5 +1,49 @@
 
-// Create an endpoint that exports all questionnaire data from training requests for the specified type and returns as a CSV file.
+/*
+ * Exports all training request conversation data (excluding questionnaires) as a downloadable CSV file.
+ *
+ * This Hyperlambda HTTP endpoint allows root users to export conversation data collected during training requests,
+ * grouped by user, and filtered by a specific [type]. The endpoint generates a CSV file where each row represents
+ * a full conversation session (prompt + completion pairs) for a user. The output is delivered as a downloadable file.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   This is enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `type` (string): Required. Filters training requests by this type. Only requests where `questionnaire != 1`
+ *   are included in the export.
+ *
+ * ### Behavior:
+ * 1. Connects to the `magic` database.
+ * 2. Retrieves all unique `user_id`s from `ml_requests` where:
+ *    - `type` matches the provided input.
+ *    - `questionnaire` is not marked as true (≠ 1).
+ * 3. For each `user_id`:
+ *    - Retrieves all related `prompt` and `completion` values from `ml_requests`.
+ *    - Aggregates the conversation history into a single string per user, formatted with double line breaks between Q/A pairs.
+ * 4. Compiles the data into rows containing a single `conversation` column per user.
+ * 5. Converts the final dataset to CSV using [lambda2csv].
+ * 6. Sets appropriate HTTP headers to return the CSV file as a download named `"conversations.csv"`.
+ *
+ * ### Returns:
+ * - A streamed CSV file containing the exported conversation history.
+ *   The response includes headers:
+ *   - `Content-Type: text/csv`
+ *   - `Content-Disposition: attachment; filename="conversations.csv"`
+ *
+ * ### Example Output:
+ * ```
+ * conversation
+ * "What is AI?\n\nAI stands for artificial intelligence.\n\nHow does it work?\n\nThrough models like GPT."
+ * ...
+ * ```
+ *
+ * ### Notes:
+ * - All conversations are merged into one field per user, separated by line breaks.
+ * - The export excludes any rows marked as `questionnaire = 1` to avoid including evaluation data.
+ * - This endpoint is ideal for creating datasets for fine-tuning, analysis, or archive purposes.
+ */
 .arguments
    type:string
 

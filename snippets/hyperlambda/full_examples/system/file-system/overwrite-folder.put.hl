@@ -1,5 +1,57 @@
 
-// How do I create an endpoint that uploads, unzips, and overwrites the specified folder.
+/*
+ * Uploads a ZIP file and overwrites the contents of the specified folder with its extracted contents.
+ *
+ * This Hyperlambda endpoint allows root users to perform a full folder replacement by uploading a ZIP archive.
+ * It deletes all existing files and subfolders inside the specified folder, then extracts the uploaded ZIP
+ * to that location. This is useful for updating frontend resources, themes, static content, or any other
+ * deployable content set via a file upload.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced via [auth.ticket.verify:root].
+ *
+ * ### Content-Type:
+ * - This endpoint requires `multipart/form-data`, declared using [.accept:multipart/form-data].
+ *
+ * ### Arguments:
+ * - `file` (object): Required.
+ *   - `name` (string): The name of the uploaded file. Must end in `.zip`.
+ *   - `stream` (binary): The binary stream representing the uploaded ZIP file.
+ * - `folder` (string): Required. The full path of the folder to overwrite with the ZIP contents.
+ *
+ * ### Behavior:
+ * 1. Verifies the uploaded file has a `.zip` extension.
+ * 2. Clears the target folder by:
+ *    - Deleting all subfolders using [io.folder.list] + [io.folder.delete].
+ *    - Deleting all files using [io.file.list] + [io.file.delete].
+ * 3. Saves the uploaded ZIP file to disk inside the target folder.
+ * 4. Extracts the ZIP contents using [io.file.unzip], unzipping directly into the target folder.
+ * 5. Deletes the temporary ZIP file after successful extraction.
+ *
+ * ### Returns:
+ * - A success confirmation:
+ *   ```
+ *   result:Success
+ *   ```
+ *
+ * ### Example Use Case:
+ * Uploading a new version of a frontend UI:
+ * ```
+ * POST /upload-frontend
+ * Content-Type: multipart/form-data
+ * file: admin-ui.zip
+ * folder: /etc/www/
+ * ```
+ * This will:
+ * - Clear `/etc/www/`
+ * - Unzip `admin-ui.zip` into `/etc/www/`
+ *
+ * ### Security Considerations:
+ * - Only root users can invoke this endpoint.
+ * - No validation is performed on ZIP content. Consider scanning the ZIP before deployment if exposed to external clients.
+ * - Folder paths should be controlled to prevent malicious uploads to sensitive locations.
+ */
 .arguments
    file:*
    folder:string

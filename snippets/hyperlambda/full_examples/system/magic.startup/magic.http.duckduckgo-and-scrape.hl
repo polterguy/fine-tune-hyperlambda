@@ -1,9 +1,63 @@
+
 /*
- * Create a dynamic slot that does the following;
+ * Performs a DuckDuckGo search, scrapes the top N result URLs, and returns the content as aggregated Markdown.
  *
- * Searches DuckDuckGo for [max] URLs matching the [query],
- * for then to scrape each URL, and aggregating the result
- * returning it back to caller as a single Markdown.
+ * This dynamic slot, `magic.http.duckduckgo-and-scrape`, takes a search query and scrapes up to [max] URLs returned
+ * from DuckDuckGo, aggregating the resulting semantic snippets into a structured Markdown-like format.
+ * It executes all scraping operations in parallel using [fork]/[join] for efficiency, and optionally emits real-time
+ * progress updates via WebSockets if a session ID is provided.
+ *
+ * ### Arguments:
+ * - `query` (string, required): The search string to pass into DuckDuckGo. Must be between 3–250 characters.
+ * - `max` (int, required): Maximum number of result URLs to scrape. Must be between 1–10.
+ * - `session` (string, optional): A WebSocket session ID for emitting real-time scraping status updates.
+ *
+ * ### Behavior:
+ * 1. **Validation**:
+ *    - Ensures that `query` and `max` are present and valid.
+ * 2. **Search**:
+ *    - Uses [signal:magic.http.duckduckgo-search] to fetch search results from DuckDuckGo.
+ *    - Extracts up to [max] URLs from the search result.
+ * 3. **WebSocket Progress Notifications**:
+ *    - If `session` is provided, emits messages as each URL begins scraping.
+ * 4. **Parallel Scraping**:
+ *    - Constructs a dynamic [fork]/[join] parallel execution tree.
+ *    - Each forked thread calls [signal:magic.http.scrape-url] with `semantics: true`.
+ *    - Scraped data includes semantic sections (prompt + completion format).
+ *    - If scraping fails, logs the error silently and continues.
+ * 5. **Aggregation**:
+ *    - After all scrapers complete, the slot assembles the results:
+ *      - Only includes entries where both `prompt` and `completion` exist.
+ *      - Returns a list of results containing:
+ *        - `url`: The original source URL.
+ *        - `title`: The page title.
+ *        - `snippets`: An array of semantic segments extracted from the page.
+ * 6. **Final Output**:
+ *    - A structured JSON array of enriched web snippets from the top search results.
+ *
+ * ### Returns:
+ * A list of scraped results with semantic structure:
+ * ```json
+ * [
+ *   {
+ *     "url": "https://example.com/what-is-ai",
+ *     "title": "What is Artificial Intelligence?",
+ *     "snippets": [
+ *       {
+ *         "prompt": "Definition of AI",
+ *         "completion": "Artificial Intelligence refers to machines that mimic human intelligence..."
+ *       },
+ *       ...
+ *     ]
+ *   },
+ *   ...
+ * ]
+ * ```
+ *
+ * ### Notes:
+ * - WebSocket progress signals can be used to inform users of scraping progress in real time.
+ * - This slot is ideal for research tools, automated knowledge harvesting, summarization systems, or building LLM pretraining datasets.
+ * - Scraping is subject to network delays and page variability; poorly structured or dynamic pages may return no usable content.
  */
 slots.create:magic.http.duckduckgo-and-scrape
 

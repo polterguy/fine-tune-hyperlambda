@@ -1,5 +1,71 @@
 
-// Create an endpoint that returns all public endpoints as an OpenAPI specification.
+/*
+ * Returns an OpenAPI 3.1.0 specification describing all public (or optionally internal) endpoints in the system.
+ *
+ * This Hyperlambda endpoint dynamically generates a full OpenAPI (Swagger) document by inspecting all registered HTTP
+ * endpoints in the system, applying filters to include only public (non-internal) routes unless explicitly told to include internal/system endpoints.
+ * This allows clients and developers to programmatically explore and interact with your Magic Cloudlet backend.
+ *
+ * ### Access Control:
+ * - No explicit role-based access control is enforced, but endpoint visibility is restricted to public
+ *   endpoints unless [system=true] is provided.
+ *
+ * ### Arguments:
+ * - `system` (bool): Optional. If `true`, includes internal/system endpoints (those under `magic/modules/*`).
+ *                    Defaults to `false`.
+ * - `filter` (string): Optional. A case-insensitive substring to filter endpoint paths. Only paths that contain
+ *                      this string will be included in the result.
+ *
+ * ### Behavior:
+ * 1. Retrieves the Magic version and current HTTP scheme and host to construct the base server URL.
+ * 2. Initializes a standard OpenAPI response structure with:
+ *    - `openapi: "3.1.0"`
+ *    - `info` (title, description, version)
+ *    - `servers` array with `url` pointing to the backend host
+ *    - `paths` placeholder for discovered endpoints
+ * 3. Iterates through each endpoint returned by [endpoints.list]:
+ *    - Skips endpoints with `type=internal` unless [system=true] is set or path matches `magic/modules/*`
+ *    - Applies optional `filter` if provided
+ *    - For each qualifying endpoint:
+ *      - Extracts metadata: verb, path, input arguments, description, etc.
+ *      - Organizes arguments into OpenAPI `parameters` (for GET/DELETE) or `requestBody` (for POST/PUT/PATCH)
+ *      - Generates a unique `operationId` for each verb-path combo
+ *      - Adds the endpoint structure into the `paths` object
+ * 4. Deduplicates endpoints to avoid multiple entries for the same path
+ * 5. Removes the `paths` node if no valid endpoints were found
+ *
+ * ### Returns:
+ * - A fully formed OpenAPI 3.1.0 JSON document describing the public API of your backend.
+ *
+ * Example structure:
+ * ```
+ * {
+ *   "openapi": "3.1.0",
+ *   "info": {
+ *     "title": "AINIRO.IO Magic Cloud Cloudlet",
+ *     "description": "Interact with your cloudlet",
+ *     "version": "11.4.0"
+ *   },
+ *   "servers": [
+ *     {
+ *       "url": "https://cloudlet.ainiro.io"
+ *     }
+ *   ],
+ *   "paths": {
+ *     "/user/login": {
+ *       "post": {
+ *         "operationId": "post_user_login",
+ *         "description": "Authenticates the user and returns a token",
+ *         "requestBody": { ... }
+ *       }
+ *     }
+ *   }
+ * }
+ * ```
+ *
+ * This endpoint is ideal for dynamic documentation portals, API explorers, code generators, and
+ * clients such as Swagger UI or Postman.
+ */
 .arguments
    system:bool
    filter:string

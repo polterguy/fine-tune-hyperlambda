@@ -1,17 +1,39 @@
 
 /*
- * Create a Hyperlambda slot that does the following:
- * Returns the Google OpenID provider.
- * 
- * It will be invoked by the framework whenever the system needs to know which OIDC providers
- * are supported by the system due to its name. Any slot named [magic.openid.providers.XYZ] will be invoked
- * when the system needs to know which OIDC providers are supported.
+ * Returns the OpenID Connect (OIDC) provider configuration for Google.
  *
- * This allows you to extend the system with additional OIDC providers according to your requirements.
- * Notice, the system only supports "id_token" types of providers at the moment, so any additional provider
- * you want to register must be of type "id_token".
+ * This Hyperlambda slot is named [magic.openid.providers.google] and is automatically invoked
+ * by the framework when the system needs to discover supported OpenID providers.
+ * The naming convention [magic.openid.providers.XYZ] is used to register new providers,
+ * allowing dynamic extensibility with custom or third-party OIDC configurations.
+ *
+ * This slot returns metadata required to initiate an OIDC "id_token" based login flow with Google,
+ * including parameters such as issuer, client ID, and optionally a generated [nonce] for enhanced security.
+ *
+ * ### Important Notes:
+ * - Only providers using the "id_token" flow are currently supported by the system.
+ * - A unique [nonce] is generated and cached for 60 minutes to prevent replay attacks, but only
+ *   if the caller requests it via the [createNonce] argument.
+ * - The [issuer] is cached alongside the [nonce], enabling later verification that the returned token
+ *   was issued by Google.
+ *
+ * ### Arguments:
+ * - `createNonce` (bool): Mandatory. If true, the slot generates and stores a unique [nonce] used
+ *   for validating the authenticity of the returned ID token.
+ *
+ * ### Returns:
+ * - A dictionary structure with the following information:
+ *   - `name` (string): Human-friendly name of the provider, e.g., `"Google"`.
+ *   - `issuer` (string): The issuer URL for Google's OIDC endpoint, i.e., `"https://accounts.google.com"`.
+ *   - (Optional) If `createNonce = true`, it also includes:
+ *     - `nonce` (string): A randomly generated secure token used to bind the authentication request.
+ *     - `url` (string): The Google OIDC authorization endpoint.
+ *     - `client_id` (string): The configured Google client ID retrieved from system config.
+ *     - `response_type` (string): Always set to `"id_token"`.
+ *     - `scope` (string): Predefined scopes such as `"openid email profile"` to include in the request.
+ *
+ * This information can be used by frontend clients to initiate a secure OpenID Connect login with Google.
  */
-
 slots.create:magic.openid.providers.google
 
    // Sanity checking invocation.

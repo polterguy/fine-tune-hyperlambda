@@ -1,8 +1,54 @@
 
 /*
- * Create a dynamic slot that does the following;
- * Executes all slots starting with the speicified [namespace] value, passing in
- * all [arguments] to all invocations.
+ * Executes all dynamic slots that start with the specified namespace prefix, passing the same input arguments to each.
+ *
+ * This dynamic slot, `magic.misc.execute-slots`, scans the system for all registered slots that begin with a given
+ * namespace (e.g., `"magic.system-information."`, `"magic.modules."`, etc.), and invokes each one in turn using the
+ * provided argument list. This enables flexible plugin-style extension points, batch execution across modules, and
+ * dynamic orchestration of logic.
+ *
+ * ### Arguments:
+ * - `namespace` (string, required): The slot name prefix to search for (e.g., `"magic.my-plugins."`).
+ * - `arguments` (object, optional): A dictionary of arguments that will be passed to **each** matching slot invocation.
+ *
+ * ### Behavior:
+ * 1. **Validation**:
+ *    - Ensures `namespace` is provided.
+ * 2. **Slot Discovery**:
+ *    - Uses [slots.vocabulary] to list all registered dynamic slots with names starting with the given `namespace`.
+ * 3. **Execution Loop**:
+ *    - Iterates over each discovered slot.
+ *    - Constructs an [execute] invocation, injecting all `arguments` provided.
+ *    - Invokes each slot sequentially using [execute].
+ *
+ * ### Returns:
+ * - The results of each executed slot are returned in-place.
+ *   (Note: if you want to capture and aggregate results, this slot can be extended accordingly.)
+ *
+ * ### Example Usage:
+ * ```json
+ * {
+ *   "namespace": "magic.system-information.",
+ *   "arguments": {
+ *     "includeStats": true
+ *   }
+ * }
+ * ```
+ * Would invoke:
+ * - `magic.system-information.plugins`
+ * - `magic.system-information.tasks`
+ * - `magic.system-information.cache`
+ * - …etc., passing `{ "includeStats": true }` to each.
+ *
+ * ### Use Cases:
+ * - Triggering all plugin hooks within a module namespace.
+ * - Running diagnostics, health checks, or aggregating system KPIs.
+ * - Creating plugin extension points with minimal boilerplate.
+ *
+ * ### Notes:
+ * - Slots are executed **sequentially** (not in parallel).
+ * - No filtering is applied beyond the namespace prefix.
+ * - If any slot throws an exception, execution halts unless wrapped in a [try] structure.
  */
 slots.create:magic.misc.execute-slots
 

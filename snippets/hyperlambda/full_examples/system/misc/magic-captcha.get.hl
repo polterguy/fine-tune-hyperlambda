@@ -1,5 +1,32 @@
 
-// Endpoint that returns the Magic CAPTCHA JavaScript library to caller.
+/*
+ * Returns the Magic CAPTCHA JavaScript library with server-specific public key and URL embedded.
+ *
+ * This endpoint serves the Magic CAPTCHA JavaScript to the client by delegating its execution to
+ * the internal handler located at `/system/misc/magic-captcha.js.get.hl`. This script is dynamically
+ * generated at runtime to inject:
+ * - A unique server-specific public key (derived from the double SHA256 of the server’s auth secret).
+ * - The correct scheme and host for API requests (`http` or `https` + `request.host`).
+ *
+ * ### Arguments:
+ * - `v` (string, optional): Version tag, used as a cache buster or for future CDN optimization. Currently unused in logic.
+ *
+ * ### Behavior:
+ * 1. Forwards all input arguments into the delegated handler using `[execute-file]`.
+ * 2. The internal handler performs the following:
+ *    - Loads either a minified or raw JavaScript file.
+ *    - Replaces `[[public-key]]` and `[[url]]` placeholders with runtime values.
+ *    - Returns the result with `Content-Type: text/javascript`.
+ *
+ * ### Use Cases:
+ * - Used by browser-based CAPTCHA solvers that rely on dynamic content.
+ * - Prevents replay attacks by binding CAPTCHA tokens to specific server environments.
+ * - Ideal for embedding in public forms, user registration workflows, or spam-protected endpoints.
+ *
+ * ### Notes:
+ * - If you want to serve this from a CDN, ensure dynamic placeholder substitution is done at build or edge runtime.
+ * - The JavaScript returned is tied to the identity and configuration of the server where the request is made.
+ */
 .arguments
    v:string
 

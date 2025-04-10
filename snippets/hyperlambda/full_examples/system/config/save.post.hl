@@ -1,5 +1,52 @@
 
-// Create endpoint without arguments that saves the specified configuration object to appsettings.json.
+/*
+ * Saves a new configuration object to the `appsettings.json` file.
+ *
+ * This Hyperlambda endpoint allows a user with the `root` role to persist a new configuration
+ * structure into the system's `appsettings.json` file. It serializes the input argument tree into
+ * formatted JSON and writes it to disk as the new active configuration.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role are allowed to invoke this endpoint.
+ *   Authorization is enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - This endpoint takes no named arguments directly, but the *structure* of the request payload
+ *   should represent the full configuration tree to be saved.
+ *   The format should mirror the desired structure of `appsettings.json`.
+ *
+ * ### Behavior:
+ * 1. Validates that the caller is authorized.
+ * 2. Serializes all provided child nodes under `.arguments` into a formatted JSON object using [lambda2json].
+ * 3. Saves the resulting JSON structure to `appsettings.json` via [config.save].
+ *
+ * ### Returns:
+ * - A static confirmation message:
+ *   ```
+ *   result:success
+ *   ```
+ *
+ * ### Example Invocation Payload:
+ * ```
+ * {
+ *    "magic": {
+ *       "auth": {
+ *          "secret": "new-secret",
+ *          "recaptcha": {
+ *             "key": "xyz",
+ *             "secret": "abc"
+ *          }
+ *       },
+ *       "logging": {
+ *          "level": "debug"
+ *       }
+ *    }
+ * }
+ * ```
+ *
+ * This endpoint allows for fully dynamic runtime reconfiguration of the application,
+ * and should be restricted to trusted administrative clients only.
+ */
 .arguments
 
 // Ensuring user is authorized to access endpoint.

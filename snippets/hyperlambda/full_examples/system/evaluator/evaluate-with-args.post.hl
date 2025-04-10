@@ -1,8 +1,56 @@
 
 /*
- * Create a Hyperlambda endpoint that does the following:
- * Evaluates the given [hyperlambda], and returns
- * the results of the evaluation. Endpoint takes [args] argument which it passed into the execution of your Hyperlambda code as arguments.
+ * Dynamically evaluates a Hyperlambda code snippet with user-provided arguments and returns the result.
+ *
+ * This endpoint allows administrative users to pass in arbitrary Hyperlambda code as a string,
+ * along with an [args] node containing arguments, and evaluate it safely on the backend.
+ * This is ideal for admin consoles, script editors, automation, and debugging tools.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role can access this endpoint.
+ *   Authorization is enforced using [auth.ticket.verify:root] to prevent abuse or unauthorized code execution.
+ *
+ * ### Arguments:
+ * - `hyperlambda` (string): A serialized Hyperlambda code block to evaluate.
+ *   Must be valid Hyperlambda code formatted as a string using indentation and node rules.
+ * - `args` (object): Optional. A dictionary of arguments that are injected into the execution context.
+ *   Argument values are type-converted based on `.arguments` declarations inside the provided Hyperlambda code (if present).
+ *
+ * ### Behavior:
+ * 1. Deserializes the Hyperlambda code into an executable format using [hyper2lambda].
+ * 2. Inspects the `.arguments` declaration (if present) in the code to determine expected types for each argument.
+ * 3. Iterates over the `args` input and type-converts each argument to match the expected type.
+ * 4. Removes the original `.arguments` declaration from the code before execution to avoid conflict.
+ * 5. Injects the provided arguments as root-level nodes into the Hyperlambda code structure.
+ * 6. Executes the final Hyperlambda code using [invoke].
+ * 7. Returns the result of the execution to the client.
+ *
+ * ### Returns:
+ * - The result of the evaluated Hyperlambda code. The structure depends entirely on what the code returns.
+ *
+ * ### Example Use Case:
+ * Given the following Hyperlambda input:
+ * ```plaintext
+ * .arguments
+ *    name:string
+ * strings.concat
+ *    .:"Hello "
+ *    get-value:x:@.arguments/*/name
+ * ```
+ * And arguments:
+ * ```
+ * {
+ *    "name": "Thomas"
+ * }
+ * ```
+ * The endpoint will return:
+ * ```
+ * Hello Thomas
+ * ```
+ *
+ * ### Warning:
+ * - This endpoint is extremely powerful and should only be exposed to trusted root users,
+ *   as it allows full backend execution of arbitrary Hyperlambda.
  */
 .arguments
    hyperlambda:string

@@ -1,9 +1,46 @@
+
 /*
- * Searches the internet using DuckDuckGo for the [query] query,
- * scrapes the resulting websites, and returns a context that can
- * be used for querying OpenAI.
+ * Searches DuckDuckGo using the specified [query], scrapes results,
+ * and returns a Markdown context suitable for OpenAI prompting.
  *
- * Will not get more than [max_tokens] text.
+ * This slot performs a full-text web search using DuckDuckGo and retrieves up to 5 results.
+ * Each result is scraped for semantic snippets and converted into Markdown. It ensures
+ * the total result does not exceed the specified [max_tokens] token limit using OpenAI's tokenizer.
+ *
+ * ---
+ * ### Arguments:
+ * - `query` (string, mandatory): The search query to submit to DuckDuckGo.
+ * - `max_tokens` (int, mandatory): Maximum number of OpenAI tokens allowed in result (min 250, max 15,000).
+ * - `session` (optional): A WebSocket session ID to emit progress events to a frontend user.
+ *
+ * ---
+ * ### Output:
+ * Returns a Markdown document containing structured context, including:
+ * - A concatenated list of prompts and completions extracted from the top search result.
+ * - A reference URL as a Markdown link appended at the end, provided it does not exceed token limit.
+ *
+ * ---
+ * ### Use Case:
+ * This slot can be used to construct grounding context for RAG workflows or
+ * on-the-fly knowledge injection prior to querying LLMs.
+ *
+ * ---
+ * ### Example:
+ * Input:
+ * ```json
+ * {
+ *   "query": "What is the latest on GPT-5?",
+ *   "max_tokens": 1500
+ * }
+ * ```
+ * Output:
+ * Returns a markdown snippet like:
+ * ```
+ * ### What is GPT-5?
+ * GPT-5 is the next generation language model by OpenAI ...
+ *
+ * Source: [OpenAI Blog](https://openai.com/blog/gpt-5)
+ * ```
  */
 slots.create:magic.ai.create-search-context
 

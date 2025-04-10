@@ -1,12 +1,57 @@
 
 /*
- * Create a Hyperlambda endpoint that does the following:
- * Returns all supported OpenID Connect providers the system supports, if any.
+ * Returns a list of all supported OpenID Connect (OIDC) providers registered in the system.
  *
- * Notice, this endpoint can be extended by creating a slot named [magic.openid.providers-XYZ]
- * that returns additional OpenID providers, which will inject new providers into the core of the system.
+ * This Hyperlambda endpoint dynamically collects and returns information about all configured
+ * OIDC providers, such as Google, Microsoft, or any custom providers, by invoking all slots
+ * that follow the naming convention [magic.openid.providers.XYZ].
  *
- * See the code for the slot named [magic.openid.providers.google] for an example.
+ * This allows the system to be extended modularly with new identity providers, simply by defining
+ * a new slot that conforms to this convention. Each such slot must return a valid OIDC provider
+ * structure that includes, at minimum, the fields `issuer` and `name`.
+ *
+ * ### Extensibility:
+ * - Developers can register new providers by implementing additional slots with names like
+ *   [magic.openid.providers.github], [magic.openid.providers.azure], etc.
+ * - Each slot is executed dynamically at runtime, and the combined results are returned
+ *   to the client as a list of available providers.
+ *
+ * ### Arguments:
+ * - `createNonce` (bool): Passed to each provider slot. If true, provider slots may generate
+ *   a [nonce] to enhance security during authentication (e.g., to prevent replay attacks).
+ *
+ * ### Behavior:
+ * 1. Discovers all slots whose names begin with [magic.openid.providers.].
+ * 2. Invokes each discovered slot, passing the [createNonce] flag.
+ * 3. Validates that each returned provider includes both `issuer` and `name` fields.
+ *    If either is missing, a 500 Internal Server Error is thrown.
+ * 4. Prevents duplicate entries by checking if a provider with the same `issuer`
+ *    has already been registered by another slot invocation.
+ * 5. Returns a deduplicated list of valid providers.
+ *
+ * ### Returns:
+ * - An array of OIDC provider structures. Each item contains:
+ *   - `issuer` (string): The unique identifier for the OIDC provider.
+ *   - `name` (string): A human-readable name for the provider (e.g., "Google").
+ *   - (Optional) Additional configuration metadata depending on the provider slot.
+ *
+ * Example response:
+ * ```
+ * [
+ *    {
+ *       name: "Google",
+ *       issuer: "https://accounts.google.com",
+ *       url: "https://accounts.google.com/o/oauth2/v2/auth",
+ *       client_id: "...",
+ *       response_type: "id_token",
+ *       scope: "openid email profile",
+ *       nonce: "fgh3J39kR..."
+ *    }
+ * ]
+ * ```
+ *
+ * This endpoint is essential for building dynamic login screens that allow users to
+ * select from a list of supported identity providers.
  */
 .arguments
    createNonce:bool

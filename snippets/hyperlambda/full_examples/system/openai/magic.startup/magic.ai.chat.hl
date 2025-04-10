@@ -1,12 +1,66 @@
 
 /*
- * Chat slot for having conversations with OpenAI's "gpt" type of models.
+ * Create a chat slot for OpenAI GPT models with full context management and optional streaming.
  *
- * This slot will first retrieve context information from the machine learning type's RAG database.
- * Then it will check if the question has already been cached, and then return the cache value after
- * inserting a new request into its database. Then it dynamically builds a list of messages in [.session],
- * with system instructions, previous messages, and additional data, before it sends these to OpenAI
- * and their LLMs.
+ * This dynamic slot handles full conversational logic with OpenAI’s GPT models.
+ * It integrates database-driven retrieval-augmented generation (RAG), caching, system message setup,
+ * session memory, and support for multi-turn conversations. It also handles OpenAI function calling
+ * with dynamic slot execution and SSE-based token streaming to clients.
+ *
+ * ---
+ * ### Features:
+ *
+ * - **RAG Integration**: Retrieves contextual snippets for grounding the conversation.
+ * - **Cache Checking**: Returns cached completions when appropriate.
+ * - **Session Memory**: Uses previous messages and context from `ml_requests` table.
+ * - **Prompt Management**: Includes support for prefixing, context trimming, and system message injection.
+ * - **Streaming Support**: Allows real-time SSE token streaming to WebSocket clients.
+ * - **Function Calling**: Parses `FUNCTION_INVOCATION[...]` markers and dynamically executes related slots.
+ * - **Token Budget Management**: Prunes conversation to fit the model’s token window.
+ * - **Integration Hooks**: Supports webhook-based outgoing message integrations.
+ *
+ * ---
+ * ### Key Arguments:
+ *
+ * - `type` (string): ML type for context and categorization.
+ * - `prompt` (string): The question or message to send.
+ * - `model` (string): OpenAI model to use (`gpt-4`, `gpt-3.5-turbo`, `o3-mini`, etc).
+ * - `max_tokens` (int): Max tokens for OpenAI response.
+ * - `system_message` (string, optional): Prepended instruction to guide the assistant.
+ * - `session` (string, optional): Enables session memory via caching.
+ * - `stream` (bool): Enables token streaming via SSE.
+ * - `user_id`, `referrer` (string): Metadata for storage and tracing.
+ * - `supervised` (bool): If true, stores conversation to `ml_requests` database.
+ * - `max_function_invocations` (int): Max recursive OpenAI+function iterations.
+ *
+ * ---
+ * ### Output:
+ *
+ * - If `stream=true`, returns nothing directly; tokens stream via sockets.
+ * - Otherwise, returns:
+ *   - `result`: Final response from OpenAI
+ *   - `finish_reason`: Why OpenAI stopped
+ *   - `db_time`: Optional database latency
+ *   - `references`: RAG snippet references if enabled
+ *
+ * ---
+ * ### Example Use:
+ *
+ * ```json
+ * {
+ *   "type": "support",
+ *   "prompt": "How can I reset my password?",
+ *   "model": "gpt-4",
+ *   "stream": false,
+ *   "session": "chat-abc123",
+ *   "supervised": true,
+ *   "max_function_invocations": 2
+ * }
+ * ```
+ *
+ * ---
+ * This slot serves as the core backend for any GPT-powered assistant using Magic Cloudlet,
+ * supporting both supervised fine-tuning data collection and real-time chat UX.
  */
 slots.create:magic.ai.chat
 

@@ -1,8 +1,69 @@
 
 /*
- * Create a dynamic slot that does the following;
- * HTTP POST invoke slot that invokes an HTTP endpoint passing in everything
- * specified as arguments as payload, except [url] which is the invocation URL.
+ * Sends an HTTP POST request to a specified URL using all other input arguments as the JSON payload.
+ *
+ * This dynamic slot, `magic.http.post`, allows dynamic invocation of any HTTP endpoint via POST.
+ * It uses the provided [url] argument as the destination and includes all other arguments in the payload body.
+ * It logs success or failure events based on the HTTP status code, and captures error responses for debugging.
+ *
+ * ### Arguments:
+ * - `url` (string, required): The URL of the HTTP endpoint to invoke. Must be a valid absolute URL.
+ * - All other arguments provided are included as the POST request body (in JSON format).
+ *
+ * ### Behavior:
+ * 1. Validates the presence and format of the `url` argument.
+ * 2. Extracts the `url` and removes it from the payload so it isn’t sent as part of the request body.
+ * 3. Constructs an [http.post] invocation dynamically:
+ *    - Includes all remaining arguments as the payload.
+ * 4. Sends the request to the specified URL.
+ * 5. Evaluates the HTTP status:
+ *    - If the status is between 200 and 299:
+ *      - Logs a success event using [log.info], including the URL and payload.
+ *    - Otherwise:
+ *      - Logs an error using [log.error].
+ *      - Transforms the response body using [lambda2hyper] for better debugging visibility.
+ *
+ * ### Example Request:
+ * ```json
+ * {
+ *   "url": "https://api.example.com/submit",
+ *   "name": "John",
+ *   "email": "john@example.com",
+ *   "message": "Hello there!"
+ * }
+ * ```
+ *
+ * ### Example Payload Sent:
+ * ```json
+ * {
+ *   "name": "John",
+ *   "email": "john@example.com",
+ *   "message": "Hello there!"
+ * }
+ * ```
+ *
+ * ### Example Success Log:
+ * ```
+ * Webhook successfully invoked
+ * url: https://api.example.com/submit
+ * ```
+ *
+ * ### Example Error Log:
+ * ```
+ * Webhook failed
+ * url: https://api.example.com/submit
+ * content: { "error": "Invalid token" }
+ * ```
+ *
+ * ### Use Cases:
+ * - Sending webhooks or push notifications.
+ * - Integrating with external APIs or internal service endpoints.
+ * - Server-to-server communication in workflows or background jobs.
+ *
+ * ### Notes:
+ * - Only arguments other than `url` are passed to the HTTP POST body.
+ * - The payload is sent as `application/json` by default (implicit by [http.post]).
+ * - This slot is designed for flexibility and reusability in dynamic automation flows.
  */
 slots.create:magic.http.post
 

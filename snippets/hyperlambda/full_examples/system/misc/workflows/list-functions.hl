@@ -1,8 +1,57 @@
 
 /*
- * Endpoint that lists all functions
- * 
- * This function lists all functions for the specified [type]. Notice, [type] is mandatory and should always be 'YOUR_TYPE_NAME_HERE'.
+ * Lists all function invocations associated with a specific type from both training snippets and system message metadata.
+ *
+ * This endpoint retrieves and returns all function invocations related to a given `_type`. It extracts:
+ *
+ * - `rag_functions`: Function usage examples embedded in training data (`ml_training_snippets`) that match the given type and contain a specific marker.
+ * - `system_functions`: Functions defined in the system message for the type in the `ml_types` table, avoiding internal references and helper workflows.
+ *
+ * ### Arguments:
+ * - `_type` (string, required): The type identifier for which to fetch function declarations and usage examples.
+ *   - This typically corresponds to a model or domain name for training or inference, e.g., `"my_rag_agent"` or `"my_inference_type"`.
+ *
+ * ### Behavior:
+ * 1. **Validation**:
+ *    - Ensures the `_type` argument is provided.
+ *
+ * 2. **RAG Function Extraction**:
+ *    - Connects to the `magic` database.
+ *    - Queries the `ml_training_snippets` table for rows of the specified type where the `meta` field contains `"FUNCTION_INVOCATION ==> "`.
+ *    - Extracts the `prompt` field from each result as a function usage example.
+ *    - Returns these as `rag_functions`.
+ *
+ * 3. **System Function Extraction**:
+ *    - Retrieves the `system_message` from the `ml_types` table for the given `_type`.
+ *    - Splits the system message on `"# "` to isolate Markdown headers (which often denote function definitions).
+ *    - Filters for segments containing `FUNCTION_INVOCATION[/`, excluding known non-functional patterns:
+ *      - `/FOLDER/FILENAME.hl` and `/system/misc/workflows/list-functions.hl`
+ *    - Further splits each match by newline and trims extra formatting.
+ *    - Returns these as `system_functions`.
+ *
+ * 4. **Return Format**:
+ *    ```json
+ *    {
+ *      "rag_functions": [
+ *        "FUNCTION_INVOCATION[/my/func.hl]: This does something useful...",
+ *        ...
+ *      ],
+ *      "system_functions": [
+ *        "FUNCTION_INVOCATION[/my/system.hl]: Handle auth requests",
+ *        ...
+ *      ]
+ *    }
+ *    ```
+ *
+ * ### Use Cases:
+ * - Documentation automation and discovery of callable functions in a RAG or LLM system.
+ * - UI assistants or editors that need to auto-complete or visualize function capabilities for a model type.
+ * - Pipeline builders needing to list all actions available for a given domain.
+ *
+ * ### Notes:
+ * - The logic avoids returning internal utility workflow entries to maintain clarity.
+ * - If no functions are found for a given type, the result arrays may be empty.
+ * - System function parsing is based on conventionally formatted Markdown `#` headers and assumes consistency.
  */
 .arguments
 

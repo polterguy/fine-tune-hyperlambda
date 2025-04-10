@@ -1,9 +1,86 @@
 
 /*
- * Show me a slot that does the following;
+ * Loads and parses a website's robots.txt file to extract crawling directives.
  *
- * Loads the robots.txt file for the specified URL and returning disallowed and allowed URLs to caller,
- * in addition to other settings such as crawl delay.
+ * This dynamic slot retrieves the `robots.txt` file for the given website and returns key directives
+ * useful for web crawling. These include disallowed and allowed paths, sitemap URLs, and crawl delays.
+ * It supports real-time feedback using WebSockets and robust error handling for malformed or missing files.
+ *
+ * ---
+ * ### Arguments:
+ *
+ * - `url` (string, required): The full URL of the page or domain to crawl.
+ * - `headers` (map, optional): HTTP headers to use when retrieving robots.txt. If not specified,
+ *   default headers will be used (e.g. custom `User-Agent`).
+ * - `feedback-channel` (string, optional): A WebSocket channel to send feedback messages (e.g., status or warnings).
+ *
+ * ---
+ * ### Returns:
+ *
+ * A structured response that may include:
+ *
+ * - `found` (bool): Whether a valid `robots.txt` file was found and parsed.
+ * - `disallow` (list): A list of paths or URLs disallowed for crawling.
+ * - `allow` (list): A list of explicitly allowed paths or URLs.
+ * - `sitemap` (list): A list of sitemap URLs discovered in `robots.txt` or a default guess like `/sitemap.xml`.
+ * - `crawl-delay` (int): Delay in milliseconds between crawl requests (defaults to max 60s if malformed).
+ *
+ * ---
+ * ### Behavior:
+ *
+ * 1. **URL Normalization**:
+ *    - Strips everything from the input URL except the scheme and domain to build the `robots.txt` path.
+ *
+ * 2. **HTTP Request**:
+ *    - Sends a `GET` request to `<domain>/robots.txt` using the specified or default headers.
+ *    - Defaults include: `User-Agent: AINIRO-Crawler 2.0`.
+ *
+ * 3. **Parsing**:
+ *    - Splits the `robots.txt` content line-by-line.
+ *    - Handles:
+ *        - `User-Agent`: Determines relevant blocks for `AINIRO`, `GPTBot`, or `*`.
+ *        - `Disallow` and `Allow`: Converts relative paths to full URLs.
+ *        - `Crawl-Delay`: Converts to milliseconds, clamps to 60s max.
+ *        - `Sitemap`: Parses absolute or relative sitemap URLs.
+ *
+ * 4. **Feedback**:
+ *    - Uses `[sockets.signal]` to send progress or warnings to the frontend if `feedback-channel` is provided.
+ *
+ * 5. **Fallbacks**:
+ *    - If no sitemaps are found, returns a default guess: `<domain>/sitemap.xml`.
+ *    - If the request fails or returns an unexpected content-type, returns `found: false`.
+ *
+ * ---
+ * ### Example:
+ * ```json
+ * {
+ *   "url": "https://example.com",
+ *   "feedback-channel": "crawler-log"
+ * }
+ * ```
+ * Returns:
+ * ```json
+ * {
+ *   "found": true,
+ *   "sitemap": ["https://example.com/sitemap.xml"],
+ *   "disallow": ["https://example.com/private"],
+ *   "allow": ["https://example.com/public"],
+ *   "crawl-delay": 10000
+ * }
+ * ```
+ *
+ * ---
+ * ### Use Cases:
+ *
+ * - Preparing for responsible crawling of a site by honoring its `robots.txt`.
+ * - Integrating into ML crawling workflows like `magic.ai.crawl-site`.
+ * - Displaying parsed crawl rules to users prior to training.
+ *
+ * ---
+ * ### Notes:
+ * - Slot is tolerant to malformed or missing directives.
+ * - Automatically de-prioritizes generic `*` sections if `AINIRO`-specific block is found.
+ * - Makes relative path adjustments for URLs.
  */
 slots.create:magic.ai.load-robots
 

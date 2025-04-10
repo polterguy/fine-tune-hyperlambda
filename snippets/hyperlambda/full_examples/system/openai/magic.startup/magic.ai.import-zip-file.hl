@@ -1,7 +1,17 @@
 
 /*
- * Slot responsible for unzipping and importing a ZIP file
- * as machine learning training data.
+ * Create a slot that does the following;
+ *
+ * Accepts a ZIP file containing source code and plain text, extracts it, and inserts the content
+ * as machine learning training data into the `ml_training_snippets` table. It handles the following:
+ *
+ * 1. Validates and stores the ZIP file under `/etc/system/openai/temp/`.
+ * 2. Unzips the content and deletes the ZIP archive.
+ * 3. Recursively processes supported file types including `.py`, `.js`, `.ts`, `.css`, `.html`, `.sql`, `.md`, etc.
+ * 4. Optionally invokes OpenAI (if [massage] is supplied and content is less than 15,000 tokens) to summarize the file before inserting it.
+ * 5. Falls back to using the filename and metadata as the prompt if no summarization is performed.
+ * 6. Inserts prompt/completion pairs into `ml_training_snippets` with `type`, `prompt`, `completion`, and `filename`.
+ * 7. Communicates progress using socket signals via a feedback channel.
  */
 slots.create:magic.ai.import-zip-file
 

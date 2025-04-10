@@ -1,9 +1,44 @@
 
 /*
- * Create an HTTP endpoint that does the following;
+ * Generates a Proof of Work CAPTCHA challenge and returns a unique challenge ID to the caller.
  *
- * Returns a Magic CAPTCHA challenge to caller according to arguments specified that can be used to
- * solve a Proof of Work CAPTCHA puzzle.
+ * This HTTP endpoint issues a Magic CAPTCHA challenge that can be used by clients to solve a computational
+ * puzzle (proof of work) as part of a CAPTCHA system. It produces a unique, cryptographically secure
+ * token (challenge ID), stores it in the server's cache, and returns it to the client.
+ *
+ * The client must later include this token in its CAPTCHA solution to verify authenticity and prevent replay attacks.
+ *
+ * ### Arguments:
+ * *(none required)*
+ *
+ * ### Behavior:
+ * 1. **Token Generation**:
+ *    - Generates a cryptographically secure random string using `[crypto.random]`.
+ *    - Prefixes the token with `c_` to distinguish it as a challenge-based token.
+ *    - Resulting format: `"c_abcd1234..."`.
+ *
+ * 2. **Caching the Challenge**:
+ *    - Stores the generated token in the cache using `[cache.set]`.
+ *    - Value stored is `"valid"`, with an expiration time of **30 seconds**.
+ *    - This ensures tokens must be solved shortly after creation to prevent abuse.
+ *
+ * 3. **Response**:
+ *    - Returns the generated token to the caller in the form:
+ *    ```json
+ *    {
+ *      "result": "c_abcd1234..."
+ *    }
+ *    ```
+ *
+ * ### Use Cases:
+ * - Frontend apps can use this token with a client-side Proof of Work algorithm (e.g. Magic CAPTCHA JS).
+ * - Later submitted back via CAPTCHA verification endpoints (`magic.auth.captcha-verify`).
+ * - Used for bots and spam prevention in public form submissions, user registration, etc.
+ *
+ * ### Notes:
+ * - This challenge is compatible with Magic's [CAPTCHA] system that uses either challenge-based or timestamp-based validation.
+ * - The token should be used only once and will expire after 30 seconds.
+ * - If the client fails to solve and submit within the time window, a new token must be requested.
  */
 .arguments
 

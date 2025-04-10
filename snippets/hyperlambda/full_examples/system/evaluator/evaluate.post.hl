@@ -1,8 +1,60 @@
 
 /*
- * Create a Hyperlambda endpoint that does the following:
- * Evaluates the given [hyperlambda], and returns
- * the results of the evaluation.
+ * Dynamically evaluates arbitrary Hyperlambda code and returns the result, with exception handling.
+ *
+ * This endpoint allows administrative users to evaluate Hyperlambda code at runtime. It accepts
+ * serialized Hyperlambda as a string via the [hyperlambda] argument and optional named arguments under [args].
+ * The endpoint returns the result of the execution, or a structured public exception if an error occurs.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role are allowed to execute this endpoint.
+ *   This is enforced via [auth.ticket.verify:root] to prevent unauthorized code execution.
+ *
+ * ### Arguments:
+ * - `hyperlambda` (string): The Hyperlambda source code to be evaluated. It must be a properly
+ *   formatted string representation of Hyperlambda code using the correct node structure and indentation.
+ * - `args` (object): Optional. Named arguments passed into the Hyperlambda execution context.
+ *   These arguments will be injected under the `.arguments` node of the Hyperlambda root scope.
+ *
+ * ### Behavior:
+ * 1. Wraps execution in a [try] block to catch any runtime exceptions.
+ * 2. Uses [hyper2lambda] to deserialize the stringified Hyperlambda into a lambda object.
+ * 3. Removes any internal `.arguments` declarations from the source code to avoid conflicts.
+ * 4. Injects the provided [args] as new `.arguments` under the evaluation root.
+ * 5. To isolate the execution context, it binds the resulting lambda tree to a new artificial root node (`.x`)
+ *    preventing user code from interfering with the file's own logic.
+ * 6. Executes the final lambda using [eval], and serializes the result using [lambda2hyper].
+ * 7. Returns the evaluation result under a `result` node.
+ * 8. If an exception occurs, it is rethrown with the original message and marked as public,
+ *    using HTTP status `400 Bad Request`.
+ *
+ * ### Returns:
+ * - On success:
+ *   ```
+ *   result:<evaluation-output>
+ *   ```
+ * - On failure:
+ *   A public exception with the same error message returned as a structured 400 error.
+ *
+ * ### Example Request:
+ * ```json
+ * {
+ *   "hyperlambda": ".arguments\n  name:string\nstrings.concat\n  .:\"Hello \"\n  get-value:x:@.arguments/*/name",
+ *   "args": {
+ *     "name": "Thomas"
+ *   }
+ * }
+ * ```
+ *
+ * ### Example Response:
+ * ```
+ * result: Hello Thomas
+ * ```
+ *
+ * ### Notes:
+ * - Because this endpoint executes arbitrary code, access **must** be restricted to trusted users.
+ * - The wrapping technique used ensures safe root isolation during execution, which prevents
+ *   malicious or poorly structured Hyperlambda from contaminating or accessing the host file structure.
  */
 .arguments
    hyperlambda:string

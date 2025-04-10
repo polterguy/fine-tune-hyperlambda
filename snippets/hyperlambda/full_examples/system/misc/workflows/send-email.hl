@@ -1,8 +1,62 @@
 
 /*
- * Endpoint that sends an email
- * 
- * This function will send an email. [reply-to] and [reply-to-email] is the name and email address of the sender. Always display the email to the user before sending it, and have the user confirm that you should send it.
+ * Sends an email to a specified recipient with optional reply-to information and Markdown-to-HTML formatting.
+ *
+ * This endpoint allows sending emails from the backend, taking in required details such as the recipient’s
+ * name, email, subject, and body. It transforms the email body from Markdown to HTML and ensures safe transmission
+ * by HTML-encoding the content. The `reply-to` fields define the sender information for email replies. The endpoint
+ * uses configuration-based sender defaults unless explicitly overridden.
+ *
+ * ### Arguments:
+ * - `name` (string, required): The name of the person receiving the email.
+ * - `email` (string, required): The email address to send the message to.
+ * - `reply-to` (string, required): The display name for reply-to.
+ * - `reply-to-email` (string, required): The email address for reply-to.
+ * - `subject` (string, required): The subject line of the email. Will be HTML-encoded before sending.
+ * - `body` (string, required): The body content in Markdown format. This is transformed into HTML before sending.
+ *
+ * ### Behavior:
+ * 1. **HTML Encoding**:
+ *    - HTML-encodes both the subject and the body using reusable workflow actions to prevent injection issues.
+ *
+ * 2. **Markdown Conversion**:
+ *    - Converts the `body` argument from Markdown to HTML using a reusable `markdown2html.hl` action.
+ *
+ * 3. **Sender Configuration**:
+ *    - Fetches the default sender name (`magic:smtp:from:name`) and sender email (`magic:smtp:from:address`)
+ *      from the configuration system using the `config.hl` workflow action.
+ *
+ * 4. **Email Sending**:
+ *    - Executes the final email sending using `email.hl`, passing in:
+ *      - Recipient name and email
+ *      - HTML-formatted body
+ *      - HTML-encoded subject
+ *      - Reply-to fields (`reply-to`, `reply-to-email`)
+ *      - Marks the email body as `html: true` to send the transformed HTML properly.
+ *
+ * 5. **Returns**:
+ * ```json
+ * {
+ *   "result": "success"
+ * }
+ * ```
+ *
+ * ### Example Usage:
+ * ```json
+ * {
+ *   "name": "Jane Doe",
+ *   "email": "jane@example.com",
+ *   "reply-to": "Support Team",
+ *   "reply-to-email": "support@company.com",
+ *   "subject": "Welcome to Our Platform",
+ *   "body": "Hi **Jane**, we're glad you're here!"
+ * }
+ * ```
+ *
+ * ### Notes:
+ * - The user should confirm the email before it is sent to ensure correctness and prevent accidental sends.
+ * - Always preview the resulting HTML to ensure Markdown renders as expected.
+ * - Errors in any step (e.g., missing config values, bad input) will cause the action to fail.
  */
 .arguments
 

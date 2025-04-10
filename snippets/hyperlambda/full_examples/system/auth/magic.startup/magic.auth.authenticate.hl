@@ -1,9 +1,31 @@
 
 /*
- * Create a Hyperlambda slot that does the following:
- * Authenticates the user with the specified [username] and [password] combination.
+ * Authenticates a user and returns a JWT token if successful.
  *
- * Returns a JWT token that can be used for consecutive access to the backend.
+ * This Hyperlambda slot named [magic.auth.authenticate] performs a full authentication cycle by:
+ * - Accepting a [username], [password], and [expires] timestamp as input.
+ * - Checking whether the [username] exists in the `users` database table.
+ * - Verifying the supplied [password] using a bcrypt hash comparison with the stored password hash.
+ * - If verification is successful, it retrieves the user's roles from the `users_roles` table.
+ * - Uses the collected roles to generate a JWT token via [auth.ticket.create].
+ * - Logs successful authentication and returns the JWT ticket to the client.
+ *
+ * If the user doesn't exist or the password is incorrect, the slot throws an HTTP 401 "Access denied" exception,
+ * and sets [public] to true, making the error message publicly visible.
+ *
+ * ### Arguments:
+ * - `username` (string): The username of the user trying to authenticate. Mandatory.
+ * - `password` (string): The plaintext password to verify against the stored hash. Mandatory.
+ * - `password-check` (bool): A helper argument that must be `true` to proceed with password validation. Mandatory.
+ * - `expires` (date): The expiration timestamp for the JWT ticket to be created. Optional, depending on the configuration.
+ *
+ * ### Returns:
+ * - On success: Yields a structure containing a [ticket] node with the generated JWT token.
+ *   Example:
+ *   ```
+ *   ticket:eyJhbGciOi...
+ *   ```
+ * - On failure: Throws a `401 Unauthorized` error with a public message "Access denied".
  */
 slots.create:magic.auth.authenticate
 

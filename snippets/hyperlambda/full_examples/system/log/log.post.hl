@@ -1,5 +1,56 @@
 
-// Show an endpoint that creates a log item using the specified arguments, with optional [meta] arguments becoming meta fields on my log entry.
+/*
+ * Creates a log entry with the specified type, content, and optional metadata.
+ *
+ * This Hyperlambda endpoint allows any authenticated user (regardless of role) to write structured
+ * log entries into the backend system. It supports different severity levels (info, error, debug, fatal),
+ * and allows optional metadata to be attached via the [meta] argument.
+ *
+ * ### Access Control:
+ * - Any authenticated user may invoke this endpoint.
+ *   This is enforced using [auth.ticket.verify], without checking for specific roles.
+ *
+ * ### Arguments:
+ * - `type` (string): Required. The log level. Allowed values are:
+ *   - `info`
+ *   - `error`
+ *   - `debug`
+ *   - `fatal`
+ * - `content` (string): Required. The main log message or description.
+ * - `meta` (object): Optional. A dictionary of key-value pairs to include as metadata in the log entry.
+ *   These become named child nodes under the log item.
+ *
+ * ### Behavior:
+ * 1. Validates that the caller is authenticated.
+ * 2. Ensures `type` and `content` are provided and that `type` is one of the allowed log levels.
+ * 3. Constructs a dynamic slot name for the log type (e.g., `log.info`, `log.error`).
+ * 4. Adds all fields from the optional [meta] dictionary as child nodes to the log entry.
+ * 5. Invokes the appropriate log slot (e.g., [log.info], [log.error]) to create the entry.
+ *
+ * ### Returns:
+ * - `result:success`: A static confirmation of successful log creation.
+ *
+ * ### Example Request:
+ * ```json
+ * {
+ *   "type": "info",
+ *   "content": "User initiated export",
+ *   "meta": {
+ *     "userId": "1234",
+ *     "action": "export",
+ *     "fileType": "csv"
+ *   }
+ * }
+ * ```
+ *
+ * ### Example Result:
+ * ```
+ * result:success
+ * ```
+ *
+ * This endpoint is useful for client-side applications, automation tools, or server-side logic
+ * that needs to log activity in a structured and consistent format.
+ */
 .arguments
    type:string
    content:string

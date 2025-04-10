@@ -1,17 +1,51 @@
 
 /*
- * Create a Hyperlambda web endpoint that does the following:
- * Endpoint that verifies the specified OpenID Connect JWT Token and returns a valid application JWT token accordingly.
+ * Verifies an OpenID Connect (OIDC) JWT token and issues a local application-specific JWT token.
  *
- * This will automatically find the issuer from the JWT token, download any public keys to verify the
- * signature, and return the email, name and issuer from the token.
+ * This Hyperlambda web API endpoint performs token verification against a third-party OpenID Connect (OIDC) provider.
+ * It extracts and verifies the OIDC JWT [token] provided by the caller, checks if the issuer is registered and trusted,
+ * and issues a local application-specific JWT token in return. It also gathers and returns extra user profile details,
+ * such as name and email, based on existing or newly created records.
  *
- * If it succeeds it will return a new application specific JWT token.
- * If it fails it will throw an exception.
+ * ### Token Verification & Security:
+ * - The [auth.token.verify] slot validates the JWT signature and decodes claims from the OIDC token.
+ * - The [nonce] stored in cache is checked against the issuer to prevent replay attacks.
+ * - If verification fails, appropriate HTTP exceptions are thrown with public visibility (status: 400).
+ * - The [issuer] of the token is matched against known providers registered in the system, using the
+ *   [/system/auth/openid-providers.get.hl] endpoint. Unregistered issuers result in a hard failure.
  *
- * Notice, the endpoint will only return valid JWT tokens for OIDC providers that are
- * registered in the system with existing configurations. See the "openid-providers.get.hl" file for
- * details about how to register a new OIDC provider in the app.
+ * ### User Flow:
+ * 1. If the token is valid and the issuer is recognized:
+ *    - Checks if a local user with the token's [email] already exists:
+ *      - If yes, issues a new application JWT using [magic.auth.authenticate].
+ *      - If not, provisions a new user account automatically:
+ *        - Username is set to the OIDC email.
+ *        - Password is hardcoded to `"openid-connect"` (not used for login).
+ *        - Default role is set to `"guest"`.
+ *        - User’s email and name (if provided) are stored in the [users_extra] table.
+ *    - Extra profile data (email, name) is returned to the client.
+ *
+ * ### Arguments:
+ * - `token` (string): A valid OpenID Connect JWT token from a trusted provider such as Google, Microsoft, etc.
+ *
+ * ### Returns:
+ * - `ticket` (string): A newly created application-specific JWT token issued for the user.
+ * - `extra` (object): A dictionary containing metadata about the user such as `email` and `name`.
+ *
+ * Example response:
+ * ```
+ * ticket:eyJhbGciOi...
+ * extra:
+ *    email:user@example.com
+ *    name:John Doe
+ * ```
+ *
+ * ### Prerequisites:
+ * - Only tokens from OIDC providers registered in the system will be accepted.
+ *   See the file `openid-providers.get.hl` for how to register a new provider.
+ *
+ * This endpoint enables seamless third-party identity federation using OpenID Connect and simplifies first-time
+ * login experiences by auto-provisioning new accounts securely. It supports single sign-on (SSO) via external identity providers.
  */
 .arguments
    token:string

@@ -1,5 +1,62 @@
 
-// Create a CRUD endpoint updating one record in your ml_requests table in your magic database filtering which item to update with id updating type, prompt, completion, finish_reason fields with authentication and authorisation for root roles
+/*
+ * Updates a single record in the `ml_requests` table based on its `id`.
+ *
+ * This Hyperlambda HTTP `PUT` endpoint allows root users to update a single record in the `ml_requests` table.
+ * It supports changing fields such as `type`, `prompt`, `completion`, and `finish_reason`, and optionally the `cached` flag.
+ * The record to be updated is identified using its unique `id`.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role are allowed to invoke this endpoint.
+ *   Enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `id` (long): Required. The primary key of the record to update.
+ * - `type` (string): Optional. The type/category of the request (e.g., `training`, `questionnaire`).
+ * - `prompt` (string): Optional. The original prompt or user input.
+ * - `completion` (string): Optional. The generated response or output.
+ * - `finish_reason` (string): Optional. The reason the generation finished (e.g., `stop`, `questionnaire`, `lead`).
+ * - `cached` (int): Optional. A flag indicating whether the result was cached (`1`) or freshly generated (`0`).
+ *
+ * ### Behavior:
+ * 1. Validates that the `id` is provided.
+ * 2. Verifies the caller is a root-level authenticated user.
+ * 3. Opens a connection to the `magic` database.
+ * 4. Separates primary key (`id`) from update values to:
+ *    - Use it as a filter in the `WHERE` clause.
+ *    - Use the rest of the arguments as the new values to update.
+ * 5. Executes the update using [data.update].
+ * 6. If no record was affected (i.e., the ID does not exist), returns:
+ *    - `404 Not Found` with the message `"Record not found"`.
+ * 7. If successful, returns:
+ *    - HTTP `202 Accepted`
+ *    - A response with the number of records affected.
+ *
+ * ### Returns:
+ * - On success:
+ *   ```
+ *   affected:1
+ *   ```
+ * - On failure (non-existent ID):
+ *   ```
+ *   result:Record not found
+ *   ```
+ *   With HTTP status code `404`.
+ *
+ * ### Example Request:
+ * ```json
+ * {
+ *   "id": 101,
+ *   "prompt": "What is Hyperlambda?",
+ *   "completion": "Hyperlambda is a declarative programming language used in Magic...",
+ *   "type": "training",
+ *   "finish_reason": "stop",
+ *   "cached": 0
+ * }
+ * ```
+ *
+ * This endpoint is useful for administrative UI panels, fine-tuning dataset corrections, or auditing edits to logged AI completions.
+ */
 .arguments
    id:long
    type:string

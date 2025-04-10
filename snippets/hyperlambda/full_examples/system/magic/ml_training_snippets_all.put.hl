@@ -1,5 +1,67 @@
 
-// Generate a CRUD update endpoint updating all filtered records in your ml_training_snippets table in your magic database with authentication and authorisation for root roles
+/*
+ * Updates all records in the `ml_training_snippets` table that match the specified filter criteria.
+ *
+ * This Hyperlambda HTTP `PUT` endpoint allows root users to perform a bulk update across multiple records
+ * in the `ml_training_snippets` table by applying a flexible set of filter conditions and update values.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * #### `filter` (object): Defines the conditions for selecting which records to update.
+ * - `ml_training_snippets.prompt.like` (string): Optional. Performs a `LIKE` match on the `prompt` field.
+ * - `ml_training_snippets.uri.like` (string): Optional. Performs a `LIKE` match on the `uri` field.
+ * - `ml_training_snippets.type.eq` (string): Optional. Filters records where `type` matches exactly.
+ *
+ * #### `values` (object): Defines the fields and values to be updated for all matching records.
+ * - `type` (string): Optional. The new type to apply to all matched records.
+ * - `pushed` (long): Optional. A flag or timestamp indicating if/when the record was pushed (e.g., to VSS or external service).
+ *
+ * ### Behavior:
+ * 1. Verifies root-level access via [auth.ticket.verify:root].
+ * 2. Constructs the SQL `WHERE` clause dynamically:
+ *    - Applies `OR` logic for multiple `LIKE` filters (prompt, uri).
+ *    - Applies `AND` logic for remaining filters (e.g., `type.eq`).
+ * 3. Populates the SQL `SET` clause with all fields in the `values` object.
+ * 4. Executes the update using [data.update] to affect all matching rows.
+ * 5. If no records match the filters:
+ *    - Returns HTTP `404 Not Found` and a message: `Record not found`.
+ * 6. On success:
+ *    - Returns HTTP `202 Accepted`.
+ *    - Includes the number of affected rows in the response.
+ *
+ * ### Returns:
+ * - If successful:
+ *   ```
+ *   affected: <number-of-rows-updated>
+ *   ```
+ * - If no matching records found:
+ *   ```
+ *   result: Record not found
+ *   ```
+ *   With HTTP status `404`.
+ *
+ * ### Example Use Case:
+ * Update all training snippets of type `blog` with a specific `uri` pattern:
+ * ```json
+ * {
+ *   "filter": {
+ *     "ml_training_snippets.uri.like": "%/drafts/%",
+ *     "ml_training_snippets.type.eq": "blog"
+ *   },
+ *   "values": {
+ *     "type": "article",
+ *     "pushed": 1
+ *   }
+ * }
+ * ```
+ *
+ * ### Notes:
+ * - This endpoint is useful for bulk data operations, such as reclassifying training data or marking snippets as processed.
+ * - The logic gracefully handles cases where no `OR` conditions exist by removing empty branches from the final SQL query.
+ */
 .arguments
    filter
       ml_training_snippets.prompt.like:string

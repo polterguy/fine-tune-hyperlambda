@@ -1,5 +1,51 @@
 
-// Create an endpoint that exports all questionnaire data from training requests for the specified type and returns as a CSV file.
+/*
+ * Exports all questionnaire-based training data for the specified type as a downloadable CSV file.
+ *
+ * This Hyperlambda endpoint allows root users to extract all completed questionnaire entries from
+ * training requests for a given `type`, along with the associated conversation history per user.
+ * The result is compiled into a CSV file and returned as a downloadable attachment.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `type` (string): Required. Filters the questionnaire entries based on the specified training type.
+ *
+ * ### Behavior:
+ * 1. Validates that the caller is authorized and that a `type` is provided.
+ * 2. Retrieves all distinct `user_id` values from `ml_requests` where:
+ *    - `type` matches the given value
+ *    - `questionnaire = 1` (indicating questionnaire submissions)
+ * 3. For each user:
+ *    - Retrieves all questionnaire answers (`prompt`, `completion`) with `finish_reason = 'questionnaire'`
+ *    - Builds a row with prompts as column headers and corresponding completions as values.
+ *    - Retrieves conversation history (non-questionnaire requests) for that user.
+ *    - Concatenates prompt and completion entries into a full conversation string and adds it to the row.
+ * 4. The resulting dataset is compiled into CSV format using [lambda2csv].
+ * 5. Returns the CSV file as a downloadable attachment named `questionnaires.csv`.
+ *
+ * ### Returns:
+ * - If records are found:
+ *   - A CSV file with one row per user, where each column represents a questionnaire prompt and the full conversation is appended as a `conversation` column.
+ * - If no questionnaire data is found:
+ *   - HTTP 404 with a message:
+ *     ```
+ *     result: No questionnaires found
+ *     ```
+ *
+ * ### Example CSV Output:
+ * ```
+ * How satisfied are you?, What could be improved?, conversation
+ * "Very satisfied", "More examples", "Prompt 1...\n\nCompletion 1...\n\n..."
+ * ```
+ *
+ * ### Notes:
+ * - The endpoint excludes any training requests where `questionnaire = 0`.
+ * - The full conversation is grouped per user and stored in the final column (`conversation`).
+ * - This export is ideal for feedback analysis, survey reviews, or user research based on AI feedback flows.
+ */
 .arguments
    type:string
 

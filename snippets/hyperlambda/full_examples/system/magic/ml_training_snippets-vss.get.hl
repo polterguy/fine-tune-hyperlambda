@@ -1,5 +1,64 @@
 
-// Write a CRUD read endpoint with paging, and VSS filtering selecting records from your ml_training_snippets table in your magic database returning id, created, type, pushed, uri, prompt, completion filtering on id, created, type, pushed, uri, prompt, completion with authentication and authorisation for root roles
+/*
+ * Retrieves training snippets from `ml_training_snippets` using OpenAI embeddings and vector similarity search (VSS).
+ *
+ * This Hyperlambda HTTP `GET` endpoint allows root users to perform semantic search over the `ml_training_snippets` table
+ * using OpenAI embeddings. It retrieves records ranked by vector similarity to a [filter] string input, with optional
+ * filtering by `type` and support for paging via `limit` and `offset`.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `filter` (string): Required. The string query to embed and use as the basis for VSS search.
+ * - `type` (string): Optional. Filters results by matching the `type` column.
+ * - `limit` (long): Optional. Limits the number of returned records. Defaults to `10`.
+ * - `offset` (long): Optional. Offsets the results for pagination.
+ *
+ * ### Behavior:
+ * 1. **Authorization & Validation**:
+ *    - Requires the `filter` string to be present and between 1 and 1000 characters.
+ * 2. **Retrieve Embedding Model**:
+ *    - Queries the `ml_types` table to determine the vector model to use for the specified `type`.
+ * 3. **Generate Embedding**:
+ *    - Sends a request to the OpenAI `/v1/embeddings` API using the configured model and API key.
+ *    - Validates the response and logs + throws an error if OpenAI returns an error.
+ * 4. **Query VSS-Indexed Table**:
+ *    - Performs a vector similarity search in the `vss_ml_training_snippets` shadow table using the generated embedding.
+ *    - Joins results with `ml_training_snippets` using `rowid`.
+ *    - Applies optional `type` filter and paginates using `limit` and `offset`.
+ * 5. **Result Post-processing**:
+ *    - Converts `embedding_vss` column to a boolean (`true` if it exists, `false` otherwise) to reduce bandwidth.
+ *    - Appends a `tokens` field to each record, indicating the total token count of `prompt + completion` using OpenAI's tokenizer.
+ * 6. **Returns a list of relevant records** sorted by vector similarity, each including:
+ *    - `id`, `created`, `type`, `pushed`, `uri`, `prompt`, `completion`, `filename`, `cached`, `meta`, `embedding_vss`, and `tokens`.
+ *
+ * ### Returns:
+ * - A list of semantically similar `ml_training_snippets` records with token counts and filtered by type if specified.
+ *
+ * ### Example Response:
+ * ```json
+ * [
+ *   {
+ *     "id": 1204,
+ *     "created": "2024-12-01T15:22:00Z",
+ *     "type": "faq",
+ *     "pushed": 1,
+ *     "uri": "/support/chat",
+ *     "prompt": "How do I reset my password?",
+ *     "completion": "To reset your password, go to the login page and click 'Forgot password'.",
+ *     "embedding_vss": true,
+ *     "tokens": 34
+ *   }
+ * ]
+ * ```
+ *
+ * ### Notes:
+ * - This endpoint leverages the `vss_search()` function and requires your database to support VSS (Vector Similarity Search).
+ * - The OpenAI embedding call requires a valid key under the config path `magic:openai:key`.
+ * - Useful for building intelligent search experiences across training data or fine-tuning datasets.
+ */
 .arguments
    limit:long
    offset:long

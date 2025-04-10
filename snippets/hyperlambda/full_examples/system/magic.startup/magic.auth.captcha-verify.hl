@@ -1,35 +1,61 @@
 
 /*
- * Create a dynamic slot that does the following;
- * Verifies the specified CAPTCHA, and throws an exception if it's not valid.
+ * Verifies a Magic CAPTCHA token based on Proof of Work using either time-based or challenge-based verification.
  *
- * This logic relies upon Proof of Work, which implies a SHA256 hash value with [workload]
- * amount of trailing zeros, which can only be created by brute force until a valid hash
- * has been generated.
+ * This dynamic slot, `magic.auth.captcha-verify`, ensures the client has performed enough work to generate a valid
+ * CAPTCHA token. It supports two modes of verification:
  *
- * The slot handles two different versions of a token, one that relies upon it being
- * generated less than [age] milliseconds ago. The other being based upon a challenge.
+ * - **Time-based tokens**: Uses the client's UNIX timestamp to validate token freshness.
+ * - **Challenge-based tokens**: Matches tokens to a previously issued challenge stored in cache.
  *
- * The challenge logic is more verbose since it relies upon another HTTP invocation having
- * generated the challenge, while the age logic relies upon the UNIX timestamp on the client
- * and the server being synchronised. Generally the challenge-based version is more stable,
- * since it doesn't require the client and the server being perfectly synchronised towards
- * their time servers, which might happen every once in a while.
+ * Both rely on a SHA256 hash with a configurable number of trailing zeros (the "workload").
+ * The server uses a double-hashed secret as part of its HMAC-style verification to validate authenticity.
  *
- * The [age] argument is the how old the token can maximumly be before it's considered invalid.
- * [age] is measured in milliseconds, implying 5,000 in age implies the token needs to be
- * created less than 5 seconds ago on the client. The default value for [age] is 10,000, implying
- * 10 seconds, and the default value for [workload] is 3, implying it requires up to 4,096
- * hashing iterations on average, while the client has 10 seconds to generate a valid token.
+ * ### Arguments:
+ * - `token` (string): Required. A colon-separated token string in the format `hash:timestamp|challenge:seed`.
+ * - `workload` (int): Optional. Number of trailing zeros required in the hash. Default: `3`.
+ * - `age` (int): Optional. Maximum allowed age (in milliseconds) for time-based tokens. Default: `10000` (10 seconds).
  *
- * The magic-captcha.js file will generate a valid [age] token, assuming the [workload] argument to
- * this slot was the same or less than the workload argument to the `mcaptcha.token` function
- * invocation on the client.
+ * ### Token Structure:
+ * The token must have exactly 3 parts:
+ * ```
+ * [hash]:[timestamp or challenge]:[seed]
+ * ```
+ * - `hash`: The SHA256 hash that ends in `[workload]` trailing zeros.
+ * - `timestamp`: A UNIX timestamp (milliseconds) representing when the token was generated (for time-based mode).
+ * - `challenge`: A key previously stored in cache by a challenge-generating endpoint (for challenge-based mode).
+ * - `seed`: A numeric value that was brute-forced to produce a hash ending with the required zeros.
  *
- * The magic-captcha-challenge.js file will generate a challenge-based token and automatically
- * invoke the server to create a new challenge before trying to solve the token. If the challenge
- * has not been previously created on the server less than 5 minutes ago, the challenge-based
- * token will not be accepted.
+ * ### Behavior:
+ * 1. **Sanity Checks**:
+ *    - Ensures the token has exactly 3 parts.
+ *    - Applies default values to `workload` and `age`.
+ * 2. **Token Type Detection**:
+ *    - If the second part starts with `c_`, it's treated as a challenge-based token:
+ *      - Ensures a valid challenge exists in cache and deletes it after use.
+ *    - Otherwise, it's treated as a time-based token:
+ *      - Verifies that the timestamp is not too old or from the future.
+ * 3. **Hash Validation**:
+ *    - Ensures the token hash ends in the correct number of zeros based on the `workload`.
+ *    - Reconstructs the expected hash using server-side secret and compares it to the submitted hash.
+ * 4. **Returns**:
+ *    - `true` if the CAPTCHA token is valid.
+ *    - Otherwise, throws a descriptive, publicly visible error with HTTP `400`.
+ *
+ * ### Security:
+ * - Uses double SHA256 hashing (like HMAC) of the server-side secret to prevent predictable hash generation.
+ * - Challenge-based tokens expire automatically after use (one-time).
+ *
+ * ### Example Use Case:
+ * - Protecting public endpoints (e.g., user registration, contact forms) without requiring user accounts.
+ * - Bot protection via client-side proof of work using JavaScript (e.g., `magic-captcha.js` or `magic-captcha-challenge.js`).
+ *
+ * ### Failure Scenarios:
+ * - Token structure is incorrect.
+ * - Token expired (for time-based mode).
+ * - Challenge not found or reused (for challenge-based mode).
+ * - Workload not met (hash lacks enough trailing zeros).
+ * - Token not verifiable against the server’s secret.
  */
 slots.create:magic.auth.captcha-verify
 

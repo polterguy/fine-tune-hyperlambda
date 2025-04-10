@@ -1,8 +1,63 @@
+
 /*
- * Create a dynamic slot that does the following;
+ * Performs a DuckDuckGo search and returns a list of structured results.
  *
- * Uses DuckDuckGo to search for the specified [query]
- * returning an optional [max] results to caller.
+ * This dynamic slot, `magic.http.duckduckgo-search`, sends a query to DuckDuckGo using its HTML interface,
+ * scrapes the returned page for result links, and extracts URLs, titles, and descriptions.
+ * It optionally limits the number of returned results and can notify a WebSocket client session
+ * with progress updates during execution.
+ *
+ * ### Arguments:
+ * - `query` (string, required): The search term to use when querying DuckDuckGo.
+ * - `max` (int, optional): The maximum number of result entries to return. Must be at least 1.
+ * - `session` (string, optional): WebSocket session ID. If provided, server will emit status updates via `sockets.signal`.
+ *
+ * ### Behavior:
+ * 1. **Validation**:
+ *    - Ensures that the `query` is present and that `max` is a valid positive integer if provided.
+ * 2. **Search Request**:
+ *    - Constructs a DuckDuckGo search URL: `https://html.duckduckgo.com/html/?q=[query]`
+ *    - Optionally emits a WebSocket signal to the user indicating that a search has begun.
+ *    - Sends an HTTP GET request using [signal:magic.http.get-with-cache] for efficient reuse of results.
+ * 3. **HTML Parsing**:
+ *    - Converts HTML to lambda format using [html2lambda].
+ *    - Iterates over all anchor (`<a>`) tags with class `result__a`, which represent search result links.
+ * 4. **URL Extraction & Decoding**:
+ *    - Parses and extracts the `uddg` query parameter, which contains the actual external link.
+ *    - URL-decodes the value and discards any invalid or incomplete links.
+ * 5. **Result Compilation**:
+ *    - Assembles a list of search results with:
+ *      - `url`: The target URL of the result.
+ *      - `title`: The clickable headline.
+ *      - `description`: Text snippet or preview, if available.
+ *    - Stops once [max] results are collected.
+ * 6. **Returns**:
+ *    - A list of DuckDuckGo search results, wrapped in a `result` node.
+ *    - Includes a `reference` node containing the full DuckDuckGo search URL for traceability.
+ *
+ * ### Returns:
+ * ```json
+ * {
+ *   "reference": "https://html.duckduckgo.com/html/?q=hyperlambda",
+ *   "result": [
+ *     {
+ *       "url": "https://example.com/what-is-hyperlambda",
+ *       "title": "What is Hyperlambda?",
+ *       "description": "Hyperlambda is a tree-based declarative programming language used in Magic Cloud..."
+ *     },
+ *     ...
+ *   ]
+ * }
+ * ```
+ *
+ * ### Use Cases:
+ * - Semantic research and automated knowledge scraping.
+ * - Feeding URLs into downstream processing tools (e.g., scrapers, summarizers).
+ * - Lightweight search UI without needing DuckDuckGo's official API.
+ *
+ * ### Notes:
+ * - This implementation parses HTML output from DuckDuckGo's web UI. It may break if DuckDuckGo changes its markup.
+ * - For large queries, consider throttling or caching results to avoid rate-limiting or IP blocks.
  */
 slots.create:magic.http.duckduckgo-search
 

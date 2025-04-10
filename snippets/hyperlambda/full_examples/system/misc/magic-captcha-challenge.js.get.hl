@@ -1,5 +1,52 @@
 
-// Endpoint returning the Magic CAPTCHA JavaScript library to caller.
+/*
+ * Returns the Magic CAPTCHA JavaScript library with runtime-generated public key and server URL embedded.
+ *
+ * This HTTP endpoint serves the Magic CAPTCHA client-side JavaScript library to the requesting client,
+ * dynamically injecting security-sensitive metadata such as a unique public key (derived from the server’s
+ * auth secret) and the correct server URL. This allows the CAPTCHA challenge to securely bind to the
+ * server instance and avoid replay or injection attacks.
+ *
+ * ### Arguments:
+ * - `v` (string, optional): Versioning or cache busting hint (currently unused, but may influence future caching logic).
+ *
+ * ### Behavior:
+ * 1. **Server-Specific Key Generation**:
+ *    - Retrieves the configured authentication secret from the config (`magic:auth:secret`).
+ *    - Applies **double SHA256 hashing** to generate a public, non-reversible fingerprint of the server identity.
+ *    - This key is injected into the JavaScript file using the placeholder `[[public-key]]`.
+ *
+ * 2. **Dynamic URL Construction**:
+ *    - Detects the scheme (`http` or `https`) based on the request's host.
+ *    - Builds the full base URL and replaces all `[[url]]` placeholders inside the JavaScript.
+ *    - Ensures that the CAPTCHA JavaScript always points to the correct backend for challenge resolution.
+ *
+ * 3. **JavaScript Source Loading**:
+ *    - Attempts to serve a minified version of the file if available:
+ *    - `/system/misc/magic-captcha-challenge.min.js`
+ *    - Falls back to unminified source:
+ *    - `/system/misc/magic-captcha-challenge.js`
+ *
+ * 4. **Header Configuration**:
+ *    - Sets `Content-Type` to `text/javascript` for correct client-side execution and caching.
+ *
+ * 5. **Response**:
+ *    - Returns the transformed JavaScript file as the HTTP response body.
+ *
+ * ### Example Placeholders Replaced:
+ * - `[[public-key]]` → Server-specific hashed fingerprint.
+ * - `[[url]]` → Base URL such as `https://my-cloudlet.ainiro.io`.
+ *
+ * ### Use Cases:
+ * - Client-side CAPTCHA generation and token hashing logic.
+ * - CAPTCHA binding to specific backend, preventing misuse or cloning.
+ * - Plug-and-play JavaScript loader for forms requiring spam protection.
+ *
+ * ### Notes:
+ * - This is part of the Magic CAPTCHA proof-of-work system.
+ * - The script is served fully customized to the backend instance issuing it.
+ * - Avoid caching this script statically on external CDNs unless you explicitly handle dynamic key and URL substitution.
+ */
 .arguments
    v:string
 

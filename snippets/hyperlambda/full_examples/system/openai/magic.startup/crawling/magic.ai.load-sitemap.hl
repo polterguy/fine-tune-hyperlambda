@@ -1,13 +1,85 @@
 
 /*
- * Generate a slot that does the following;
+ * Create a dynamic slot that loads and parses sitemap files recursively and returns crawlable URLs.
  *
- * Loads sitemap according to given [sitemap] collection,
- * [allow] collection, and [disallow] collection, and
- * returns [max] number of links to caller.
+ * This slot loads one or more sitemaps from the provided `sitemap` URLs. It supports recursive loading of
+ * sitemap indexes, validation against `robots.txt` `disallow`/`allow` rules, and respects max link limits
+ * to prevent memory exhaustion. It optionally provides real-time progress feedback via sockets and uses
+ * default HTTP headers unless overridden.
  *
- * Optionally supply [headers] collection being HTTP headers to
- * use when retrieving sitemap(s).
+ * ---
+ * ### Arguments:
+ *
+ * - `sitemap` (list of string, required): One or more sitemap or sitemap index URLs.
+ * - `max` (int, optional): Max number of URLs to return. Defaults to 25. Range: [1–10000].
+ * - `headers` (map, optional): HTTP headers to use when retrieving sitemaps. Defaults include User-Agent and Accept.
+ * - `feedback-channel` (string, optional): WebSocket channel name used to provide progress notifications to clients.
+ * - `allow` (list of string, optional): Explicitly allowed URLs, overrides `disallow`.
+ * - `disallow` (list of string, optional): URLs matching these patterns will be excluded unless explicitly allowed.
+ * - `filter-on-url` (bool, optional): If true, all returned URLs must start with the base URL (e.g. domain root).
+ * - `url` (string, optional): Base URL used for `filter-on-url` matching.
+ *
+ * ---
+ * ### Behavior:
+ *
+ * 1. **Sitemap Fetching and Parsing**:
+ *    - Loads XML sitemaps using `http.get`.
+ *    - Parses XML to extract `<urlset><url><loc>>` and `<sitemapindex><sitemap><loc>>` values.
+ *    - Supports both `#text` and `#cdata-section` styles.
+ *    - Recursively loads up to 25 nested sitemap URLs.
+ *
+ * 2. **Duplicate Filtering and Normalization**:
+ *    - Normalizes relative sitemap entries into absolute URLs using the domain from the sitemap URL.
+ *    - Deduplicates all URLs using a reference match before adding to results.
+ *
+ * 3. **Robots.txt Compliance**:
+ *    - Applies `disallow` and `allow` filters using custom wildcard/anchor-aware matching logic.
+ *    - Includes support for `*` wildcard and `$` anchor-style pattern endings.
+ *
+ * 4. **Link Sorting and Prioritization**:
+ *    - Sorts links by URL length to prioritize "shallower" pages (e.g. `https://example.com/` before deeper links).
+ *
+ * 5. **Real-time Client Feedback**:
+ *    - Sends progress messages to the frontend via WebSockets using the `feedback-channel`.
+ *    - Warns about disallowed links or loading failures via `sockets.signal`.
+ *
+ * 6. **Safety and Constraints**:
+ *    - Hard limit of 10,000 links to protect memory.
+ *    - Limits sitemap depth to 25 files to prevent runaway recursion.
+ *
+ * ---
+ * ### Returns:
+ *
+ * ```json
+ * {
+ *   "has-sitemap": true,
+ *   "total": 1342,
+ *   "urls": [
+ *     "https://example.com/page1",
+ *     "https://example.com/page2"
+ *   ]
+ * }
+ * ```
+ *
+ * ---
+ * ### Example Usage:
+ *
+ * ```json
+ * {
+ *   "sitemap": ["https://example.com/sitemap.xml"],
+ *   "max": 100,
+ *   "disallow": ["/admin"],
+ *   "feedback-channel": "web-crawler-status"
+ * }
+ * ```
+ *
+ * ---
+ * ### Notes:
+ *
+ * - This slot is commonly invoked as part of the `magic.ai.crawl-site` flow.
+ * - It is robust to malformed XML or non-200 responses.
+ * - URLs are sorted by importance (shorter first) before filtering.
+ * - If no sitemap is successfully parsed, `has-sitemap` will be `false`.
  */
 slots.create:magic.ai.load-sitemap
 

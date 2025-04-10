@@ -1,5 +1,45 @@
 
-// Show me an endpoint for root users that saves the specified file in the specified folder.
+/*
+ * Allows a root user to upload a file and save it to a specified folder on the server.
+ *
+ * This Hyperlambda endpoint accepts `multipart/form-data` and securely saves the uploaded file
+ * to the path specified by the [folder] argument. It validates the file input and ensures the
+ * request is coming from a user with the `root` role.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Access is enforced using [auth.ticket.verify:root] to prevent unauthorized uploads.
+ *
+ * ### Content-Type:
+ * - This endpoint explicitly accepts `multipart/form-data` uploads.
+ *   Declared using [.accept:multipart/form-data].
+ *
+ * ### Arguments:
+ * - `file` (object): Required. The uploaded file, containing:
+ *   - `name` (string): The name of the file, typically extracted from the upload metadata.
+ *   - `stream` (binary stream): The file’s content as a stream.
+ * - `folder` (string): Required. The destination folder path where the file should be saved.
+ *
+ * ### Behavior:
+ * 1. Ensures all required fields (`file.name`, `file.stream`, and `folder`) are present.
+ * 2. Constructs the full destination path by concatenating `folder` + `file.name`.
+ * 3. Saves the file to disk using [io.stream.save-file].
+ *
+ * ### Returns:
+ * - This endpoint performs the upload operation but does not return an explicit result node.
+ *   You can enhance it with a `return-nodes` block (e.g., `result:success`) if desired.
+ *
+ * ### Example Request:
+ * - POST to this endpoint using `multipart/form-data` with:
+ *   - `file`: a binary file input
+ *   - `folder`: e.g., `/modules/uploads/`
+ *
+ * The file will be saved as: `/modules/uploads/my-file.zip`
+ *
+ * ### Security Considerations:
+ * - Ensure [folder] is validated or restricted in production to avoid unsafe path injection.
+ * - You may also wish to sanitize the filename to prevent conflicts or malicious names.
+ */
 .arguments
    file:*
    folder:string

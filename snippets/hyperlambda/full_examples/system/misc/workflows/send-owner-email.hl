@@ -1,10 +1,58 @@
 
 /*
- * Create an HTTP endpoint that does the following;
+ * Sends an email to the cloudlet owner using default configuration and a custom reply-to address.
  *
- * Sends an email to owner
- * 
- * This function will send the owner of the cloudlet an email, with the specified [reply-to], [reply-to-email], [subject], and [body].
+ * This HTTP endpoint allows sending a Markdown-based message to the cloudlet owner. It uses the sender's
+ * display name and email for reply purposes (`reply-to` and `reply-to-email`) while automatically retrieving
+ * the recipient's name and email from the backend configuration (typically defined in `magic:smtp:from:name`
+ * and `magic:smtp:from:address`).
+ *
+ * ### Arguments:
+ * - `reply-to` (string, required): The name to display as the reply-to sender.
+ * - `reply-to-email` (string, required): The email address to use as reply-to.
+ * - `subject` (string, required): The subject of the email. This will be HTML-encoded before sending.
+ * - `body` (string, required): The body content of the email, written in Markdown. It will be transformed into HTML.
+ *
+ * ### Behavior:
+ * 1. **HTML Encoding**:
+ *    - HTML-encodes the `subject` and `body` to sanitize input.
+ *
+ * 2. **Markdown Conversion**:
+ *    - Converts the sanitized body from Markdown to HTML for formatting consistency in the email client.
+ *
+ * 3. **Configuration Lookup**:
+ *    - Retrieves the owner's name and email address from configuration keys:
+ *      - `magic:smtp:from:name`
+ *      - `magic:smtp:from:address`
+ *    - These values define the actual recipient of the email.
+ *
+ * 4. **Email Sending**:
+ *    - Uses the generic email workflow to send the final message:
+ *      - Sends the encoded subject and Markdown-rendered HTML body.
+ *      - Sets reply-to headers to the sender’s provided details.
+ *      - Marks the body as `html: true` to ensure correct formatting.
+ *
+ * ### Returns:
+ * ```json
+ * {
+ *   "result": "success"
+ * }
+ * ```
+ *
+ * ### Example Usage:
+ * ```json
+ * {
+ *   "reply-to": "John Doe",
+ *   "reply-to-email": "john@example.com",
+ *   "subject": "Feedback on the platform",
+ *   "body": "Hi there,\n\nI just wanted to say thanks for the amazing product!"
+ * }
+ * ```
+ *
+ * ### Notes:
+ * - This function **does not expose or require the recipient's email address** explicitly; it is pulled securely from config.
+ * - The system should always prompt the user to confirm the email before executing this endpoint.
+ * - All content is sanitized and transformed to ensure it renders cleanly and safely in HTML-capable email clients.
  */
 .arguments
 

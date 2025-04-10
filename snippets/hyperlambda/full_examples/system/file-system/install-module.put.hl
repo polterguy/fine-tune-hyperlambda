@@ -1,5 +1,54 @@
 
-// Show me an endpoint that uploads and installs the specified ZIP file module.
+/*
+ * Uploads and installs a module from a ZIP file into the server's `/modules/` directory.
+ *
+ * This endpoint allows root users to install new backend modules by uploading a ZIP file using `multipart/form-data`.
+ * It handles validation, unzipping, folder management, and module installation via `magic.modules.install-module`.
+ * Optionally, it respects a `manifest.hl` file inside the ZIP for module renaming based on the declared `module_name`.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   This is enforced using [auth.ticket.verify:root].
+ *
+ * ### Content-Type:
+ * - The endpoint expects a `multipart/form-data` POST request.
+ *   Declared using [.accept:multipart/form-data].
+ *
+ * ### Arguments:
+ * - `file` (object): Required.
+ *   - `name` (string): The name of the uploaded file. Must be a ZIP file with a valid `[a-z0-9_-]+.zip` format.
+ *   - `stream` (binary): The actual file stream to save and install.
+ *
+ * ### Behavior:
+ * 1. Validates the request structure:
+ *    - Checks for the presence of a file stream and valid filename.
+ *    - Ensures filename uses lowercase letters, numbers, dashes/underscores, and ends in `.zip`.
+ * 2. Saves the ZIP file into `/modules/`.
+ *    - Deletes any previous ZIP file or module folder if it exists.
+ * 3. Unzips the file into `/modules/[module-name]/`.
+ * 4. If a `manifest.hl` exists and contains a `module_name` that differs from the original folder name:
+ *    - Renames the folder accordingly (also deleting a conflicting folder if necessary).
+ * 5. Calls `magic.modules.install-module` to execute any installation logic for the module.
+ * 6. Deletes the ZIP file after successful extraction.
+ *
+ * ### Returns:
+ * - A simple success response indicating the module has been installed:
+ *   ```
+ *   result:Success
+ *   ```
+ *
+ * ### Example Usage:
+ * Upload a ZIP file named `analytics.zip` using a frontend form or curl:
+ * ```
+ * curl -F "file=@analytics.zip" https://your-cloudlet.io/modules/upload
+ * ```
+ * This will extract the module into `/modules/analytics/` and install it.
+ *
+ * ### Security Notes:
+ * - The module name must be safe and controlled via regex.
+ * - Only ZIP files are allowed, and this is strictly enforced.
+ * - Root access is required to perform this operation.
+ */
 .arguments
    file:*
 

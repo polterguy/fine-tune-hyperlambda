@@ -1,5 +1,72 @@
 
-// CRUD read endpoint with paging, sorting, filtering selecting records from your ml_requests table in your magic database returning id, created, type, prompt, completion, finish_reason filtering on id, created, type, prompt, completion, finish_reason with authentication and authorisation for root roles
+/*
+ * Reads and returns records from the `ml_requests` table with full support for filtering, paging, and sorting.
+ *
+ * This Hyperlambda CRUD HTTP `GET` endpoint allows root users to query the `ml_requests` table
+ * using a combination of pagination, sorting, and conditional filters across multiple fields.
+ * It is intended for administrative and diagnostic use, enabling deep insight into training request logs.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role are allowed to invoke this endpoint.
+ *   This is enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * #### Pagination:
+ * - `limit` (long): Optional. Limits the number of records returned.
+ * - `offset` (long): Optional. Skips a number of records for pagination purposes.
+ *
+ * #### Sorting:
+ * - `order` (string): Optional. The name of the column to sort by.
+ * - `direction` (string): Optional. Sort direction: `asc` or `desc`.
+ *
+ * #### Quick Text Search:
+ * - `filter` (string): Optional. Applies a broad match (`LIKE %%`) across `prompt`, `completion`, and `user_id`.
+ *
+ * #### Column-specific Filters:
+ * - `ml_requests.id.eq` / `mt` / `lt`: Filters based on ID (exact, greater than, less than).
+ * - `ml_requests.created.eq`: Filters by exact creation date.
+ * - `ml_requests.type.like` / `eq`: Filters by request type.
+ * - `ml_requests.prompt.like` / `eq`: Filters by prompt text.
+ * - `ml_requests.completion.like` / `eq`: Filters by response text.
+ * - `ml_requests.finish_reason.like` / `eq`: Filters by reason the request was marked complete.
+ *
+ * ### Behavior:
+ * 1. Validates that the caller has root access.
+ * 2. Constructs the database read query by:
+ *    - Injecting sort and paging parameters if provided.
+ *    - Applying a broad `OR` search for `prompt`, `completion`, and `user_id` if `filter` is provided.
+ *    - Adding all other provided filter arguments to the `WHERE` clause via structured bindings.
+ * 3. Reads from the `ml_requests` table and selects the following fields:
+ *    - `id`, `created`, `type`, `prompt`, `completion`, `finish_reason`, `cached`, `questionnaire`, `session`, `user_id`, `referrer`
+ * 4. Returns the resulting records to the caller as a list of nodes.
+ *
+ * ### Returns:
+ * - An array of matching `ml_requests` records with selected fields.
+ *
+ * ### Example Response:
+ * ```json
+ * [
+ *   {
+ *     "id": 1234,
+ *     "created": "2024-12-01T12:34:56Z",
+ *     "type": "training",
+ *     "prompt": "What is a lambda function?",
+ *     "completion": "A lambda function is a small anonymous function...",
+ *     "finish_reason": "success",
+ *     "cached": false,
+ *     "questionnaire": 0,
+ *     "session": "abc123",
+ *     "user_id": "user-789",
+ *     "referrer": "dashboard"
+ *   }
+ * ]
+ * ```
+ *
+ * ### Use Cases:
+ * - Building administrative UIs for monitoring request activity.
+ * - Exporting filtered request logs for analytics.
+ * - Debugging training workflows using advanced filters.
+ */
 .arguments
    limit:long
    offset:long

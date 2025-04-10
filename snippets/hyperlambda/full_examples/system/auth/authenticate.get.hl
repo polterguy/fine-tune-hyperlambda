@@ -1,14 +1,43 @@
 
 /*
- * Create a Hyperlambda HTTP web API endpoint that does the following:
- * Authenticates a user by verifying username/password and returns a JWT token if successful.
+ * Authenticates a user and returns a JWT token, with optional fallback for initial setup mode.
  *
- * Notice, if Magic is not already setup, implying the auth secret is less than 50
- * characters in length, then the default username and password is root/root and is
- * hard coded.
+ * This Hyperlambda endpoint takes a username and password, verifies them, and returns a JWT token
+ * if authentication succeeds. It also includes additional user information from the [users_extra]
+ * database table, such as name and email, if available.
  *
- * The JWT token returned will contain the roles the user belongs to. This endpoint
- * will also return extra information associated with the user.
+ * ### Initial Setup Mode
+ * If the JWT secret (config value "magic:auth:secret") is not configured or is shorter than 50 characters,
+ * the system is assumed to be in "setup mode". In this case, the credentials [root/root] are accepted
+ * as valid and return a special JWT token with the [root] role, allowing the user to perform initial setup
+ * of their cloudlet. This is a bootstrapping mechanism for newly installed instances.
+ *
+ * ### Standard Authentication
+ * Outside setup mode, the endpoint delegates the authentication process to the slot [magic.auth.authenticate],
+ * which verifies credentials, fetches roles, and issues a JWT token if valid. If authentication fails,
+ * a 401 Unauthorized error is thrown by the underlying slot.
+ *
+ * After successful authentication, the endpoint also queries the [users_extra] table for user-specific
+ * metadata, such as their name or email, and returns it along with the JWT ticket.
+ *
+ * ### Arguments:
+ * - `username` (string): The user's login name. Mandatory.
+ * - `password` (string): The user's login password. Mandatory.
+ *
+ * ### Returns:
+ * - `ticket` (string): A JWT token containing user identity and associated roles.
+ * - `extra` (object): A dictionary of key-value pairs retrieved from [users_extra],
+ *   where `type` fields like "name" or "email" are used as keys, and their corresponding values are returned.
+ *
+ * Example response:
+ * ```
+ * ticket:eyJhbGciOiJIUzI1NiIsInR5cCI6...
+ * extra:
+ *    name:John Doe
+ *    email:john@example.com
+ * ```
+ *
+ * This endpoint is essential for secure login flows and cloudlet initialization logic.
  */
 .arguments
    username:string

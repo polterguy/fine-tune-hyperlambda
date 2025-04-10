@@ -1,13 +1,66 @@
 
 /*
- * Show me a slot that does the following;
+ * Converts HTML into machine learning training snippets using Markdown.
  *
- * Returns Markdown training snippet from specified [html].
+ * This dynamic slot takes an HTML document and optionally its originating URL, and extracts semantically
+ * meaningful content for AI training. It converts HTML into Markdown, then breaks the content into discrete
+ * training snippets based on structural HTML elements such as headers, lists, and code blocks.
  *
- * Takes the following arguments:
+ * The result is a structured object containing:
+ * - Extracted training snippets (`prompt` + `completion`)
+ * - List of URLs found in the original document
+ * - Meta information, such as number of main-level sections
  *
- * - [html]     - Mandatory. Being the actual HTML we're traversing for training data.
- * - [url]      - Optional.  Being the URL from where the document was fetched
+ * ### Arguments:
+ * - `html` (string, required): The raw HTML to process.
+ * - `url` (string, required): The originating URL of the HTML (used in anchor normalization and context).
+ * - `images` (bool, optional, default: true): Whether to preserve image links.
+ * - `lists` (bool, optional, default: true): Whether to preserve UL/OL list structures.
+ * - `code` (bool, optional, default: true): Whether to preserve `pre` and `code` blocks.
+ *
+ * ### Behavior:
+ * 1. **HTML to Markdown Transformation**:
+ *    - Uses `[html2markdown]` to convert the full HTML into Markdown.
+ *    - Normalizes anchor references, images, code blocks, and lists based on options.
+ *
+ * 2. **Structural Decomposition**:
+ *    - Transforms Markdown → HTML → lambda tree for semantic traversal.
+ *    - Identifies `ul`, `ol`, and `pre` elements and treats each as a standalone training snippet.
+ *    - Assigns prompts based on heading context (`h1`–`h6`) near each snippet.
+ *    - Accumulates remaining content (excluding lists and code) into one final completion snippet.
+ *
+ * 3. **Prompt Construction**:
+ *    - Primary prompt is derived from document title and description.
+ *    - Headings (`h1`–`h6`) are appended to prompts for relevant UL, OL, and PRE-based snippets.
+ *
+ * 4. **Snippets Returned**:
+ *    - Each snippet contains a `prompt` and `completion` field, optimized for use in AI fine-tuning.
+ *    - Snippets are returned in the order they appear in the document structure.
+ *
+ * 5. **Meta and URL Collection**:
+ *    - Collects URLs discovered in the document while converting to Markdown.
+ *    - Stores basic metadata (e.g., number of `main`-level segments).
+ *
+ * ### Example Response:
+ * ```json
+ * {
+ *   "snippets": [
+ *     { "prompt": "Page | Section Title", "completion": "Bullet list or code block here..." },
+ *     { "prompt": "Page", "completion": "Remaining Markdown from HTML..." }
+ *   ],
+ *   "urls": [ "https://example.com/about", "https://example.com/help" ],
+ *   "meta": { "main": 1 }
+ * }
+ * ```
+ *
+ * ### Use Cases:
+ * - Automatically extracting fine-tuning data from web pages.
+ * - Transforming documentation into training examples for LLMs.
+ * - Ingesting Markdown-compatible data into vector or RAG-based systems.
+ *
+ * ### Notes:
+ * - This slot is designed to support human-in-the-loop preprocessing if needed.
+ * - The corresponding `magic.ai.crawl-site` slot can be used to automate crawling and pass content here.
  */
 slots.create:magic.ai.html.extract
 

@@ -1,5 +1,52 @@
 
-// Create an endpoint that renames the specified file or folder.
+/*
+ * Renames a file or folder on the server.
+ *
+ * This Hyperlambda endpoint allows root users to rename an existing file or directory
+ * by specifying its current name (`oldName`) and desired new name (`newName`).
+ * It automatically determines whether the target is a file or a folder and renames it accordingly.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `oldName` (string): Required. The current absolute or relative path to the file or folder.
+ * - `newName` (string): Required. The new name (or full path) to rename the object to.
+ *   - For folders: This must be a valid folder path.
+ *   - For files: This is interpreted as the new filename only, not a full path. It will be placed in the same directory.
+ *
+ * ### Behavior:
+ * 1. Verifies the caller is authorized.
+ * 2. Logs the renaming request using [log.info] for traceability.
+ * 3. Checks if the [oldName] path refers to a folder:
+ *    - If so, renames the folder using [io.folder.move].
+ * 4. If not a folder, treats it as a file:
+ *    - Resolves the file’s current folder path using [io.path.get-folder].
+ *    - Concatenates it with the new filename and renames using [io.file.move].
+ * 5. Returns a simple success response.
+ *
+ * ### Returns:
+ * - `result:success`: Confirmation that the file or folder was renamed successfully.
+ *
+ * ### Example:
+ * Request:
+ * ```json
+ * {
+ *   "oldName": "/modules/old-module",
+ *   "newName": "new-module"
+ * }
+ * ```
+ * Result:
+ * ```
+ * result:success
+ * ```
+ *
+ * ### Notes:
+ * - For folders, [newName] should be a full path or relative folder path.
+ * - For files, [newName] is assumed to be just the filename, placed in the same folder.
+ * - No validation is performed to prevent name collisions. Consider adding such checks in production.
+ */
 .arguments
    oldName:string
    newName:string

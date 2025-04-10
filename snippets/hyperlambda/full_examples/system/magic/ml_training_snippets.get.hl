@@ -1,5 +1,68 @@
 
-// Generate a CRUD read endpoint with paging, sorting, filtering selecting records from your ml_training_snippets table in your magic database returning id, created, type, pushed, uri, prompt, completion filtering on id, created, type, pushed, uri, prompt, completion with authentication and authorisation for root roles
+/*
+ * Reads training snippets from the `ml_training_snippets` table with support for paging, sorting, advanced filtering, and token analysis.
+ *
+ * This Hyperlambda HTTP `GET` endpoint allows root users to retrieve records from the `ml_training_snippets` table,
+ * with full support for pagination, sorting, and flexible filtering across multiple fields. It also adds metadata such
+ * as token count and indicates whether an embedding exists, which is useful for AI dataset management and annotation UIs.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * #### Paging:
+ * - `limit` (long): Optional. Maximum number of records to return.
+ * - `offset` (long): Optional. Number of records to skip (for pagination).
+ *
+ * #### Sorting:
+ * - `order` (string): Optional. Column to sort by.
+ *   - Special value: `tokens` orders by the combined length of `prompt || completion`.
+ * - `direction` (string): Optional. `asc` or `desc`.
+ *
+ * #### Filtering (all fields are optional):
+ * - `ml_training_snippets.id.eq`, `.lt`, `.mt`: Filters on ID.
+ * - `ml_training_snippets.type.like`, `.eq`: Filters by type.
+ * - `ml_training_snippets.pushed.eq`: Filters by push state (0 or 1).
+ * - `ml_training_snippets.uri.like`, `.eq`: Filters by URI.
+ * - `ml_training_snippets.prompt.like`, `.eq`: Filters by prompt text.
+ * - `ml_training_snippets.completion.like`, `.eq`: Filters by completion text.
+ *
+ * ### Behavior:
+ * 1. Validates and enforces root-only access.
+ * 2. If `order` is set to `"tokens"`, dynamically transforms it to SQL: `length(prompt || completion)`.
+ * 3. Constructs a [data.read] query with:
+ *    - Pagination (`limit`, `offset`)
+ *    - Ordering (`order`, `direction`)
+ *    - Flexible filtering using `OR` logic for matching on textual fields, and `AND` logic for exact filters.
+ * 4. Queries the database and returns the following fields:
+ *    - `id`, `created`, `type`, `pushed`, `uri`, `prompt`, `completion`, `embedding` (as `embedding_vss`), `cached`, `meta`
+ * 5. For each record:
+ *    - Converts the `embedding_vss` field to a boolean (`true`/`false`) to minimize payload size.
+ *    - Concatenates `prompt + completion` and uses `openai.tokenize` to compute token count, which is appended to the response.
+ *
+ * ### Returns:
+ * - An array of matching training snippet records, each with the additional `tokens` and `embedding_vss` fields.
+ *
+ * ### Example Response:
+ * ```json
+ * [
+ *   {
+ *     "id": 42,
+ *     "type": "faq",
+ *     "prompt": "What is Magic?",
+ *     "completion": "Magic is a low-code backend platform...",
+ *     "embedding_vss": true,
+ *     "tokens": 38
+ *   }
+ * ]
+ * ```
+ *
+ * ### Notes:
+ * - This endpoint is ideal for AI dataset review interfaces, moderation dashboards, or tooling that requires
+ *   exploration and filtering of fine-tuning samples or training snippets.
+ * - The `tokens` field allows for easy estimation of completion cost or dataset size.
+ */
 .arguments
    limit:long
    offset:long

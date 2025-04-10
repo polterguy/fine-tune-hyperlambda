@@ -1,9 +1,53 @@
+
 /*
- * Create a dynamic slot that does the following;
+ * Scrapes all hyperlinks from a given URL and returns them as a Markdown-formatted list.
  *
- * Scrapes the specified [url] and returns all hyperlinks as Markdown to caller,
- * optionally with [max], [starts_with] or [class] arguments, allowing you to filter
- * what links you want to return.
+ * This dynamic slot, `magic.http.html2markdown-links`, fetches a webpage and extracts anchor (`<a>`) elements,
+ * converting them into a Markdown list of links (`* [title](url)`). The slot supports several optional
+ * filters to refine which links are included, such as max result count, URL prefix filtering,
+ * class-based filtering, and query parameter extraction (e.g., for unmasking redirect URLs).
+ *
+ * ### Arguments:
+ * - `url` (string, required): The URL of the HTML document to scrape.
+ * - `max` (int, optional): The maximum number of links to include in the result. Range: 1–200.
+ * - `starts_with` (string, optional): Only includes links whose href begins with this prefix.
+ * - `class` (string, optional): Only includes links whose anchor tag contains this class name.
+ * - `query` (string, optional): The name of a query parameter to extract from masked/redirect URLs.
+ *   - If specified, the slot looks for this parameter in each link and replaces the visible URL with its decoded value.
+ *
+ * ### Behavior:
+ * 1. Validates the input parameters.
+ * 2. Computes the base URL from the input for resolving relative paths.
+ * 3. Fetches the target page using [signal:magic.http.get-with-cache].
+ * 4. Parses the HTML with [html2lambda] and iterates over all anchor tags.
+ * 5. For each link:
+ *    - Converts it into an absolute URL.
+ *    - Applies optional filters:
+ *      - `starts_with` and/or `class`
+ *      - Skips links with empty or hash-only URLs
+ *    - Extracts query-based redirect URLs if `query` is provided.
+ *    - Builds a Markdown entry for each valid anchor using the format:
+ *      ```
+ *      * [anchor text](https://absolute-url.com)
+ *      ```
+ *    - Stops when the optional `max` threshold is reached.
+ * 6. Returns the Markdown string to the caller, trimmed and newline-separated.
+ *
+ * ### Example Output:
+ * ```markdown
+ * * [OpenAI](https://www.openai.com)
+ * * [Hyperlambda Reference](https://docs.ainiro.io/hyperlambda/)
+ * ```
+ *
+ * ### Use Cases:
+ * - Building link summaries of articles, websites, or directories.
+ * - Extracting educational or reference links for further crawling.
+ * - Preprocessing content for LLM training or knowledge ingestion pipelines.
+ *
+ * ### Notes:
+ * - All URLs are normalized into absolute form using the provided page’s base URL.
+ * - This implementation handles common edge cases like `//`, `/`, and relative paths.
+ * - If a `query` argument is specified (e.g., `uddg` from DuckDuckGo), links are "unmasked" for accurate output.
  */
 slots.create:magic.http.html2markdown-links
 

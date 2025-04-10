@@ -1,5 +1,53 @@
 
-// Endpoint that returns the Magic CAPTCHA JavaScript library to caller.
+/*
+ * Returns the Magic CAPTCHA JavaScript library with embedded server-specific public key.
+ *
+ * This HTTP endpoint serves the Magic CAPTCHA client-side JavaScript library to the requesting client.
+ * It dynamically replaces a `[[public-key]]` placeholder in the file with a server-specific hashed
+ * fingerprint derived from the system’s authentication secret. This ensures the JavaScript returned
+ * is cryptographically tied to the specific backend instance.
+ *
+ * ### Arguments:
+ * - `v` (string, optional): Version tag or cache buster (not currently used in logic but reserved for future compatibility).
+ *
+ * ### Behavior:
+ * 1. **Server Key Generation**:
+ *    - Loads the system authentication secret (`magic:auth:secret`) from config.
+ *    - Applies **double SHA256 hashing** to generate a secure, non-reversible fingerprint.
+ *    - This hashed value acts as the server’s CAPTCHA public key and is injected into the script.
+ *
+ * 2. **JavaScript File Selection**:
+ *    - Attempts to load the minified CAPTCHA script:
+ *      - `/system/misc/magic-captcha.min.js`
+ *    - Falls back to the non-minified version if the minified file doesn't exist:
+ *      - `/system/misc/magic-captcha.js`
+ *
+ * 3. **Dynamic Substitution**:
+ *    - Replaces all `[[public-key]]` tokens in the loaded JavaScript file with the generated server fingerprint.
+ *
+ * 4. **Headers and Output**:
+ *    - Sets the `Content-Type` header to `text/javascript`.
+ *    - Returns the final JavaScript file with injected content to the client.
+ *
+ * ### Use Cases:
+ * - Dynamically serving the CAPTCHA script for use in public forms, user registration, or anti-bot protection.
+ * - Ensures CAPTCHA tokens can only be validated by the server instance that issued them.
+ *
+ * ### Example Output:
+ * JavaScript with:
+ * ```js
+ * const publicKey = "[[public-key]]";  // replaced dynamically
+ * ```
+ * becomes:
+ * ```js
+ * const publicKey = "09A7BF1E7E7A...";  // double SHA256 of auth secret
+ * ```
+ *
+ * ### Notes:
+ * - This endpoint ensures every CAPTCHA challenge is securely tied to its issuing backend.
+ * - If no `[[public-key]]` placeholder is found, the file is returned as-is.
+ * - To improve caching, a `v` parameter can later be incorporated into ETag or Cache-Control logic.
+ */
 .arguments
    v:string
 

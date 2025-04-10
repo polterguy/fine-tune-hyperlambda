@@ -1,8 +1,34 @@
 
 /*
- * Slot for commonalities between different endpoint responsible for 
- * handling authentication, reCAPTCHA, opening database connection,
- * and all other commonalities between the different endpoints.
+ * Create a dynamic slot that does the following;
+ *
+ * Provides common logic for LLM endpoint invocations by applying configuration settings,
+ * access control, reCAPTCHA verification, and request validation for a specified [type].
+ *
+ * This includes:
+ *
+ * 1. Connecting to your database and retrieving model configuration from the `ml_types` table.
+ * 2. Fallback to `default` type if the requested type does not exist.
+ * 3. Verifying authorization based on configured `auth` and reCAPTCHA values in the type definition.
+ * 4. Automatically verifying CAPTCHA (reCAPTCHA or Magic CAPTCHA) if required and user is anonymous.
+ * 5. Validating that the number of requests has not exceeded the monthly cap for this type.
+ * 6. Resolving and invoking any webhook integration for `incoming` messages.
+ * 7. Trimming the prompt and checking its token length against the `max_request_tokens` limit.
+ * 8. Ensuring the system message can be dynamically templated with mixins if it contains `{{ }}`.
+ * 9. Determining the `model_size` depending on the model name.
+ * 10. Defaulting `max_context_tokens` and `max_request_tokens` based on model size if not configured.
+ * 11. Executing the `.callback` specified in the arguments, passing both the model configuration and the arguments.
+ * 12. Incrementing the `no_requests` counter for the model in your database.
+ *
+ * ---
+ * ### Example:
+ * Use this slot as a reusable wrapper inside endpoint definitions:
+ * ```hyperlambda
+ * execute:magic.ai.endpoint-common
+ *   type:my-model
+ *   prompt:string:Ask me anything
+ *   .callback:my.slot.to.invoke
+ * ```
  */
 slots.create:magic.ai.endpoint-common
 

@@ -1,8 +1,56 @@
 
 /*
- * Create slot that does the following;
+ * Initiates an asynchronous site crawl to generate machine learning training data from website content.
  *
- * Crawls the specified website generating training data for machine learning in the process.
+ * This dynamic slot acts as the orchestration layer that spawns a new thread to crawl a given website.
+ * It invokes the `[magic.ai.crawl-site-on-thread]` slot to handle the actual crawling and content extraction,
+ * isolating the heavy lifting from the main process to prevent blocking and to ensure fault tolerance.
+ *
+ * If an error occurs during crawling, it logs the error, notifies the frontend via WebSockets, and optionally
+ * invokes a user-supplied `.onerror` handler to allow custom error processing.
+ *
+ * ### Arguments:
+ * - `url` (string, required): The root URL of the website to crawl.
+ * - `feedback-channel` (string, optional): A WebSocket feedback channel used to notify frontend users of progress or errors.
+ * - `onerror` (lambda, optional): A lambda function to invoke if the crawling thread throws an exception.
+ * - Additional arguments may be passed to the underlying thread to customize crawling behavior.
+ *
+ * ### Behavior:
+ * 1. **Thread Forking**:
+ *    - Spawns a new thread using `[fork]` to perform the crawl asynchronously.
+ *    - All arguments are passed to the thread by inserting them into the invocation context.
+ *
+ * 2. **Site Crawling**:
+ *    - Inside the thread, `[signal:magic.ai.crawl-site-on-thread]` is invoked with the same arguments.
+ *    - This delegated slot performs actual content scraping, transformation, and storage.
+ *
+ * 3. **Error Handling**:
+ *    - Exceptions are caught inside the thread to avoid crashing the main process.
+ *    - If an error occurs:
+ *      - Logs the error using `[log.error]`, tagging it with the `url`.
+ *      - Sends a real-time notification over the specified `feedback-channel` using `[sockets.signal]`.
+ *      - If a `.onerror` lambda is defined, it is invoked with the same arguments for custom handling.
+ *
+ * ### Example:
+ * ```json
+ * {
+ *   "url": "https://example.com",
+ *   "feedback-channel": "crawl-status",
+ *   "onerror": {
+ *     "invoke": "my.custom.error.handler"
+ *   }
+ * }
+ * ```
+ *
+ * ### Use Cases:
+ * - Background processing for AI training pipelines (e.g., document ingestion, RAG indexing).
+ * - Non-blocking crawl jobs triggered via API or UI.
+ * - Error-resilient scraping with real-time feedback integration.
+ *
+ * ### Notes:
+ * - This slot **does not return a value immediately**, since it forks to another thread.
+ * - To monitor status, the frontend should listen on the `feedback-channel` for success/failure messages.
+ * - The actual crawling logic resides in `magic.ai.crawl-site-on-thread`.
  */
 slots.create:magic.ai.crawl-site
 

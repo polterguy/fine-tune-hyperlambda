@@ -1,8 +1,60 @@
 
 /*
- * Endpoint that retrieves the specified URL using HTTP GET
+ * Performs an HTTP GET request to a specified URL with optional Bearer or Basic authentication and query parameters.
  *
- * Uses HTTP GET to retrieve the specified [url], optionally with Basic or Bearer authentication.
+ * This endpoint provides a flexible HTTP GET wrapper with built-in support for both Bearer and Basic authentication,
+ * pulling credentials either from arguments or from application configuration keys. It is ideal for interacting with
+ * external APIs, testing HTTP endpoints, or securely integrating with third-party services.
+ *
+ * ### Arguments:
+ * - `url` (string, required): The fully qualified URL to send the GET request to.
+ *
+ * #### Optional Authentication:
+ * - `token_type` (string): Must be either `"Bearer"` or `"Basic"` if authentication is used.
+ *
+ * ##### For Bearer Auth:
+ * - `token_key` (string): A configuration key containing the token (e.g., `"magic:my_app:api_token"`).
+ * - `token` (string): A raw Bearer token (used if `token_key` is not provided).
+ *
+ * ##### For Basic Auth:
+ * - `username` (string): The username to use for Basic authentication.
+ * - `password` (string): The password to use for Basic authentication.
+ *
+ * #### Optional Query Parameters:
+ * - `params` (map): A key/value object of query string parameters to append to the URL.
+ *
+ * ### Behavior:
+ * 1. **Authentication Resolution**:
+ *    - If `token_key` is provided, retrieves the Bearer token from configuration.
+ *    - If `token` is provided directly, uses it for Bearer authentication.
+ *    - If `username` and `password` are provided, uses them for Basic authentication.
+ *    - If none are provided, performs the request anonymously.
+ *
+ * 2. **Query Parameter Construction**:
+ *    - If `params` is specified, appends the key-value pairs to the query string.
+ *
+ * 3. **Execution**:
+ *    - Delegates the HTTP GET request to a reusable workflow action: `/misc/workflows/actions/http/http-get.hl`.
+ *    - The request is executed through `magic.workflows.actions.execute`, allowing for reuse of any additional
+ *      authentication or transport-level logic.
+ *
+ * 4. **Returns**:
+ *    - Returns the full result of the HTTP GET request, including headers, status, and content body.
+ *    - If authentication or invocation fails, the response includes the relevant error status and message.
+ *
+ * ### Example Usage:
+ * ```json
+ * {
+ *   "url": "https://api.example.com/data",
+ *   "token_type": "Bearer",
+ *   "token_key": "magic:example:api_token"
+ * }
+ * ```
+ *
+ * ### Notes:
+ * - This endpoint abstracts away the repetitive logic for performing secure HTTP GET requests.
+ * - It supports seamless integration with config-driven secrets using `token_key`, ideal for secure APIs.
+ * - Returns raw HTTP response data that can be processed or transformed downstream.
  */
 .arguments
 

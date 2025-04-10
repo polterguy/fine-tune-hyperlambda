@@ -1,10 +1,58 @@
 
 /*
- * Write a slot that does the following;
+ * Create a dynamic slot that retrieves HTML from a specified URL, optionally following redirects.
  *
- * Retrieves HTML from specified [url] and returns as HTML.
+ * This slot fetches the HTML content of a webpage using HTTP GET. It accepts optional headers, handles
+ * redirects (301 and 302), retries using HTTPS if the original request was plain HTTP, and verifies that
+ * the response is valid HTML before returning it to the caller. If the content is not HTML, an exception
+ * is thrown.
  *
- * Optionally provide [headers] argument to override the default HTTP headers.
+ * ---
+ * ### Arguments:
+ *
+ * - `url` (string, required): The URL to retrieve HTML from. Must be a valid absolute URL.
+ * - `headers` (map, optional): HTTP headers to include in the request. Defaults include:
+ *   - `User-Agent: AINIRO-Crawler 2.0`
+ *   - `Accept: text/html`
+ *   - `Accept-Encoding: identity`
+ * - `feedback-channel` (string, optional): WebSocket channel for real-time status messages during redirects.
+ *
+ * ---
+ * ### Behavior:
+ *
+ * 1. **Validates** the `url` and ensures it is a valid URL.
+ * 2. **Adds default headers** unless explicitly provided.
+ * 3. Performs a **GET request** using the provided or default headers.
+ * 4. Handles **redirects (301/302)**:
+ *    - If redirected and the original URL was HTTP, retries with HTTPS.
+ *    - If redirected elsewhere, follows the new `Location` header.
+ * 5. Emits optional **feedback messages via WebSockets** if `feedback-channel` is provided.
+ * 6. **Validates MIME type** of the response. If not `text/html`, throws a descriptive error.
+ * 7. **Returns raw HTML** content to the caller.
+ *
+ * ---
+ * ### Error Handling:
+ *
+ * - Non-200/300 responses (besides 301/302) trigger an error log and a thrown exception.
+ * - If the server responds with a non-HTML content type, an exception is thrown with a descriptive message.
+ *
+ * ---
+ * ### Example Usage:
+ *
+ * ```json
+ * {
+ *   "url": "https://example.com",
+ *   "headers": {
+ *     "User-Agent": "AINIRO-Crawler 2.0"
+ *   },
+ *   "feedback-channel": "crawler-feedback"
+ * }
+ * ```
+ *
+ * ---
+ * ### Return:
+ *
+ * The raw HTML content of the target page as a string.
  */
 slots.create:magic.ai.url.get
 

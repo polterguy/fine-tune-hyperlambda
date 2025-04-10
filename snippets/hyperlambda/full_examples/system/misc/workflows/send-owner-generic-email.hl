@@ -1,10 +1,51 @@
 
 /*
- * Create an HTTP endpoint that does the following;
+ * Sends a system-generated email to the cloudlet owner using Markdown-formatted body content.
  *
- * Send an email to owner of cloudlet
- * 
- * This endpoint will send the owner of the cloudlet an email, with the specified [body].  The workflow will send an email from the owner of the cloudlet to the owner of the cloudlet, allowing the system to send generic emails without having an explicit reply to email address, which is useful for notifications, etc.
+ * This HTTP endpoint sends an email **from** the cloudlet owner **to** the cloudlet owner, using default
+ * name and email settings from configuration. It is useful for system-triggered notifications, logs, or alerts
+ * that do not require a user-defined reply-to address. The message body is passed in as Markdown and is
+ * automatically transformed to HTML before sending.
+ *
+ * ### Arguments:
+ * - `body` (string, required): The email content, written in Markdown. This will be HTML-encoded for safety
+ *   and then converted into HTML for proper rendering in email clients.
+ *
+ * ### Behavior:
+ * 1. **HTML Encoding**:
+ *    - HTML-encodes the `body` input to prevent HTML injection or formatting issues.
+ *
+ * 2. **Markdown Conversion**:
+ *    - Converts the encoded body content from Markdown to HTML using a reusable workflow action.
+ *
+ * 3. **Configuration Lookup**:
+ *    - Retrieves the owner's name and email from configuration keys:
+ *      - `magic:smtp:from:name` → Sender and recipient name
+ *      - `magic:smtp:from:address` → Sender and recipient email
+ *    - These values are used for both the `from`, `to`, and `reply-to` headers, ensuring consistency and no user input leakage.
+ *
+ * 4. **Email Sending**:
+ *    - Sends the final email with:
+ *      - Static subject line: `"Email from Magic Cloudlet"`
+ *      - The converted HTML body
+ *      - Both sender and recipient using the configuration-based identity
+ *      - Marks the content as HTML with `html: true`
+ *
+ * 5. **Returns**:
+ * ```json
+ * {
+ *   "result": "success"
+ * }
+ * ```
+ *
+ * ### Example Use Case:
+ * - Internal alert like “Low disk space” or “User signup completed.”
+ * - Background task completion notice to the owner.
+ * - System health report summary.
+ *
+ * ### Notes:
+ * - No reply-to or external user input is used in the email's metadata (sender/recipient), making this safe for internal system messages.
+ * - Subject is static and hardcoded as `"Email from Magic Cloudlet"` to prevent subject spoofing or variability.
  */
 .arguments
 

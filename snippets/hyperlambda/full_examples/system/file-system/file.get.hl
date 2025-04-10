@@ -1,5 +1,45 @@
 
-// Create endpoint for root users that loads the specified file and returns to caller as 'application/octet-stream' Content-Type.
+/*
+ * Allows a root user to download a file from the server as an octet-stream.
+ *
+ * This Hyperlambda endpoint lets administrative users securely download files from the backend
+ * by specifying the absolute or relative path to a file. The file is streamed back as binary data
+ * with appropriate `Content-Type` and `Content-Disposition` headers to prompt a browser download.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced using [auth.ticket.verify:root] to ensure only trusted users can access server-side files.
+ *
+ * ### Arguments:
+ * - `file` (string): The full file path to the file to download. Required.
+ *
+ * ### Behavior:
+ * 1. Verifies the user is authorized as a root user.
+ * 2. Validates that a `file` path has been provided.
+ * 3. Extracts the filename portion using [strings.split] and [strings.concat] to set a `Content-Disposition` header.
+ * 4. Sets response headers to:
+ *    - `Content-Type: application/octet-stream`
+ *    - `Content-Disposition: attachment; filename="..."` (forces file download)
+ *    - `Access-Control-Expose-Headers: Content-Disposition` (makes headers visible to frontend clients)
+ * 5. Uses [io.stream.open-file] to stream the specified file's binary content back to the client.
+ *
+ * ### Returns:
+ * - The binary contents of the file, returned directly as the response body.
+ *   Content is delivered using `application/octet-stream`, allowing any type of file to be downloaded.
+ *
+ * ### Example Usage:
+ * A client can call this endpoint to download logs, backups, or exported files.
+ *
+ * Example response headers:
+ * ```
+ * Content-Type: application/octet-stream
+ * Content-Disposition: attachment; filename="export.zip"
+ * ```
+ *
+ * ### Security Warning:
+ * - This endpoint grants access to any file the backend can reach. Input should be validated further
+ *   in production to prevent path traversal or leakage of unintended files.
+ */
 .arguments
    file:string
 

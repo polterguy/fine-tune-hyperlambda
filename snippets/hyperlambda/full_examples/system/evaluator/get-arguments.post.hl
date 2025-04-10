@@ -1,7 +1,58 @@
 
 /*
- * Create a Hyperlambda endpoint that does the following:
- * Returns arguments the specified Hyperlambda require if any.
+ * Inspects a Hyperlambda code snippet and returns its declared input arguments, if any.
+ *
+ * This Hyperlambda endpoint analyzes the structure of a given [hyperlambda] string and extracts
+ * the `.arguments` declaration block, returning a list of expected parameters along with their types.
+ * This is useful for building dynamic UIs or automation workflows that need to prompt users for the
+ * correct inputs required to execute a given Hyperlambda script.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   This is enforced using [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * - `hyperlambda` (string): A properly formatted Hyperlambda code snippet as a string.
+ *   This code may (optionally) include an `.arguments` block describing required inputs.
+ *
+ * ### Behavior:
+ * 1. Uses [hyper2lambda] to deserialize the input Hyperlambda string into a structured lambda tree.
+ * 2. Iterates through the `.arguments` block of the lambda object (if it exists).
+ * 3. For each argument:
+ *    - If a type is not explicitly defined but the value is a non-null string, it is normalized into the format:
+ *      ```
+ *      arg_name
+ *         type:string
+ *      ```
+ *    - This normalization ensures consistency in how argument declarations are presented.
+ * 4. Returns the processed `.arguments` structure to the caller.
+ *
+ * ### Returns:
+ * - A list of argument nodes representing the parameters required by the Hyperlambda.
+ *   Each argument will include:
+ *   - `name`: The argument key
+ *   - `type`: (optional) A primitive type such as `string`, `int`, `bool`, etc.
+ *
+ * ### Example Response:
+ * ```
+ * name
+ *    type:string
+ * age
+ *    type:int
+ * ```
+ *
+ * ### Example Input Hyperlambda:
+ * ```plaintext
+ * .arguments
+ *    name:string
+ *    age:int
+ * strings.concat
+ *    .:"Hello "
+ *    get-value:x:@.arguments/*/name
+ * ```
+ *
+ * This endpoint is especially useful when working with dynamic execution engines,
+ * script editors, or developer tools that need to analyze or prepare arguments before invoking a script.
  */
 .arguments
    hyperlambda:string

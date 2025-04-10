@@ -1,5 +1,51 @@
 
-// Show me a CRUD delete endpoint deleting multiple records from your ml_training_snippets table in your magic database matching filter authentication and authorisation for root roles
+/*
+ * Deletes multiple records from the `ml_training_snippets` table based on filter criteria, and performs associated cleanup.
+ *
+ * This Hyperlambda HTTP `DELETE` endpoint allows root users to perform bulk deletions on the `ml_training_snippets` table.
+ * It supports advanced filtering via query arguments, cleans up any referenced files on disk, and synchronizes deletion
+ * with the related `vss_ml_training_snippets` shadow table.
+ *
+ * ### Access Control:
+ * - Only users with the `root` role may invoke this endpoint.
+ *   Enforced via [auth.ticket.verify:root].
+ *
+ * ### Arguments:
+ * The endpoint accepts flexible filters to target which records to delete:
+ * - `ml_training_snippets.prompt.like` (string): Optional. Deletes records where the prompt matches a LIKE expression.
+ * - `ml_training_snippets.completion.like` (string): Optional. Deletes records where the completion matches a LIKE expression.
+ * - `ml_training_snippets.uri.like` (string): Optional. Deletes records where the URI matches a LIKE expression.
+ * - `ml_training_snippets.type.eq` (string): Optional. Deletes records where the type matches exactly.
+ *
+ * ### Behavior:
+ * 1. Authenticates the user and validates root access.
+ * 2. Dynamically builds a parameterized filter query using provided arguments.
+ *    - Filters using an `OR` condition for prompt, completion, and URI matches.
+ *    - Filters using an `AND` condition for the rest (e.g., type).
+ * 3. Reads matching entries from the database and deletes associated files on disk (if the `filename` column exists and points to a real file).
+ * 4. Prepares and executes a deletion statement for the shadow table (`vss_ml_training_snippets`) by generating a SQL query from the filtered result set.
+ * 5. Deletes the filtered records from the `ml_training_snippets` main table.
+ *
+ * ### Returns:
+ * - A response node indicating how many records were deleted:
+ * ```
+ * affected:<number-of-rows-deleted>
+ * ```
+ *
+ * ### Example Use Case:
+ * Delete all snippets of type `blog`, where the URI contains `"draft"`:
+ * ```
+ * {
+ *   "ml_training_snippets.uri.like": "%draft%",
+ *   "ml_training_snippets.type.eq": "blog"
+ * }
+ * ```
+ *
+ * ### Notes:
+ * - Automatically deletes associated files found in the `filename` column, if they exist on disk.
+ * - Ensures consistency between the primary table and its vector search shadow table.
+ * - Filters are optional but must match at least one record for deletions to occur.
+ */
 .arguments
    ml_training_snippets.prompt.like:string
    ml_training_snippets.completion.like:string
