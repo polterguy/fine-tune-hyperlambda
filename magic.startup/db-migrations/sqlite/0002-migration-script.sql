@@ -1,0 +1,1 @@
+alter table hyperlambda add column "synthesised" numeric not null default 0; 

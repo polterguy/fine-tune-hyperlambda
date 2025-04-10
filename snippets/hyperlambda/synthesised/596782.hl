@@ -1,0 +1,31 @@
+/*
+ * This code retrieves all URLs from the sitemap of a specified website.
+ * It starts by constructing the main sitemap URL, retrieves its content,
+ * and then iterates through each URL in the sitemap index. For each URL,
+ * it fetches and parses the XML content to extract URLs from the nested
+ * sitemaps, adding them to a list of URLs.
+ */
+.website:"https://ainiro.io"
+
+// This node will store all extracted URLs from the website.
+.urlList
+
+// Constructing the main sitemap URL and fetching its content.
+strings.concat
+   get-value:x:@.website
+   .:/sitemap.xml
+http.get:x:@strings.concat
+xml2lambda:x:@http.get/*/content
+
+// Looping through each URL in the main sitemap index.
+for-each:x:"@xml2lambda/*/sitemapindex/*/sitemap/*/loc/*/\\#text"
+
+   // Fetching and parsing XML from each sitemap subset.
+   unwrap:x:+/*/*
+   http.get:x:@.dp/#
+   xml2lambda:x:@http.get/*/content
+   for-each:x:"@xml2lambda/*/urlset/*/url/*/loc/*/\\#text"
+      unwrap:x:+/*/*
+      add:x:@.urlList
+         . 
+            .:x:@.dp/#

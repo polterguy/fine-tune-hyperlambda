@@ -45,4 +45,5 @@ Below are some example prompts you can run through the model after fine tuning i
 * How do I concatenate two strings given to an endpoint as arguments?
 * Generate an AI function allowing me to send emails. Assume the user ID is the user's email address
 * Create an API endpoint that allows me to insert a contact into HubSpot
+* Create an endpoint allowing me to read a sitemap from a domain, and return all URLs found.
 
