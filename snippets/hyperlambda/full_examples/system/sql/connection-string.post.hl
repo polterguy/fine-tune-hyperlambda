@@ -1,13 +1,34 @@
-
 /*
- * Adds the specified connection string.
- * 
- * Arguments;
- * - [databaseType] - Database type, typically 'mssql' or 'mysql'.
- * - [name] - Name of connection string.
- * - [connectionString] - Connection string to add.
- * - [useAsDefault] - If true will become the default connection string for the magic database
+ * Adds a new database connection string to the system configuration with optional default status.
+ *
+ * ### Arguments:
+ * - **[databaseType]** *(required)*: Must be one of `mysql`, `pgsql`, or `mssql`.
+ * - **[name]** *(required)*: Logical name of the connection string.
+ * - **[connectionString]** *(required)*: The actual connection string, must contain `{database}` placeholder.
+ * - **[useAsDefault]** *(optional)*: If true and name is `generic`, it sets this as the default Magic database.
+ *
+ * ### Behavior:
+ * 1. **Validation**: Ensures all required parameters are present and valid.
+ * 2. **Sanity Check**: Confirms the connection string contains `{database}` placeholder for substitution.
+ * 3. **Test Connection**: Attempts to connect using a known database name (`master`, `postgres`, or `information_schema`) depending on the database type.
+ * 4. **Add to Configuration**:
+ *    - Loads current config and inserts the connection string under `magic.databases.{databaseType}.{name}`.
+ *    - If the database type section doesn't exist, it is created.
+ * 5. **Use as Default (Optional)**:
+ *    - If `[useAsDefault]` is true and `[name]` is `generic`, sets `[databaseType]` as default database.
+ *    - Migrates the current user credentials from the old default database to the new one.
+ *    - Recreates the user, their metadata (email, name), and roles in the new database.
+ *    - Runs `/system/ensure-magic-database.hl` to create schema if needed.
+ *    - Clears all config cache to prevent stale values.
+ * 6. **Returns**:
+ *    - `{ result: "success" }` on successful creation.
+ *    - `{ result: "failure", message: "...error..." }` if validation or database connection test fails.
+ *
+ * ### Use Case:
+ * - Enables programmatic addition of database connections.
+ * - Supports dynamic switching of the Magic backend database via API.
  */
+
 .arguments
    databaseType:string
    name:string
