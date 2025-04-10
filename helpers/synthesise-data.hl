@@ -1,0 +1,106 @@
+/* 
+ * Selects records from fine-tune database, and its hyperlambda table,
+ * that does not contain .arguments in their code column.
+ *
+ * Then it sends the prompt + code columns to OpenAI with a default system message,
+ * after having added the prompt to the code part as a file level comment at the top.
+ *
+ * When OpenAI returns, it saves the result to '/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised/'
+ * with an indexed file name.
+ */
+.arguments
+   limit:long
+   offset:long
+.type:public
+
+// Ensuring both arguments are specified by caller!
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+
+// Loading our system message file.
+.system-message
+set-value:x:@.system-message
+   io.file.load:/modules/fine-tune-hyperlambda/system-message-synthesiser.md
+
+// Connecting to our fine-tune database.
+data.connect:fine-tune
+
+   // Selecting records.
+   data.select:"select * from hyperlambda where code not like '%.arguments%' and is_static = 0 limit @limit offset @offset"
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   // Iterating through records.
+   for-each:x:@data.select/*
+
+      // Transforming prompt + code into a file-level comment + original code.
+      hyper2lambda:x:@.dp/#/*/code
+         comments:true
+      unwrap:x:+/*/*
+      insert-before:x:@hyper2lambda/0
+         .
+            ..:x:@.dp/#/*/prompt
+
+      // Transforming to Hyperlambda again.
+      .hl
+      set-value:x:@.hl
+         lambda2hyper:x:@hyper2lambda/*
+            comments:true
+
+      // Doing some logging.
+      log.info:Invoking OpenAI
+         prompt:x:@.hl
+         
+            
+      /*
+       * Returns context for the specified [query] from the specified [type],
+       * and returns to caller.
+       *
+       * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
+       * tokens to return. [type] is a machine learning type from your ml_types database table in
+       * your magic database.
+       */
+      execute:magic.workflows.actions.execute
+         name:openai-context-from-database
+         filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+         arguments
+            type:magic-documentation
+            query:x:@.hl
+            threshold:decimal:0.3
+            max_tokens:int:3000
+      
+
+      /*
+       * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+       * [instruction] and [query].
+       *
+       * Will use the default API key found from configurations.
+       *
+       * [context] is additional data you can supply to OpenAI such that it responds using
+       * your data as its source for information. [instruction] is a system message allowing
+       * you to change how OpenAI responds.
+       */
+      execute:magic.workflows.actions.execute
+         name:openai-query
+         filename:/modules/openai/workflows/actions/openai-query.hl
+         arguments
+            model:gpt-4o
+            max_tokens:int:1500
+            instruction:x:@.system-message
+            context:x:@execute/@execute/*/context
+            query:x:@.hl
+
+      // Creating a unique filename
+      .filename
+      set-value:x:@.filename
+         strings.concat
+            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised/
+            get-value:x:@.dp/#/*/hyperlambda_id
+            .:.hl
+
+      // Saving to file system.
+      io.file.save:x:@.filename
+         get-value:x:@execute/*/answer
+
+      // To avoid 429 from OpenAI we wait for 5 seconds before we execute the next record.
+      sleep:5000

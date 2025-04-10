@@ -1,0 +1,30 @@
+Make the name filter optional
+
+```hyperlambda
+.arguments
+   name:string
+data.connect:sales
+   data.read
+      table:customers
+      columns
+         name
+         email
+      where
+         and
+            name.like:x:@.arguments/*/name
+   return-nodes:x:@data.read/*
+``` 
+---
+.arguments
+   name.like:string
+data.connect:sales
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/name.like
+   data.read
+      table:customers
+      columns
+         name
+         email
+      where
+         and
+   return-nodes:x:@data.read/*
