@@ -1,5 +1,27 @@
+/*
+ * Create an HTTP endpoint that lists all databases in the system for a given [databaseType] and [connectionString],
+ * including each database’s tables, columns, indexes, and foreign keys. Only root users are allowed to invoke it.
+ *
+ * ### Arguments:
+ * - **[databaseType]** *(required)*: One of `mysql`, `pgsql`, `mssql`, or `sqlite`.
+ * - **[connectionString]** *(required)*: The connection string to use for inspecting the database server.
+ *
+ * ### Behavior:
+ * 1. **Authentication**: Validates root access via `auth.ticket.verify:root`.
+ * 2. **Validation**: Ensures both `databaseType` and `connectionString` are provided and of valid enum values.
+ * 3. **Caching**: Results are cached for 10 hours to reduce repeated costly lookups.
+ * 4. **Database Listing**:
+ *    - Calls the appropriate signal to retrieve all available databases for the given connection.
+ *    - Filters out system/internal databases like `master`, `postgres`, `information_schema`, etc.
+ * 5. **Metadata Collection**:
+ *    - For each user-defined database, retrieves:
+ *      - **Tables** in the database.
+ *      - **Columns** for each table, including nullable, primary key, automatic, and HL flags.
+ *      - **Foreign keys** for each table.
+ *      - **Indexes** on each table.
+ * 6. **Return**: Returns a list of all databases with their structure and metadata in a structured format.
+ */
 
-// Create endpoint that lists all database in your installation with authentication requirements for root accounts only.
 .arguments
    databaseType:string
    connectionString:string
