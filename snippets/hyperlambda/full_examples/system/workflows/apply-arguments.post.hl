@@ -1,8 +1,48 @@
 
 /*
- * Create an endpoint that applies the specified arguments and file comment description
- * to the specified Hyperlambda.
+ * Creates an HTTP endpoint that updates a Hyperlambda code snippet by injecting arguments and a file-level description.
+ *
+ * ### Purpose:
+ * This endpoint allows programmatic enhancement of a raw Hyperlambda file, enabling users to:
+ * - Add or replace the `.arguments` section.
+ * - Insert or update a file-level comment (`..`) as the description.
+ * - Apply metadata indicating that the file is public (`.type:public`).
+ *
+ * ### Access Control:
+ * - Only users with `root` privileges are authorized to invoke this endpoint.
+ *
+ * ### Workflow:
+ * 1. **Conversion of Input**:
+ *    - Converts the provided `hyperlambda` string into a structured lambda object using `hyper2lambda`.
+ *    - Enables comment parsing to preserve or modify file-level comments.
+ *
+ * 2. **Cleanup**:
+ *    - Removes any existing file-level comment (`..`) and `.arguments` section to ensure a clean overwrite.
+ *    - Adds a temporary `.support` node at the end to avoid structural issues during node insertion.
+ *
+ * 3. **Argument Injection**:
+ *    - If new arguments (`args`) are supplied, inserts them under a new `.arguments` node at the beginning.
+ *    - If no arguments are given:
+ *      - Adds an empty `.arguments` node after the description if present.
+ *      - Otherwise, adds it as the first node in the file.
+ *
+ * 4. **Metadata**:
+ *    - Inserts a `.type:public` node after the `.arguments` block to label the file as publicly accessible.
+ *
+ * 5. **Description Handling**:
+ *    - If a `description` string is provided:
+ *      - Normalizes line endings to `\r\n`.
+ *      - Adds the content as a new file-level comment (`..`) at the top of the file.
+ *
+ * 6. **Finalization**:
+ *    - Removes the temporary `.support` node.
+ *    - Converts the modified lambda object back into Hyperlambda format using `lambda2hyper`.
+ *
+ * ### Returns:
+ * - A `result` node containing the newly constructed Hyperlambda string.
  */
+
+
 .arguments
    hyperlambda:string
    description:string

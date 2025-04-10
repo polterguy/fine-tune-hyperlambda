@@ -1,11 +1,47 @@
-
 /*
- * Create Hyperlambda slot for using Twilio in combination with OpenAI's ChatGPT APIs.
+ * Creates a dynamic Hyperlambda slot that integrates Twilio messaging services (SMS, WhatsApp, Messenger) 
+ * with OpenAI's ChatGPT API to build intelligent virtual assistants that can respond to messages 
+ * in real time.
  *
- * Intended to be used as a callback slot when Twilio's webhook is being invoked,
- * allowing you to invoke OpenAI's GPT API to automatically answer messages originating
- * from WhatsApp, SMS, and Messenger, creating virtual AI chatbots for these chat channels.
+ * Overview:
+ * This slot is designed to act as a Twilio webhook callback handler. When a user sends a message via 
+ * SMS, WhatsApp, or another Twilio-supported channel, the message body is forwarded to this slot. 
+ * The slot then:
+ * 
+ * 1. **Validates Required Arguments**:
+ *    - Ensures that incoming webhook payload contains required fields: [to], [from], [body], and [twilio_account_id].
+ *    - Reassigns the [body] to a more semantic name [prompt] to align with OpenAI's expected input.
+ *    - Derives a session identifier from the [from] number for user state tracking.
+ *
+ * 2. **Looks Up the Corresponding AI Model**:
+ *    - Uses [twilio_account_id] to lookup the appropriate ML type (model configuration) from the `ml_types` table.
+ *    - If the model is not found, it returns a 401 unauthorized error.
+ *
+ * 3. **Spawns a Forked Thread**:
+ *    - Immediately returns control to Twilio while spawning a background thread to process the message.
+ *    - Prevents webhook timeout while processing potentially long OpenAI requests.
+ *
+ * 4. **Enriches Execution Context and Invokes AI Endpoint**:
+ *    - Passes arguments into a generic AI slot ([magic.ai.endpoint-common]) to resolve the full model configuration.
+ *    - If the message includes an email address, and a lead capture message is configured, 
+ *      the system attempts to capture the lead via [magic.ai.send-lead-email].
+ *    - Sends a confirmation message back to the user if a lead was captured successfully.
+ *
+ * 5. **Selects and Invokes the Appropriate AI Slot**:
+ *    - If the model name starts with `gpt`, it invokes [magic.ai.chat] (chat-style GPT interface).
+ *    - Otherwise, it falls back to [magic.ai.completion] (for legacy or fine-tuned models).
+ *
+ * 6. **Sends the AI-Generated Response**:
+ *    - Sends the generated reply from OpenAI back to the original sender using the 
+ *      [magic.twilio.send-message] slot, which communicates via Twilio’s API.
+ *
+ * Use Cases:
+ * - Auto-responding to customers on WhatsApp or SMS.
+ * - AI-powered lead generation from text messages.
+ * - Connecting OpenAI language models with Twilio channels seamlessly.
  */
+
+
 slots.create:magic.twilio.ai.chat
 
    // Sanity checking invocation.

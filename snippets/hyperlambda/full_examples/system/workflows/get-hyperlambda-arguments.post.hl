@@ -1,7 +1,35 @@
-
 /*
- * Generate an endpoint that returns the arguments the specified Hyperlambda can handle.
+ * Creates an HTTP endpoint that analyzes a Hyperlambda file or string to extract its accepted arguments.
+ *
+ * ## Overview
+ * This endpoint returns the `.arguments` node of a Hyperlambda snippet or file, including argument names and types,
+ * and optionally the file-level description if provided. It's especially useful for introspection in dynamic environments
+ * like a workflow engine or an action designer.
+ *
+ * ## Input Arguments
+ * - **[hyperlambda]** *(string)*: A raw Hyperlambda code block (optional if [path] is provided).
+ * - **[path]** *(string)*: File path to the Hyperlambda file to load and analyze.
+ *
+ * ## Processing Logic
+ * - If `path` is provided (and `hyperlambda` is not), the endpoint loads the file from disk.
+ * - Parses the Hyperlambda code into an AST (`lambda`) format using `[hyper2lambda]`.
+ * - Checks whether the file contains a `.arguments` node to determine if it's executable as a function.
+ * - Removes framework-managed arguments (`_session`, `_user-id`, `_type`) to avoid clutter.
+ * - Loops through the `.arguments` node (up to 100 items) and extracts:
+ *   - Argument name
+ *   - Argument type
+ *   - Description (if present via file-level `..` comment)
+ *
+ * ## Return Value
+ * - **[function]** *(bool)*: Whether the file has a `.arguments` collection (i.e., is a valid function).
+ * - **[args]** *(collection)*: List of input arguments with name and type.
+ * - **[description]** *(optional string)*: The file-level comment if available, used as human-readable description.
+ *
+ * ## Example Use Case
+ * This is useful for form builders, action designers, or developer tools where you need to inspect and visualize
+ * the expected parameters a Hyperlambda file supports.
  */
+
 .arguments
    hyperlambda:string
    path:string

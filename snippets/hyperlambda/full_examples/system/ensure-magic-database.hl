@@ -1,8 +1,37 @@
-
 /*
- * Creates the magic database, applies all migration SQL scripts, and
- * creates a scheduled task that creates a backup of the database once every day at 1AM UTC time.
+ * Adds a new database connection string to the system configuration.
+ *
+ * ### Arguments:
+ * - **[databaseType]** *(required)*: Must be one of `mysql`, `pgsql`, or `mssql`.
+ * - **[name]** *(required)*: Name under which the connection string will be stored.
+ * - **[connectionString]** *(required)*: The database connection string. Must include a `{database}` placeholder.
+ * - **[useAsDefault]** *(optional)*: If true and the name is `generic`, this connection will be used as the new default database.
+ *
+ * ### Validation & Safety:
+ * - Ensures user has `root` access.
+ * - Validates all required arguments and allowed values for `databaseType`.
+ * - Ensures the connection string includes a `{database}` placeholder.
+ * - Attempts to connect to the target database type using a temporary substitution for `{database}` to verify validity.
+ *
+ * ### Behavior:
+ * - Loads the system config using `config.load` and modifies the lambda-based representation of it.
+ * - Adds the new connection string under `magic:databases:{databaseType}:{name}`.
+ * - If `useAsDefault` is true and `name` is `generic`, updates the default database type,
+ *   reinitializes schema via `/system/ensure-magic-database.hl`, and migrates the authenticated root user to the new database.
+ *
+ * ### Persistence:
+ * - The updated configuration is saved using `config.save`.
+ * - A `sleep:2000` is included to ensure configuration is stable before executing schema setup.
+ * - Clears the server cache post-migration to prevent stale entries.
+ *
+ * ### Output:
+ * - Returns `{ "result": "success" }` if completed without issues.
+ * - Returns `{ "result": "failure", "message": "...error..." }` if validation or connection testing fails.
+ *
+ * ### Use Case:
+ * - Allows administrators to programmatically onboard new databases and optionally switch the default database engine.
  */
+
 
 // Figuring out what our default database type is.
 .db-type

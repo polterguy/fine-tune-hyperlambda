@@ -1,7 +1,42 @@
 
 /*
- * Create a slot for sending a message using Twilio.
+ * Creates a dynamic Hyperlambda slot to send SMS, WhatsApp, or other text messages using the Twilio API.
+ *
+ * This slot is used for sending outgoing messages in applications that integrate with Twilio's communication platform,
+ * such as AI chatbots or notification services. It supports basic formatting cleanup for Markdown content
+ * and builds a fully compliant Twilio request.
+ *
+ * ### Workflow:
+ *
+ * 1. **Input Validation**:
+ *    - Ensures all required fields are present: [to], [from], [body], [twilio_account_id], and [twilio_account_sid].
+ *
+ * 2. **Creates Basic Authentication Header**:
+ *    - Concatenates Twilio credentials ([twilio_account_id] and [twilio_account_sid]) into a Base64-encoded Basic Auth header.
+ *
+ * 3. **Prepares and Sanitizes Message Content**:
+ *    - Removes Markdown image syntax using regex (`!\[...\](...)`), which is not supported by Twilio.
+ *    - Trims excess whitespace and line breaks to ensure clean delivery.
+ *    - Converts Markdown-style hyperlinks `[text](url)` into a plain format `text (url)`.
+ *
+ * 4. **Constructs Twilio API URL**:
+ *    - Dynamically generates the correct Twilio endpoint URL to send a message using the Twilio Account SID.
+ *
+ * 5. **Sends HTTP POST Request to Twilio**:
+ *    - Issues a `application/x-www-form-urlencoded` HTTP request to the Twilio Messages API.
+ *    - Sends [Body], [From], and [To] as the payload.
+ *    - Uses the Basic Auth header for authentication.
+ *
+ * 6. **Handles Success and Errors**:
+ *    - If the response is not in the 200-299 range, it logs an error and throws a public exception.
+ *    - Otherwise, logs a successful send with the message details for audit and debugging purposes.
+ *
+ * ### Use Cases:
+ * - Send AI-generated chatbot responses via SMS or WhatsApp.
+ * - Dispatch automated alerts, confirmations, or marketing texts.
+ * - Integrate natural language APIs like OpenAI with Twilio communications.
  */
+
 slots.create:magic.twilio.send-message
 
    // Sanity checking invocation.

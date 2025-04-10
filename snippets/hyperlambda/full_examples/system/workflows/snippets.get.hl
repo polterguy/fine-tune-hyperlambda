@@ -1,7 +1,35 @@
 
 /*
- * Create endpoint that returns all workflow snippets to caller.
+ * HTTP endpoint that returns all available workflow snippets to the caller.
+ *
+ * ## Overview
+ * This endpoint aggregates all workflow snippets across the system, including:
+ * - Core system snippets under `/misc/workflows/snippets/`.
+ * - User-defined/custom snippets under `/etc/workflows/snippets/`.
+ * - Snippets bundled inside installed modules under `/modules/*/workflows/snippets/`.
+ *
+ * ## Access Control
+ * - Restricted to users with `root` access via `[auth.ticket.verify:root]`.
+ *
+ * ## Functionality
+ * 1. **Scans the filesystem recursively** for `.hl` (Hyperlambda) files within the above folders.
+ * 2. **Loads each `.hl` snippet** and transforms it to a lambda structure using `[hyper2lambda]`.
+ *    - If the file starts with a file-level comment (`..`), it's interpreted as a `description` and extracted.
+ *    - The raw Hyperlambda content is also attached to the return structure as `content`.
+ * 3. **Generates a readable snippet name** from the filename, excluding the file extension.
+ * 4. **Constructs a structured response** for each snippet, including:
+ *    - `name`: A normalized identifier based on the file path.
+ *    - `filename`: The full system path to the snippet.
+ *    - `description` (optional): Extracted comment block describing the snippet.
+ *    - `content`: The actual Hyperlambda string for the snippet (for preview or editor use).
+ *
+ * ## Output
+ * - Returns a list of all discovered workflow snippets with metadata suitable for UI listing or dynamic loading.
+ *
+ * ## Example Use Case
+ * - Backend for a visual workflow editor listing available reusable snippet templates.
  */
+
 .arguments
 
 // Verifying user is authorized to access endpoint.

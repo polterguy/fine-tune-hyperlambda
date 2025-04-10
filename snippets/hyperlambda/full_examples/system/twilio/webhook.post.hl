@@ -1,12 +1,39 @@
-
 /*
- * Create a Twilio webhook callback endpoint allowing me to configure Twilio to send me backend notifications when my
- * Twilio account receives messages over WhatsApp, Messenger, or SMS etc. Supports all channels that Twilio
- * supports.
+ * Creates a dynamic Hyperlambda endpoint to act as a universal Twilio webhook callback handler for incoming messages.
  *
- * This webhook will pass in [body], [from], [to] and [twilio_account_id] being the AccountSid as given from
- * Twilio during callbacks invocations.
+ * This endpoint is intended to be configured as the webhook URL inside your Twilio account,
+ * allowing it to receive inbound messages over any Twilio-supported channel including:
+ * WhatsApp, SMS, Facebook Messenger, and more.
+ *
+ * ### Workflow:
+ *
+ * 1. **Retrieves Message Payload from Twilio**:
+ *    - Extracts the actual message content from the `Body` argument.
+ *    - Retrieves the sender's number (`From`) and the recipient's number (`To`).
+ *
+ * 2. **Logs Incoming Message**:
+ *    - Logs the basic details of the message including sender, recipient, and message body
+ *      to help with debugging and traceability.
+ *
+ * 3. **Dynamically Constructs and Executes Configured Callback**:
+ *    - Constructs a `lambda` object `.exe` that will execute a callback slot defined in system configuration.
+ *    - Uses the configuration setting: `magic:twilio:callback` to determine which slot to invoke.
+ *    - This makes it easy to change callback behavior without modifying this webhook endpoint.
+ *    - Ensures that this configuration is mandatory.
+ *
+ * 4. **Passes Parameters to Callback**:
+ *    - Passes the parsed `body`, `from`, `to`, and `twilio_account_id` (derived from Twilio’s `AccountSid`) into the callback slot.
+ *
+ * 5. **Executes Callback**:
+ *    - Dynamically invokes the configured slot using `invoke:x:@.exe`.
+ *    - If the callback produces a return value, the webhook returns it back to Twilio.
+ *
+ * ### Use Cases:
+ * - Allows AI or automation platforms to respond to inbound messages on WhatsApp/SMS via custom logic.
+ * - Enables modular webhook logic by externalizing behavior to slots.
+ * - Can integrate with slots like `magic.twilio.ai.chat`, `magic.twilio.send-message`, or any custom automation flow.
  */
+
 .arguments
 
 // Retrieving actual message.

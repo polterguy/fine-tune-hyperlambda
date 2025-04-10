@@ -1,7 +1,44 @@
-
 /*
- * Create a slot that executes a single workflow action.
+ * Defines a dynamic slot that executes a single workflow action and optionally provides detailed debugging information to root users.
+ *
+ * ### Purpose:
+ * This slot is designed to invoke a workflow action represented by a Hyperlambda file and return the result. It also offers real-time
+ * visibility for administrators by emitting socket signals before and after execution.
+ *
+ * ### Behavior:
+ * 1. **Validation**:
+ *    - Ensures that both the [name] (action name) and [filename] (Hyperlambda file path) arguments are provided.
+ *
+ * 2. **Debug Input Signal (Root Only)**:
+ *    - If the caller is authenticated as a root user:
+ *      - Emits a socket signal (`magic.workflows.action`) with the action type `action`.
+ *      - Includes the input arguments passed to the workflow for transparency.
+ *      - Captures the execution start time.
+ *
+ * 3. **Action Execution**:
+ *    - Dynamically adds the provided [arguments] as input to the target file.
+ *    - Executes the Hyperlambda file specified by [filename].
+ *
+ * 4. **Debug Output Signal (Root Only)**:
+ *    - If the user is root:
+ *      - Emits a socket signal (`magic.workflows.action`) with the action type `result`.
+ *      - Includes the output of the action and the time elapsed in milliseconds.
+ *
+ * 5. **Result Handling**:
+ *    - Decorates the output with the [name] of the action.
+ *    - Merges the result of the executed file into the return structure.
+ *    - Returns the composed result to the caller.
+ *
+ * 6. **Error Handling**:
+ *    - If an exception is thrown during execution:
+ *      - Sends a socket signal (`magic.workflows.action`) with type `error` and the error message (root users only).
+ *      - Rethrows the exception with the original message, status, and visibility flags.
+ *
+ * ### Use Case:
+ * Enables dynamic execution of reusable workflow actions with built-in tracing and diagnostics for root users,
+ * ideal for both production and development observability.
  */
+
 slots.create:magic.workflows.actions.execute
 
    // Sanity checking invocation.

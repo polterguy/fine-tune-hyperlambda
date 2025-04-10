@@ -1,7 +1,44 @@
-
 /*
- * Create an endpoint that returns all workflow actions to caller.
+ * Creates a secured endpoint that returns a list of all available workflow actions within the system.
+ *
+ * ### Purpose:
+ * This endpoint enumerates all installed Hyperlambda-based workflow actions, collects metadata from them,
+ * and returns a structured list of available actions including their filenames, display names, and optional metadata
+ * such as descriptions and icons.
+ *
+ * ### Access Control:
+ * - Restricted to users with `root` privileges to ensure only authorized administrators can enumerate backend workflows.
+ *
+ * ### Behavior:
+ * 1. **Initial System and Custom Action Discovery**:
+ *    - Uses `io.file.list-recursively` to collect all `.hl` files from:
+ *      - System default directory: `/misc/workflows/actions/`
+ *      - Custom override directory: `/etc/workflows/actions/` (if exists)
+ *
+ * 2. **Module-Level Discovery**:
+ *    - Iterates through all subfolders under `/modules/` and checks for the existence of `workflows/actions/`.
+ *    - If found, adds all `.hl` files within these module action directories to the result set.
+ *
+ * 3. **Filtering and Metadata Extraction**:
+ *    - Iterates over all collected file paths and filters only those ending with `.hl`.
+ *    - For each valid action file:
+ *      - Loads its contents using `load-file`.
+ *      - Parses the file using `hyper2lambda` with `comments:true` to extract metadata.
+ *      - If the file includes a file-level comment (`..`), this is added to the `description` metadata.
+ *      - If an `.icon` node is present in the Hyperlambda, it is included in the result.
+ *      - Derives the action's name by stripping path and extension from the filename.
+ *
+ * 4. **Output Structure**:
+ *    - Each returned action includes:
+ *      - `name` – The human-readable action name derived from filename.
+ *      - `filename` – Full path to the Hyperlambda file representing the action.
+ *      - Optional metadata: `description` and `icon` (if provided within the file).
+ *
+ * ### Returns:
+ * - A collection of action descriptors representing all discoverable workflow actions available in the system,
+ *   with relevant metadata to support UI presentation or internal reference.
  */
+
 .arguments
 
 // Verifying user is authorized to access endpoint.

@@ -1,7 +1,34 @@
-
 /*
- * Write endpoint that returns Hyperlambda required to execute action or snippet.
+ * Creates an HTTP endpoint that returns Hyperlambda required to invoke an action or snippet file.
+ *
+ * ## Overview
+ * This endpoint dynamically generates a ready-to-execute Hyperlambda block based on the given
+ * action or snippet file and its expected arguments. It is capable of handling:
+ * - Workflow action files stored under `/workflows/actions/` by wrapping them in an `execute` invocation.
+ * - Plain Hyperlambda files (e.g. preconfigured code snippets) by returning them as-is.
+ *
+ * ## Input Arguments
+ * - **[filename]** *(string)*: The path to the Hyperlambda file (either an action or snippet).
+ * - **[args]** *(map)*: A dictionary of argument names and values to apply to the file invocation.
+ *   - If the file is a workflow action, it requires an additional [action_name] key to name the invocation.
+ *
+ * ## Logic Breakdown
+ * 1. Loads the Hyperlambda file using `[load-file]`.
+ * 2. If the file is recognized as an action template (i.e. path contains `/workflows/actions/`):
+ *    - It creates a wrapper using `execute:magic.workflows.actions.execute`, injecting [name], [filename], and [arguments].
+ *    - File-level comment (`..`) is preserved and prepended to the generated Hyperlambda.
+ *    - Argument types are auto-converted according to their type declarations in `.arguments`.
+ *    - Supports complex argument types, including `hyperlambda`, which are converted to structured lambda.
+ * 3. If the file is not an action, it is assumed to be a reusable snippet and returned as-is.
+ *
+ * ## Output
+ * - Returns fully-assembled Hyperlambda ready to execute, optionally with inline comments and proper formatting.
+ *
+ * ## Use Case
+ * This endpoint is primarily used by UI components such as visual workflow editors or API explorers
+ * that let users preview or invoke Hyperlambda logic dynamically based on selected action templates or modules.
  */
+
 .arguments
    filename:string
    args:*
