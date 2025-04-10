@@ -1,0 +1,126 @@
+
+/*
+ * Return an aggregate value (min, max, avg, or sum) from the tasks table in your CRM database, using optional filters and aggregation over a specific column.
+ *
+ * - Requires [aggregate_function] and [aggregate_column] as mandatory arguments.
+ * - Validates that the aggregate function is one of [min, max, sum, avg].
+ * - Validates the aggregate_column against allowed fully-qualified column names from the tasks or joined users table.
+ * - Authenticates the caller via [auth.ticket.verify:guest].
+ * - Applies any optional filters on task fields or joined user fields.
+ * - Executes [data.read] with an aggregate SQL function (e.g. sum(tasks.due_date)) aliased as [result].
+ * - Performs a left join from [tasks] to [users] using user_id.
+ * - Returns the resulting aggregation from the first matched row.
+ */
+.arguments
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+
+   /*
+    * Optional filtering arguments.
+    *
+    * Since these are added to [where] condition using [add], these arguments are optional
+    */
+   tasks.task_id.mt:long
+   tasks.task_id.lt:long
+   tasks.task_id.mteq:long
+   tasks.task_id.lteq:long
+   tasks.task_id.neq:long
+   tasks.task_id.eq:long
+   tasks.user_id.mt:long
+   tasks.user_id.lt:long
+   tasks.user_id.mteq:long
+   tasks.user_id.lteq:long
+   tasks.user_id.neq:long
+   tasks.user_id.eq:long
+   tasks.description.like:string
+   tasks.description.mt:string
+   tasks.description.lt:string
+   tasks.description.mteq:string
+   tasks.description.lteq:string
+   tasks.description.neq:string
+   tasks.description.eq:string
+   tasks.due_date.mt:date
+   tasks.due_date.lt:date
+   tasks.due_date.mteq:date
+   tasks.due_date.lteq:date
+   tasks.due_date.neq:date
+   tasks.due_date.eq:date
+   tasks.status.like:string
+   tasks.status.mt:string
+   tasks.status.lt:string
+   tasks.status.mteq:string
+   tasks.status.lteq:string
+   tasks.status.neq:string
+   tasks.status.eq:string
+   user_id.username.eq:string
+   user_id.username.like:string
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:tasks.task_id
+   .:tasks.user_id
+   .:tasks.description
+   .:tasks.due_date
+   .:tasks.status
+   .:user_id.username
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:tasks
+         join:users
+            as:user_id
+            type:left
+            on
+               and
+                  tasks.user_id:user_id.user_id
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,81 @@
+
+/*
+ * Update a single opportunity in the CRM database by specifying the opportunity_id and any new values for client_id, description, value, stage, and/or close_date.
+ *
+ * - Requires [opportunity_id] as a mandatory argument to identify the record.
+ * - Authenticates the caller via [auth.ticket.verify:root,admin].
+ * - Connects to the SQLite-based [crm] database.
+ * - Adds all optional update fields as [values], and applies a [where] clause using the primary key.
+ * - Performs the update via [data.update] on the [opportunities] table.
+ * - If no records are affected (i.e., the ID is not found), returns 404 with a descriptive message.
+ * - If successful, returns 202 and publishes a socket signal [crm.opportunities.put] to [admin,root].
+ * - Responds with the number of affected records.
+ */
+.arguments
+
+   // Mandatory opportunity_id column value being primary key of record to update, mandatory argument
+   opportunity_id:long
+
+   // Optional client_id column's new value
+   client_id:long
+
+   // Optional description column's new value
+   description:string
+
+   // Optional value column's new value
+   value:double
+
+   // Optional stage column's new value
+   stage:string
+
+   // Optional close_date column's new value
+   close_date:date
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/opportunity_id
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:opportunities
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.opportunities.put
+      args
+      roles:admin,root
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

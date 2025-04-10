@@ -1,0 +1,29 @@
+/*
+ * This Hyperlambda code creates a dynamic slot that retrieves and caches the raw HTML of a specified URL.
+ * It performs input validation to ensure the URL is provided and valid. The content is cached server-side
+ * for 5 minutes to minimize repeated HTTP requests. The HTTP GET request is made with specific headers
+ * to mimic a standard browser request.
+ */
+slots.create:custom.http.fetch-html
+
+   // Validate the input URL.
+   validators.mandatory:x:@.arguments/*/target-url
+   validators.url:x:@.arguments/*/target-url
+
+   // Attempt to retrieve from cache.
+   unwrap:x:+/*/.lambda/*/.target-url
+   cache.try-get:x:@.arguments/*/target-url
+      expiration:300
+      .lambda
+
+         // Evaluate the URL for HTTP GET.
+         .target-url:x:@.arguments/*/target-url
+         http.get:x:@.target-url
+            headers
+               User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
+               Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+               Accept-Language:en-US,en;q=0.9
+         return:x:-/*/content
+
+   // Return the cached or newly fetched content.
+   return:x:@cache.try-get

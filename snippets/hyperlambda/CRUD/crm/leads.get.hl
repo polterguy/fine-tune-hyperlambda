@@ -1,5 +1,29 @@
 
-// Read or list records from your leads table in your crm database
+/*
+ * Retrieves a paginated list of records from the "leads" table in your CRM database,
+ * supporting dynamic filtering, sorting, and pagination. Also includes client name lookup via a JOIN.
+ *
+ * Optional Arguments:
+ * - [limit]: Maximum number of records to return (default is 25; use -1 to return all).
+ * - [offset]: Offset into the dataset for pagination.
+ * - [order]: Fully qualified column name to sort by (e.g. leads.status).
+ * - [direction]: Either 'asc' or 'desc' to define sort order.
+ *
+ * Filtering:
+ * - Allows filtering on all standard lead fields, including [lead_id], [client_id], [source], [status],
+ *   and [created_date] using operators like `.eq`, `.lt`, `.like`, `.neq`, `.lteq`, `.mteq`, etc.
+ * - Supports filtering on related client fields like [client_id.name] through a LEFT JOIN on the "clients" table.
+ *
+ * Functionality:
+ * - Connects to the SQLite CRM database using [data.connect].
+ * - Dynamically injects ordering, paging, and filtering arguments using [get-nodes] and [add].
+ * - Retrieves the resulting rows using [data.read], returning the selected columns:
+ *   lead ID, client ID, source, status, creation date, and client name.
+ * - Applies a LEFT JOIN to include the client's name associated with each lead.
+ * - Ensures authenticated access using [auth.ticket.verify] for users with the "guest" role.
+ * - Adds an HTTP header to cache the response for 5 minutes using `Cache-Control`.
+ * - Returns the results directly as structured nodes from the [data.read] invocation.
+ */
 .arguments
 
    // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.

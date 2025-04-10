@@ -1,0 +1,25 @@
+/*
+ * This endpoint ensures that the user is authorized to access it by verifying their roles.
+ * It checks for a [roles] argument and, if present, joins all roles into a comma-separated string.
+ * The endpoint then verifies the user's authentication and authorization status.
+ */
+.arguments
+   userRoles:*
+
+/*
+ * Verifying the presence of a [userRoles] argument,
+ * and if it exists, concatenating all roles into a single comma-separated string.
+ */
+.roleList
+if
+   exists:x:@.arguments/*/userRoles/*
+   .lambda
+
+      // Constructing a comma-separated list of user roles.
+      set-value:x:@.roleList
+         strings.join:x:@.arguments/*/userRoles/*
+            .:,
+
+
+// Ensuring the user is authenticated and optionally authorized.
+auth.ticket.verify:x:@.roleList

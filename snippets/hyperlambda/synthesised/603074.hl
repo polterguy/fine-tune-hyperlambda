@@ -1,0 +1,18 @@
+/*
+ * Hyperlambda endpoint that does not require any input arguments. The SQL query aggregates and retrieves the top 25 artists with the most albums from the chinook SQLite database.
+ */
+.arguments
+
+// Ensuring the user has the necessary permissions to access this endpoint.
+auth.ticket.verify:root,admin
+
+// Establishing a connection to the chinook database.
+data.connect:chinook
+   database-type:sqlite
+
+   // Running the [data.select] slot to execute our SQL query.
+   data.select:"\n/*\n * Query to aggregate album counts per artist in the chinook database.\n * Ensure the chinook database is selected before running this query.\n */\nselect ar.Name, count(*) as count\n  from Album al, Artist ar where al.ArtistId = ar.ArtistId\n  group by al.ArtistId\n  order by count desc\n  limit 25\n"
+      database-type:sqlite
+
+   // Sending the result of the SQL execution back to the client.
+   return-nodes:x:@data.select/*

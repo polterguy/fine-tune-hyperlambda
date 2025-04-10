@@ -1,0 +1,71 @@
+/*
+ * This endpoint allows users to upload a ZIP file, unzip its contents, and overwrite the specified folder.
+ * It accepts a file and a folder as arguments, with the file being uploaded as form-data.
+ * The endpoint verifies user authorization and performs sanity checks on the input arguments.
+ * It ensures the uploaded file is a ZIP file and clears the specified folder before unzipping the contents.
+ * The ZIP file is temporarily saved to the specified folder, unzipped, and then deleted.
+ * Finally, the endpoint returns a success message to the caller.
+ */
+.arguments
+
+   // Accepts any type of file, including nested nodes.
+   upload:*
+   destination:string
+
+// Endpoint supports form-data uploads
+.accept:multipart/form-data
+
+// Verifies user authorization for accessing this endpoint.
+auth.ticket.verify:root
+
+// Validates the presence of mandatory arguments.
+validators.mandatory:x:@.arguments/*/upload
+validators.mandatory:x:@.arguments/*/upload/*/name
+validators.mandatory:x:@.arguments/*/upload/*/stream
+validators.mandatory:x:@.arguments/*/destination
+
+// Checks if the uploaded file is a ZIP file.
+strings.split:x:@.arguments/*/upload/*/name
+   .:.
+if
+   not
+      eq
+         get-value:x:@strings.split/0/-
+         .:zip
+   .lambda
+
+      // Error: File is not a ZIP.
+      throw:Only ZIP files are allowed
+         public:true
+         status:415
+
+// Clears the specified folder of its contents.
+io.folder.list:x:@.arguments/*/destination
+   display-hidden:true
+for-each:x:-/*
+   io.folder.delete:x:@.dp/#
+io.file.list:x:@.arguments/*/destination
+   display-hidden:true
+for-each:x:-/*
+   io.file.delete:x:@.dp/#
+
+// Determines the full path for saving the ZIP file.
+.tempFilePath
+set-value:x:@.tempFilePath
+   strings.concat
+      get-value:x:@.arguments/*/destination
+      get-value:x:@.arguments/*/upload/*/name
+
+// Saves the uploaded stream to a file.
+io.stream.save-file:x:@.tempFilePath
+   get-value:x:@.arguments/*/upload/*/stream
+
+// Extracts the contents of the ZIP file.
+io.file.unzip:x:@.tempFilePath
+
+// Removes the temporary ZIP file.
+io.file.delete:x:@.tempFilePath
+
+// Responds with a success message.
+return-nodes
+   result:Operation completed successfully

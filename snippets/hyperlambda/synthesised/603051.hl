@@ -1,0 +1,62 @@
+/*
+ * This Hyperlambda code defines an endpoint to read or list records from the "Categories" table in the Northwind database.
+ * It supports paging, filtering, and sorting of the records. The endpoint accepts arguments for limit, offset, order, and direction.
+ * It connects to a SQLite database, applies the specified parameters to the data read operation, and returns the results.
+ */
+.arguments
+
+   // Specifies the number of records to return, defaults to 25 if not provided. Use -1 to retrieve all records.
+   max-records:long
+
+   // Specifies the starting point in the dataset for retrieving records.
+   start-point:long
+
+   // The column to sort by, must be in the format TABLE_NAME.COLUMN_NAME.
+   sort-column:string
+
+   // Specifies the sorting direction, 'asc' for ascending or 'desc' for descending.
+   sort-direction:string
+
+   // Optional filtering criteria.
+   Categories.CategoryID.eq:long
+   Categories.CategoryName.like:string
+   Categories.CategoryName.eq:string
+   Categories.Description.like:string
+   Categories.Description.eq:string
+   Categories.Picture.like:string
+   Categories.Picture.eq:string
+
+// Initiating a connection to the database.
+data.connect:[generic|northwind]
+
+   // Adding sorting parameters to the read operation if they are provided.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/sort-column
+      get-nodes:x:@.arguments/*/sort-direction
+   remove-nodes:x:@.arguments/*/sort-column
+   remove-nodes:x:@.arguments/*/sort-direction
+
+   // Adding paging parameters to the read operation if they are provided.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/max-records
+      get-nodes:x:@.arguments/*/start-point
+   remove-nodes:x:@.arguments/*/max-records
+   remove-nodes:x:@.arguments/*/start-point
+
+   // Adding filtering parameters to the read operation.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Executing the read operation to fetch data from the database.
+   data.read
+      table:Categories
+      columns
+         Categories.CategoryID
+         Categories.CategoryName
+         Categories.Description
+         Categories.Picture
+      where
+         and
+
+   // Returning the result of the read operation to the caller.
+   return-nodes:x:@data.read/*

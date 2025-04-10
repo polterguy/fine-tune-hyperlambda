@@ -1,5 +1,32 @@
 
-// Returns unique and distinct values from your leads table in your crm database
+/*
+ * Retrieves a list of unique and distinct values from a specified column in the "leads" table
+ * of your CRM database. Supports filtering, ordering, and pagination, and allows for joined filtering
+ * via the related "clients" table.
+ *
+ * Required:
+ * - [distinct_column]: A fully qualified column name in the format "TABLE_NAME.COLUMN_NAME",
+ *   such as "leads.source" or "client_id.name".
+ *
+ * Optional:
+ * - [limit]: Number of records to return (defaults to 25; use -1 for no limit).
+ * - [offset]: Record offset for pagination.
+ * - [order] and [direction]: Sorting based on a fully qualified column and either 'asc' or 'desc'.
+ *
+ * Filtering:
+ * - Supports filtering across lead fields like [lead_id], [client_id], [source], [status], [created_date],
+ *   and joined client fields like [client_id.name].
+ * - Accepts advanced comparison operators including `.eq`, `.lt`, `.like`, `.neq`, `.lteq`, `.mteq`, etc.
+ *
+ * Implementation:
+ * - Validates the required [distinct_column] and ensures it belongs to the allowed list via [validators.enum].
+ * - Dynamically constructs a SQL `distinct(COLUMN)` expression using [strings.concat].
+ * - Applies any provided filters using [get-nodes] and [add].
+ * - Connects to the CRM database via [data.connect] (SQLite).
+ * - Executes a [data.read] query that joins the "clients" table and returns distinct values as flat results.
+ * - Uses the `Cache-Control` header to allow public caching of the response for 5 minutes.
+ * - Ensures that only authenticated users with the "guest" role can access this endpoint via [auth.ticket.verify].
+ */
 .arguments
 
    // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

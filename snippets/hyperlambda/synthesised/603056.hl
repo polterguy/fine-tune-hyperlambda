@@ -1,0 +1,37 @@
+/*
+ * Hyperlambda API endpoint for updating a single record in the "surveys" table within the "analytics" database. 
+ * The endpoint filters records to update based on "identifier" and modifies the "category" field. 
+ * It ensures only users with "admin" roles can access this functionality.
+ */
+.arguments
+   identifier:string
+   category:string
+   operation:string
+
+// Ensuring the primary key(s) are provided for the update operation.
+validators.mandatory:x:@.arguments/*/identifier
+
+// Checking if the user has the necessary permissions to use this endpoint.
+auth.ticket.verify:admin
+
+// Establishing a connection to the database.
+data.connect:[generic|analytics]
+   database-type:sqlite
+
+   // Preparing the update operation with parameters.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Executing the update operation on the database.
+   data.update
+      database-type:sqlite
+      table:surveys
+      values
+      where
+         and
+
+   // Sending a success response back to the client.
+   yield
+      affected:x:@data.update

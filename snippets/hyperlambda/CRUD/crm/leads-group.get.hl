@@ -1,5 +1,30 @@
 
-// Returns minimum, maximum, average, sum or count from your leads table in your crm database grouped by a column
+/*
+ * Performs grouped aggregation on the "leads" table of your CRM database, returning one
+ * aggregate value (min, max, sum, avg, or count) per unique value in the specified [group_column].
+ *
+ * Required arguments:
+ * - [group_column]: Fully qualified column name to group by (e.g. leads.source, client_id.name).
+ * - [aggregate_function]: Aggregation type (min, max, sum, avg, count).
+ * - [aggregate_column]: Column on which to apply the aggregation function.
+ *
+ * Optional arguments:
+ * - [limit] and [offset]: For pagination support.
+ * - [order] and [direction]: For sorting results.
+ * - Filtering on any combination of lead or related client fields, including:
+ *   [lead_id], [client_id], [source], [status], [created_date], and [client_id.name].
+ *   Filtering supports comparison operators like `.eq`, `.lt`, `.like`, `.mteq`, `.neq`, etc.
+ *
+ * Functionality:
+ * - Validates required fields and their values using [validators.mandatory] and [validators.enum].
+ * - Dynamically builds SQL expressions for both the grouping and the aggregate function using [strings.concat].
+ * - Joins the "clients" table using a LEFT JOIN to support grouping or filtering by client data.
+ * - Connects to a SQLite CRM database using [data.connect].
+ * - Injects filtering, sorting, and pagination parameters dynamically with [add] and [get-nodes].
+ * - Returns each group and its corresponding aggregated value, labeled with the name of the aggregate function.
+ * - Sets the HTTP caching policy with a 5-minute `Cache-Control` header.
+ * - Restricts access to authenticated users with the "guest" role using [auth.ticket.verify].
+ */
 .arguments
 
    // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME

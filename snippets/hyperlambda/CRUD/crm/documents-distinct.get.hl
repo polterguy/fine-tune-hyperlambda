@@ -1,5 +1,24 @@
 
-// Returns unique and distinct values from your documents table in your crm database
+/*
+ * Retrieves a list of unique and distinct values from a specified column in the "documents" table
+ * of your CRM database, with optional filtering, sorting, and pagination support.
+ *
+ * The required [distinct_column] argument must be a fully qualified column name in the format
+ * "TABLE_NAME.COLUMN_NAME" (e.g. "documents.title" or "client_id.name"). The endpoint returns
+ * only unique values from that column, optionally filtered and sorted according to the provided criteria.
+ *
+ * Features:
+ * - Validates presence and correctness of [distinct_column] using [validators.mandatory] and [validators.enum].
+ * - Supports optional [limit] and [offset] for pagination and [order]/[direction] for sorting.
+ * - Filtering is available on all standard document fields and related client fields, including:
+ *   [document_id], [client_id], [title], [file_path], [uploaded_date], and [client_id.name].
+ * - Constructs a dynamic SQL expression using `distinct(COLUMN)` via [strings.concat] and injects it into [data.read].
+ * - Executes a LEFT JOIN with the "clients" table to support filtering or ordering by client names.
+ * - Connects to the SQLite CRM database using [data.connect] and applies WHERE clause dynamically.
+ * - Adds a `Cache-Control` HTTP header to cache results publicly for 5 minutes.
+ * - Requires authentication via [auth.ticket.verify] for guest-level access.
+ * - Returns a list of distinct values under a single unnamed node in the response.
+ */
 .arguments
 
    // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

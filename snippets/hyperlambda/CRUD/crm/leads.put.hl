@@ -1,5 +1,23 @@
 
-// Update one record in your leads table in your crm database
+/*
+ * Updates a specific record in the "leads" table of your CRM database based on the provided [lead_id].
+ * Only users with the "admin" or "root" role are authorized to perform this operation.
+ *
+ * The caller may update any combination of the optional fields: [client_id], [source], and [status].
+ * If the record does not exist (i.e., no rows were affected), the endpoint returns a 404 Not Found status.
+ *
+ * Features:
+ * - Validates presence of the [lead_id] primary key using [validators.mandatory].
+ * - Authorizes access through [auth.ticket.verify] for users with the "root" or "admin" roles.
+ * - Connects to the SQLite CRM database using [data.connect].
+ * - Dynamically injects only provided updates into [data.update] via [get-nodes].
+ * - Applies conditional logic to verify if the update actually affected any rows.
+ *   If not, responds with HTTP status 404 and a message indicating the record wasn't found.
+ * - On success, sets HTTP status to 202 (Accepted) using [response.status.set].
+ * - Publishes a [crm.leads.put] socket signal with the updated payload to "admin" and "root" roles
+ *   to notify other systems of the change in real-time.
+ * - Returns the number of affected rows in the [affected] field.
+ */
 .arguments
 
    // Mandatory lead_id column value being primary key of record to update, mandatory argument

@@ -1,0 +1,74 @@
+
+/*
+ * Count the number of records in the users table of your CRM database.
+ *
+ * Allows optional filtering using user fields (e.g. user_id, password, email, role).
+ *
+ * Adds:
+ * - Guest-level access requirement
+ * - Cache-Control header to response
+ * - Returns [count] from the [users] table using SQL COUNT(*)
+ */
+.arguments
+
+   /*
+    * Optional filtering arguments.
+    *
+    * Since these are added to [where] condition using [add], these arguments are optional
+    */
+   users.user_id.mt:long
+   users.user_id.lt:long
+   users.user_id.mteq:long
+   users.user_id.lteq:long
+   users.user_id.neq:long
+   users.user_id.eq:long
+   users.password.like:string
+   users.password.mt:string
+   users.password.lt:string
+   users.password.mteq:string
+   users.password.lteq:string
+   users.password.neq:string
+   users.password.eq:string
+   users.email.like:string
+   users.email.mt:string
+   users.email.lt:string
+   users.email.mteq:string
+   users.email.lteq:string
+   users.email.neq:string
+   users.email.eq:string
+   users.role.like:string
+   users.role.mt:string
+   users.role.lt:string
+   users.role.mteq:string
+   users.role.lteq:string
+   users.role.neq:string
+   users.role.eq:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:users
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

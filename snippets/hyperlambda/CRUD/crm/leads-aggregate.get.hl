@@ -1,5 +1,27 @@
 
-// Returns minimum, maximum, average or sum from your leads table in your crm database
+/*
+ * Computes a single aggregate value (MIN, MAX, SUM, or AVG) from a specified column in the "leads" table
+ * of your CRM database, with full support for dynamic filtering and client-based join lookups.
+ *
+ * Required arguments:
+ * - [aggregate_function]: One of the legal aggregate operations (min, max, sum, avg).
+ * - [aggregate_column]: Fully qualified name of the column to aggregate on (e.g., leads.lead_id).
+ *
+ * Filtering:
+ * - Supports extensive filtering across both lead and client fields including:
+ *   [lead_id], [client_id], [source], [status], [created_date], and [client_id.name].
+ * - Accepts comparison operators like `.eq`, `.lt`, `.mteq`, `.like`, `.neq`, etc.
+ *
+ * Implementation:
+ * - Validates all mandatory arguments using [validators.mandatory] and ensures values are allowed with [validators.enum].
+ * - Constructs the SQL aggregate expression dynamically via [strings.concat] and injects it into the [data.read] call.
+ * - Connects to the SQLite CRM database via [data.connect].
+ * - Joins the "clients" table using a LEFT JOIN for filtering on related client data.
+ * - Applies all specified filters using [get-nodes] and [add].
+ * - Returns the final aggregate result as a single node labeled [result].
+ * - Caches the result for 5 minutes using the `Cache-Control` response header.
+ * - Access is restricted to authenticated "guest" users using [auth.ticket.verify].
+ */
 .arguments
 
    // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg

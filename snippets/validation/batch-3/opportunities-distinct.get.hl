@@ -1,0 +1,145 @@
+
+/*
+ * Retrieve distinct values from a specified column in the [opportunities] table of the CRM database.
+ *
+ * - Requires a [distinct_column] argument (validated against a predefined list of columns).
+ * - Supports optional paging via [limit] and [offset], and optional ordering via [order] and [direction].
+ * - Accepts a wide set of optional filters for both [opportunities] and related [clients] table.
+ * - Adds public caching header with a 5-minute expiration.
+ * - Requires [guest] level authorization via [auth.ticket.verify].
+ * - Opens a [sqlite] connection to the [crm] database using [data.connect:[generic|crm]].
+ * - Dynamically creates a SQL column name that wraps the selected field in [distinct(...)].
+ * - Executes a [data.read] with a [left join] to the [clients] table.
+ * - Returns only the unique values from the specified column.
+ * - All helper arguments are removed before invoking the database query.
+ */
+.arguments
+
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   /*
+    * Optional filtering arguments.
+    *
+    * Since these are added to [where] condition using [add], these arguments are optional
+    */
+   opportunities.opportunity_id.mt:long
+   opportunities.opportunity_id.lt:long
+   opportunities.opportunity_id.mteq:long
+   opportunities.opportunity_id.lteq:long
+   opportunities.opportunity_id.neq:long
+   opportunities.opportunity_id.eq:long
+   opportunities.client_id.mt:long
+   opportunities.client_id.lt:long
+   opportunities.client_id.mteq:long
+   opportunities.client_id.lteq:long
+   opportunities.client_id.neq:long
+   opportunities.client_id.eq:long
+   opportunities.description.like:string
+   opportunities.description.mt:string
+   opportunities.description.lt:string
+   opportunities.description.mteq:string
+   opportunities.description.lteq:string
+   opportunities.description.neq:string
+   opportunities.description.eq:string
+   opportunities.value.mt:double
+   opportunities.value.lt:double
+   opportunities.value.mteq:double
+   opportunities.value.lteq:double
+   opportunities.value.neq:double
+   opportunities.value.eq:double
+   opportunities.stage.like:string
+   opportunities.stage.mt:string
+   opportunities.stage.lt:string
+   opportunities.stage.mteq:string
+   opportunities.stage.lteq:string
+   opportunities.stage.neq:string
+   opportunities.stage.eq:string
+   opportunities.close_date.mt:date
+   opportunities.close_date.lt:date
+   opportunities.close_date.mteq:date
+   opportunities.close_date.lteq:date
+   opportunities.close_date.neq:date
+   opportunities.close_date.eq:date
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:opportunities.opportunity_id
+   .:opportunities.client_id
+   .:opportunities.description
+   .:opportunities.value
+   .:opportunities.stage
+   .:opportunities.close_date
+   .:client_id.name
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:opportunities
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  opportunities.client_id:client_id.client_id
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

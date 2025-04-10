@@ -1,5 +1,29 @@
 
-// Returns minimum, maximum, average, sum or count from your clients table in your crm database grouped by a column
+/*
+ * Computes grouped aggregate values from the "clients" table in your CRM database,
+ * using a specified [group_column] and an aggregation function applied to a target column.
+ * The result is a list of records where each row represents a unique group with its
+ * corresponding aggregate value.
+ *
+ * The caller must specify:
+ * - [group_column]: The column to group by (e.g., clients.address).
+ * - [aggregate_function]: The function to apply (min, max, sum, avg, or count).
+ * - [aggregate_column]: The column to aggregate.
+ *
+ * Additional optional parameters allow full customization:
+ * - [limit], [offset] for pagination.
+ * - [order], [direction] for sorting results.
+ * - Filtering on all common client fields using a wide variety of operators (.eq, .lt, .like, etc.).
+ *
+ * - Validates that all required arguments are provided and valid using [validators.enum] and [validators.mandatory].
+ * - Builds a dynamic SQL `GROUP BY` query with the selected aggregation using [strings.concat] and [set-name].
+ * - Ensures the group column is included in the result set.
+ * - Uses [data.connect] to access a SQLite-backed CRM database.
+ * - Adds filtering, pagination, and sorting dynamically via [add] and [get-nodes].
+ * - Caches results for 5 minutes via a `Cache-Control` header.
+ * - Restricts access to authenticated "guest" users via [auth.ticket.verify].
+ * - Returns each group and its aggregated value in a structured list to the caller.
+ */
 .arguments
 
    // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME

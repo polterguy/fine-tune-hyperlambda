@@ -1,0 +1,35 @@
+/*
+ * This Hyperlambda endpoint facilitates the deletion of a single record from the "media" table in the "cms" database.
+ * It is designed for admin users, ensuring that only authorized personnel can perform this operation.
+ * The endpoint requires a mandatory "id" argument, which serves as the primary key for the record to be deleted.
+ * It verifies the user's authorization, connects to the SQLite database, and executes the delete operation.
+ * Finally, it returns the result of the deletion operation to the caller.
+ */
+.arguments
+
+   // Mandatory primary key of the record to be removed
+   record-id:long
+validators.mandatory:x:@.arguments/*/record-id
+
+// Ensuring the user has admin privileges to access this endpoint.
+auth.ticket.verify:admin
+
+// Establishing a connection to the database.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Preparing the delete operation with parameters.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Executing the deletion from the database.
+   data.delete
+      database-type:sqlite
+      table:media
+      where
+         and
+
+   // Sending back the outcome of the deletion to the client.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,5 +1,23 @@
 
-// Count unique and distinct items from your clients table in your crm database
+/*
+ * Counts the number of unique and distinct values in a specified column of the "clients" table
+ * in your CRM database, with support for optional filtering on all standard client fields.
+ *
+ * The caller must supply the [distinct_column] argument in the format "TABLE_NAME.COLUMN_NAME",
+ * such as "clients.email" or "clients.phone". The result will be a single numeric value
+ * representing how many unique entries exist in that column across all matching records.
+ *
+ * - Validates the presence and correctness of [distinct_column] using [validators.enum].
+ * - Supports flexible filtering with a wide range of comparison operators (.eq, .lt, .like, etc.)
+ *   across fields like client ID, name, email, phone, and address.
+ * - Constructs a dynamic `count(distinct COLUMN)` expression using [strings.concat] and injects
+ *   it into a [data.read] query.
+ * - Uses [data.connect] to access the SQLite CRM database.
+ * - Applies all filtering arguments dynamically to the WHERE clause using [add] and [get-nodes].
+ * - Executes the query and returns the count as a [count] node.
+ * - Enables public caching of the result for 5 minutes via a `Cache-Control` header.
+ * - Restricts access to authenticated guest users using [auth.ticket.verify].
+ */
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

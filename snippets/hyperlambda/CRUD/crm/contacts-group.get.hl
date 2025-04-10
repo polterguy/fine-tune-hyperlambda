@@ -1,5 +1,31 @@
 
-// Returns minimum, maximum, average, sum or count from your contacts table in your crm database grouped by a column
+/*
+ * Performs grouped aggregation on the "contacts" table in your CRM database, returning
+ * one aggregate value per unique group, based on a user-defined grouping column and
+ * aggregation function.
+ *
+ * The caller must provide:
+ * - [group_column]: Column to group by (e.g., contacts.position, client_id.name).
+ * - [aggregate_function]: Aggregation method: min, max, sum, avg, or count.
+ * - [aggregate_column]: Column to aggregate (e.g., contacts.contact_id).
+ *
+ * Optional parameters:
+ * - [limit] and [offset]: For pagination control.
+ * - [order] and [direction]: To sort the grouped results.
+ * - Filters across both contact and related client fields, supporting `.eq`, `.lt`, `.like`, `.neq`, etc.
+ *
+ * Functionality:
+ * - Validates required and enum-based parameters for safety and correctness.
+ * - Applies a LEFT JOIN to the "clients" table for filtering or grouping by `client_id.name`.
+ * - Constructs SQL expressions for both the group and aggregate functions dynamically using [strings.concat].
+ * - Dynamically injects WHERE, GROUP BY, ORDER BY, and LIMIT clauses using [add] and [get-nodes].
+ * - Connects to a SQLite-backed CRM database via [data.connect].
+ * - Executes the grouped query via [data.read] and returns a list of result nodes, where each node includes:
+ *     - The group value (e.g. position)
+ *     - The computed aggregate (e.g. count, avg, etc.)
+ * - Applies a 5-minute caching policy via `Cache-Control` response header.
+ * - Ensures the caller is authenticated using [auth.ticket.verify] with guest access.
+ */
 .arguments
 
    // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME

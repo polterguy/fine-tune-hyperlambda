@@ -1,9 +1,26 @@
 
 /*
- * Distinct Keyword Search from notes table in crm database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * Perform a distinct keyword search on the "notes" table in your CRM database.
+ *
+ * This endpoint returns records where the [content] column contains one or more of the words provided in the [query] string.
+ * Results are ranked by the number of distinct matched keywords and their density within the field.
+ *
+ * Required Argument:
+ * - [query]: Space-separated string of keywords to search for. Must be provided.
+ *
+ * Optional Arguments:
+ * - [limit]: Maximum number of results to return. Defaults to 10 if not provided.
+ * - [offset]: Number of records to skip for pagination.
+ *
+ * Implementation Details:
+ * - Splits [query] into lowercase keywords and ensures SQL-safe parameterization.
+ * - Constructs a dynamic SQL statement using [coalesce] to safely concatenate the target fields ([content]).
+ * - Computes keyword match "density" per row based on the frequency of matched characters relative to full content.
+ * - Computes "keyword_count" for number of distinct matched keywords in the row.
+ * - Filters out rows with zero matches, and sorts by [keyword_count] descending, followed by [keyword_density] descending.
+ * - Executes dynamic SQL via [data.select] and removes helper fields from the result before returning the dataset.
+ * - Uses [validators.mandatory] and [validators.default] to ensure required input is present and defaults are applied.
+ * - Returns a ranked list of notes best matching the input keywords.
  */
 .arguments
 

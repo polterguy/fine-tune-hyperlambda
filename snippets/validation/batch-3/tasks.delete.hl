@@ -1,0 +1,46 @@
+
+/*
+ * Delete a single record from the tasks table in the crm database.
+ *
+ * - Requires [task_id] as a mandatory primary key argument.
+ * - Verifies the authenticated user has [root] privileges using [auth.ticket.verify:root].
+ * - Connects to the database via [data.connect:[generic|crm]] using SQLite.
+ * - Constructs a parameterized [data.delete] with a [where/and] clause using the provided [task_id].
+ * - Sends a socket signal [crm.tasks.delete] after successful deletion for both [admin] and [root] roles.
+ * - Unwraps and returns the affected rows count to the caller using [return].
+ */
+.arguments
+
+   // Mandatory primary key of record to delete, mandatory argument
+   task_id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/task_id
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:tasks
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.tasks.delete
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

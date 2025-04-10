@@ -1,0 +1,59 @@
+
+/*
+ * Create a new opportunity record in the CRM database using optional values for client_id, description, value, stage, and close_date.
+ *
+ * - Verifies that the user is authorized using [auth.ticket.verify:root,admin].
+ * - Connects to the SQLite [crm] database.
+ * - Adds all provided arguments as [values] for the [data.create] invocation.
+ * - Creates a new record in the [opportunities] table.
+ * - Sets the HTTP response status to 201 upon success.
+ * - Publishes a socket event [crm.opportunities.post] to roles [admin,root] with the created data.
+ * - Returns the [id] of the newly inserted opportunity record to the caller.
+ */
+.arguments
+
+   // Optional client_id column value
+   client_id:long
+
+   // Optional description column value
+   description:string
+
+   // Optional value column value
+   value:double
+
+   // Optional stage column value
+   stage:string
+
+   // Optional close_date column value
+   close_date:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:opportunities
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.opportunities.post
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   yield
+      id:x:@data.create

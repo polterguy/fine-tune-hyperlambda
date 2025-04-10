@@ -1,5 +1,26 @@
 
-// Returns minimum, maximum, average, sum or count from your campaigns table in your crm database grouped by a column
+/*
+ * Performs grouped aggregation on the "campaigns" table in your CRM database using a specified
+ * [group_column], [aggregate_function], and [aggregate_column]. The result returns one row per
+ * group, each containing the group value and the computed aggregate.
+ *
+ * This endpoint supports any of the following aggregate functions: min, max, sum, avg, and count.
+ * The grouping column and aggregation target column must be valid fully qualified field names
+ * such as "campaigns.status" or "campaigns.budget".
+ *
+ * - Validates the presence and correctness of [group_column], [aggregate_column], and [aggregate_function].
+ * - Dynamically builds a SQL `GROUP BY` query with aggregation using [strings.concat] and [set-name].
+ * - Automatically includes the grouping column in the result set.
+ * - Supports pagination via optional [limit] and [offset] arguments.
+ * - Allows sorting of the grouped results using [order] and [direction] on fully qualified column names.
+ * - Accepts rich filtering criteria on all standard campaign fields with `.eq`, `.lt`, `.like`, etc.
+ * - Uses [data.connect] and [data.read] to access the SQLite-backed CRM database and run the grouped query.
+ * - Returns a list of grouped results, each containing:
+ *     - The value of the [group_column]
+ *     - The result of the aggregate function under a node named after the aggregate type (e.g., `avg`, `sum`)
+ * - Caches the result for 5 minutes via an HTTP `Cache-Control` header.
+ * - Ensures access is restricted to authenticated guest users via [auth.ticket.verify].
+ */
 .arguments
 
    // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME

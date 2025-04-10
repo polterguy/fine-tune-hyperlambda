@@ -1,0 +1,45 @@
+/*
+ * This Hyperlambda endpoint is designed to create a new record in the "media" table within your CMS database.
+ * It accepts four arguments: post_id, file_path, file_type, and created_at, which are used to populate the respective columns in the database.
+ * The endpoint first verifies that the user has the appropriate authorization (either root or admin) to access it.
+ * It then establishes a connection to the CMS database, specifically using SQLite.
+ * The values for the new record are parameterized from the provided arguments.
+ * After successfully creating the record, it sets the HTTP response status to 201 (Created) and returns the ID of the newly created record.
+ */
+.arguments
+
+   // Value for the post_id column
+   post_id:long
+
+   // Value for the file_path column
+   file_path:string
+
+   // Value for the file_type column
+   file_type:string
+
+   // Value for the created_at column
+   created_at:date
+
+// Checking if the user has the necessary permissions to access this endpoint.
+auth.ticket.verify:root,admin
+
+// Establishing a connection to the CMS database.
+data.connect:[generic|cms]
+   database-type:sqlite
+
+   // Preparing the values for the data.create operation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Executing the creation of the new record in the media table.
+   data.create
+      database-type:sqlite
+      table:media
+      values
+
+   // Setting the HTTP response status to indicate successful creation.
+   response.status.set:201
+
+   // Returning the ID of the newly created record to the caller.
+   yield
+      id:x:@data.create

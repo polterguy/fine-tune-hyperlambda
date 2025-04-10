@@ -1,0 +1,135 @@
+
+/*
+ * Returns a distinct list of values for a specified column from the tasks table in your CRM system.
+ *
+ * - The [distinct_column] argument is mandatory and validated using [validators.enum].
+ * - Joins the tasks table with users table on [user_id] using a LEFT JOIN.
+ * - Accepts optional arguments for [limit], [offset], [order], and [direction] to control pagination and sorting.
+ * - Applies optional filters on any tasks or users columns (like tasks.status or user_id.username).
+ * - Returns only unique values of the specified column using SQL DISTINCT and aliases the result as [.].
+ * - Adds a Cache-Control header for caching the response for 5 minutes.
+ * - Requires guest-level authorization.
+ */
+.arguments
+
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   /*
+    * Optional filtering arguments.
+    *
+    * Since these are added to [where] condition using [add], these arguments are optional
+    */
+   tasks.task_id.mt:long
+   tasks.task_id.lt:long
+   tasks.task_id.mteq:long
+   tasks.task_id.lteq:long
+   tasks.task_id.neq:long
+   tasks.task_id.eq:long
+   tasks.user_id.mt:long
+   tasks.user_id.lt:long
+   tasks.user_id.mteq:long
+   tasks.user_id.lteq:long
+   tasks.user_id.neq:long
+   tasks.user_id.eq:long
+   tasks.description.like:string
+   tasks.description.mt:string
+   tasks.description.lt:string
+   tasks.description.mteq:string
+   tasks.description.lteq:string
+   tasks.description.neq:string
+   tasks.description.eq:string
+   tasks.due_date.mt:date
+   tasks.due_date.lt:date
+   tasks.due_date.mteq:date
+   tasks.due_date.lteq:date
+   tasks.due_date.neq:date
+   tasks.due_date.eq:date
+   tasks.status.like:string
+   tasks.status.mt:string
+   tasks.status.lt:string
+   tasks.status.mteq:string
+   tasks.status.lteq:string
+   tasks.status.neq:string
+   tasks.status.eq:string
+   user_id.username.eq:string
+   user_id.username.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:tasks.task_id
+   .:tasks.user_id
+   .:tasks.description
+   .:tasks.due_date
+   .:tasks.status
+   .:user_id.username
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:tasks
+         join:users
+            as:user_id
+            type:left
+            on
+               and
+                  tasks.user_id:user_id.user_id
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

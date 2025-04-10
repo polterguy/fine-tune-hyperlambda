@@ -1,0 +1,49 @@
+
+/*
+ * Create a new user record in the users table of the CRM database.
+ * 
+ * Accepts optional values for [password], [email], and [role] fields.
+ * Verifies the caller is authorized with either 'root' or 'admin' role.
+ * Publishes a socket event and returns the new [user_id] upon successful creation.
+ */
+.arguments
+
+   // Optional password column value
+   password:string
+
+   // Optional email column value
+   email:string
+
+   // Optional role column value
+   role:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:users
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.users.post
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   yield
+      id:x:@data.create

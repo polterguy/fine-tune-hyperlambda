@@ -1,5 +1,28 @@
 
-// Count unique and distinct items from your notes table in your crm database
+/*
+ * Counts the number of unique and distinct values in a specified column from the "notes" table
+ * of your CRM database. Useful for analytics, filtering summaries, and tag cloud generation.
+ *
+ * Required Arguments:
+ * - [distinct_column]: Fully qualified column name to evaluate for uniqueness,
+ *   e.g. "notes.client_id" or "client_id.name". This argument is validated against a known whitelist.
+ *
+ * Optional Filtering:
+ * - Supports advanced filtering on all fields in the "notes" table such as:
+ *   [note_id], [client_id], [content], and [created_date].
+ * - Also supports filtering by joined client fields like [client_id.name].
+ * - Comparison operators like `.eq`, `.neq`, `.lt`, `.gteq`, `.like`, etc. are supported on all fields.
+ *
+ * Functionality:
+ * - Access is restricted to users with a verified ticket for the "guest" role using [auth.ticket.verify].
+ * - Validates input using [validators.mandatory] and [validators.enum] to ensure correctness.
+ * - Connects to the CRM SQLite database with [data.connect].
+ * - Joins the "clients" table via a LEFT JOIN to support cross-table filtering.
+ * - Builds a SQL query dynamically to compute `count(distinct ...)` using [strings.concat].
+ * - Applies filters using [add] and [get-nodes] on WHERE clauses.
+ * - Executes the query using [data.read] and returns a single field [count] representing the distinct total.
+ * - Adds a `Cache-Control` header to cache the response publicly for 5 minutes.
+ */
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

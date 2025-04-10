@@ -1,5 +1,27 @@
 
-// Returns minimum, maximum, average or sum from your contacts table in your crm database
+/*
+ * Computes an aggregate value (MIN, MAX, SUM, or AVG) from a specified column in the "contacts" table
+ * of your CRM database, optionally filtered by a wide range of fields and joined with the "clients" table.
+ *
+ * The user must provide:
+ * - [aggregate_function]: One of "min", "max", "sum", or "avg".
+ * - [aggregate_column]: The column to apply the aggregation on, in the format "TABLE_NAME.COLUMN_NAME".
+ *
+ * Filtering is supported on both contact and client fields, including:
+ * - [contact_id], [client_id], [name], [email], [phone], [position]
+ * - [client_id.name] through a LEFT JOIN with the "clients" table
+ * - With comparison operators such as `.eq`, `.lt`, `.like`, `.neq`, etc.
+ *
+ * Features:
+ * - Validates required arguments and ensures they are among allowed values using [validators.enum].
+ * - Dynamically generates the aggregation SQL expression via [strings.concat].
+ * - Applies optional filtering by injecting WHERE clauses using [add] and [get-nodes].
+ * - Executes the aggregation using [data.read], returning the result under a node named [result].
+ * - Connects to the SQLite CRM database via [data.connect].
+ * - Performs a LEFT JOIN to include filters based on related client information.
+ * - Adds a `Cache-Control` HTTP header to cache results for 5 minutes.
+ * - Ensures only authenticated guest users can access the endpoint via [auth.ticket.verify].
+ */
 .arguments
 
    // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg

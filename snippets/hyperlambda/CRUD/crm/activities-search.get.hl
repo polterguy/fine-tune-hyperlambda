@@ -1,9 +1,24 @@
 
 /*
- * Distinct Keyword Search from activities table in crm database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * Performs a distinct keyword-based search over the "activities" table in your CRM database.
+ *
+ * The endpoint accepts a [query] string of one or more space-separated keywords and returns records
+ * that contain at least one of these keywords in the [type] or [notes] columns. Each result is ranked
+ * based on two factors:
+ *
+ * - [keyword_count]: The number of unique keywords found in the record (higher is better).
+ * - [keyword_density]: How densely packed the keywords are within the target fields.
+ *
+ * Records are sorted first by [keyword_count] in descending order, then by [keyword_density].
+ * Optional [limit] and [offset] arguments allow for pagination.
+ *
+ * Key features:
+ * - Dynamically constructs a SQL expression to compute keyword match statistics per record.
+ * - Searches across multiple columns by concatenating them with SQL's `COALESCE` and `||` operators.
+ * - Protects against SQL injection by lowercasing and parameterizing all user input.
+ * - Filters the result set to only include rows with at least one keyword match.
+ * - Supports dynamic pagination via [limit] and [offset] parameters.
+ * - Final output excludes internal helper fields like `keyword_density` and `keyword_count`.
  */
 .arguments
 

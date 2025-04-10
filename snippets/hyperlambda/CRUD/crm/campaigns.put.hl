@@ -1,5 +1,21 @@
 
-// Update one record in your campaigns table in your crm database
+/*
+ * Updates an existing record in the "campaigns" table of your CRM database,
+ * using the specified [campaign_id] as the primary key.
+ *
+ * The caller can provide any combination of optional fields to update, including
+ * [name], [start_date], [end_date], [budget], and [status]. The endpoint ensures
+ * that the record exists before applying the update and broadcasts the update via sockets.
+ *
+ * - Validates the presence of the [campaign_id] to locate the record.
+ * - Authorizes access using [auth.ticket.verify], allowing only "root" and "admin" roles.
+ * - Uses [data.connect] to establish a connection to the SQLite CRM database.
+ * - Dynamically injects only the provided fields into the [data.update] operation.
+ * - If no matching record is found, returns a 404 Not Found response.
+ * - On success, sets HTTP status to 202 (Accepted) and returns the number of affected rows.
+ * - Publishes a [crm.campaigns.put] socket signal to notify clients of the update,
+ *   sharing the updated data and limiting visibility to "admin" and "root" roles.
+ */
 .arguments
 
    // Mandatory campaign_id column value being primary key of record to update, mandatory argument

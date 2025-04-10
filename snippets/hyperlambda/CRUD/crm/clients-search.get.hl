@@ -1,9 +1,27 @@
 
 /*
- * Distinct Keyword Search from clients table in crm database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * Performs a keyword-based search across the "clients" table in your CRM database,
+ * returning only records that contain one or more keywords from the provided [query].
+ * Results are ranked by the number of distinct keywords matched and their keyword density.
+ *
+ * The endpoint analyzes the given [query] by splitting it into individual keywords, normalizing
+ * them to lowercase, and scanning the target columns: [name], [email], [phone], and [address].
+ * Each result includes only those rows where at least one keyword is found.
+ *
+ * Ranking logic:
+ * - [keyword_count]: Counts how many unique keywords are found in each row (higher is better).
+ * - [keyword_density]: Measures how densely keywords appear in the text content (used as secondary ranking).
+ *
+ * Features:
+ * - Accepts optional [limit] (default 10) and [offset] for pagination.
+ * - Uses SQL's string functions (e.g., `length`, `replace`, `coalesce`, `lower`) to compute keyword statistics.
+ * - Builds dynamic SQL using [strings.concat], injected with keyword parameters.
+ * - Protects against SQL injection via lowercasing and parameterization.
+ * - Connects to the SQLite CRM database using [data.connect] and executes with [data.select].
+ * - Automatically removes intermediate fields (keyword_count, keyword_density) before returning the final result set.
+ *
+ * This endpoint is ideal for implementing ranked keyword search functionality across textual fields
+ * within the clients table, providing both flexibility and performance.
  */
 .arguments
 

@@ -1,0 +1,47 @@
+
+/*
+ * Delete a single record from the [opportunities] table in the CRM database.
+ *
+ * - Requires a mandatory argument [opportunity_id] which is the primary key of the record to delete.
+ * - Uses [validators.mandatory] to ensure [opportunity_id] is provided.
+ * - Access is protected via [auth.ticket.verify:root].
+ * - Opens a connection to the [crm] SQLite database using [data.connect].
+ * - Executes a [data.delete] call on the [opportunities] table with a parameterized [where] clause.
+ * - Publishes a socket message [crm.opportunities.delete] after successful deletion for real-time notification.
+ * - Returns the number of affected rows to the caller using [unwrap] and [return].
+ */
+.arguments
+
+   // Mandatory primary key of record to delete, mandatory argument
+   opportunity_id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/opportunity_id
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:opportunities
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.opportunities.delete
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

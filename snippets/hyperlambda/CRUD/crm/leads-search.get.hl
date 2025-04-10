@@ -1,9 +1,25 @@
 
 /*
- * Distinct Keyword Search from leads table in crm database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * Performs a keyword-based search across the "leads" table in your CRM database,
+ * returning only records that contain one or more of the keywords specified in the [query] string.
+ * Results are ranked by the number of distinct matched keywords and their density within the text.
+ *
+ * This full-text search spans across the [source] and [status] columns of each lead.
+ * The query is case-insensitive and supports multiple space-separated keywords.
+ *
+ * Features:
+ * - Requires a [query] string and supports optional [limit] and [offset] for pagination.
+ * - Splits the query string into lowercase keywords and safely maps them into SQL parameters.
+ * - Dynamically builds a SQL expression to:
+ *   1. Concatenate selected columns into one searchable string.
+ *   2. Compute [keyword_density]: ratio of matched characters over total string length.
+ *   3. Compute [keyword_count]: number of unique keywords matched in each row.
+ * - Results are sorted by descending [keyword_count] and then by [keyword_density].
+ * - Executes a dynamically built SQL query using [data.select].
+ * - Cleans up temporary scoring fields ([keyword_density], [keyword_count]) before returning.
+ * - Limits execution to authenticated users with the "guest" role.
+ *
+ * This logic allows advanced fuzzy searching and prioritizes records with more relevant matches.
  */
 .arguments
 

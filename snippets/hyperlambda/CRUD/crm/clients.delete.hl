@@ -1,5 +1,20 @@
 
-// Delete one record from your clients table in your crm database
+/*
+ * Deletes a single record from the "clients" table in your CRM database based on the provided [client_id].
+ *
+ * This endpoint requires root-level authorization and is used to permanently remove a client record
+ * identified by its primary key. It also notifies connected clients about the deletion through a
+ * socket broadcast.
+ *
+ * - Validates the presence of the [client_id] argument using [validators.mandatory].
+ * - Ensures only authorized "root" users can invoke this endpoint via [auth.ticket.verify].
+ * - Connects to the SQLite CRM database using [data.connect].
+ * - Dynamically builds the WHERE clause using [add] and [get-nodes] to safely inject the primary key.
+ * - Deletes the specified record using [data.delete].
+ * - Publishes a [crm.clients.delete] socket message containing the deleted client ID,
+ *   scoped to "admin" and "root" roles for real-time notification purposes.
+ * - Unwraps and returns the number of affected rows under the [affected] node.
+ */
 .arguments
 
    // Mandatory primary key of record to delete, mandatory argument

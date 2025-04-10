@@ -1,0 +1,97 @@
+
+/*
+ * Count all matching records from the [opportunities] table in the CRM database.
+ *
+ * - Optionally filters by a wide range of conditions on [opportunities] and [clients] tables.
+ * - Uses [validators] to support optional filters, but no mandatory arguments are enforced.
+ * - Adds a [Cache-Control] HTTP header for public caching with a 5-minute max-age.
+ * - Verifies that the user has [guest] authorization via [auth.ticket.verify].
+ * - Establishes a connection to a [sqlite] CRM database using [data.connect:[generic|crm]].
+ * - Appends all argument-based filters into the [where] clause dynamically using [add].
+ * - Performs a left join on the [clients] table using [client_id].
+ * - Executes a [data.read] that returns the total count of records using [count(*) as count].
+ * - Ensures only a single record is returned by specifying [limit:1].
+ * - Finally, returns only the count result node to the caller using [return-nodes:x:@data.read/*/*].
+ */
+.arguments
+
+   /*
+    * Optional filtering arguments.
+    *
+    * Since these are added to [where] condition using [add], these arguments are optional
+    */
+   opportunities.opportunity_id.mt:long
+   opportunities.opportunity_id.lt:long
+   opportunities.opportunity_id.mteq:long
+   opportunities.opportunity_id.lteq:long
+   opportunities.opportunity_id.neq:long
+   opportunities.opportunity_id.eq:long
+   opportunities.client_id.mt:long
+   opportunities.client_id.lt:long
+   opportunities.client_id.mteq:long
+   opportunities.client_id.lteq:long
+   opportunities.client_id.neq:long
+   opportunities.client_id.eq:long
+   opportunities.description.like:string
+   opportunities.description.mt:string
+   opportunities.description.lt:string
+   opportunities.description.mteq:string
+   opportunities.description.lteq:string
+   opportunities.description.neq:string
+   opportunities.description.eq:string
+   opportunities.value.mt:double
+   opportunities.value.lt:double
+   opportunities.value.mteq:double
+   opportunities.value.lteq:double
+   opportunities.value.neq:double
+   opportunities.value.eq:double
+   opportunities.stage.like:string
+   opportunities.stage.mt:string
+   opportunities.stage.lt:string
+   opportunities.stage.mteq:string
+   opportunities.stage.lteq:string
+   opportunities.stage.neq:string
+   opportunities.stage.eq:string
+   opportunities.close_date.mt:date
+   opportunities.close_date.lt:date
+   opportunities.close_date.mteq:date
+   opportunities.close_date.lteq:date
+   opportunities.close_date.neq:date
+   opportunities.close_date.eq:date
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Adding filtering arguments.
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:opportunities
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  opportunities.client_id:client_id.client_id
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

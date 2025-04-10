@@ -1,5 +1,33 @@
 
-// Returns unique and distinct values from your notes table in your crm database
+/*
+ * Retrieves a list of unique and distinct values from a specified column in the "notes" table
+ * of your CRM database, with optional filtering, sorting, and pagination support.
+ *
+ * Required Argument:
+ * - [distinct_column]: Fully qualified column name (e.g. "notes.content" or "client_id.name") to return distinct values from.
+ *
+ * Optional Arguments:
+ * - [limit]: Number of distinct records to return (default is 25, -1 returns all).
+ * - [offset]: Index into result set from which to begin returning records.
+ * - [order]: Column name (in TABLE.COLUMN format) to sort results by.
+ * - [direction]: Sorting direction, must be "asc" or "desc".
+ *
+ * Filtering Support:
+ * - Supports advanced filtering on all fields in the "notes" table including:
+ *   [note_id], [client_id], [content], and [created_date].
+ * - Also allows filtering on joined "clients" table fields such as [client_id.name].
+ * - Accepts a wide variety of filter operators including `.eq`, `.neq`, `.lt`, `.like`, etc.
+ *
+ * Execution Details:
+ * - Verifies required input using [validators.mandatory] and [validators.enum].
+ * - Connects to the CRM SQLite database using [data.connect].
+ * - Constructs a `SELECT DISTINCT` expression dynamically using [strings.concat].
+ * - Applies pagination, sorting, and filtering via dynamic argument injection.
+ * - Uses a LEFT JOIN with the "clients" table to support filtering on related fields.
+ * - Returns the distinct values in a flat result set labeled as ".".
+ * - Response includes a public cache control header of 5 minutes using [response.headers.set].
+ * - Only authenticated "guest" users can access this endpoint, enforced by [auth.ticket.verify].
+ */
 .arguments
 
    // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

@@ -1,0 +1,127 @@
+
+/*
+ * Read or list records from the [opportunities] table in the CRM database with optional filtering, paging, and sorting.
+ *
+ * - Accepts optional [limit], [offset], [order], and [direction] arguments to control pagination and sorting.
+ * - Supports a wide range of filtering arguments on [opportunities] and joined [clients] fields.
+ * - Verifies access with [auth.ticket.verify:guest].
+ * - Connects to the [crm] database and executes a [data.read] on the [opportunities] table,
+ *   using a LEFT JOIN on the [clients] table (aliased as [client_id]).
+ * - Returns selected columns including joined [client_id.name] as [client_id.name].
+ * - Uses [add] and [remove-nodes] to apply dynamic filters, ordering, and limits.
+ * - Adds a [Cache-Control] header with 5-minute caching.
+ * - The result set is returned using [return-nodes] from the [data.read] invocation.
+ */
+.arguments
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   /*
+    * Optional filtering arguments.
+    *
+    * Since these are added to [where] condition using [add], these arguments are optional
+    */
+   opportunities.opportunity_id.mt:long
+   opportunities.opportunity_id.lt:long
+   opportunities.opportunity_id.mteq:long
+   opportunities.opportunity_id.lteq:long
+   opportunities.opportunity_id.neq:long
+   opportunities.opportunity_id.eq:long
+   opportunities.client_id.mt:long
+   opportunities.client_id.lt:long
+   opportunities.client_id.mteq:long
+   opportunities.client_id.lteq:long
+   opportunities.client_id.neq:long
+   opportunities.client_id.eq:long
+   opportunities.description.like:string
+   opportunities.description.mt:string
+   opportunities.description.lt:string
+   opportunities.description.mteq:string
+   opportunities.description.lteq:string
+   opportunities.description.neq:string
+   opportunities.description.eq:string
+   opportunities.value.mt:double
+   opportunities.value.lt:double
+   opportunities.value.mteq:double
+   opportunities.value.lteq:double
+   opportunities.value.neq:double
+   opportunities.value.eq:double
+   opportunities.stage.like:string
+   opportunities.stage.mt:string
+   opportunities.stage.lt:string
+   opportunities.stage.mteq:string
+   opportunities.stage.lteq:string
+   opportunities.stage.neq:string
+   opportunities.stage.eq:string
+   opportunities.close_date.mt:date
+   opportunities.close_date.lt:date
+   opportunities.close_date.mteq:date
+   opportunities.close_date.lteq:date
+   opportunities.close_date.neq:date
+   opportunities.close_date.eq:date
+   client_id.name.eq:string
+   client_id.name.like:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:guest
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:opportunities
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  opportunities.client_id:client_id.client_id
+      columns
+         opportunities.opportunity_id
+         opportunities.client_id
+         opportunities.description
+         opportunities.value
+         opportunities.stage
+         opportunities.close_date
+         client_id.name
+            as:client_id.name
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

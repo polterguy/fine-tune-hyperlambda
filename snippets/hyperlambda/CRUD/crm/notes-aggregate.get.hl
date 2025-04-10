@@ -1,5 +1,29 @@
 
-// Returns minimum, maximum, average or sum from your notes table in your crm database
+/*
+ * Returns an aggregate result (min, max, sum, or average) computed on a specified column
+ * from the "notes" table in your CRM database. The result is filtered according to optional
+ * conditions and joined with the "clients" table to support client-related filters.
+ *
+ * Required arguments:
+ * - [aggregate_function]: Must be one of "min", "max", "sum", or "avg".
+ * - [aggregate_column]: Fully qualified column name on which to apply the aggregate function,
+ *   such as "notes.note_id" or "notes.created_date".
+ *
+ * Optional filtering:
+ * - Supports filtering on all standard fields in the "notes" table including [note_id], [client_id],
+ *   [content], [created_date], and joined fields like [client_id.name].
+ * - Filtering supports rich comparison operators such as `.eq`, `.neq`, `.lt`, `.mteq`, `.like`, etc.
+ *
+ * Functionality:
+ * - Validates required parameters and ensures values are within accepted options using [validators.enum].
+ * - Dynamically constructs a SQL aggregate expression using [strings.concat].
+ * - Injects filtering conditions dynamically using [get-nodes] and [add].
+ * - Connects to the CRM SQLite database via [data.connect].
+ * - Executes a [data.read] with a LEFT JOIN on "clients" to allow filters on client fields.
+ * - Returns the aggregated result as a single value labeled as [result].
+ * - Caches the response publicly for 5 minutes using a `Cache-Control` header.
+ * - Endpoint access is restricted to authenticated users with the "guest" role via [auth.ticket.verify].
+ */
 .arguments
 
    // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg

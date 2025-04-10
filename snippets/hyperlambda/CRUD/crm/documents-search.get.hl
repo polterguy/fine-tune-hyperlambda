@@ -1,9 +1,25 @@
 
 /*
- * Distinct Keyword Search from documents table in crm database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * Performs a keyword-based search across the "documents" table in your CRM database,
+ * returning only records that contain one or more keywords from the specified [query] string.
+ * Results are ranked by the number of distinct matched keywords and keyword density,
+ * prioritizing the most relevant entries first.
+ *
+ * The endpoint searches across the [title] and [file_path] columns, splitting the input [query]
+ * into individual words and calculating:
+ *
+ * - [keyword_count]: The number of unique keywords found in each row.
+ * - [keyword_density]: How densely those keywords appear in the combined searchable text.
+ *
+ * Features:
+ * - Requires a [query] argument (space-separated keywords).
+ * - Accepts optional [limit] and [offset] arguments for pagination.
+ * - Dynamically constructs the SQL for full-text matching using `lower`, `replace`, and `length`
+ *   to compute keyword density and presence.
+ * - Joins and concatenates multiple columns into one searchable text blob using SQL `coalesce` and `||`.
+ * - Orders the results by descending [keyword_count] and then [keyword_density] for best match relevance.
+ * - Executes the search against a SQLite database using [data.select].
+ * - Removes internal scoring fields ([keyword_count] and [keyword_density]) before returning the result.
  */
 .arguments
 

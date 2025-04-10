@@ -1,0 +1,50 @@
+
+/*
+ * Delete a single record from the users table in the CRM database, and log the operation.
+ * 
+ * Requires a mandatory [user_id] argument representing the primary key of the user to delete.
+ * The endpoint verifies the requester has root access, logs the deletion along with all input arguments,
+ * and publishes a socket signal after removing the record.
+ */
+.arguments
+
+   // Mandatory primary key of record to delete, mandatory argument
+   user_id:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:crm.users entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/user_id
+
+// Opening up our database connection.
+data.connect:[generic|crm]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:users
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.users.delete
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete
