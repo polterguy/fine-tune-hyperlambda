@@ -1,0 +1,34 @@
+Retrieve the user's username and assume this is the user's email address
+
+```hyperlambda
+.arguments
+   user_id:string
+   subject:string
+   body:string
+validators.mandatory:x:@.arguments/*/user_id
+validators.mandatory:x:@.arguments/*/subject
+validators.mandatory:x:@.arguments/*/body
+mail.smtp.send
+   message
+      to
+         .
+            email:x:@.arguments/*/user_id
+      subject:x:@.arguments/*/subject
+      entity:text/plain
+         content:x:@.arguments/*/body
+```
+---
+.arguments
+   subject:string
+   body:string
+validators.mandatory:x:@.arguments/*/subject
+validators.mandatory:x:@.arguments/*/body
+auth.ticket.get
+mail.smtp.send
+   message
+      to
+         .
+            email:x:@auth.ticket.get
+      subject:x:@.arguments/*/subject
+      entity:text/plain
+         content:x:@.arguments/*/body

@@ -22,7 +22,8 @@ mail.smtp.send
             email:x:@.arguments/*/email
       subject:x:@.arguments/*/subject
       entity:text/plain
-         content:x:@.arguments/*/content```
+         content:x:@.arguments/*/content
+```
 ---
 .arguments
    name:string

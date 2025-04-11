@@ -1,0 +1,24 @@
+/*
+ * HTTP endpoint that encrypts and signs a message using RSA,
+ * then decrypts it using the corresponding private key.
+ *
+ * This endpoint accepts one argument:
+ * - [text]: The plain text message to encrypt and then decrypt
+ *
+ * It returns both the encrypted string and the decrypted version as [cipher] and [plain] respectively,
+ * proving the encryption-decryption roundtrip is successful.
+ */
+.arguments
+   text:string
+crypto.rsa.create-key
+   strength:1024
+crypto.encrypt:x:@.arguments/*/text
+   encryption-key:x:@crypto.rsa.create-key/*/public
+   signing-key:x:@crypto.rsa.create-key/*/private
+   signing-key-fingerprint:x:@crypto.rsa.create-key/*/fingerprint
+crypto.decrypt:x:@crypto.encrypt
+   decryption-key:x:@crypto.rsa.create-key/*/private
+   verify-key:x:@crypto.rsa.create-key/*/public
+yield
+   cipher:x:@crypto.encrypt
+   plain:x:@crypto.decrypt
