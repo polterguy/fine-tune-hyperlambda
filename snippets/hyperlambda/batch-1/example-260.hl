@@ -1,0 +1,40 @@
+/*
+ * Read endpoint that retrieves employee records from the 'employees' table in the 'hr' database.
+ * Supports paging and sorting via [offset], [limit], [order], and [direction] arguments.
+ * All arguments are optional and can be ommitted. This is because of the [add] invocation
+ * only adding arguments present in the [.arguments] node.
+ *
+ * ### Arguments
+ * - [.arguments] includes:
+ *   - [offset]: Number of records to skip for pagination.
+ *   - [limit]: Maximum number of records to return.
+ *   - [order]: Column to sort the result by.
+ *   - [direction]: Sort direction, either 'asc' or 'desc'.
+ *
+ * ### Database Operation
+ * - [data.connect] connects to the 'hr' database.
+ * - [add] injects the paging and sorting arguments into the next [data.read] operation.
+ *   Notice, it will only add arguments specified by caller, implying all arguments are optional.
+ * - [data.read] retrieves records from the 'employees' table with any applied constraints.
+ *
+ * ### Response
+ * - [yield] returns the result as [employees] to the client.
+ *
+ * This example demonstrates a clean and dynamic way to implement sorting and pagination
+ * in a Hyperlambda read endpoint.
+ */
+.arguments
+   offset:int
+   limit:int
+   order:string
+   direction:string
+data.connect:hr
+   add:x:+
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   data.read
+      table:employees
+   yield
+      employees:x:@data.read/*

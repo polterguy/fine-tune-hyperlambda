@@ -1,0 +1,60 @@
+
+/*
+ * Sends an HTTP POST request to the HubSpot API to create a new contact.
+ * All provided arguments are optional and included in the payload only if specified.
+ *
+ * ### Arguments
+ * - [.arguments] may include:
+ *   - [firstname]: The first name of the contact.
+ *   - [lastname]: The last name of the contact.
+ *   - [email]: The email address of the contact.
+ *
+ * ### Payload Construction
+ * - [add] copies any provided arguments into the [properties] block of the [http.post] payload.
+ *   - Arguments are dynamically added and simply ignored if not present.
+ *
+ * ### HTTP Request
+ * - [http.post] sends a POST request to the HubSpot API endpoint for creating contacts.
+ * - [headers] include:
+ *   - [Authorization]: Bearer token for API authentication.
+ *   - [Content-Type]: application/json to specify the payload format.
+ * - [payload] includes the [properties] object populated with available argument values.
+ *
+ * ### Response
+ * - [yield] returns a static [result] with the value "OK" to acknowledge the operation.
+ *
+ * This snippet demonstrates how to construct and send authenticated HTTP POST requests
+ * with optional parameters to external APIs using Hyperlambda.
+ */
+.arguments
+
+   // Mandatory first name of contact
+   firstname:string
+
+   // Mandatory last name of contact
+   lastname:string
+
+   // Mandatory email of contact
+   email:string
+
+/*
+ * Adding all arguments specified by caller.
+ *
+ * Dynamically adding arguments like this to slot invocations, implies the arguments are optional,
+ * and simply ignored if not specified by the caller.
+ */
+add:x:./*/http.post/*/payload/*/properties
+   get-nodes:x:@.arguments/*
+
+// Creating our HTTP POST request towards HubSpot.
+http.post:"https://api.hubapi.com/crm/v3/objects/contacts"
+   headers
+      Authorization:Bearer YOUR_HUBSPOT_API_TOKEN
+      Content-Type:application/json
+   payload
+      properties
+
+// Returning result of above invocation to caller.
+yield
+   result:OK
+

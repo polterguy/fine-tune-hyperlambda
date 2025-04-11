@@ -1,0 +1,73 @@
+/*
+ * Retrieves and parses the sitemap of a given domain, extracting all URLs from <loc> tags.
+ *
+ * ### Arguments
+ * - [.arguments] includes:
+ *   - [domain]: The domain name to retrieve the sitemap from (e.g., example.com).
+ *
+ * ### Sitemap Retrieval
+ * - [strings.concat] constructs the full sitemap URL using `https://[domain]/sitemap.xml`.
+ * - [http.get] sends a GET request to the constructed URL.
+ * - [convert] enables automatic decoding of the response.
+ *
+ * ### URL Extraction
+ * - [.urls] is initialized as a buffer to collect extracted URLs.
+ * - [if] checks that the response status code is in the 2xx range:
+ *   - [xml2lambda] converts the XML content of the sitemap into lambda nodes.
+ *   - [for-each] iterates through all `<loc>` tag values using a recursive expression.
+ *   - [add] appends each URL found to the [.urls] buffer.
+ *   - [unwrap] is crucial when we're adding nodes having expressions to make sure we evaluate
+ *     these expressions and replace them with whatever the expression is pointing to.
+ *
+ * ### Error Handling
+ * - [else] throws an error if the sitemap could not be retrieved.
+ *
+ * ### Response
+ * - [yield] returns the extracted URLs to the caller under the [urls] node.
+ *
+ * This endpoint provides a robust way to crawl and extract links from a domain's sitemap
+ * using Hyperlambda, with built-in error handling and structural XML parsing.
+ */
+.arguments
+   domain:string
+
+// Reading sitemap.
+strings.concat
+   .:"https://"
+   get-value:x:@.arguments/*/domain
+   .:/sitemap.xml
+http.get:x:@strings.concat
+   convert:true
+
+// Buffer for all URLs found in sitemap.
+.urls
+
+// Making sure we actually read the sitemap.
+if
+   and
+      mte:x:@http.get
+         .:int:200
+      lt:x:@http.get
+         .:int:300
+   .lambda
+
+      // Loading XML from HTTP response.
+      xml2lambda:x:@http.get/*/content
+
+      // Iterating through all <loc> nodes in XML.
+      for-each:x:"@xml2lambda/**/loc/*/\\#text"
+
+         // Adding URL to [.urls] above.
+         unwrap:x:+/*/*
+         add:x:@.urls
+            .
+               .:x:@.dp/#
+
+else
+
+   throw:Failed retrieving sitemap!
+
+// Returning result to caller.
+yield
+   urls:x:@.urls/*
+
