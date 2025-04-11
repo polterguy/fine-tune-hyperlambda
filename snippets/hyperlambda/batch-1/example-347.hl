@@ -1,5 +1,43 @@
 
-// Endpoint searching for images using Google with a mandatory query parameter.
+/*
+ * Endpoint that performs an image search using Google's image engine via the SERP API.
+ * The user must provide a [query] parameter. The endpoint returns a structured list of image results.
+ *
+ * ### Arguments
+ * - [.arguments] includes:
+ *   - [query]: The search term used to find images (mandatory).
+ *
+ * ### Validation
+ * - [validators.mandatory] ensures the [query] argument is present before proceeding.
+ *
+ * ### API Key Handling
+ * - [config.get] retrieves the SERP API key from configuration using the key 'magic:serp-api:api_key'.
+ * - [if] checks if the API key is missing or empty, and throws an error if not found.
+ *
+ * ### URL Construction
+ * - [strings.concat] constructs the full request URL by:
+ *   - Appending the engine type ('google_images'), API key, and URL-encoded [query] to the base endpoint.
+ *
+ * ### API Call
+ * - [http.get] sends a GET request to the constructed URL.
+ * - [convert] being true converts the returned JSON response into a lambda object for easy traversal.
+ *
+ * ### Error Handling
+ * - [if] checks the HTTP response status code.
+ *   - If not in the 2xx range, it logs and throws an exception.
+ *
+ * ### Result Parsing
+ * - [for-each] iterates through the first 10 image results under [images_results].
+ * - [unwrap] evaluates all expressions in [add]'s 'great grand children' nodes.
+ * - [add] copies the image result data into the return payload, extracting:
+ *   - [title], [link], [original], and [source].
+ *
+ * ### Final Response
+ * - [return-nodes] returns the parsed image results under the [result] node.
+ *
+ * This endpoint provides a secure, paginated, and structured interface to perform
+ * image searches using Google's SERP API via Hyperlambda.
+ */
 .arguments
 
    // Mandatory query to search for.
@@ -62,6 +100,5 @@ for-each:x:@http.get/*/content/*/images_results/*/[0,10]
             source:x:@.dp/#/*/source
 
 // Returning result to caller.
-unwrap:x:+/*
 return-nodes
    result
