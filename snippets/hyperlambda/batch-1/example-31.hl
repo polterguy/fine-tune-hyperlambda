@@ -1,7 +1,33 @@
 
-// Hyperlambda that moves SQL scripts to the correct folder and creates the Chinook database file if it doesn't exist.
+/*
+ * Initializes the Chinook SQLite database if it doesn't already exist by relocating SQL script files
+ * into the correct templates folder and executing the database creation script.
+ *
+ * ### Step 1: Move SQL Scripts into Template Folder
+ * - [io.file.list] lists all files in the [/modules/sqlite-chinook/magic.startup/] folder.
+ * - A [for-each] loop processes each file:
+ *   - [strings.split] splits the file path into parts using `/` as the delimiter.
+ *   - [strings.ends-with] checks whether the file is a `.sql` file.
+ *   - If true, [strings.concat] constructs a target path in [/etc/sqlite/templates/].
+ *   - [io.file.exists] checks if the file already exists at the target.
+ *   - If not, [io.file.move] relocates the `.sql` file and logs the action via [log.info].
 
-// Listing all files in startup folder
+ * ### Step 2: Create the Chinook Database File
+ * - [io.file.exists] checks if the Chinook database file [/data/chinook.db] already exists.
+ * - If not:
+ *   - [io.file.save] creates an empty file at [/data/chinook.db] to initialize the DB.
+ *   - A creation message is logged.
+ *   - [io.file.load] reads the Chinook SQL script from [/etc/sqlite/templates/chinook.sql].
+ *   - [sqlite.connect:chinook] connects to the database, and [sqlite.execute] runs the SQL.
+ *   - Logs success after creation using [log.info].
+ *
+ * ### Step 3: Cache Invalidation
+ * - [cache.set] resets the SQLite connection cache to reflect the new DB state,
+ *   ensuring any subsequent operations see the newly created Chinook database.
+ *
+ * This snippet is ideal for automated initialization workflows and demonstrates
+ * file manipulation, conditional logic, and database provisioning in Hyperlambda.
+ */
 io.file.list:/modules/sqlite-chinook/magic.startup/
 
 // Looping through the result of above invocation

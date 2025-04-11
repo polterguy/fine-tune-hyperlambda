@@ -1,5 +1,37 @@
 
-// Read endpoint with paging, sorting, and filtering, selecting records from our crawl_urls table with filtering.
+/*
+ * Read endpoint that retrieves records from the 'crawl_urls' table in the 'scraper' SQLite database,
+ * supporting paging, sorting, and dynamic filtering. Access is restricted to 'root' and 'admin' users.
+ *
+ * ### Arguments
+ * - [.arguments] includes support for:
+ *   - Paging:
+ *     - [limit]: Maximum number of records to return.
+ *     - [offset]: Number of records to skip.
+ *   - Sorting:
+ *     - [order]: Column name to sort by.
+ *     - [direction]: Sort direction, either 'asc' or 'desc'.
+ *   - Filtering:
+ *     - [crawl_urls.crawl_url_id.eq]: Exact match on crawl URL ID.
+ *     - [crawl_urls.url.like]: Pattern match on URL.
+ *     - [crawl_urls.url.eq]: Exact match on URL.
+ *     - [crawl_urls.type.like]: Pattern match on type.
+ *     - [crawl_urls.type.eq]: Exact match on type.
+ *
+ * ### Authorization
+ * - [auth.ticket.verify] ensures only users with the 'root' or 'admin' role may access this endpoint.
+ *
+ * ### Database Operation
+ * - [data.connect] connects to the [scraper] database using the [generic] connection string.
+ * - [add] injects [order], [direction], [limit], and [offset] into the [data.read] call to enable paging and sorting.
+ * - [remove-nodes] removes these parameters from the argument set to prevent them from being misinterpreted as filters.
+ * - [add] forwards the remaining filtering arguments into the [where] / [and] parts.
+ * - [data.read] retrieves [crawl_url_id], [url], and [type] from the 'crawl_urls' table with the specified constraints.
+ *
+ * ### Response
+ * - [return-nodes] returns the matched rows to the caller.
+ *
+ * This endpoint demonstrates advanced querying capabilities*
 .arguments
 
    // Number of records to return

@@ -1,7 +1,33 @@
 
 /*
- * HTTP Endpoint that counts items from your spice_urls table in your scraper database.
- * With filtering. Can only be executed by root accounts and admin accounts.
+ * HTTP endpoint that counts records in the 'spice_urls' table of the 'scraper' SQLite database.
+ * The endpoint supports optional filtering and is restricted to users with 'root' or 'admin' roles.
+ *
+ * ### Arguments
+ * - [.arguments] includes optional filters for:
+ *   - [spice_urls.spice_url_id.eq]: Exact match on the ID.
+ *   - [spice_urls.url.like]: Wildcard match on the URL.
+ *   - [spice_urls.url.eq]: Exact match on the URL.
+ *   - [spice_urls.type.like]: Wildcard match on the type.
+ *   - [spice_urls.type.eq]: Exact match on the type.
+ *
+ * ### Authorization
+ * - [auth.ticket.verify] ensures that only users with 'root' or 'admin' roles can invoke the endpoint.
+ *
+ * ### Database Operation
+ * - [data.connect] connects to the 'scraper' database using the 'generic' connection string.
+ * - [add] injects the provided filter arguments into the [and] node.
+ * - [data.read] performs a count query on the 'spice_urls' table:
+ *   - [columns] includes [count(*)] aliased as [count].
+ *   - [where] applies all filter conditions.
+ *   - [and] makes sure ALL filter arguments must match.
+ *   - [limit] is set to 1 to ensure only one count result is returned.
+ *
+ * ### Response
+ * - [return-nodes] returns the count result from the query as a node structure.
+ *
+ * This endpoint demonstrates how to implement a secure, filterable count operation
+ * using Hyperlambda with proper access control and structured argument mapping.
  */
 .arguments
 

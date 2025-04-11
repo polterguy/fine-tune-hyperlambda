@@ -1,5 +1,42 @@
 
-// Create a Hyperlambda endpoint that returns all filtered training snippets as a CSV file, ensuring the user is 'root'.
+/*
+ * Creates a Hyperlambda endpoint that returns all filtered training snippets from the 'ml_training_snippets' table
+ * in the 'magic' SQLite database as a downloadable CSV file. Only users with the 'root' role are authorized.
+ *
+ * ### Arguments
+ * - [.arguments] includes optional filters:
+ *   - [ml_training_snippets.completion.like]: Partial match on the 'completion' column.
+ *   - [ml_training_snippets.prompt.like]: Partial match on the 'prompt' column.
+ *   - [ml_training_snippets.uri.like]: Partial match on the 'uri' column.
+ *   - [ml_training_snippets.type.eq]: Exact match on the 'type' column.
+ *
+ * ### Authorization
+ * - [auth.ticket.verify] ensures only 'root' users can execute the endpoint.
+ *
+ * ### Filtering Setup
+ * - [add] injects all "like" filters into an [or] clause within the [where] condition.
+ * - [remove-nodes] removes the "like" filters from the general arguments after injecting them into the [or] clause.
+ * - Remaining filters are injected as part of the outer [and] clause.
+ * - An [if] statement checks if the [or] clause has any child nodes. If not, it's removed to avoid invalid SQL.
+ *
+ * ### Database Read
+ * - [data.read] selects [type], [uri], [prompt], and [completion] from the 'ml_training_snippets' table,
+ *   applying all active filters with no record limit.
+ *
+ * ### Fallback
+ * - [if] checks if no records are returned.
+ *   - If none are found, it sets the HTTP response status to 404 and returns a message.
+ *
+ * ### CSV Conversion & Response
+ * - [lambda2csv] converts the result into CSV format.
+ * - [response.headers.set] sets headers for CSV file download:
+ *   - [Content-Type] as text/csv
+ *   - [Content-Disposition] for download with filename `training-snippets.csv`
+ * - [return] streams the CSV content back to the caller.
+ *
+ * This endpoint is designed for exporting ML training snippets in a flexible, filterable, and downloadable format,
+ * supporting secure access and proper CSV file handling in Hyperlambda.
+ */
 .arguments
    ml_training_snippets.completion.like:string
    ml_training_snippets.prompt.like:string

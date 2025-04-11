@@ -1,7 +1,31 @@
 
 /*
- * Delete endpoint deleting one record from your crawl_urls table in your scraper database having a primary key of 'crawl_url_id'.
- * Only allow root users and admin users to execute it.
+ * Delete endpoint that removes a single record from the 'crawl_urls' table in the 'scraper' SQLite database.
+ * Access is restricted to users with the 'root' or 'admin' roles.
+ *
+ * ### Arguments
+ * - [.arguments] includes:
+ *   - [crawl_url_id]: The primary key of the record to delete (mandatory).
+ *
+ * ### Authorization
+ * - [auth.ticket.verify] ensures only users with the 'root' or 'admin' role can invoke the endpoint.
+ *
+ * ### Validation
+ * - [validators.mandatory] enforces that 'crawl_url_id' is provided to prevent accidental full-table deletion.
+ *
+ * ### Database Operation
+ * - [data.connect] opens a connection to the 'scraper' database using the 'generic' connection string.
+ * - [add] dynamically inserts the argument node into the [where] / [and] parts of the [data.delete] operation.
+ * - [data.delete] deletes the matching record from the 'crawl_urls' table.
+ *
+ * ### Response
+ * - [unwrap] is used to forward-evaluate the [affected] node’s value so it becomes part of the final response.
+ *   Without this invocation the expression would be returned to tha caller, making the actual value impossible to retrieve
+ *   since the node the expression is pointing to would no longer be "in scope".
+ * - [return] provides the number of affected rows as [affected].
+ *
+ * This endpoint provides a secure and role-restricted delete operation for a single record,
+ * with proper validation and safe execution using Hyperlambda.
  */
 .arguments
 

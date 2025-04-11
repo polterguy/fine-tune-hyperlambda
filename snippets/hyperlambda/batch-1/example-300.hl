@@ -1,7 +1,37 @@
 
 /*
- * Endpoint returning items from your cloudlets table in your [generic|hub] database according to the specified arguments,
- * allowing for paging, sorting, and filtering on id, created, and name. Return all columns from the table.
+ * Endpoint that returns records from the 'cloudlets' table in the 'hub' database using the 'generic' connection string.
+ * It supports paging, sorting, and filtering based on various arguments. Only 'root' users are allowed to access this endpoint.
+ *
+ * ### Arguments
+ * - [.arguments] may include:
+ *   - [limit]: Maximum number of records to return.
+ *   - [offset]: Number of records to skip (for pagination).
+ *   - [order]: Column name to sort by.
+ *   - [direction]: Sort direction, either 'asc' or 'desc'.
+ *   - [cloudlets.id.eq]: Filter by exact ID.
+ *   - [cloudlets.created.eq]: Filter by exact creation date.
+ *   - [cloudlets.name.like]: Pattern-based filter on the name.
+ *   - [cloudlets.name.eq]: Exact match filter on the name.
+ *
+ * ### Authorization
+ * - [auth.ticket.verify] ensures that only users with the 'root' role can invoke this endpoint.
+ *
+ * ### Query Construction
+ * - [data.connect] opens a connection to the 'hub' database.
+ * - [add] extracts paging and sorting arguments and applies them to the [data.read] operation.
+ * - [remove-nodes] cleans these from the argument list so they aren't mistakenly added as filters.
+ * - [add] injects the remaining filter arguments into the [and] node, resulting in these becoming a
+ *   part of the WHERE clause of the resulting SQL.
+ *
+ * ### Data Retrieval
+ * - [data.read] queries the 'cloudlets' table, applying all specified filters, sort order, and limits.
+ *
+ * ### Response
+ * - [return-nodes] returns the full result set from the query to the caller.
+ *
+ * This endpoint provides a robust and flexible way to browse cloudlets
+ * using precise filtering, sorting, and pagination, all secured through role-based access.
  */
 .arguments
    limit:long

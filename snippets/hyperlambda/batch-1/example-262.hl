@@ -1,5 +1,32 @@
 
-// Generate a Hyperlambda endpoint to return a specified training data PDF file to the client.
+/*
+ * Hyperlambda endpoint that returns a specified training data PDF file to the client.
+ *
+ * ### Arguments
+ * - [.arguments] includes:
+ *   - [file]: The name of the file to be returned (required).
+ *
+ * ### Validation
+ * - [validators.mandatory] ensures the [file] argument is provided.
+ *
+ * ### Path Construction
+ * - [strings.concat] builds the full path to the file by prepending the base directory:
+ *   - `/etc/system/openai/pdf/` + the [file] value.
+ *
+ * ### HTTP Headers
+ * - [strings.concat] constructs the [Content-Disposition] header for a file download with the original filename.
+ * - [response.headers.set] sets:
+ *   - [Content-Type] to `application/pdf`.
+ *   - [Content-Disposition] to indicate the file should be downloaded.
+ *   - [Access-Control-Expose-Headers] to allow [Content-Disposition] to be visible in CORS contexts.
+ *
+ * ### File Streaming
+ * - [io.stream.open-file] opens the file from the constructed path.
+ * - [return] streams the file contents to the client.
+ *
+ * This endpoint enables secure delivery of static training data files through a REST interface
+ * while properly setting headers for file downloads and enforcing input validation.
+ */
 .arguments
    file:string
 
@@ -17,7 +44,7 @@ strings.concat
    get-value:x:@.arguments/*/file
    .:"\""
 response.headers.set
-   Content-Type:text/plain
+   Content-Type:application/pdf
    Content-Disposition:x:@strings.concat
    Access-Control-Expose-Headers:Content-Disposition
 

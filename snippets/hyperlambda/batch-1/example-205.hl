@@ -1,5 +1,45 @@
 
-// Search for products on Ebay endpoint using SERP API with a mandatory query parameter. Retrieve API key from configuration
+/*
+ * Endpoint that searches for products on eBay using the SERP API, with a required [query] parameter and optional country code filter.
+ *
+ * ### Arguments
+ * - [.arguments] includes:
+ *   - [query]: The search term to look for on eBay (mandatory).
+ *   - [gl]: Optional country code for regional search (e.g., US, NO).
+ *
+ * ### API Key Retrieval
+ * - [config.get] fetches the SERP API key from configuration using the key [magic:serp-api:api_key].
+ * - If the API key is missing or empty, [throw] is used to abort with an error.
+ *
+ * ### URL Construction
+ * - [strings.concat] builds the full API URL using:
+ *   - Base endpoint: `https://serpapi.com/search.json`
+ *   - Query parameters: `engine=ebay`, the API key, and `_nkw` for the search term.
+ *   - [strings.url-encode] is used to safely encode the [query] value.
+ *
+ * ### API Invocation
+ * - [http.get] sends a GET request to the constructed URL.
+ * - [convert:true] converts the JSON response into lambda-compatible structure.
+ *
+ * ### Response Validation
+ * - [if] with [mte] and [lt] checks that the status code is within the 2xx success range.
+ * - If the request failed, the original lambda is logged with [lambda2hyper] and an error is thrown.
+ *
+ * ### Result Processing
+ * - [for-each] loops through the first 5 items in the [organic_results] array.
+ * - [unwrap] flattens nested result structure for easy access.
+ * - [add] creates a structured result for each item with:
+ *   - [title], [link], [condition], [price], and [thumbnail]
+ *
+ * ### Final Response
+ * - [unwrap] cleans up the response structure.
+ * - [return-nodes] returns:
+ *   - [result]: The list of matched products.
+ *   - [total_matches]: Total number of matches from the search metadata.
+ *
+ * This endpoint showcases structured API invocation, input validation, configuration usage,
+ * and result transformation using Hyperlambda and the SERP API.
+ */
 .arguments
 
    // Mandatory query to search for.

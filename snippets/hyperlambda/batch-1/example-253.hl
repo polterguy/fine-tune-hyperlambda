@@ -1,8 +1,31 @@
 
 /*
- * Create a Hyperlambda file for a CRUD delete endpoint that deletes one item from the users_roles table in the magic database
- * matching the specified arguments for 'user' and 'role', ensuring authentication and authorization for root roles.
- * Use the 'generic' connection string.
+ * CRUD delete endpoint that removes a record from the `users_roles` table in the `magic` SQLite database
+ * where both [user] and [role] match the provided arguments. Only users with the `root` role are allowed to invoke this endpoint.
+ *
+ * ### Arguments
+ * - [.arguments] includes:
+ *   - [role]: The role name to match.
+ *   - [user]: The username to match.
+ *
+ * ### Authorization
+ * - [auth.ticket.verify] ensures the caller belongs to the `root` role.
+ *
+ * ### Validation
+ * - [validators.mandatory] ensures that both [role] and [user] arguments are provided before proceeding.
+ *   This will throw an exception if one of the arguments is NOT specified by the caller.
+ *
+ * ### Database Operation
+ * - [data.connect] establishes a connection to the `magic` database using the `generic` connection string.
+ * - [add] forwards all argument nodes into the [where] clause of the [data.delete] operation and its [and] child.
+ * - [data.delete] deletes the matching record from the `users_roles` table.
+ *
+ * ### Response
+ * - [unwrap] is used to forward-evaluate the [affected] node’s value such that it becomes the return value of [data.delete].
+ * - [return] sends back the number of affected rows to the caller as [affected].
+ *
+ * This endpoint demonstrates secure, parameterized deletion of records from a table
+ * using strict role-based access and safe input validation in Hyperlambda.
  */
 .arguments
    role:string

@@ -1,8 +1,40 @@
 
 /*
- * Update endpoint updating one record in your crawl_urls table in your scraper database.
- * Will update the record having a [crawl_url_id] matching filter argument, and set its url and type according to arguments.
- * Only allow root and admin users to execute the endpoint.
+ * Update endpoint that modifies a record in the 'crawl_urls' table of the 'scraper' SQLite database.
+ * It identifies the record using the [crawl_url_id] and updates the [url] and [type] fields based on the provided arguments.
+ * Only users with 'root' or 'admin' roles are allowed to execute this endpoint.
+ *
+ * ### Arguments
+ * - [.arguments] includes:
+ *   - [crawl_url_id]: The primary key of the record to update (mandatory).
+ *   - [url]: The new value for the URL column.
+ *   - [type]: The new value for the type column.
+ *
+ * ### Validation
+ * - [validators.mandatory] ensures that the [crawl_url_id] argument is present before continuing.
+ *   If the argument is not specified an exception will be thrown.
+ *
+ * ### Authorization
+ * - [auth.ticket.verify] allows only 'root' or 'admin' users to access the endpoint.
+ *
+ * ### Database Operation
+ * - [data.connect] opens a connection to the 'scraper' SQLite database using the 'generic' connection string.
+ * - [add] prepares:
+ *   - [values] to update the [url] and [type] fields.
+ *   - [where] clause to match the record using [crawl_url_id] by adding this ONLY the first argument (crawl_url_id) to the [and] node.
+ * - [data.update] performs the update operation on the 'crawl_urls' table.
+ *
+ * ### Post-Update Check
+ * - [if] block checks whether [data.update] affected zero records:
+ *   - If so, it sets the HTTP response status to 404 and returns a message indicating the record was not found.
+ *
+ * ### Response
+ * - [response.status.set] sets the HTTP status to 202 (Accepted) for successful updates.
+ * - [unwrap] forward evaluates the expression being the value of the [affected] node.
+ * - [return] sends the number of affected rows to the client as [affected].
+ *
+ * This endpoint demonstrates safe and role-restricted update operations in Hyperlambda,
+ * with validation, conditional logic, and proper HTTP response semantics.
  */
 .arguments
 
