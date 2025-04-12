@@ -1,0 +1,85 @@
+/*
+ * This Hyperlambda file demonstrates a secured and resilient endpoint that retrieves and parses an XML sitemap from a user-provided domain.
+ * It uses validation, external HTTP requests, conditional error handling, XML conversion, and manual iteration to extract all URLs listed in the sitemap.
+ *
+ * [.arguments]
+ * Declares an input argument named 'domain', expected to be a URL pointing to a remote sitemap file.
+ *
+ * [auth.ticket.verify]
+ * Verifies that the current caller has a valid and authorized ticket with 'root' access.
+ * This provides a security barrier to prevent unauthorized access to this endpoint.
+ *
+ * [http.get]
+ * Issues a GET request to the given domain URL to fetch the sitemap XML file.
+ * [convert:true] automatically parses the HTTP response body into a string node.
+ * A 60-second timeout is set to account for slower external services.
+ *
+ * [if]
+ * This conditional block performs error handling by checking whether the HTTP response code is valid.
+ * If the response code is not 200 (OK) and also not 0 (special placeholder), it executes a lambda branch that:
+ * - Logs an error message using [log.error]
+ * - Includes contextual info: the URL, HTTP status code, and raw response
+ * - Aborts the flow using [response.status.set:500] and [throw] with an exception message
+ *
+ * [xml2lambda]
+ * Converts the raw XML body (stored in the 'content' child of [http.get]) into a traversable Hyperlambda structure.
+ *
+ * [.result]
+ * Declares a temporary container node to store the extracted URLs.
+ *
+ * [for-each]
+ * Iterates through every `<loc>` element found under `<url>` elements in the XML structure.
+ * The path uses escaped XPath-like syntax with `#text` to point directly at the textual content inside `<loc>`.
+ *
+ * Inside the loop:
+ * - [unwrap] resolves the location of the current item
+ * - [add] adds the extracted URL into [.result] as a new unnamed child node
+ *
+ * [return-nodes]
+ * Returns all child nodes under [.result] to the client, producing a flat list of URLs.
+ *
+ * This pattern showcases a secure and reliable way to ingest, validate, and transform XML content via HTTP into a structured result.
+ */
+.arguments
+   domain:string
+
+// Making sure user has access to invoked endpoint.
+auth.ticket.verify:root
+
+// Retrieving sitemap.
+http.get:x:@.arguments/*/domain
+   convert:true
+   timeout:60
+if
+   neq
+      get-value:x:@http.get
+      .:int:200
+   .lambda
+
+      // Logging error.
+      log.error:Something went wrong while trying to retrieve sitemap
+         url:x:@.arguments/*/domain
+         status:x:@http.get
+         reason:x:@http.get/*/content
+
+      // Throwing exception
+      throw:"Couldn't load sitemap!"
+
+// Converting result to XML.
+xml2lambda:x:@http.get/*/content
+
+// Creating our return value.
+.result
+
+// Iterating through all URLs in sitemap.
+for-each:x:"@xml2lambda/*/urlset/*/url/*/loc/*/\\#text"
+
+   // Adding URL to return value.
+   unwrap:x:+/*/*
+   add:x:@.result
+      .
+         .:x:@.dp/#
+
+// Returning result to caller.
+return-nodes:x:@.result/*
+
