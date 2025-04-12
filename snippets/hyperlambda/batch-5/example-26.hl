@@ -1,0 +1,43 @@
+/*
+ * This Hyperlambda file shows how to enrich author data with external statistics
+ * from a public API using [for-each] and [add].
+ *
+ * [data.connect]
+ * Connects to the 'bookstore' database to fetch author data.
+ *
+ * [data.read]
+ * Retrieves the first 50 authors, selecting 'AuthorId' and 'Name'.
+ *
+ * [for-each]
+ * Iterates over each author record.
+ *
+ * - [http.get] calls an external API ('https://api.bookstats.org/author/metrics') using 'AuthorId' as the query param.
+ *
+ * - The API response is parsed and its contents are extracted using [get-nodes].
+ *
+ * - The extracted metrics are grouped under a child node named 'metrics' and added to each author record.
+ *
+ * [yield]
+ * Outputs the enriched author list under the 'enriched' node.
+ */
+data.connect:bookstore
+   data.read
+      table:Authors
+      limit:50
+      columns
+         AuthorId
+         Name
+   for-each:x:@data.read/*
+
+      http.get:"https://api.bookstats.org/author/metrics"
+         query
+            authorId:x:@.dp/#/*/AuthorId
+         convert:bool:true
+      add:x:+/*/*
+         get-nodes:x:@http.get/*/content/*
+      add:x:@.dp/#
+         .
+            metrics
+
+   yield
+      enriched:x:@.authors

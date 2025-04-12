@@ -1,0 +1,55 @@
+/*
+ * This Hyperlambda file demonstrates how to manually enrich database records using [for-each],
+ * [http.get], and [add] to embed external API data into each record in a controlled, low-level loop.
+ *
+ * [data.connect]
+ * Opens a connection to the 'streamingdb' database.
+ *
+ * [data.read]
+ * Retrieves the first 50 artists from the 'Artists' table.
+ * Only the 'ArtistId' and 'StageName' columns are selected to optimize data retrieval.
+ *
+ * [for-each]
+ * Iterates over each artist record returned from [data.read].
+ * The current item in the iteration is accessed through [.dp].
+ *
+ * Inside the loop:
+ *
+ * - [http.get] issues a GET request to 'https://api.streamstats.com/plays',
+ *   passing the current artist's 'ArtistId' as a query parameter named 'id'.
+ *
+ * - [convert:true] converts the JSON response into a native Hyperlambda node tree structure.
+ *
+ * - The first [add] call copies the individual fields from the response (inside 'content') into the root of the document,
+ *   effectively flattening the data structure to prepare it for merging into the artist object.
+ *   It uses [get-nodes] to select all children of 'content', and attaches them directly under the root using [add:x:+/*/*].
+ *
+ * - The second [add] appends a child node named 'plays' under the currently iterated artist node.
+ *   This groups the previously copied API fields under a named container, maintaining a clean structure.
+ *
+ * Final [yield]
+ * Once the loop is complete, the enriched artist list is returned to the client under the 'enriched' node.
+ * This pattern gives full manual control over how enrichment is structured and merged into the data.
+ */
+data.connect:streamingdb
+   data.read
+      table:Artists
+      limit:50
+      columns
+         ArtistId
+         StageName
+   for-each:x:@data.read/*
+
+      // Fetch remote stats via API
+      http.get:"https://api.streamstats.com/plays"
+         query
+            id:x:@.dp/#/*/ArtistId
+         convert:bool:true
+      add:x:+/*/*
+         get-nodes:x:@http.get/*/content/*
+      add:x:@.dp/#
+         .
+            plays
+
+   yield
+      enriched:x:@.artists

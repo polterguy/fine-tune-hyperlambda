@@ -1,0 +1,46 @@
+/*
+ * This Hyperlambda file enriches academic course data with live enrollment stats from an API
+ * using [for-each], [http.get], and [add] for full manual control over data injection.
+ *
+ * [data.connect]
+ * Opens a connection to the 'university' database.
+ *
+ * [data.read]
+ * Reads 50 records from the 'Courses' table, selecting 'CourseId' and 'Title'.
+ *
+ * [for-each]
+ * Iterates through each course and performs enrichment.
+ *
+ * - [http.get] sends a GET request to 'https://api.university.edu/enrollments'
+ *   with the current course ID passed as the 'cid' query parameter.
+ *
+ * - [convert:true] allows the API's JSON response to be automatically parsed into a usable Hyperlambda structure.
+ *
+ * - The API response's 'content' children are unwrapped and added to the root.
+ *
+ * - These nodes are then grouped under a 'enrollment' container and added to the current course node.
+ *
+ * Final [yield]
+ * The final list of enriched course records is returned under the 'enriched' node.
+ */
+data.connect:university
+   data.read
+      table:Courses
+      limit:50
+      columns
+         CourseId
+         Title
+   for-each:x:@data.read/*
+
+      http.get:"https://api.university.edu/enrollments"
+         query
+            cid:x:@.dp/#/*/CourseId
+         convert:bool:true
+      add:x:+/*/*
+         get-nodes:x:@http.get/*/content/*
+      add:x:@.dp/#
+         .
+            enrollment
+
+   yield
+      enriched:x:@.courses

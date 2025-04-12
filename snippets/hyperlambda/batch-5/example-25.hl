@@ -1,0 +1,47 @@
+/*
+ * This Hyperlambda file demonstrates how to enrich department records from the 'hrdb' database
+ * with remote headcount data using [for-each], [http.get], and [add].
+ *
+ * [data.connect]
+ * Connects to the 'hrdb' database for reading department data.
+ *
+ * [data.read]
+ * Retrieves the first 50 departments, selecting only 'DeptId' and 'DeptName'.
+ *
+ * [for-each]
+ * Iterates over each department record using [.dp] as the current context.
+ *
+ * Inside the loop:
+ *
+ * - [http.get] sends a request to 'https://api.hr.example.com/headcount', passing the department ID as 'dept'.
+ *
+ * - [convert:true] transforms the JSON API response into a Hyperlambda structure.
+ *
+ * - The first [add] copies the data from the 'content' section into the root using [get-nodes], making it available for the next step.
+ *
+ * - The second [add] attaches a 'headcount' child node under the department, grouping the enriched data.
+ *
+ * Final [yield]
+ * Returns the final enriched department list under the 'enriched' node.
+ */
+data.connect:hrdb
+   data.read
+      table:Departments
+      limit:50
+      columns
+         DeptId
+         DeptName
+   for-each:x:@data.read/*
+
+      http.get:"https://api.hr.example.com/headcount"
+         query
+            dept:x:@.dp/#/*/DeptId
+         convert:bool:true
+      add:x:+/*/*
+         get-nodes:x:@http.get/*/content/*
+      add:x:@.dp/#
+         .
+            headcount
+
+   yield
+      enriched:x:@.departments

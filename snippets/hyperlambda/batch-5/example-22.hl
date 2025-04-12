@@ -1,0 +1,49 @@
+/*
+ * This Hyperlambda file demonstrates how to use [for-each] to manually iterate over database records,
+ * enriching each item with external data fetched via an HTTP API using [http.get].
+ *
+ * [data.connect]
+ * Opens a connection to the 'streamingdb' database, which contains a table named 'Artists'.
+ *
+ * [data.read]
+ * Retrieves the first 50 records from the 'Artists' table.
+ * Only the 'ArtistId' and 'StageName' columns are selected to optimize the payload.
+ *
+ * [for-each]
+ * Iterates over each artist record in the result set from [data.read].
+ * The current record is accessed through the [.dp] context during each loop iteration.
+ *
+ * Inside the [for-each] block:
+ *
+ * - [http.get] is used to call the external endpoint 'https://api.streamstats.com/plays'.
+ *   The current artist's ID is passed as a query parameter named 'id'.
+ *
+ * - [convert:true] automatically transforms the JSON response into a Hyperlambda-compatible structure.
+ *
+ * - [yield] adds a new child node named 'plays' to each artist record, embedding the response content from the API.
+ *
+ * Final [yield]
+ * After the loop completes, the enriched list of artists is returned to the caller under a node named 'enriched'.
+ *
+ * This approach allows precise, low-level control of how enrichment is applied to each database record,
+ * useful when [include] isn't flexible enough or when sequential slot logic is needed per record.
+ */
+data.connect:streamingdb
+   data.read
+      table:Artists
+      limit:50
+      columns
+         ArtistId
+         StageName
+   for-each:x:@data.read/*
+
+      // Fetch remote stats via API
+      http.get:"https://api.streamstats.com/plays"
+         query
+            id:x:@.dp/#/*/ArtistId
+         convert:bool:true
+      yield
+         plays:x:@http.get/*/content/*
+
+   yield
+      enriched:x:@.artists
