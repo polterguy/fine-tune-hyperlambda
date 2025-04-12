@@ -1,5 +1,33 @@
 
-// Endpoint that does not take arguments returning all available themes from the backend.
+/*
+ * Defines an authenticated HTTP endpoint that returns all available theme files from two backend folders.
+ * The endpoint does not take any input arguments and is restricted to users with the 'root' role.
+ *
+ * ## Authentication
+ * - [auth.ticket.verify] ensures only users with the 'root' role can access this endpoint.
+ *
+ * ## Custom Themes Lookup
+ * - [io.folder.exists] checks if the custom themes folder '/etc/system/openai/css/chat/' exists.
+ * - If it exists:
+ *   - [io.file.list] retrieves all files in the directory.
+ *   - [for-each] iterates over each file.
+ *     - [strings.ends-with] filters for files ending in `.css`.
+ *     - [strings.split] extracts the filename without path or extension.
+ *     - [add] inserts the base filename into [.result].
+ *
+ * ## System Themes Lookup
+ * - [io.folder.exists] checks if the system themes folder [/system/openai/front.files/chat/] exists.
+ * - If it exists:
+ *   - Same logic is applied to collect `.css` files.
+ *   - Before adding, [not-exists] checks that the filename hasn't already been added (avoiding duplicates).
+ *
+ * ## Output
+ * - [return-nodes] returns a list of theme names (without extension) collected in [.result].
+ *
+ * ## Use Case
+ * - Enables frontend components to dynamically list available themes for UI customization,
+ *   supporting both custom and built-in theme directories.
+ */
 .arguments
 
 // Making sure user has access to invoked endpoint.

@@ -1,5 +1,32 @@
 
-// Create a Hyperlambda endpoint to update an existing task according to specified arguments. Only allow root users to execute it.
+/*
+ * Defines a protected HTTP endpoint for updating an existing task's description and Hyperlambda logic.
+ * Only users with the 'root' role are permitted to invoke this endpoint.
+ *
+ * ## Input Arguments
+ * - [id]: Required string representing the unique identifier of the task to update.
+ * - [description]: The updated human-readable description of the task.
+ * - [hyperlambda]: Optional string containing Hyperlambda code, which will be converted and used to update the task logic.
+ *
+ * ## Security
+ * - [auth.ticket.verify] enforces that only authenticated users with the 'root' role can execute this endpoint.
+ *
+ * ## Hyperlambda Conversion Logic
+ * - The code checks if the [hyperlambda] string is present, non-null, and not empty.
+ * - If so, it uses [hyper2lambda] to convert the Hyperlambda string into an executable lambda object.
+ * - The converted lambda is injected into the next [tasks.update] call to update the task logic accordingly.
+ *
+ * ## Task Update
+ * - [tasks.update] is used twice:
+ *   - First, with the converted lambda (conditionally included if [hyperlambda] is valid).
+ *   - Then again to update the [description] based on user input.
+ *
+ * ## Output
+ * - [return] responds with a simple success status upon successful update.
+ *
+ * ## Use Case
+ * - Ideal for administrative interfaces that allow privileged users to maintain and modify system tasks dynamically.
+ */
 .arguments
    id:string
    description:string

@@ -1,5 +1,35 @@
 
-// Hyperlambda file for a CRUD update endpoint that updates an existing item in the users table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+/*
+ * Defines a secure HTTP CRUD endpoint that updates an existing user in the 'users' table of the 'magic' database.
+ * Only users with the 'root' role are authorized to invoke this endpoint.
+ *
+ * ## Input Arguments
+ * - [username]: Required. Used to identify which user record should be updated.
+ * - [password]: Optional. Used to update the user's password.
+ *
+ * ## Validation & Authorization
+ * - [validators.mandatory] ensures the [username] is provided.
+ * - [auth.ticket.verify:root] restricts access to users with the 'root' role.
+ *
+ * ## Database Logic
+ * - [data.connect] with `generic|magic` opens a connection to the 'magic' database.
+ * - [add] injects argument values into the [data.update] operation:
+ *   - The [values] section receives all arguments from index 1 onward (i.e., fields to update).
+ *   - The [where] clause is populated with the [username] argument to filter the target record.
+ * - [data.update] attempts to update the user matching the provided username.
+ *
+ * ## Record Verification
+ * - [if] condition checks if [data.update] returned 0 affected rows, indicating no matching user.
+ *   - If so, a [404 Not Found] status is returned with a message.
+ *
+ * ## Response
+ * - On success, [response.status.set] returns a 202 Accepted status.
+ * - [yield] includes the number of affected rows under the [affected] node.
+ *
+ * ## Use Case
+ * - Useful for updating user information securely, such as changing passwords or profile details,
+ *   while ensuring the caller is both authenticated and authorized.
+ */
 .arguments
    username:string
    password:string

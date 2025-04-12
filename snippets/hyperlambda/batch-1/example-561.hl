@@ -1,5 +1,36 @@
 
-// Hyperlambda script for a CRUD read endpoint that returns items from the users_roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+/*
+ * Defines a secure CRUD HTTP GET endpoint that retrieves records from the 'users_roles' table
+ * in the 'magic' database, supporting pagination, ordering, and optional filtering by user and role.
+ *
+ * ## Input Arguments
+ * - [limit]: Maximum number of records to return (used for pagination).
+ * - [offset]: Number of records to skip (used for pagination).
+ * - [order]: Column name to sort by (e.g., 'role' or 'user').
+ * - [direction]: Sort direction ('asc' or 'desc').
+ * - [role.eq]: Optional filter to return only records where [role] matches the specified value.
+ * - [user.eq]: Optional filter to return only records where [user] matches the specified value.
+ *
+ * ## Security
+ * - [auth.ticket.verify:root] ensures the endpoint is restricted to users with the 'root' role.
+ *
+ * ## Query Construction
+ * - [data.connect] opens a connection to the 'magic' database using the 'generic' connection string.
+ * - [add] injects pagination and ordering arguments into the read operation.
+ * - [remove-nodes] cleans up those parameters from [.arguments] so they aren’t mistakenly reused in the filtering step.
+ * - [add] appends remaining filter-related arguments to the WHERE clause of [data.read].
+ *
+ * ## Data Retrieval
+ * - [data.read] queries the [users_roles] table with the constructed WHERE, ORDER, LIMIT, and OFFSET clauses.
+ * - Only the [role] and [user] columns are selected for return.
+ *
+ * ## Response
+ * - [return-nodes] returns the resulting records to the client.
+ *
+ * ## Use Case
+ * - Suitable for admin dashboards or internal tools that allow privileged users to browse user-role mappings
+ *   with support for server-side filtering and pagination.
+ */
 .arguments
    limit:long
    offset:long

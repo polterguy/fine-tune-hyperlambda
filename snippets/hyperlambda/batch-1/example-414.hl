@@ -1,5 +1,32 @@
 
-// Endpoint that counts unique and distinct items from your city table in your sakila database with filtering and caching
+/*
+ * This endpoint counts the number of unique and distinct values from a specified column in the "city" table
+ * within the "sakila" SQLite database, with support for optional filtering and caching.
+ * 
+ * ## Input Arguments
+ * - [distinct_column]: Required; must match one of the valid column names in `city` table (e.g. city.city_id).
+ * - [recaptcha]: Placeholder for a security check (e.g. CAPTCHA verification).
+ * - Optional filtering parameters such as [city.city.like], [city.country_id.eq], etc.
+ * 
+ * ## Validation
+ * - [validators.mandatory] ensures the [distinct_column] argument is present.
+ * - [validators.enum] restricts [distinct_column] to a predefined safe list of column names.
+ * 
+ * ## Caching
+ * - [response.headers.set] is used to add an HTTP `Cache-Control` header, caching the response for 500 seconds.
+ * 
+ * ## Database Access
+ * - A connection is opened to the [sakila] database using the [generic] connection string.
+ * - A node named [distinct_functor] is dynamically generated using [strings.concat] to contain the
+ *   SQL function string `"count(distinct columnName)"`, where `columnName` comes from the [distinct_column] argument.
+ * - The [set-name] slot renames the generated column node to fit into the required structure for [data.read].
+ * - The original [distinct_column] argument is removed after use to avoid interfering with the dynamic [where] clause.
+ * - Remaining arguments are added as filters to the [where] / [and] clause.
+ * 
+ * ## Execution
+ * - The [data.read] slot reads from the "city" table using the generated distinct count expression as a column.
+ * - The result is returned to the caller using [return-nodes].
+ */
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

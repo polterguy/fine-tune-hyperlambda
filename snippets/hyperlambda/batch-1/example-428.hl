@@ -1,5 +1,31 @@
 
-// Hyperlambda endpoint that returns all available template snippets from the backend, including prompt and completion details.
+/*
+ * Declares an authenticated Hyperlambda endpoint that retrieves and parses all available training
+ * template snippets stored as `.md` files under `/modules/` and `/system/` directories.
+ * 
+ * ## Input Arguments
+ * - [private]: Optional boolean flag, not used in logic but could be used for future filtering or permission logic.
+ * 
+ * ## Authorization
+ * - [auth.ticket.verify] ensures only users with the 'root' role can access this endpoint.
+ * 
+ * ## File Discovery
+ * - [io.file.list-recursively] recursively lists files under the `/modules/` and `/system/` paths.
+ * - [for-each] loops through the resulting file paths.
+ * - [if] checks if the file path ends with `.md` and contains `/ts-templates/`, qualifying it as a template file.
+ * 
+ * ## Template Parsing
+ * - [load-file] reads the content of each matching file.
+ * - [strings.split] splits the file into lines based on newline characters.
+ * - [set-value] assigns the first line (usually the prompt) to a [.prompt] node after trimming.
+ * - [remove-nodes] removes the first line from the split lines.
+ * - [strings.join] joins the remaining lines as the completion content, also trimmed using [set-value].
+ * - [unwrap] simplifies the structure before adding it to the [.result] collection.
+ * 
+ * ## Output
+ * - Each discovered template is added to [.result] as a new node with [prompt] and [completion] keys.
+ * - The [return-nodes] slot returns the full list of processed template snippets to the client.
+ */
 .arguments
    private:bool
 
