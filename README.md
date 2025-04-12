@@ -19,6 +19,10 @@ Notice, during inference you should use around 0.0 and 0.1 in temperature to tig
 Below are some example prompts you can run through the model after fine tuning is done to test it.
 
 * How do I convert a string to an integer?
+* Generate a list of strings containing names of famous books
+  - Add 3 items to it
+* Generate a list of objects being employees
+  - Loop through them and remove their names
 * How do I open a database connection?
 * How do I concatenate 2 strings?
 * How do I send an email?
@@ -29,6 +33,7 @@ Below are some example prompts you can run through the model after fine tuning i
 * Create an endpoint allowing me to create new items in my contacts table in my CRM database.
 * Generate an API endpoint allowing me to select users from employees database, with optional filtering for name, email, and phone
 * Generate an endpoint that only partner users can execute
+* How do I retrieve a configuration value named 'foo' inside of my 'magic' section?
 * Select all contacts from CRM, loop through all of these and update these one at the time and change their names to 'REDACTED' and save your changes
 * Generate code for an endpoint allowing me to update items in my stock table in my logistics database
 * How do I delete a record from contacts in crm database?

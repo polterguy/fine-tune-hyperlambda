@@ -1,5 +1,35 @@
 
-// Endpoint that counts items from your cloudlets table in your [generic|hub] database according to the specified arguments.
+/*
+ * This Hyperlambda endpoint counts the number of records in the 'cloudlets' table
+ * in the 'hub' database, applying optional filters from the request arguments
+ * and enforcing access control for users with the 'root' role.
+ *
+ * 1. [auth.ticket.verify]
+ *    - Ensures only users with the 'root' role can access this endpoint.
+ *    - Provides role-based access control using JWT tokens.
+
+ * 2. [data.connect]
+ *    - Opens a connection to the 'hub' SQLite database using the 'generic' connection string.
+ *    - All database interactions such as [data.read] must be enclosed within this slot.
+
+ * 3. [add]
+ *    - Dynamically injects user-provided filtering conditions from [.arguments]
+ *      into the [where] clause of the upcoming [data.read] operation.
+ *    - Its expression targets the [and] clause inside [data.read].
+
+ * 4. [get-nodes]
+ *    - Retrieves all child nodes under [.arguments], representing filtering parameters.
+ *    - This enables flexible and dynamic query construction based on client input.
+
+ * 5. [data.read]
+ *    - Executes a SQL SELECT statement on the 'cloudlets' table.
+ *    - The [columns] section includes [count(*)] to return the total number of matching records.
+ *    - The [where]/[and] structure ensures only filtered records are counted.
+ *    - [limit] ensures performance optimization by restricting the result to a single row.
+
+ * 6. [return-nodes]
+ *    - Extracts and returns the count result from the output of [data.read] to the caller.
+ */
 .arguments
 
    // Optional filtering arguments.
@@ -21,9 +51,6 @@ auth.ticket.verify:root
 data.connect:[generic|hub]
 
    // Parametrising our read invocation.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/operator
-   remove-nodes:x:@.arguments/*/operator
    add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 

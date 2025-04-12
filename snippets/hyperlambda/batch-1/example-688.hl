@@ -1,7 +1,24 @@
-// Defines a DELETE endpoint that removes a user based on their unique ID with auth for 'admin'.
 
 /*
- * Save as '/modules/users/delete.delete.hl' for instance to expose it using the DELETE verb
+ * This Hyperlambda DELETE endpoint removes a user by their unique ID from the 'users' table
+ * in the 'users' database. It enforces secure access using role-based authorization.
+ *
+ * 1. [auth.ticket.verify]
+ *    - Verifies that the user invoking the endpoint belongs to the 'admin' role.
+ *    - Protects the endpoint from unauthorized access using JWT-based authentication.
+
+ * 2. [data.connect]
+ *    - Establishes a database connection to the 'users' SQLite database using the 'generic' connection string.
+ *    - The [data.delete] operation must be scoped inside this connection context to function.
+
+ * 3. [data.delete]
+ *    - Executes a SQL DELETE operation against the 'users' table.
+ *    - Uses a [where] clause with [and] logic to filter records.
+ *    - Deletes the record where the [id] column matches the provided [id] argument.
+
+ * 4. [yield]
+ *    - Returns the number of affected rows back to the client.
+ *    - This helps confirm whether a user was successfully deleted.
  */
 .arguments
    id:int
@@ -14,4 +31,5 @@ data.connect:[generic|users]
       where
          and
             id.eq:x:@.arguments/*/id
-   return-nodes:x:@data.delete/*
+   yield
+      affected:x:@data.delete

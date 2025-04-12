@@ -1,5 +1,30 @@
 
-// Endpoint that counts items from your Artist table in your chinook database with filtering and authentication
+/*
+ * This endpoint counts records in the 'Artist' table of the 'chinook' database,
+ * while enforcing role-based access control and allowing flexible filtering.
+ *
+ * 1. [auth.ticket.verify]
+ *    - Ensures the calling user is authenticated and belongs to either the 'root' or 'admin' role.
+ *    - If the JWT token is missing or invalid, or the user lacks required roles, the request fails with an exception.
+ *    - This provides secure access control at the role level.
+
+ * 2. [data.connect]
+ *    - Establishes a connection to the 'chinook' database using the configured 'generic' connection string.
+ *    - The connection is scoped to its child nodes, allowing safe and contextual access to database slots like [data.read].
+
+ * 3. [add]
+ *    - Dynamically adds all matching argument nodes into [where]'s child node, being the [add] node.
+ *    - Uses a lambda expression to retrieve filtering parameters from [.arguments] and injects them into the [data.read]/[where]/[and] part.
+
+ * 4. [data.read]
+ *    - Executes a SQL SELECT operation against the 'Artist' table.
+ *    - Retrieves only the count of matching records using the aggregation function [count(*)].
+ *    - The result is aliased as 'count' using the [as] node under [count(*)].
+
+ * 5. [return-nodes]
+ *    - Returns the result of the executed database query to the caller.
+ *    - Extracts the result directly from the output of [data.read] using an expression.
+ */
 .arguments
 
    // Optional filtering conditions

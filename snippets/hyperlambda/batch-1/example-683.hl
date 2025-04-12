@@ -1,5 +1,30 @@
 
-// Hyperlambda file and endpoint that returns the setup status of the system, ensuring the user is authorized.
+/*
+ * This Hyperlambda endpoint checks whether the system setup is complete by inspecting a critical configuration key,
+ * while enforcing authorization for access. It returns a boolean indicating the setup status.
+ *
+ * 1. [auth.ticket.verify]
+ *    - Ensures that only users with the 'root' role can invoke this endpoint.
+ *    - If the user does not have the required role, the request is rejected with an authorization error.
+
+ * 2. [config.get]
+ *    - Retrieves a configuration value from the application's settings store.
+ *    - In this case, it fetches the value of the 'magic:auth:secret' key, which is expected to be a long, secure JWT secret.
+ *    - If the key is not set or too short, it is treated as an indication that the system setup is incomplete.
+
+ * 3. [if] + [or]
+ *    - Used to evaluate multiple conditions:
+ *       a) If [config.get] returns null (secret not set).
+ *       b) If the length of the secret string is less than 50 characters.
+ *    - If either condition is true, the system is considered "not set up".
+
+ * 4. [strings.length]
+ *    - Measures the length of the retrieved string to ensure minimum security requirements (e.g., for JWT signing).
+
+ * 5. [return]
+ *    - Returns a result object with a boolean [result] node to indicate setup status.
+ *    - If setup is incomplete, returns `false`; otherwise, returns `true`.
+ */
 .arguments
 
 // Ensures user is authorized to access endpoint.

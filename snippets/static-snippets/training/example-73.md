@@ -1,0 +1,33 @@
+Make paging optional
+
+```hyperlambda
+.arguments
+   offset:int
+   limit:int
+   order:string
+   direction:string
+data.connect:hr
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   data.read
+      table:employees
+      offset:x:@.arguments/*/offset
+      limit:x:@.arguments/*/limit
+   return-nodes:x:@data.read/*
+``` 
+---
+.arguments
+   offset:int
+   limit:int
+   order:string
+   direction:string
+data.connect:hr
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+   data.read
+      table:employees
+   return-nodes:x:@data.read/*

@@ -1,5 +1,39 @@
 
-// Endpoint searching for scholar articles using Google with a mandatory query parameter.
+/*
+ * This Hyperlambda endpoint queries Google Scholar via the SERP API and returns a list of matching scholarly articles.
+ * It includes robust validation, dynamic URL generation, error handling, and structured parsing of API responses.
+ *
+ * 1. [validators.mandatory]
+ *    - Ensures the 'query' parameter is provided in the request.
+ *    - Prevents proceeding with an incomplete or malformed request.
+
+ * 2. [config.get]
+ *    - Retrieves the SERP API key from application configuration using the key 'magic:serp-api:api_key'.
+ *    - This key is required to authenticate with the SERP API.
+
+ * 3. [if] + [or]
+ *    - Validates the presence and non-emptiness of the API key.
+ *    - Throws a descriptive error using [throw] if the key is missing or empty.
+
+ * 4. [strings.concat] + [strings.url-encode]
+ *    - Dynamically constructs the full SERP API URL for Google Scholar search.
+ *    - Includes the API key and URL-encoded search query in the final string.
+
+ * 5. [http.get]
+ *    - Executes an HTTP GET request to the SERP API using the generated URL.
+ *    - The [convert:true] flag enables automatic parsing of the JSON response.
+
+ * 6. [if] + [not] + [and] + [mte]/[lt]
+ *    - Validates the HTTP status code to confirm successful communication with the API.
+ *    - Accepts any response code in the 2xx range; otherwise, logs and throws a custom error.
+
+ * 7. [for-each]
+ *    - Iterates through each item in the API's 'organic_results' list.
+ *    - Extracts and transforms relevant fields (title, type, link, snippet) for response formatting.
+
+ * 8. [unwrap] and [return-nodes]
+ *    - Finalizes and returns the aggregated result list to the client in a structured format.
+ */
 .arguments
 
    // Mandatory query to search for.

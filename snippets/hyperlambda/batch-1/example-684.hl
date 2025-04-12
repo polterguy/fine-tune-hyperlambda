@@ -1,5 +1,39 @@
 
-// Hyperlambda script for a CRUD update endpoint that updates an existing item in the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+/*
+ * This Hyperlambda endpoint provides secure and dynamic updating of records in the 'roles' table
+ * within the 'magic' SQLite database. It ensures both input validation and role-based access control.
+ *
+ * 1. [validators.mandatory]
+ *    - Ensures the 'name' argument is provided before proceeding.
+ *    - Prevents invalid or incomplete update attempts due to missing required keys.
+
+ * 2. [auth.ticket.verify]
+ *    - Verifies that the invoking user has 'root' access rights.
+ *    - Enforces role-based access control using JWT-based authentication.
+
+ * 3. [data.connect]
+ *    - Opens a connection to the 'magic' database using the 'generic' connection string.
+ *    - All child operations requiring database access must reside within this slot.
+
+ * 4. [add]
+ *    - Injects argument nodes into the appropriate parts of the [data.update] statement.
+ *    - The first [add] pushes non-key attributes into [values].
+ *    - The second [add] pushes keys (typically primary identifiers) into the [where]/[and] clause for conditional targeting.
+
+ * 5. [data.update]
+ *    - Executes a dynamic update operation against the 'roles' table.
+ *    - Uses two child nodes: [values] defines updated values; [where]/[and] filters target records.
+
+ * 6. [if] + [eq]
+ *    - Verifies if any records were updated by checking if [data.update] returns 0.
+ *    - If no record matched the filter criteria, a 404 status is returned.
+
+ * 7. [response.status.set]
+ *    - Sets the HTTP status code of the response to indicate success (202) or failure (404).
+
+ * 8. [yield]
+ *    - Returns the number of records affected by the update to the client as a part of the result.
+ */
 .arguments
    name:string
    description:string
