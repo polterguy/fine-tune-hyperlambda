@@ -1,0 +1,34 @@
+/*
+ * This Hyperlambda file demonstrates a pattern where publisher data is fetched from a relational database
+ * and enriched with book data retrieved via an external HTTP API, creating a master-detail structure.
+ *
+ * [data.connect]
+ * Connects to the 'bookdata' database and enables data access to the 'Publishers' table.
+ *
+ * [data.read]
+ * Fetches the top 50 publishers, selecting only 'PublisherId' and 'PublisherName'.
+ *
+ * [include]
+ * For each publisher, uses [http.get] to retrieve their associated books from an external book catalog service.
+ *
+ * [http.get]
+ * Calls 'https://api.bookworld.io/catalog/books' with a query param 'publisher' set to the publisher's ID.
+ * The API result is automatically converted into Hyperlambda structure using [convert:true].
+ *
+ * [yield]
+ * Enriches each publisher node with a child 'books' node containing the API response data.
+ */
+data.connect:bookdata
+   data.read
+      table:Publishers
+      limit:50
+      columns
+         PublisherId
+         PublisherName
+   include:x:@data.read/*
+      http.get:"https://api.bookworld.io/catalog/books"
+         query
+            publisher:x:@.dp/#/*/PublisherId
+         convert:bool:true
+      yield
+         books:x:@http.get/*/content

@@ -1,0 +1,37 @@
+/*
+ * This Hyperlambda file demonstrates a two-stage enrichment process for department records in an HR system.
+ * First, it retrieves department data from a database, then uses [http.get] to fetch manager info,
+ * and finally loads HR policy guidelines from local JSON files using [io.file.load].
+ *
+ * [data.connect] connects to the 'hrdb' database and reads from the 'Departments' table.
+ * [data.read] selects 50 records, fetching 'DeptId' and 'DeptName'.
+ *
+ * First [include] uses [http.get] to fetch the manager for each department from an external API.
+ * The department ID is passed as a query parameter. The result is added under 'manager'.
+ *
+ * Second [include] builds a file path based on the department ID to load internal policy documents using [io.file.load].
+ * Each policy is stored as a JSON file under '/docs/policies/<DeptId>.json' and added under 'guidelines'.
+ */
+data.connect:hrdb
+   data.read
+      table:Departments
+      limit:50
+      columns
+         DeptId
+         DeptName
+   include:x:@data.read/*
+      http.get:"https://api.hr.example.com/manager"
+         query
+            dept:x:@.dp/#/*/DeptId
+         convert:bool:true
+      yield
+         manager:x:@http.get/*/content
+   include:x:@data.read/*
+      strings.concat
+         .:"/docs/policies/"
+         get-value:x:@.dp/#/*/DeptId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         guidelines:x:@json2lambda/*

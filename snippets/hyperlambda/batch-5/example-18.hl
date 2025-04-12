@@ -1,0 +1,28 @@
+/*
+ * Demonstrates enriching course data with online resources via HTTP and locally stored syllabi via files.
+ * Courses are loaded from the 'university' database.
+ * The first [include] fetches online materials; the second loads the syllabus JSON file.
+ */
+data.connect:university
+   data.read
+      table:Courses
+      limit:50
+      columns
+         CourseId
+         CourseTitle
+   include:x:@data.read/*
+      http.get:"https://api.university.edu/resources"
+         query
+            course:x:@.dp/#/*/CourseId
+         convert:bool:true
+      yield
+         materials:x:@http.get/*/content
+   include:x:@data.read/*
+      strings.concat
+         .:"/syllabi/"
+         get-value:x:@.dp/#/*/CourseId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         syllabus:x:@json2lambda/*

@@ -1,0 +1,52 @@
+/*
+ * This Hyperlambda file demonstrates a multi-stage enrichment process where base data is loaded from a database,
+ * and then each record is enriched first with external API data using [http.get],
+ * and second with locally stored data using [io.file.load].
+ *
+ * [data.connect]
+ * Connects to the 'ecommerce' database, which contains customer records.
+ *
+ * [data.read]
+ * Retrieves the first 50 customers from the 'Customer' table, selecting only 'CustomerId' and 'Email'.
+ *
+ * First [include]
+ * Iterates over each customer and calls an external order service using [http.get] to retrieve their orders.
+ * The query parameter 'customerId' is dynamically injected from the current record.
+ * The response is converted from JSON to a Hyperlambda structure using [convert:true],
+ * and then yielded under the 'orders' node of the current customer.
+ *
+ * Second [include]
+ * Iterates again over the same records (now containing 'orders') and enriches each customer with locally stored preference data.
+ * The file path is built using [strings.concat] and the customer's ID (e.g., '/data/preferences/42.json').
+ * [io.file.load] reads the file from disk, and [json2lambda] parses the content.
+ * The parsed preference object is then attached as a child node named 'preferences'.
+ *
+ * This demonstrates layered, hybrid enrichment combining SQL, HTTP APIs, and local file data in one coherent pipeline.
+ */
+data.connect:ecommerce
+   data.read
+      table:Customer
+      limit:50
+      columns
+         CustomerId
+         Email
+
+   // First include: Fetch orders via HTTP API
+   include:x:@data.read/*
+      http.get:"https://api.example.com/orders"
+         query
+            customerId:x:@.dp/#/*/CustomerId
+         convert:bool:true
+      yield
+         orders:x:@http.get/*/content
+
+   // Second include: Load preferences from local JSON file
+   include:x:@data.read/*
+      strings.concat
+         .:"/data/preferences/"
+         get-value:x:@.dp/#/*/CustomerId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         preferences:x:@json2lambda/*

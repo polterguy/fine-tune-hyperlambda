@@ -1,0 +1,39 @@
+/*
+ * This Hyperlambda file enriches course records from the 'university' database with related enrollment data
+ * pulled from JSON files stored locally on the server.
+ *
+ * [data.connect]
+ * Connects to the 'university' database to access the 'Courses' table.
+ *
+ * [data.read]
+ * Selects the top 50 courses and retrieves only the 'CourseId' and 'CourseTitle' fields for efficiency.
+ *
+ * [include]
+ * Iterates over each course and uses [strings.concat] to construct a file path such as '/data/enrollments/101.json'
+ * based on the course ID.
+ *
+ * [io.file.load]
+ * Reads the file from disk which contains pre-generated JSON data of student enrollments per course.
+ *
+ * [json2lambda]
+ * Converts the raw JSON string into a Hyperlambda node tree.
+ *
+ * [yield]
+ * Adds the parsed enrollments under each course object as a child node named 'enrollments'.
+ */
+data.connect:university
+   data.read
+      table:Courses
+      limit:50
+      columns
+         CourseId
+         CourseTitle
+   include:x:@data.read/*
+      strings.concat
+         .:"/data/enrollments/"
+         get-value:x:@.dp/#/*/CourseId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         enrollments:x:@json2lambda/*

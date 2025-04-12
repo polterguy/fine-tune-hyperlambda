@@ -1,0 +1,46 @@
+/*
+ * This Hyperlambda file demonstrates how to perform a master-detail data retrieval pattern by using the [include] slot in combination with [data.read],
+ * where a list of 'Warehouse' records is fetched from the 'logistics' database, and each warehouse record is enriched with its related 'Shipment' records.
+ *
+ * [data.connect]
+ * Connects to the 'logistics' database. This slot is mandatory before any data access operation via [data.read] can occur.
+ *
+ * [data.read]
+ * Reads the first 50 records from the 'Warehouse' table.
+ * The [columns] node specifies which columns to retrieve — only 'WarehouseId' and 'Location' in this case — optimizing performance by omitting unneeded data.
+ *
+ * [include]
+ * The [include] slot is used to dynamically join or embed related records from a secondary query into each of the primary records.
+ * It iterates over the records returned by the parent [data.read] and injects additional data into each result.
+ *
+ * Inside [include]
+ * Another [data.read] is executed to retrieve 'Shipment' records, filtered by matching 'WarehouseId' from the parent warehouse record (using expression evaluation).
+ *
+ * [columns] inside the nested [data.read]
+ * Only the 'ShipmentId' and 'DispatchDate' columns from the 'Shipment' table are selected, again optimizing data retrieval.
+ *
+ * [where]
+ * Filters 'Shipment' records to only include those that originate from the current warehouse being processed by [include].
+ * The value of 'WarehouseId.eq' is dynamically retrieved using an expression that resolves to the current warehouse's 'WarehouseId'.
+ *
+ * [yield]
+ * The inner [yield] inside [include] ensures that the shipments retrieved for each warehouse are attached under a 'shipments' child node in the parent warehouse object.
+ */
+data.connect:logistics
+   data.read
+      table:Warehouse
+      limit:50
+      columns
+         WarehouseId
+         Location
+   include:x:@data.read/*
+      data.read
+         table:Shipment
+         columns
+            ShipmentId
+            DispatchDate
+         where
+            and
+               WarehouseId.eq:x:@.dp/#/*/WarehouseId
+      yield
+         shipments:x:@data.read/*

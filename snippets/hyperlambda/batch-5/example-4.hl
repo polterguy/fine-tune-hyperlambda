@@ -1,0 +1,46 @@
+/*
+ * This Hyperlambda file demonstrates how to perform a master-detail data retrieval pattern by using the [include] slot in combination with [data.read],
+ * where a list of 'Customer' records is fetched from the 'ecommerce' database, and each customer record is enriched with their related 'Order' records.
+ *
+ * [data.connect]
+ * Connects to the 'ecommerce' database. This slot is mandatory before any data access operation via [data.read] can occur.
+ *
+ * [data.read]
+ * Reads the first 50 records from the 'Customer' table.
+ * The [columns] node specifies which columns to retrieve — only 'CustomerId' and 'Email' in this case — optimizing performance by omitting unneeded data.
+ *
+ * [include]
+ * The [include] slot is used to dynamically join or embed related records from a secondary query into each of the primary records.
+ * It iterates over the records returned by the parent [data.read] and injects additional data into each result.
+ *
+ * Inside [include]
+ * Another [data.read] is executed to retrieve 'Order' records, filtered by matching 'CustomerId' from the parent customer record (using expression evaluation).
+ *
+ * [columns] inside the nested [data.read]
+ * Only the 'OrderId' and 'OrderDate' columns from the 'Order' table are selected, again optimizing data retrieval.
+ *
+ * [where]
+ * Filters 'Order' records to only include those that belong to the current customer being processed by [include].
+ * The value of 'CustomerId.eq' is dynamically retrieved using an expression that resolves to the current customer's 'CustomerId'.
+ *
+ * [yield]
+ * The inner [yield] inside [include] ensures that the orders retrieved for each customer are attached under an 'orders' child node in the parent customer object.
+ */
+data.connect:ecommerce
+   data.read
+      table:Customer
+      limit:50
+      columns
+         CustomerId
+         Email
+   include:x:@data.read/*
+      data.read
+         table:Order
+         columns
+            OrderId
+            OrderDate
+         where
+            and
+               CustomerId.eq:x:@.dp/#/*/CustomerId
+      yield
+         orders:x:@data.read/*

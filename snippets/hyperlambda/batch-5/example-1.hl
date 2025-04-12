@@ -1,0 +1,50 @@
+/*
+ * This Hyperlambda file demonstrates how to perform a master-detail data retrieval pattern by using the [include] slot in combination with [data.read],
+ * where a list of 'Artist' records is fetched from the 'chinook' database, and each artist record is enriched with its related 'Album' records.
+ *
+ * [data.connect]
+ * Connects to the 'chinook' database. This slot is mandatory before any data access operation via [data.read] can occur.
+ *
+ * [data.read]
+ * Reads the first 50 records from the 'Artist' table.
+ * The [columns] node specifies which columns to retrieve — only 'ArtistId' and 'Name' in this case — optimizing performance by omitting unneeded data.
+ *
+ * [include]
+ * The [include] slot is used to dynamically join or embed related records from a secondary query into each of the primary records.
+ * It iterates over the records returned by the parent [data.read] and injects additional data into each result.
+ *
+ * Inside [include]
+ * Another [data.read] is executed to retrieve 'Album' records, filtered by matching 'ArtistId' from the parent artist record (using expression evaluation).
+ *
+ * [columns] inside the nested [data.read]
+ * Only the 'Title' and 'AlbumId' columns from the 'Album' table are selected, again optimizing data retrieval.
+ *
+ * [where]
+ * Filters 'Album' records to only include albums that belong to the current artist being processed by [include].
+ * The value of 'ArtistId.eq' is dynamically retrieved using an expression that resolves to the current artist's 'ArtistId'.
+ * This ensures each album query is scoped to its corresponding artist.
+ *
+ * [yield]
+ * The inner [yield] inside [include] ensures that the albums retrieved for each artist are attached under an 'albums' child node in the parent artist object.
+ * The use of [yield] in this context enables automatic evaluation and attachment of the inner query results into each parent result.
+ *
+ * In total, this creates a structured dataset where each artist object contains a nested list of their albums under the 'albums' key.
+ */
+data.connect:chinook
+   data.read
+      table:Artist
+      limit:50
+      columns
+         ArtistId
+         Name
+   include:x:@data.read/*
+      data.read
+         table:Album
+         columns
+            Title
+            AlbumId
+         where
+            and
+               ArtistId.eq:x:@.dp/#/*/ArtistId
+      yield
+         albums:x:@data.read/*

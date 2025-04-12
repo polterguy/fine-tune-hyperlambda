@@ -1,0 +1,39 @@
+/*
+ * This Hyperlambda file demonstrates how to enrich department records from the 'hrdb' database
+ * with related employee data stored locally as JSON files.
+ *
+ * [data.connect]
+ * Opens a connection to the 'hrdb' database for reading department data.
+ *
+ * [data.read]
+ * Fetches the first 50 records from the 'Departments' table and selects the 'DeptId' and 'DeptName' columns.
+ *
+ * [include]
+ * Iterates through each department and dynamically generates a file path like '/local/employees/42.json'
+ * using [strings.concat] with the department ID.
+ *
+ * [io.file.load]
+ * Loads the content of the generated file from disk, where each file contains JSON data for the employees in that department.
+ *
+ * [json2lambda]
+ * Parses the loaded JSON string into a Hyperlambda tree so it can be embedded into the parent node.
+ *
+ * [yield]
+ * Attaches the parsed employee data as a child node named 'employees' under each department.
+ */
+data.connect:hrdb
+   data.read
+      table:Departments
+      limit:50
+      columns
+         DeptId
+         DeptName
+   include:x:@data.read/*
+      strings.concat
+         .:"/local/employees/"
+         get-value:x:@.dp/#/*/DeptId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         employees:x:@json2lambda/*

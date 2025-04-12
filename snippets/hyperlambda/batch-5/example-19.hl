@@ -1,0 +1,27 @@
+/*
+ * Loads warehouse data and enriches each record with current shipment data from an external API,
+ * and a static floor plan loaded from a local JSON file.
+ */
+data.connect:logisticsdb
+   data.read
+      table:Warehouses
+      limit:50
+      columns
+         WarehouseId
+         Location
+   include:x:@data.read/*
+      http.get:"https://api.shipfast.io/shipments"
+         query
+            warehouse:x:@.dp/#/*/WarehouseId
+         convert:bool:true
+      yield
+         shipments:x:@http.get/*/content
+   include:x:@data.read/*
+      strings.concat
+         .:"/layouts/warehouses/"
+         get-value:x:@.dp/#/*/WarehouseId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         layout:x:@json2lambda/*

@@ -1,0 +1,37 @@
+/*
+ * This Hyperlambda file demonstrates how to implement a master-detail composition pattern where primary data is retrieved from a database,
+ * and each record is enriched with related child data via an HTTP GET request using the [include] slot.
+ *
+ * [data.connect]
+ * Establishes a connection to the 'chinook' database. Required before invoking any slots that access the database.
+ *
+ * [data.read]
+ * Reads the first 50 rows from the 'Artist' table and selects only the 'ArtistId' and 'Name' columns to optimize the result set.
+ *
+ * [include]
+ * For each 'Artist' record retrieved, executes an [http.get] request to an external REST API to fetch related 'Album' records.
+ * The [include] slot allows dynamic expansion of each parent node with external data, here fetched via HTTP.
+ *
+ * [http.get]
+ * Performs a GET request to 'https://api.example.com/albums', with a query parameter 'artistId' whose value is dynamically extracted
+ * from the current 'Artist' record's 'ArtistId' field using the expression 'x:@.dp/#/*/ArtistId'.
+ * The [convert:true] option ensures that the response (assumed to be in JSON format) is automatically converted into a Hyperlambda node tree.
+ *
+ * [yield]
+ * The response from [http.get] is injected into the current artist object under the node 'albums',
+ * creating a nested data structure that contains each artist and their corresponding albums as returned by the API.
+ */
+data.connect:chinook
+   data.read
+      table:Artist
+      limit:50
+      columns
+         ArtistId
+         Name
+   include:x:@data.read/*
+      http.get:"https://api.example.com/albums"
+         query
+            artistId:x:@.dp/#/*/ArtistId
+         convert:bool:true
+      yield
+         albums:x:@http.get/*/content

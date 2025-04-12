@@ -1,0 +1,46 @@
+/*
+ * This Hyperlambda file demonstrates how to perform a master-detail data retrieval pattern by using the [include] slot in combination with [data.read],
+ * where a list of 'Publisher' records is fetched from the 'bookstore' database, and each publisher record is enriched with its related 'Book' records.
+ *
+ * [data.connect]
+ * Connects to the 'bookstore' database. This slot is mandatory before any data access operation via [data.read] can occur.
+ *
+ * [data.read]
+ * Reads the first 50 records from the 'Publisher' table.
+ * The [columns] node specifies which columns to retrieve — only 'PublisherId' and 'Name' in this case — optimizing performance by omitting unneeded data.
+ *
+ * [include]
+ * The [include] slot is used to dynamically join or embed related records from a secondary query into each of the primary records.
+ * It iterates over the records returned by the parent [data.read] and injects additional data into each result.
+ *
+ * Inside [include]
+ * Another [data.read] is executed to retrieve 'Book' records, filtered by matching 'PublisherId' from the parent publisher record (using expression evaluation).
+ *
+ * [columns] inside the nested [data.read]
+ * Only the 'BookId' and 'Title' columns from the 'Book' table are selected, again optimizing data retrieval.
+ *
+ * [where]
+ * Filters 'Book' records to only include books that belong to the current publisher being processed by [include].
+ * The value of 'PublisherId.eq' is dynamically retrieved using an expression that resolves to the current publisher's 'PublisherId'.
+ *
+ * [yield]
+ * The inner [yield] inside [include] ensures that the books retrieved for each publisher are attached under a 'books' child node in the parent publisher object.
+ */
+data.connect:bookstore
+   data.read
+      table:Publisher
+      limit:50
+      columns
+         PublisherId
+         Name
+   include:x:@data.read/*
+      data.read
+         table:Book
+         columns
+            BookId
+            Title
+         where
+            and
+               PublisherId.eq:x:@.dp/#/*/PublisherId
+      yield
+         books:x:@data.read/*

@@ -1,0 +1,39 @@
+/*
+ * This Hyperlambda file demonstrates how to extend warehouse records from a logistics system
+ * by embedding static inventory data stored in JSON files located on the local filesystem.
+ *
+ * [data.connect]
+ * Connects to the 'logisticsdb' database and enables reading from the 'Warehouses' table.
+ *
+ * [data.read]
+ * Retrieves 50 warehouse records, selecting 'WarehouseId' and 'Location' columns.
+ *
+ * [include]
+ * For each warehouse, builds a file path using [strings.concat] like '/store/inventory/W123.json',
+ * where the filename corresponds to the warehouse ID.
+ *
+ * [io.file.load]
+ * Loads the inventory file from disk containing product quantities and SKUs.
+ *
+ * [json2lambda]
+ * Parses the loaded JSON into a usable node tree structure for embedding.
+ *
+ * [yield]
+ * Embeds the resulting data under a node named 'inventory' within each warehouse record.
+ */
+data.connect:logisticsdb
+   data.read
+      table:Warehouses
+      limit:50
+      columns
+         WarehouseId
+         Location
+   include:x:@data.read/*
+      strings.concat
+         .:"/store/inventory/"
+         get-value:x:@.dp/#/*/WarehouseId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         inventory:x:@json2lambda/*

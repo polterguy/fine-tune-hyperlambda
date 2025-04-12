@@ -1,0 +1,34 @@
+/*
+ * This Hyperlambda file performs a hybrid data-fetching operation where warehouse records are retrieved from a local database,
+ * and each warehouse is dynamically enriched with shipment data pulled via HTTP using [include] and [http.get].
+ *
+ * [data.connect]
+ * Opens a connection to the 'logisticsdb' database and enables querying the 'Warehouses' table.
+ *
+ * [data.read]
+ * Selects the first 50 warehouses with only essential columns: 'WarehouseCode' and 'Location'.
+ *
+ * [include]
+ * For each warehouse, an external call is made to a shipping management system API to retrieve associated shipments.
+ *
+ * [http.get]
+ * Requests shipment records by sending 'warehouseCode' as a query parameter to 'https://api.shipfast.com/shipments'.
+ * JSON response is parsed and converted to Hyperlambda automatically with [convert:true].
+ *
+ * [yield]
+ * Adds the fetched shipments into each warehouse record under a node named 'shipments'.
+ */
+data.connect:logisticsdb
+   data.read
+      table:Warehouses
+      limit:50
+      columns
+         WarehouseCode
+         Location
+   include:x:@data.read/*
+      http.get:"https://api.shipfast.com/shipments"
+         query
+            warehouseCode:x:@.dp/#/*/WarehouseCode
+         convert:bool:true
+      yield
+         shipments:x:@http.get/*/content

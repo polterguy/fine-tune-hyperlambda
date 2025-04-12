@@ -1,0 +1,34 @@
+/*
+ * This Hyperlambda file illustrates a master-detail enrichment pattern where department records are retrieved from the 'hrdb' database,
+ * and each department is enriched with a list of its employees via an external REST API using [http.get] inside [include].
+ *
+ * [data.connect]
+ * Connects to the 'hrdb' database to enable reading records from the 'Departments' table.
+ *
+ * [data.read]
+ * Selects the first 50 records from the 'Departments' table, including only 'DeptId' and 'DeptName' for efficiency.
+ *
+ * [include]
+ * Iterates over each department and uses [http.get] to call an API endpoint that returns employee records related to that department.
+ *
+ * [http.get]
+ * Calls 'https://api.hr.example.com/employees', passing the department ID as a query string parameter.
+ * Uses [convert:true] to automatically transform the JSON response into Hyperlambda nodes.
+ *
+ * [yield]
+ * Attaches the fetched employees under the 'employees' node inside each department record.
+ */
+data.connect:hrdb
+   data.read
+      table:Departments
+      limit:50
+      columns
+         DeptId
+         DeptName
+   include:x:@data.read/*
+      http.get:"https://api.hr.example.com/employees"
+         query
+            deptId:x:@.dp/#/*/DeptId
+         convert:bool:true
+      yield
+         employees:x:@http.get/*/content

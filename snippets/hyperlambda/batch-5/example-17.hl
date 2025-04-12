@@ -1,0 +1,31 @@
+/*
+ * This file demonstrates multi-source enrichment of author data in a bookstore system.
+ * Authors are retrieved from the database, then enriched with rating data via [http.get]
+ * and detailed biographies from local files using [io.file.load].
+ *
+ * The first [include] fetches aggregated ratings for each author.
+ * The second [include] loads a local file containing the author's biography.
+ */
+data.connect:bookstore
+   data.read
+      table:Authors
+      limit:50
+      columns
+         AuthorId
+         Name
+   include:x:@data.read/*
+      http.get:"https://api.bookdata.io/ratings"
+         query
+            authorId:x:@.dp/#/*/AuthorId
+         convert:bool:true
+      yield
+         ratings:x:@http.get/*/content
+   include:x:@data.read/*
+      strings.concat
+         .:"/bios/authors/"
+         get-value:x:@.dp/#/*/AuthorId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         biography:x:@json2lambda/*

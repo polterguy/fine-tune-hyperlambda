@@ -1,0 +1,40 @@
+/*
+ * This Hyperlambda file demonstrates how to enrich each database record with structured child data loaded from the file system using [io.file.load],
+ * replacing the use of external HTTP APIs with local static content files.
+ *
+ * [data.connect]
+ * Establishes a connection to the 'chinook' database, which contains the 'Artist' table.
+ *
+ * [data.read]
+ * Reads the first 50 artists from the 'Artist' table and selects only the 'ArtistId' and 'Name' columns to optimize performance.
+ *
+ * [include]
+ * Iterates over each artist record. For every artist, constructs a file path dynamically using [strings.concat],
+ * combining a static base path with the artist's ID and a '.json' extension (e.g., '/data/albums/12.json').
+ *
+ * [io.file.load]
+ * Loads the content of the generated file path. The file is expected to contain JSON-encoded data representing the artist’s albums.
+ *
+ * [json2lambda]
+ * Parses the JSON file content into a Hyperlambda-compatible tree structure so it can be further processed or embedded.
+ *
+ * [yield]
+ * Attaches the parsed file content under a new child node named 'albums' inside each artist record.
+ * This allows local enrichment of each artist with related album data stored as JSON files on disk.
+ */
+data.connect:chinook
+   data.read
+      table:Artist
+      limit:50
+      columns
+         ArtistId
+         Name
+   include:x:@data.read/*
+      strings.concat
+         .:"/data/albums/"
+         get-value:x:@.dp/#/*/ArtistId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         albums:x:@json2lambda/*
