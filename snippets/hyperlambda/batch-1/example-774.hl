@@ -1,5 +1,51 @@
 
-// Endpoint updating an existing item in your cloudlets table in your [generic|hub] database according to the specified arguments.
+/*
+ * This endpoint updates a record in the 'cloudlets' table within the [generic|hub] database.
+ * It processes user-defined arguments, verifies authorization, performs the update operation,
+ * and handles success or failure responses accordingly.
+ *
+ * 1. [.arguments]
+ *    - Declares the input parameters required for this endpoint: [id], [name], [plan], [cluster], and [user].
+ *
+ * 2. [validators.mandatory]
+ *    - Ensures the [id] argument is provided before proceeding, enforcing required input validation.
+ *
+ * 3. [auth.ticket.verify]
+ *    - Verifies that the caller has a valid and authorized ticket, specifically requiring 'root' access.
+ *
+ * 4. [data.connect]
+ *    - Opens a connection to the [generic|hub] database so that database operations like updates can be executed.
+ *
+ * 5. [add]
+ *    - Used here twice to dynamically inject the WHERE and VALUES nodes into the upcoming [data.update] call.
+ *    - The first [add] inserts conditions for record selection (based on [id], [name]).
+ *    - The second [add] provides the new values to update (based on [name], [plan], [cluster], and [user]).
+ *
+ * 6. [get-nodes]
+ *    - Fetches specific argument nodes by index for use in WHERE and VALUES clauses.
+ *    - Index [0,1] selects the first two nodes, while [1,1000] targets all remaining arguments.
+ *
+ * 7. [data.update]
+ *    - Executes the actual SQL UPDATE operation on the 'cloudlets' table.
+ *    - The [values] node contains new values to apply, and the [where] clause identifies the record(s) to update.
+ *
+ * 8. [if]
+ *    - Checks whether the update operation affected any rows by evaluating the result of [data.update].
+ *    - If the result is 0, the record was not found.
+ *
+ * 9. [eq] and [get-value]
+ *    - Compare the result of [data.update] to 0 to determine whether the update matched any records.
+ *
+ * 10. [response.status.set]
+ *     - If no record was updated, sets HTTP response status to '404 Not Found'.
+ *     - If successful, sets status to '202 Accepted'.
+ *
+ * 11. [return]
+ *     - Returns a custom error message when no matching record is found.
+ *
+ * 12. [yield]
+ *     - Returns the number of affected rows back to the client by retrieving the result from [data.update].
+ */
 .arguments
    id:long
    name:string

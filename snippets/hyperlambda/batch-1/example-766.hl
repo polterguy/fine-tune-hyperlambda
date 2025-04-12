@@ -1,5 +1,33 @@
 
-// Endpoint that counts items from your city table in your sakila database with filtering and caching
+/*
+ * This Hyperlambda endpoint counts matching records in the [city] table of the [sakila] database,
+ * supports optional filters via arguments, and adds caching headers to the HTTP response.
+ *
+ * 1. [.arguments]
+ *    - Defines optional query parameters for filtering by [city_id], [city name], [country_id], and [last_update].
+ *    - These parameters support both exact matching and SQL 'like' syntax.
+ *
+ * 2. [response.headers.set]
+ *    - Sets the HTTP response header [Cache-Control] to 'private, max-age=500'.
+ *    - Enables client-side caching of the response for 500 seconds.
+ *
+ * 3. [data.connect]
+ *    - Opens a connection to the [sakila] SQLite database using the [generic] connection string.
+ *    - All database operations within this block share the same connection context.
+ *
+ * 4. [add]
+ *    - Dynamically adds filtering conditions from the incoming arguments into the [where] clause.
+ *    - Uses [get-nodes] to extract the argument filters and inject them into the query logic.
+ *
+ * 5. [data.read]
+ *    - Performs a SELECT query against the [city] table.
+ *    - Uses [count(*)] to count records matching the specified filters.
+ *    - Includes a [limit] to optimize query performance and return a single row.
+ *
+ * 6. [return-nodes]
+ *    - Returns the result of the [data.read] invocation to the caller.
+ *    - The output includes a single [count] value representing the number of matching rows.
+ */
 .arguments
    city.city_id.eq:long
    city.city.like:string

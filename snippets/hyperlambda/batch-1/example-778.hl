@@ -1,5 +1,47 @@
 
-// Endpoint that reads or lists records from your comments table in your cms database with optional filtering and authorization for 'enterprise' roles and 'root' roles.
+/*
+ * This endpoint reads (or lists) records from the 'comments' table in the [cms] database.
+ * It supports dynamic filtering and performs SQL joins to include related data from posts and users tables.
+ * Below is a description of the nodes and slots used:
+ *
+ * 1. [.arguments]
+ *    - Defines optional filtering parameters that allow clients to query specific records.
+ *    - Supports exact match and partial match filters (e.g., [comments.content.like], [post_id.title.eq]).
+ *
+ * 2. [auth.ticket.verify]
+ *    - Validates that the user holds either the 'enterprise' or 'root' role before accessing the endpoint.
+ *
+ * 3. [data.connect]
+ *    - Establishes a connection to the [generic|cms] database.
+ *    - Declares that the database type is 'sqlite'.
+ *
+ * 4. [add]
+ *    - Dynamically injects all filtering arguments from [.arguments] into the [where] clause of the upcoming [data.read] invocation.
+ *    - Uses [get-nodes] to extract all filterable fields.
+ *
+ * 5. [get-nodes]
+ *    - Retrieves all argument nodes under [.arguments] for use as filtering conditions.
+ *
+ * 6. [data.read]
+ *    - Executes a SELECT query on the 'comments' table, joining it with 'posts' and 'users' via LEFT joins.
+ *    - Ensures that related fields from the joined tables are accessible (like post titles and usernames).
+ *
+ * 7. [table]
+ *    - Specifies the primary table being queried, in this case 'comments'.
+ *    - Supports SQL-style JOINs with aliased tables ([post_id], [user_id]).
+ *
+ * 8. [columns]
+ *    - Explicitly lists the fields to return from the query, including selected fields from joined tables.
+ *    - Aliases are used to maintain clarity and support namespacing (e.g., [post_id.title]).
+ *
+ * 9. [where]
+ *    - A conditional clause applied to the [data.read] operation to limit records based on provided arguments.
+ *    - Populated dynamically via [add].
+ *
+ * 10. [return-nodes]
+ *     - Returns the result set of the [data.read] invocation to the caller.
+ *     - Uses lambda selector syntax to extract all resulting nodes.
+ */
 .arguments
 
    // Optional filtering args
