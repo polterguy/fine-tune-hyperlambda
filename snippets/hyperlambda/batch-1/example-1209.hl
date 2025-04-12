@@ -1,5 +1,37 @@
 
-// Hyperlambda endpoint for a CRUD update endpoint that updates an existing item in the users_extra table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+/*
+ * This Hyperlambda endpoint performs a CRUD update on the [users_extra] table
+ * in the [magic] database. It updates an existing record based on the provided
+ * [user] and [type] values. Only users with the [root] role are authorized to access it.
+ *
+ * 1. [.arguments]
+ *    * Accepts the following input parameters:
+ *    * - [user]: The user identifier to match.
+ *    * - [type]: The type/category of the extra information.
+ *    * - [value]: The new value to update.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that both [type] and [user] are provided before proceeding with the update.
+ *
+ * 3. [auth.ticket.verify:root]
+ *    * Ensures that only users with the [root] role can invoke this endpoint.
+ *
+ * 4. [data.connect:[generic|magic]]
+ *    * Opens a connection to the [magic] SQLite database using a generic connection string.
+ *
+ * 5. [add:x:./*/data.update/*/values]
+ *    * Dynamically adds the [value] argument to the [values] clause of the [data.update] operation.
+ *    * Uses index range [2,1000] to skip the [user] and [type] nodes, which are used for filtering.
+ *
+ * 6. [add:x:./*/data.update/*/where/*/and]
+ *    * Injects [user] and [type] into the WHERE clause to target the correct record.
+ *
+ * 7. [data.update]
+ *    * Executes the SQL UPDATE command on the [users_extra] table using the values and conditions provided.
+ *
+ * 8. [return]
+ *    * Returns a success message to the client in a node named [result].
+ */
 .arguments
    user:string
    type:string

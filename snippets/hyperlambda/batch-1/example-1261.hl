@@ -1,5 +1,35 @@
 
-// Hyperlambda endpoint that deletes a specified cache item, or multiple items starting with [id]'s value, ensuring the user is authorized, and handles both single and multiple cache item deletions.
+/*
+ * This Hyperlambda endpoint deletes one or more cache items depending on the value of the [id] argument.
+ * It ensures authorization and handles both wildcard and single-key cache deletions.
+ *
+ * 1. [.arguments]
+ *    * Accepts a required argument:
+ *    * - [id]: The cache key to delete, or a prefix followed by '*' to indicate a group of keys.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures that only users with the [root] role can invoke this endpoint.
+ *
+ * 3. [validators.mandatory]
+ *    * Validates that the [id] argument is provided by the caller.
+ *
+ * 4. [if] with [strings.ends-with]
+ *    * Checks if the [id] ends with '*', indicating a bulk deletion is intended.
+ *
+ * 5. [.lambda] (wildcard branch)
+ *    * [strings.split]: Removes the '*' suffix to get the cache key prefix.
+ *    * [cache.clear]: Deletes all cache keys that begin with the specified prefix.
+ *
+ * 6. [else]
+ *    * [cache.set] with only a key (no value) removes a single cache entry by key.
+ *
+ * 7. [return]
+ *    * Returns a success message to confirm that the cache deletion has been processed.
+ *
+ * Example Use:
+ * - To delete a single item: `id:my-cache-key`
+ * - To delete all items starting with "user_": `id:user_*`
+ */
 .arguments
    id:string
 

@@ -1,5 +1,39 @@
 
-// Slot that sends the latest log items from the chatbot's history to the specified email address as an attachment in the form of a CSV file
+/*
+ * This Hyperlambda slot [utilities.history.send-email] sends the chatbot's historical log data
+ * from the [ml_requests] table as a CSV email attachment to the specified recipient.
+ *
+ * 1. [slots.create:utilities.history.send-email]
+ *    * Defines a reusable slot named [utilities.history.send-email] that can be executed
+ *      with arguments.
+ *
+ * 2. [validators.mandatory] and [validators.email]
+ *    * Ensures the [email] argument is provided and valid before execution continues.
+ *
+ * 3. [log.info]
+ *    * Logs an informational message indicating that the chatbot log is being sent.
+ *    * Includes the target email address for context.
+ *
+ * 4. [data.connect:[generic|magic]]
+ *    * Connects to the [magic] SQLite database where chatbot interactions are stored.
+ *
+ * 5. [data.read]
+ *    * Queries the [ml_requests] table to retrieve key fields:
+ *    * - [prompt], [completion], [created], [type], [finish_reason], [user_id], and [session].
+ *
+ * 6. [lambda2csv]
+ *    * Converts the result of [data.read] into a CSV-formatted string suitable for email attachment.
+ *
+ * 7. [mail.smtp.send]
+ *    * Sends an email with two MIME parts:
+ *    * - A plain text part with a message: "Latest AINIRO.IO Chatbot requests".
+ *    * - A CSV attachment containing the data, named "log.csv".
+ *    * The email is sent to the address specified in the [email] argument.
+ *
+ * Use Case:
+ * * Admins or chatbot owners can use this slot to receive recent interaction logs by email,
+ *   formatted as an easy-to-read CSV file.
+ */
 slots.create:utilities.history.send-email
 
    // Sanity checking invocation.

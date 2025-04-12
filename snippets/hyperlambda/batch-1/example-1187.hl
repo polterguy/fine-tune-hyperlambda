@@ -1,5 +1,43 @@
 
-// Endpoint to delete one record from your plugins table in your cms database, where [id] argument is mandatory and ID of record to delete. Only guest users can execute it
+/*
+ * This Hyperlambda endpoint deletes a record from the [plugins] table in the [cms] SQLite database.
+ * Only users with the [guest] role are allowed to invoke this endpoint.
+ * It also publishes a socket signal after deletion to notify clients.
+ *
+ * 1. [.arguments]
+ *    * Accepts a mandatory input:
+ *    * - [id]: The primary key of the [plugins] record to delete.
+ *
+ * 2. [auth.ticket.verify:guest]
+ *    * Verifies that the caller has the [guest] role before allowing execution.
+ *
+ * 3. [validators.mandatory]
+ *    * Ensures the [id] argument is present to prevent unintentional deletions.
+ *
+ * 4. [data.connect]
+ *    * Opens a connection to the [cms] database using the [generic] connection string.
+ *    * Declares [sqlite] as the database type.
+ *
+ * 5. [add:x:./*/data.delete/*/where/*/and]
+ *    * Dynamically injects the [id] filter into the WHERE clause of the DELETE query.
+ *
+ * 6. [data.delete]
+ *    * Executes the DELETE operation on the [plugins] table using the constructed WHERE clause.
+ *
+ * 7. [add:x:./*/sockets.signal/*/args]
+ *    * Injects the same arguments into the payload of the socket signal.
+ *    * Ensures that downstream clients receive the context of the deletion.
+ *
+ * 8. [sockets.signal:cms.plugins.delete]
+ *    * Publishes a real-time signal indicating a plugin was deleted.
+ *    * Topic is [cms.plugins.delete], and payload comes from the deletion arguments.
+ *
+ * 9. [unwrap]
+ *    * Makes the result of [data.delete] available for inclusion in the return structure.
+ *
+ * 10. [return]
+ *    * Returns the number of deleted records under the [affected] node to the caller.
+ */
 .arguments
 
    // Primary key of record to delete, mandatory argument

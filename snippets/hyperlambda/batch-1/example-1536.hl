@@ -1,5 +1,38 @@
 
-// Hyperlambda script for an endpoint that counts items in the questionnaires table in the magic database, ensuring the user is authorized and handling optional filters.
+/*
+ * This Hyperlambda endpoint counts the number of items in the [questionnaires] table
+ * in the [magic] SQLite database. It supports optional filtering and restricts access
+ * to users with the [root] role.
+ *
+ * 1. [.arguments]
+ *    * Accepts optional filter parameters for more specific querying:
+ *    * - [questionnaires.name.like]: Partial match on the questionnaire name.
+ *    * - [questionnaires.name.eq]: Exact match on the questionnaire name.
+ *    * - [questionnaires.type.like]: Partial match on the questionnaire type.
+ *    * - [questionnaires.type.eq]: Exact match on the questionnaire type.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures the endpoint can only be accessed by users with [root] authorization.
+ *
+ * 3. [data.connect:[generic|magic]]
+ *    * Opens a connection to the [magic] SQLite database using the [generic] connection string.
+ *    * Declares the database type as [sqlite].
+ *
+ * 4. [add:x:+/*/where/*]
+ *    * Dynamically adds all filtering arguments (if any were provided) into the [where and] clause.
+ *
+ * 5. [data.read]
+ *    * Executes a SELECT query on the [questionnaires] table.
+ *    * Retrieves the count of rows matching the optional filters using [count(*)].
+ *    * Aliases the result column as [count].
+ *    * Includes a [limit:1] to ensure only a single result row is returned.
+ *
+ * 6. [return-nodes:x:@data.read/*/*]
+ *    * Returns the count result to the client in a node named [count].
+ *
+ * Result:
+ * * The caller receives the number of questionnaire records matching the filters, if any were provided.
+ */
 .arguments
    questionnaires.name.like:string
    questionnaires.name.eq:string

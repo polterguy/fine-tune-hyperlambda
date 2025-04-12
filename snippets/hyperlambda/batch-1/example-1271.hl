@@ -1,5 +1,42 @@
 
-// Hyperlambda endpoint to list all files in a specified folder, with an optional filter to match file names.
+/*
+ * This Hyperlambda endpoint lists all files in a specified folder.
+ * If a [filter] argument is provided, it only returns files whose names contain the filter substring.
+ * Only users with [root] access are allowed to execute the endpoint.
+ *
+ * 1. [.arguments]
+ *    * Accepts two input parameters:
+ *    * - [folder]: The folder path to list files from (required).
+ *    * - [filter]: Optional substring used to filter filenames.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures only users with [root] privileges can access this endpoint.
+ *
+ * 3. [io.file.list]
+ *    * Lists all files in the folder specified by the [folder] argument.
+ *    * Returns a list of file nodes for further processing.
+ *
+ * 4. [if exists:x:@.arguments/*/filter]
+ *    * Checks if a [filter] was provided.
+ *
+ * 5. [.lambda] (filter logic)
+ *    * [for-each]: Iterates through all files in the result of [io.file.list].
+ *    * [strings.contains]: Checks if each file path contains the filter string.
+ *    * [add]: Adds matching files to the response under [return-nodes].
+ *
+ * 6. [else]
+ *    * If no filter is provided, all files returned from [io.file.list] are included in the response.
+ *
+ * 7. [return-nodes]
+ *    * Sends the result to the client, either filtered or unfiltered, depending on the input.
+ *
+ * Example:
+ * * Input:
+ *   - folder: "/etc/data/"
+ *   - filter: ".log"
+ * * Result:
+ *   - Returns all files in /etc/data/ that include ".log" in their name.
+ */
 .arguments
    folder:string
    filter:string

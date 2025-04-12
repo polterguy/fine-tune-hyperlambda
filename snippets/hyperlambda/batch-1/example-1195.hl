@@ -1,5 +1,52 @@
 
-// Hyperlambda endpoint listing all AI functions for a specified type, including RAG and system functions.
+/*
+ * This Hyperlambda endpoint lists all AI functions for a specified type, including both
+ * RAG-based functions from ML training snippets and system-defined function invocations.
+ *
+ * 1. [.arguments]
+ *    * Accepts a single required argument:
+ *    * - [_type]: The type identifier used to filter and retrieve function definitions.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures the [_type] argument is provided before execution continues.
+ *
+ * 3. [data.connect:[generic|magic]]
+ *    * Establishes a connection to the [magic] SQLite database to retrieve metadata.
+ *
+ * 4. [data.select]
+ *    * Queries the [ml_training_snippets] table for rows where:
+ *      - [type] matches [_type], and
+ *      - [meta] contains "FUNCTION_INVOCATION ==> ".
+ *    * Selects the [prompt] column for further processing.
+ *
+ * 5. [for-each:x:@data.select/*]
+ *    * Iterates over each returned training snippet.
+ *    * Uses [unwrap] to normalize structure and [add] to collect prompts under [rag_functions].
+ *
+ * 6. [data.read]
+ *    * Reads the [system_message] column from the [ml_types] table where [type] matches [_type].
+ *
+ * 7. [strings.split]
+ *    * Splits the [system_message] content by "# " to isolate individual function definitions.
+ *
+ * 8. [for-each:x:@strings.split/*]
+ *    * Iterates through each extracted string chunk.
+ *    * [if] conditionally filters relevant function definitions using:
+ *      - [strings.contains]: Ensures the string includes "FUNCTION_INVOCATION["
+ *      - [not contains]: Excludes known infrastructure/system invocations.
+ *
+ * 9. [strings.trim]
+ *    * Cleans the function string by removing leading "# " and trailing whitespace.
+ *
+ * 10. [add:x:@data.connect/*/yield/*/system_functions]
+ *     * Adds each cleaned system function string to [system_functions].
+ *
+ * 11. [yield]
+ *     * Returns the collected [rag_functions] and [system_functions] to the caller.
+ *
+ * Result:
+ * * The caller receives a full list of all RAG (training-based) and system-defined AI functions for a given [_type].
+ */
 .arguments
 
    // Mandatory argument and the type name for which to return functions for.

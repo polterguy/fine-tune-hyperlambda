@@ -1,5 +1,46 @@
 
-// Endpoint to delete one record from your Customer table in your chinook database.
+/*
+ * This Hyperlambda endpoint deletes one record from the [Customer] table in the [chinook] SQLite database.
+ * It requires the user to have one of the following roles: [admin], [basic], or [enterprise].
+ * After successful deletion, a socket signal is broadcast to specified roles.
+ *
+ * 1. [.arguments]
+ *    * Defines the required input:
+ *    * - [CustomerId]: The primary key of the customer to be deleted.
+ *
+ * 2. [auth.ticket.verify:admin,basic,enterprise]
+ *    * Ensures that only users with one of the authorized roles can access this endpoint.
+ *
+ * 3. [validators.mandatory]
+ *    * Validates that the [CustomerId] argument is provided before continuing.
+ *
+ * 4. [data.connect:[generic|chinook]]
+ *    * Connects to the [chinook] SQLite database using the [generic] connection string.
+ *    * Specifies the database type explicitly as [sqlite].
+ *
+ * 5. [add:x:./*/data.delete/*/where/*/and]
+ *    * Dynamically injects the filtering condition ([CustomerId]) into the WHERE clause for deletion.
+ *
+ * 6. [data.delete]
+ *    * Executes the DELETE SQL operation on the [Customer] table, removing the record matching the [CustomerId].
+ *
+ * 7. [add:x:./*/sockets.signal/*/args]
+ *    * Prepares the payload for a socket signal by adding the input arguments.
+ *
+ * 8. [sockets.signal:chinook.customer.delete]
+ *    * Sends a WebSocket signal with the topic [chinook.customer.delete].
+ *    * Includes the deleted customer's ID as the payload.
+ *    * Targets users with the [enterprise] or [guest] roles.
+ *
+ * 9. [unwrap:x:+/*]
+ *    * Unwraps the result of the [data.delete] operation for use in the return block.
+ *
+ * 10. [return]
+ *     * Returns the number of affected (deleted) rows under the [affected] node.
+ *
+ * Result:
+ * * The customer record is deleted and a real-time notification is broadcast if the operation succeeds.
+ */
 .arguments
 
    // Primary key of record to delete, mandatory argument

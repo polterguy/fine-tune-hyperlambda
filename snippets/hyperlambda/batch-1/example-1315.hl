@@ -1,5 +1,37 @@
 
-// Hyperlambda script for an endpoint that counts items from the users_roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+/*
+ * This Hyperlambda endpoint counts records from the [users_roles] table
+ * in the [magic] database based on optional filter arguments. Only [root] users are authorized.
+ *
+ * 1. [.arguments]
+ *    * Accepts optional filtering arguments:
+ *    * - [role.eq]: Filters by exact match on role.
+ *    * - [user.eq]: Filters by exact match on user.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures the caller has [root] access before continuing.
+ *
+ * 3. [data.connect:[generic|magic]]
+ *    * Opens a connection to the [magic] SQLite database using the [generic] connection string.
+ *
+ * 4. [add:x:./*/data.read]
+ *    * Injects operator nodes (e.g. [role.eq], [user.eq]) into the [data.read] structure
+ *      so that they are ready to be parsed into a SQL WHERE clause.
+ *
+ * 5. [add:x:+/*/where/*]
+ *    * Adds the extracted filter nodes under a [where and] clause for SQL filtering.
+ *
+ * 6. [data.read]
+ *    * Reads from the [users_roles] table and counts matching records.
+ *    * Uses [count(*)] and aliases the result as [count].
+ *    * [limit:long:1] ensures a single row is returned.
+ *
+ * 7. [return-nodes:x:@data.read/*/*]
+ *    * Returns the resulting count to the caller.
+ *
+ * Result:
+ * * The caller receives a count of users_roles records matching the given filters, if any.
+ */
 .arguments
    role.eq:string
    user.eq:string
@@ -11,9 +43,6 @@ auth.ticket.verify:root
 data.connect:[generic|magic]
 
    // Parametrising our read invocation.
-   add:x:./*/data.read
-      get-nodes:x:@.arguments/*/operator
-   remove-nodes:x:@.arguments/*/operator
    add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 

@@ -1,6 +1,40 @@
-// Search through a log file and extract all URLs from it
 
-// Read the log file
+/*
+ * This Hyperlambda snippet reads a server log file and extracts all URLs from it using regular expressions.
+ * If the file doesn't exist, an error is logged instead.
+ *
+ * 1. [if io.file.exists:/var/logs/server.log]
+ *    * Checks whether the log file exists at the specified path.
+ *    * If true, executes the inner [.lambda]; otherwise, logs an error.
+ *
+ * 2. [io.file.load]
+ *    * Loads the content of the log file as a string.
+ *
+ * 3. [.urls]
+ *    * Declares a temporary node to store all extracted URLs.
+ *
+ * 4. [strings.matches]
+ *    * Uses a regular expression to match all valid HTTP and HTTPS URLs from the file content.
+ *    * The regex supports common URL patterns and special characters.
+ *
+ * 5. [for-each:x:@strings.matches/*/match]
+ *    * Iterates over all matched URL segments.
+ *    * [unwrap] ensures the value can be directly retrieved.
+ *    * [add] inserts each matched URL into the [.urls] node as a new child.
+ *
+ * 6. [lambda2hyper:x:@.urls/*]
+ *    * Converts the list of matched URLs into a lambda representation.
+ *
+ * 7. [log.info]
+ *    * Logs the extracted URLs in human-readable format for debugging or tracking.
+ *    * Includes the converted lambda as part of the log message.
+ *
+ * 8. [else log.error]
+ *    * Executes if the file is not found and logs a relevant error message.
+ *
+ * Result:
+ * * Successfully extracts and logs all URLs found in the server log, or logs an error if the file is missing.
+ */
 if
    io.file.exists:/var/logs/server.log
    .lambda

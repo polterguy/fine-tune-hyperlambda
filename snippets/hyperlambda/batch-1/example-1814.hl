@@ -1,5 +1,44 @@
 
-// Write a Hyperlambda script to create a scheduled task that deletes cached questions/answers older than 2 weeks, with conditions for SQLite.
+/*
+ * This Hyperlambda script creates a scheduled task that periodically deletes
+ * old machine learning request records from the [ml_requests] table in a SQLite database.
+ * It includes conditional logic to run only if the default database is SQLite.
+ *
+ * 1. [if eq config.get:"magic:databases:default"]
+ *    * Ensures that the script runs only if the configured default database is SQLite.
+ *
+ * 2. [try]
+ *    * Attempts to safely delete any existing scheduled task named [delete-old-machine-learning-requests]
+ *      before recreating it. This ensures no duplicate tasks are registered.
+ *
+ * 3. [tasks.list:delete-old-machine-learning-requests]
+ *    * Retrieves an existing scheduled task by name.
+ *
+ * 4. [if exists]
+ *    * If a task with the same name exists, deletes it using [tasks.delete].
+ *
+ * 5. [tasks.create:delete-old-machine-learning-requests]
+ *    * Registers a new task with the given name and description.
+ *    * [repeats:72.hours] configures the task to run every 3 days.
+ *
+ * 6. [.lambda] (task body)
+ *    * [sqlite.connect:magic]: Opens a connection to the [magic] SQLite database.
+ *    * [sqlite.execute]: Executes a SQL DELETE query to remove records from [ml_requests]
+ *      where:
+ *      - The [created] timestamp is older than 14 days.
+ *      - [cached] and [questionnaire] are either 0 or null.
+ *
+ * 7. [log.info]
+ *    * Logs the number of deleted records when the task runs successfully.
+ *
+ * 8. [.catch]
+ *    * If a task with the same name already exists and cannot be deleted,
+ *      logs a message to the console.
+ *
+ * Result:
+ * * A periodic cleanup task is created and run automatically every 72 hours,
+ *   removing stale, uncached machine learning records from the system.
+ */
 if
    eq
       config.get:"magic:databases:default"

@@ -1,5 +1,47 @@
 
-// Write a Hyperlambda endpoint to return the conversation starters for a specified type.
+/*
+ * This Hyperlambda endpoint retrieves a list of conversation starters
+ * for a specified machine learning [type] from the [magic] database.
+ *
+ * 1. [.arguments]
+ *    * Accepts a required input:
+ *    * - [type]: The ML type name used to filter records in the [ml_types] table.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that the [type] argument is provided before execution continues.
+ *
+ * 3. [data.connect:[generic|magic]]
+ *    * Opens a connection to the [magic] SQLite database using the [generic] connection string.
+ *
+ * 4. [data.select]
+ *    * Executes a raw SQL query to retrieve the [conversation_starters] column
+ *      from the [ml_types] table where [type] matches the input.
+ *
+ * 5. [if]
+ *    * Ensures that the [conversation_starters] field is not null and not empty
+ *      before attempting to parse and transform it.
+ *
+ * 6. [markdown2html]
+ *    * Converts the markdown-formatted string from the database into HTML.
+ *
+ * 7. [html2lambda]
+ *    * Parses the resulting HTML into a lambda node tree for further traversal.
+ *
+ * 8. [for-each:x:"@html2lambda/**/li/**/#text"]
+ *    * Iterates over all list item texts found in the HTML structure.
+ *    * Each <li> element is treated as a separate conversation starter.
+ *
+ * 9. [add:x:../*/return/*/questions]
+ *    * Appends each parsed conversation starter into the [questions] array
+ *      in the final response node structure.
+ *
+ * 10. [return]
+ *     * Returns the [questions] list to the caller.
+ *
+ * Result:
+ * * A list of conversation starter prompts specific to the given ML [type].
+ * * Returns an empty list if the [conversation_starters] value is missing or empty.
+ */
 .arguments
    type:string
 

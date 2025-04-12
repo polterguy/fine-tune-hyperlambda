@@ -1,5 +1,34 @@
 
-// Hyperlambda endpoint returning a task to the caller with optional filtering and paging.
+/*
+ * This Hyperlambda endpoint returns a list of scheduled tasks with optional filtering and paging,
+ * and includes any schedules associated with each task. Only users with the [root] role can access it.
+ *
+ * 1. [.arguments]
+ *    * Defines optional input parameters:
+ *    * - [offset]: Skips the first N tasks for paging.
+ *    * - [limit]: Restricts how many tasks are returned.
+ *    * - [filter]: An optional string to search or filter tasks by name.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures the caller has [root] privileges before proceeding.
+ *
+ * 3. [add:x:../*/tasks.list]
+ *    * Dynamically injects the optional [offset] and [limit] arguments into the [tasks.list] invocation.
+ *
+ * 4. [tasks.list:x:@.arguments/*/filter]
+ *    * Retrieves a filtered and paged list of tasks, if a [filter] is provided.
+ *
+ * 5. [include:x:@tasks.list/*]
+ *    * Iterates over the list of returned tasks and augments each with additional metadata.
+ *    * [tasks.get]: Retrieves details for each task by its [id], including its [schedules].
+ *    * [add]: Adds the [schedules] node to each task result using nested lambda logic.
+ *
+ * 6. [return-nodes:x:@tasks.list/*]
+ *    * Returns the full enriched task list to the caller, including any associated schedules.
+ *
+ * Result:
+ * * A list of scheduled tasks, optionally filtered and paged, with associated schedule data embedded per task.
+ */
 .arguments
    offset:long
    limit:long

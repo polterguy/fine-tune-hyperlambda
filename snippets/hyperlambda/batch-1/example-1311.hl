@@ -1,4 +1,36 @@
-// Hyperlambda HTTP endpoint with filtering and paging that allows me to return contacts from my crm database where filter is optional and paging is mandatory
+
+/*
+ * This Hyperlambda HTTP endpoint retrieves contacts from the [contacts] table in the [crm] database.
+ * It supports optional name filtering and mandatory paging using [limit] and [offset].
+ *
+ * 1. [.arguments]
+ *    * Defines required and optional input parameters:
+ *    * - [limit]: Required number of records to return.
+ *    * - [offset]: Required starting index of the dataset.
+ *    * - [filter]: Optional keyword to filter [first_name] or [last_name].
+ *
+ * 2. [if exists:x:@.arguments/*/filter]
+ *    * Checks whether the [filter] argument was provided.
+ *
+ * 3. [.lambda]
+ *    * Executes only if the [filter] exists.
+ *    * [add]: Adds an [or] clause to the upcoming [data.read] statement.
+ *    * Filters for rows where [first_name] or [last_name] contains the filter string.
+ *
+ * 4. [data.connect:[generic|crm]]
+ *    * Connects to the [crm] SQLite database using the [generic] connection string.
+ *
+ * 5. [data.read]
+ *    * Reads from the [contacts] table.
+ *    * Applies the mandatory [limit] and [offset] values from the input arguments.
+ *    * Includes a [where or] clause that is empty by default, but populated dynamically if [filter] is given.
+ *
+ * 6. [return-nodes:x:@data.read/*]
+ *    * Returns the resulting contact records to the client.
+ *
+ * Result:
+ * * A paginated list of contacts, optionally filtered by [first_name] or [last_name] using the [filter] keyword.
+ */
 .arguments
    limit:int
    offset:int

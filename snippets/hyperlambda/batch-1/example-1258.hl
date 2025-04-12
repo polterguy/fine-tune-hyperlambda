@@ -1,5 +1,35 @@
 
-// Endpoint to delete one item from your clusters table in your [generic|hub] database matching the specified argument(s).
+/*
+ * This Hyperlambda endpoint deletes one item from the [clusters] table
+ * in the [hub] database. The operation is authorized only for users with the [root] role.
+ *
+ * 1. [.arguments]
+ *    * Accepts a single required input:
+ *    * - [id]: The ID of the cluster to delete (string).
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures the user invoking the endpoint has [root] level authorization.
+ *
+ * 3. [validators.mandatory]
+ *    * Validates that the [id] argument is present to prevent accidental execution without required input.
+ *
+ * 4. [data.connect:[generic|hub]]
+ *    * Opens a connection to the [hub] SQLite database using a [generic] connection string.
+ *
+ * 5. [add:x:./*/data.delete/*/where/*/and]
+ *    * Dynamically injects the [id] value into the WHERE clause of the delete operation.
+ *    * Ensures only the specified record is targeted.
+ *
+ * 6. [data.delete]
+ *    * Executes the DELETE SQL command on the [clusters] table with the constructed filter.
+ *
+ * 7. [unwrap:x:+/*]
+ *    * Unwraps the output of [data.delete] to allow its result to be accessed directly.
+ *
+ * 8. [return]
+ *    * Returns the number of deleted records using the [affected] node.
+ *    * Typically returns 1 if a match was found and deleted, or 0 if no record matched.
+ */
 .arguments
    id:string
 
