@@ -1,5 +1,34 @@
 
-// An endpoint returning line_items from financial database with optional paging support and optional filtering on name
+/*
+ * This Hyperlambda endpoint returns records from the [line_items] table in the [financial] database.
+ * It supports optional filtering on [comments.name.eq], and paging via [limit] and [offset].
+ *
+ * 1. [.arguments]
+ *    - Accepts three optional arguments:
+ *      - [limit]: Controls the maximum number of records to return.
+ *      - [offset]: Skips the specified number of records before starting to return results.
+ *      - [comments.name.eq]: Enables filtering based on exact match of the comment's name.
+ *
+ * 2. [data.connect]
+ *    - Establishes a connection to the [financial] database, allowing access to its tables.
+ *
+ * 3. [add]
+ *    - Dynamically injects nodes into the [data.read] invocation based on provided arguments.
+ *    - First [add] inserts a [where] clause filter only if [comments.name.eq] exists.
+ *    - Second [add] includes [limit] and [offset] as top-level [data.read] options if provided.
+ *
+ * 4. [get-nodes]
+ *    - Used to extract and attach arguments selectively:
+ *      - Filters: [get-nodes:x:@.arguments/*/comments.name.eq]
+ *      - Paging: [get-nodes:x:@.arguments/*/limit] and [get-nodes:x:@.arguments/*/offset]
+ *
+ * 5. [data.read]
+ *    - Executes the SQL SELECT statement against the [line_items] table.
+ *    - Only records matching the filtering condition (if supplied) will be returned.
+ *
+ * 6. [yield]
+ *    - Returns the result of the read operation under the [result] node in the HTTP response.
+ */
 .arguments
    limit:long
    offset:long

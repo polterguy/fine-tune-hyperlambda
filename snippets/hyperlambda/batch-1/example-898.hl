@@ -1,5 +1,42 @@
 
-// Count unique and distinct items endpoint for your Categories table in your northwind database with filtering
+/*
+ * This Hyperlambda endpoint counts unique/distinct values in a column from the [Categories] table in the [northwind] database.
+ * It allows optional filtering and performs validation to ensure proper usage.
+ *
+ * 1. [.arguments]
+ *    - Accepts input arguments, primarily [distinct_column] which must follow the format 'TABLE.COLUMN'.
+ *    - Includes optional filter parameters for the [Categories] table such as [eq], [like], and column-specific filters.
+
+ * 2. [validators.mandatory]
+ *    - Ensures the [distinct_column] argument is provided by the caller.
+ *
+ * 3. [validators.enum]
+ *    - Validates that the value of [distinct_column] matches one of the preapproved columns from the [Categories] table.
+ *    - Protects against SQL injection and invalid column references.
+ *
+ * 4. [data.connect]
+ *    - Opens a connection to the 'northwind' SQLite database using the 'generic' connection string.
+ *    - Declares the [database-type] explicitly as 'sqlite'.
+ *
+ * 5. [set-name]
+ *    - Dynamically constructs the SQL fragment `count(distinct COLUMN_NAME)` using [strings.concat].
+ *    - The constructed value is inserted into the query structure as a placeholder column named [distinct_functor].
+ *
+ * 6. [remove-nodes]
+ *    - Deletes the original [distinct_column] argument from [.arguments] to prevent it from interfering with filtering logic.
+ *
+ * 7. [add]
+ *    - Adds any remaining arguments under a [where] clause for filtering.
+ *    - These become dynamic filters in the final [data.read] call.
+ *
+ * 8. [data.read]
+ *    - Queries the [Categories] table.
+ *    - Dynamically uses the previously set [distinct_functor] as a column alias [count] to count distinct values.
+ *    - Applies optional filters from [.arguments] inside a logical [and] group.
+ *
+ * 9. [return-nodes]
+ *    - Returns the inner node result of [data.read], effectively returning the distinct count to the client.
+ */
 .arguments
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME

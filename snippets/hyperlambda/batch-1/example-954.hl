@@ -1,8 +1,32 @@
+
 /*
  * Endpoint that posts an order ID to the order system to fetch order details.
  * If the request is successful (2xx), the full response content is returned.
+ *
+ * 1. [.arguments]
+ *    * Declares a single input argument [id], representing the order ID to be fetched.
+ *
+ * 2. [http.post]
+ *    * Sends a POST request to "https://orders.api.example.com/get-order".
+ *    * The request includes a [payload] where [order_id] is dynamically assigned from [.arguments].
+ *    * [convert:true] instructs the system to automatically parse the response into a lambda object.
+ *
+ * 3. [if]
+ *    * Evaluates the HTTP response status to determine if the request was successful.
+ *
+ * 4. [and], [mte], [lt]
+ *    * [mte]: Confirms the status code is greater than or equal to 200.
+ *    * [lt]: Confirms the status code is less than 300.
+ *    * Together they ensure a 2xx success response.
+ *
+ * 5. [.lambda] (success branch)
+ *    * If the status code is in the 2xx range, the parsed response content is returned using [yield].
+ *    * The lambda expression `@http.post/*/content/*` extracts all fields in the JSON response body.
+ *
+ * 6. [else]
+ *    * If the request fails (non-2xx response), execution is redirected to a [throw] statement.
+ *    * Throws the message "Failed to fetch order" as an error.
  */
-
 .arguments
    id:int
 

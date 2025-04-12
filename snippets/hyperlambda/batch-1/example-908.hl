@@ -1,5 +1,45 @@
 
-// Endpoint that returns minimum, maximum, average or sum from your Customers table in your northwind database. With filtering
+/*
+ * This Hyperlambda endpoint dynamically calculates an aggregate value (min, max, sum, or avg)
+ * for a specific column in the [Customers] table in the [northwind] SQLite database.
+ * Optional filtering is supported through standard WHERE clauses.
+ *
+ * 1. [.arguments]
+ *    - Accepts user inputs, including:
+ *      - [aggregate_function]: Type of aggregation (must be one of min, max, sum, avg).
+ *      - [aggregate_column]: The column in the [Customers] table to aggregate on (e.g., Customers.City).
+ *      - Optional filters for any customer-related fields using [like] or [eq] comparisons.
+ *
+ * 2. [validators.mandatory]
+ *    - Ensures that [aggregate_function] and [aggregate_column] are present.
+ *    - Prevents execution with missing key arguments.
+ *
+ * 3. [validators.enum]
+ *    - Validates that the [aggregate_function] is one of the allowed operations: min, max, sum, or avg.
+ *    - Also restricts [aggregate_column] to a safe list of fields from the [Customers] table to avoid SQL injection or invalid references.
+ *
+ * 4. [data.connect]
+ *    - Connects to the 'northwind' SQLite database using a 'generic' connection string.
+ *    - Specifies the [database-type] as 'sqlite'.
+ *
+ * 5. [set-name]
+ *    - Dynamically constructs the SQL fragment for aggregation, e.g., `sum(Customers.City)`, using [strings.concat].
+ *    - Renames the resulting node to [aggregate_functor] to inject it into the [data.read] structure.
+ *
+ * 6. [remove-nodes]
+ *    - Removes [aggregate_function] and [aggregate_column] from the argument list after usage to clean up before building the WHERE clause.
+ *
+ * 7. [add]
+ *    - Injects the remaining arguments into a WHERE clause inside [data.read].
+ *    - Filters the result set based on any additional matching criteria provided by the caller.
+ *
+ * 8. [data.read]
+ *    - Queries the [Customers] table using the constructed [aggregate_functor] as a dynamic column expression.
+ *    - The result is aliased as [result] and returned in a single row (via [limit]).
+ *
+ * 9. [return-nodes]
+ *    - Returns the computed aggregate value (aliased as [result]) to the caller.
+ */
 .arguments
 
    // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg

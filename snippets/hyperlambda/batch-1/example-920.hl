@@ -1,5 +1,40 @@
 
-// Hyperlambda endpoint that counts items from the roles table in the magic database according to specified arguments, ensuring authentication and authorization for root roles.
+/*
+ * This Hyperlambda endpoint securely counts the number of items in the [roles] table from the [magic] database,
+ * applying optional filters and enforcing that only users with the [root] role can access it.
+ *
+ * 1. [.arguments]
+ *    - Accepts optional filtering parameters for querying the [roles] table:
+ *      - [name.eq], [name.like], and [description.like] are supported.
+ *    - These arguments are used to build a dynamic WHERE clause.
+
+ * 2. [auth.ticket.verify]
+ *    - Verifies that the requesting user has the [root] role.
+ *    - Ensures access control for privileged database operations.
+
+ * 3. [data.connect]
+ *    - Opens a connection to the [magic] SQLite database using the default [generic] connection string.
+ *
+ * 4. [add]
+ *    - Copies all [.arguments] child nodes with an [operator] suffix into the [.data.read] block.
+ *    - This supports dynamic column filtering using operators like [eq] and [like].
+ *
+ * 5. [remove-nodes]
+ *    - Removes the previously used [operator] arguments after they’ve been integrated into the WHERE clause.
+ *
+ * 6. [add] (second usage)
+ *    - Injects remaining filter arguments into the WHERE clause of the [data.read] statement.
+ *    - Builds a composite [and] filter block based on client input.
+ *
+ * 7. [data.read]
+ *    - Executes a SQL query on the [roles] table.
+ *    - Uses [count(*)] to return the total number of rows matching the filters.
+ *    - Returns one row, aliased as [count].
+ *
+ * 8. [return-nodes]
+ *    - Returns the result of [data.read] directly to the client.
+ *    - Uses a lambda expression to return the inner [count] result node.
+ */
 .arguments
    name.eq:string
    name.like:string

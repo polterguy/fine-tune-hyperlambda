@@ -1,8 +1,32 @@
+
 /*
  * Endpoint that sends a POST request to an internal user service with a user ID.
  * Verifies that the status code is 2xx and yields the full response content.
+ *
+ * 1. [.arguments]
+ *    * Accepts a single input: [id], which is the user ID to look up.
+ *
+ * 2. [http.post]
+ *    * Sends a POST request to "https://internal.api.example.com/users/lookup".
+ *    * [convert:true] enables automatic parsing of the response into a lambda object.
+ *    * The payload includes [userId], which is dynamically extracted from [.arguments].
+ *
+ * 3. [if]
+ *    * Evaluates whether the HTTP status code is in the 2xx range, indicating success.
+ *
+ * 4. [and], [mte], [lt]
+ *    * [mte]: Verifies that the status code is greater than or equal to 200.
+ *    * [lt]: Verifies that the status code is less than 300.
+ *    * Together they confirm a 2xx status.
+ *
+ * 5. [.lambda] (success branch)
+ *    * If the response is successful, it yields the entire parsed JSON body using [yield].
+ *    * The lambda expression `@http.post/*/content/*` accesses all fields in the response content.
+ *
+ * 6. [else]
+ *    * Executed if the status code is outside the 2xx range.
+ *    * Triggers a [throw] with the message "User lookup failed".
  */
-
 .arguments
    id:int
 

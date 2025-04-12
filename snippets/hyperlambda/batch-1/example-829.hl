@@ -1,7 +1,27 @@
 
-// Endpoint to return all clusters from hub, with HTTP caching.
-
-// Empty declaration like this ensures endpoint cannot accept arguments.
+/*
+ * This Hyperlambda endpoint retrieves all enabled clusters from the 'hub' database
+ * and applies HTTP caching to reduce server load and mitigate denial-of-service attacks.
+ *
+ * 1. [.arguments]
+ *    - Declared as empty to prevent the endpoint from accepting any parameters from the client.
+ *
+ * 2. [response.headers.set]
+ *    - Sets HTTP response headers to instruct the client to cache the response.
+ *    - The header [Cache-Control:public, max-age=30] tells intermediaries and browsers to cache the response for 30 seconds.
+ *    - Helps protect the endpoint against repetitive calls and improves performance.
+ *
+ * 3. [data.connect]
+ *    - Opens a connection to the [generic|hub] database before executing any data operations.
+ *
+ * 4. [data.read]
+ *    - Reads data from the [clusters] table.
+ *    - Limits the selected columns to [id], [country], and [name].
+ *    - Applies a filter using a [where] clause with [and], ensuring only clusters marked as [enabled] are returned.
+ *
+ * 5. [return-nodes]
+ *    - Returns the result set from [data.read] directly to the client as the HTTP response.
+ */
 .arguments
 
 // Adding 30 seconds of public caching to avoid DOS attacks from exhausting server.

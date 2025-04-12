@@ -1,5 +1,34 @@
 
-// Endpoint that counts items from your roles table in your cms database with filtering and authorization requirements for 'guest' users.
+/*
+ * This Hyperlambda endpoint counts rows in the [roles] table of the [cms] database.
+ * It supports optional filtering and requires 'guest' user authorization.
+ *
+ * 1. [.arguments]
+ *    * Accepts optional filtering parameters:
+ *    * - [roles.id.eq]: Filter by role ID.
+ *    * - [roles.name.like] or [roles.name.eq]: Filter by role name using partial or exact match.
+ *
+ * 2. [auth.ticket.verify]
+ *    * Verifies that the caller has the [guest] role before continuing.
+ *    * Prevents unauthorized access to role data.
+ *
+ * 3. [data.connect]
+ *    * Connects to the [cms] SQLite database using a generic connection string.
+ *    * Declares the database type explicitly as [sqlite].
+ *
+ * 4. [add]
+ *    * Dynamically injects the filter arguments from [.arguments] into the WHERE clause of [data.read].
+ *    * Uses [get-nodes] to pull all child nodes from [.arguments].
+ *
+ * 5. [data.read]
+ *    * Executes a SELECT query against the [roles] table.
+ *    * Returns a single column: [count(*)] aliased as [count].
+ *    * Applies filters under a logical [and] block and limits the result to 1 row.
+ *
+ * 6. [return-nodes]
+ *    * Returns the count result node directly to the caller using `@data.read/*/*`.
+ *    * The final output contains the number of matching records.
+ */
 .arguments
 
    // Optional filtering arguments

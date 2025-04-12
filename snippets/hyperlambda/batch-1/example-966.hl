@@ -1,8 +1,35 @@
+
 /*
  * Endpoint that invokes HTTP post with dynamic set of arguments and returning error if unsuccessful,
- * otherwise returns name an email of user
+ * otherwise returns name and email of user.
+ *
+ * 1. [.arguments]
+ *    * Declares input parameters, in this case [id], which is sent to the external API.
+ *
+ * 2. [add]
+ *    * Dynamically inserts all arguments into the [payload] node for the HTTP POST request.
+ *    * Uses [get-nodes] with `@.arguments/*` to include every key-value pair passed into the endpoint.
+ *
+ * 3. [http.post]
+ *    * Sends a POST request to "https://logistics.example.org/get-user".
+ *    * Automatically converts the HTTP response into a lambda structure using [convert:true].
+ *    * The [payload] is constructed from the dynamically added argument data.
+ *
+ * 4. [if]
+ *    * Evaluates the HTTP status code to determine if the request was successful.
+ *
+ * 5. [and], [mte], [lt]
+ *    * [mte]: Confirms the status code is ≥ 200.
+ *    * [lt]: Confirms the status code is < 300.
+ *    * Ensures the response falls within the successful 2xx range.
+ *
+ * 6. [.lambda] (success branch)
+ *    * If the request was successful, returns the [name] and [email] fields from the JSON response using [yield].
+ *
+ * 7. [return] (fallback)
+ *    * Executed if the HTTP status was not 2xx.
+ *    * Returns a static error message under the [error] node.
  */
-
 .arguments
    id:int
 

@@ -1,9 +1,37 @@
+
 /*
  * Posts a dynamic set of arguments to a user info API.
  * Returns full name and contact email on success; error message otherwise.
  * File is an HTTP endpoint for an API.
+ *
+ * 1. [.arguments]
+ *    * Declares the input parameter [id], which is used to query the user profile.
+ *
+ * 2. [add]
+ *    * Dynamically adds all arguments into a [payload] node.
+ *    * Uses [get-nodes:x:@.arguments/*] to gather all argument key-value pairs and insert them into the payload.
+ *
+ * 3. [http.post]
+ *    * Sends a POST request to "https://api.example.com/user/profile".
+ *    * Submits the payload dynamically built above.
+ *    * [convert:true] ensures the response is parsed into a lambda structure.
+ *
+ * 4. [if]
+ *    * Checks whether the HTTP status code is within the successful 2xx range.
+ *
+ * 5. [and], [mte], [lt]
+ *    * [mte] checks that the status code is ≥ 200.
+ *    * [lt] checks that the status code is < 300.
+ *    * Together, they verify that the request succeeded.
+ *
+ * 6. [.lambda] (success branch)
+ *    * On success, returns two fields from the parsed response:
+ *    * - [full_name]: The user's full name.
+ *    * - [contact_email]: The user's email address.
+ *
+ * 7. [return] (fallback)
+ *    * If the request fails, returns a static error message under the [error] node.
  */
-
 .arguments
    id:int
 

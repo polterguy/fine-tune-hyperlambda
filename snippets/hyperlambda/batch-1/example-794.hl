@@ -1,15 +1,31 @@
-/*
- * Type: HTTP web API Endpoint
- *
- * DESCRIPTION:
- * Searches employees by their last name using a `LIKE` query.
- * Useful for autocomplete by surname.
- *
- * HOW TO CREATE THIS ENDPOINT:
- * 1. Save as `/modules/api/employees/search-lastname.get.hl`
- * 2. Access via: GET /api/employees/search-lastname?lastname=Smi
- */
 
+/*
+ * This endpoint implements an autocomplete search for employee last names using a SQL `LIKE` clause.
+ * It retrieves matching records from the 'actor' table in the [sakila] database.
+ *
+ * 1. [.arguments]
+ *    - Declares a single required input parameter [lastname] of type string,
+ *      which represents the partial surname to search for.
+ *
+ * 2. [validators.mandatory]
+ *    - Ensures that the [lastname] parameter is provided by the caller.
+ *
+ * 3. [data.connect]
+ *    - Establishes a connection to the [sakila] database before performing any SQL operations.
+ *
+ * 4. [strings.concat]
+ *    - Dynamically creates a wildcard SQL pattern for the `LIKE` query.
+ *    - Concatenates the '%' character before and after the user-provided [lastname] to allow partial matching.
+ *    - The resulting pattern (e.g. '%Smi%') is passed as a bound parameter to the SQL query to prevent SQL injection.
+ *
+ * 5. [data.select]
+ *    - Executes a raw SQL query to select [first_name] and [last_name] from the 'actor' table
+ *      where the [last_name] matches the concatenated pattern using `LIKE`.
+ *    - Accepts the wildcard pattern as a named parameter [@filter].
+ *
+ * 6. [yield]
+ *    - Returns the list of matched records to the caller under the [results] node.
+ */
 .arguments
    lastname:string
 

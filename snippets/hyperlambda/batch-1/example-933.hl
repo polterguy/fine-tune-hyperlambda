@@ -1,5 +1,40 @@
 
-// A Hyperlambda endpoint file that returns all cloudlets belonging to the currently authenticated user.
+/*
+ * This Hyperlambda endpoint returns a list of cloudlets belonging to the currently authenticated user.
+ * It performs secure access control and ensures users can only retrieve their own records.
+ *
+ * 1. [.arguments]
+ *    - Declares the endpoint's argument structure, which is empty here since the user's identity is derived from the authentication context.
+ *
+ * 2. [auth.ticket.verify]
+ *    - Ensures the user is authorized to access this endpoint.
+ *    - Accepts users with roles: [root], [guest], or [impersonated].
+ *
+ * 3. [auth.ticket.get]
+ *    - Retrieves the identity (e.g., user ID or username) of the currently authenticated user.
+ *    - Used to securely scope the database query to this user.
+ *
+ * 4. [data.connect]
+ *    - Establishes a connection to the 'hub' SQLite database using a generic connection string.
+ *
+ * 5. [data.read]
+ *    - Executes a query on the [cloudlets] table, joining it with the [plans] and [clusters] tables to enrich the data.
+ *    - Uses [inner join] to only include results with matching records in both [plans] and [clusters].
+ *    - The [on] clauses ensure proper joining conditions:
+ *        - [cloudlets.plan] must equal [plans.name]
+ *        - [cloudlets.cluster] must equal [clusters.id]
+ *
+ * 6. [columns]
+ *    - Specifies which fields to return from the joined tables, including metadata about cloudlets, pricing, resource limits, and location info.
+ *    - The [clusters.name] column is aliased as [node_name] for clarity.
+ *
+ * 7. [where]
+ *    - Filters results using a dynamic condition that ensures only cloudlets belonging to the authenticated user are returned.
+ *    - Uses [user.eq] with the value from [auth.ticket.get].
+ *
+ * 8. [return-nodes]
+ *    - Returns all result nodes from the executed [data.read] query back to the HTTP caller.
+ */
 .arguments
 
 // Ensuring user is authorised to invoke endpoint.

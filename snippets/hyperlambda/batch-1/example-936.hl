@@ -1,5 +1,41 @@
 
-// Endpoint with paging, filtering, and sorting that returns items from your clusters table in your [generic|hub] database according to the specified arguments, ensuring ONLY 'root' users can execute the endpoint.
+/*
+ * This Hyperlambda endpoint securely retrieves paginated, filtered, and sorted data from the [clusters] table
+ * in the [hub] database. Only users with the [root] role can invoke this endpoint.
+ *
+ * 1. [.arguments]
+ *    * Accepts input parameters that control paging, sorting, and filtering:
+ *    * - [limit], [offset]: For pagination.
+ *    * - [order], [direction]: For sorting the result set.
+ *    * - Various filters such as [clusters.id.eq], [clusters.country.like], [clusters.enabled.eq], etc.
+ *
+ * 2. [auth.ticket.verify]
+ *    * Verifies that the caller has the [root] role.
+ *    * Ensures this endpoint is not accessible by unauthorized users.
+ *
+ * 3. [data.connect]
+ *    * Establishes a connection to the [hub] database using the [generic] connection string.
+ *
+ * 4. [add] (pagination and sorting)
+ *    * Injects [limit], [offset], [order], and [direction] nodes from [.arguments] into the structure of the [data.read] block.
+ *    * Enables dynamic control over result windowing and ordering.
+ *
+ * 5. [remove-nodes]
+ *    * Removes the used pagination and sorting arguments from [.arguments] to prevent duplication during filter generation.
+ *
+ * 6. [add] (filter conditions)
+ *    * Adds any remaining argument nodes as filters under the WHERE clause of [data.read].
+ *    * Dynamically constructs the filtering logic based on input.
+ *
+ * 7. [data.read]
+ *    * Performs the actual database read operation.
+ *    * Queries the [clusters] table and returns a specific set of columns: [id], [country], [name], and [enabled].
+ *    * Filters are applied inside a logical [and] block using the values derived from [.arguments].
+ *
+ * 8. [return-nodes]
+ *    * Returns the result nodes retrieved by [data.read] to the client.
+ *    * Uses `@data.read/*` to capture all output records.
+ */
 .arguments
    limit:long
    offset:long
