@@ -1,0 +1,49 @@
+/*
+ * This Hyperlambda file performs multi-source enrichment of artist data from the 'streamingdb' database using [include].
+ * While not a validation snippet in the traditional sense, it indirectly "validates" that data exists across external systems
+ * by attempting to fetch and embed supplementary data from both a remote API and local files.
+ *
+ * [data.connect]
+ * Establishes a connection to the 'streamingdb' database in order to query artist information.
+ *
+ * [data.read]
+ * Retrieves 50 artist records from the 'Artists' table, selecting only 'ArtistId' and 'StageName'.
+ * These serve as the base dataset for further enrichment.
+ *
+ * First [include]
+ * For each artist record, an [http.get] request is issued to 'https://api.streamstats.com/plays' to retrieve play statistics.
+ * The request includes the artist's ID as a query parameter.
+ * The response is automatically converted from JSON into a Hyperlambda structure using [convert:true].
+ * The result is attached to each artist under a new child node named 'stats'.
+ *
+ * Second [include]
+ * Each artist record is further enriched by loading additional metadata from a local JSON file using [io.file.load].
+ * The file path is constructed using [strings.concat] with the pattern '/metadata/artists/<ArtistId>.json'.
+ * The JSON file content is parsed using [json2lambda] and attached under a child node named 'metadata'.
+ *
+ * In combination, this process ensures that each artist is validated against and enhanced with two external sources:
+ * a remote system (API) and a local cache or archive (file), building a complete, cross-verified artist data structure.
+ */
+data.connect:streamingdb
+   data.read
+      table:Artists
+      limit:50
+      columns
+         ArtistId
+         StageName
+   include:x:@data.read/*
+      http.get:"https://api.streamstats.com/plays"
+         query
+            id:x:@.dp/#/*/ArtistId
+         convert:bool:true
+      yield
+         stats:x:@http.get/*/content
+   include:x:@data.read/*
+      strings.concat
+         .:"/metadata/artists/"
+         get-value:x:@.dp/#/*/ArtistId
+         .:".json"
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         metadata:x:@json2lambda/*
