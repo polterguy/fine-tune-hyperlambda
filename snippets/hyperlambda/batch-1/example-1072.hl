@@ -1,5 +1,43 @@
 
-// A Hyperlambda endpoint for a CRUD update endpoint that updates one record in the ml_requests table in the magic database, filtering which item to update with ID and updating type, prompt, completion, and finish_reason fields, ensuring authentication and authorization for root roles.
+/*
+ * A Hyperlambda endpoint for a CRUD update operation on the [ml_requests] table
+ * in the [magic] database. It filters the record to update using [id] and updates
+ * the fields [type], [prompt], [completion], [finish_reason], and [cached].
+ * Access is restricted to users with the [root] role.
+ *
+ * 1. [.arguments]
+ *    * Defines input arguments:
+ *    * - [id]: Primary key used to identify the record to update (mandatory).
+ *    * - [type], [prompt], [completion], [finish_reason], [cached]: Fields to be updated.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that [id] is provided before proceeding.
+ *
+ * 3. [auth.ticket.verify]
+ *    * Verifies the current user has [root] role authorization.
+ *
+ * 4. [data.connect]
+ *    * Connects to the [magic] database using the [generic] connection string.
+ *
+ * 5. [add] (values block)
+ *    * Dynamically adds all updateable fields (excluding [id]) to the [values] section of [data.update].
+ *
+ * 6. [add] (where block)
+ *    * Adds [id] to the WHERE clause to target the specific record for update.
+ *
+ * 7. [data.update]
+ *    * Performs the update operation on the [ml_requests] table.
+ *
+ * 8. [if]
+ *    * Verifies if any record was affected (updated).
+ *    * If the result is 0, returns a 404 response and a [Record not found] message.
+ *
+ * 9. [response.status.set]
+ *    * If the update was successful, sets the HTTP response status to 202 (Accepted).
+ *
+ * 10. [yield]
+ *    * Returns the number of records affected under the [affected] node.
+ */
 .arguments
    id:long
    type:string

@@ -1,0 +1,36 @@
+/*
+ * This Hyperlambda snippet demonstrates the use of the [crypto.encrypt] slot to encrypt a message using AES and RSA algorithms, and sign the message in the process.
+ *
+ * 1. [crypto.rsa.create-key]
+ *    - Creates a new RSA keypair with a specified strength.
+ *    - The public key is used for encryption, and the private key is used for signing.
+ *
+ * 2. [crypto.encrypt]
+ *    - Encrypts a message using AES and RSA.
+ *    - Requires a message, encryption key, signing key, and signing key fingerprint.
+ *    - The message is first signed with the private key, then encrypted with the public key.
+ *    - The signing key's fingerprint is stored within the encrypted content.
+ *
+ * 3. [crypto.decrypt]
+ *    - Decrypts the encrypted message using the recipient's private key.
+ *    - Optionally verifies the signature if a verify-key is provided.
+ *
+ * 4. [crypto.verify]
+ *    - Verifies the signature of the decrypted message using the sender's public key.
+ *    - Ensures the message was signed by the owner of the private key corresponding to the public key.
+ *
+ * The example uses a strength of 512 for demonstration purposes, but it is recommended to use at least 2048 in real-world scenarios.
+ */
+crypto.rsa.create-key
+   strength:512
+
+crypto.encrypt:Some super secret message
+   encryption-key:x:@crypto.rsa.create-key/*/public
+   signing-key:x:@crypto.rsa.create-key/*/private
+   signing-key-fingerprint:x:@crypto.rsa.create-key/*/fingerprint
+
+crypto.decrypt:x:@crypto.encrypt
+   decryption-key:x:@crypto.rsa.create-key/*/private
+
+crypto.verify:x:@crypto.decrypt
+   public-key:x:@crypto.rsa.create-key/*/public

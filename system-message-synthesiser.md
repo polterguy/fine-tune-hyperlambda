@@ -317,9 +317,7 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
 
 ## How to generate training data
 
-I will provide you with some Hyperlambda. I want you to generate another variation of this code, and return ONLY the Hyperlambda code. DO NOT return ```, return ONLY the new Hyperlambda code, and do not change its structure, only its comments, variable names, and expressions. Do NOT change node names of invocations towards system slots, but only variables.
-
-Any node starting out with a `.` character can be changed, in addition to its children nodes, but when you do this, make sure you also update expressions in accordance. Also feel free to change database names, folder names, etc. The point is to synthesize fine tuning data from existing code with the objective being to fine tune gpt-4o-mini
+I will provide you with the name of a slot in addition to its documentation. I want you to generate unique variations using the slot, and return the Hyperlambda code, in addition to a highly descriptive comment describing all slots being used in an ordered list. DO NOT return ```, return ONLY the new Hyperlambda code.
 
 ALWAYS use multi line file level comments, and describe roughly what the code does, such as follows:
 /*
@@ -327,5 +325,53 @@ ALWAYS use multi line file level comments, and describe roughly what the code do
  */
 ... hyperlambda code here ...
 
-**IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA CODE. DO NOT RETURN ANYTHING ELSE, BESIDES COMMENTS AND CODE. DO NOT RETURN ``` CHARACTERS!
+**IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA CODE AND THE FILE LEVEL COMMENT. DO NOT RETURN ANYTHING ELSE, BESIDES COMMENTS AND CODE. DO NOT RETURN ``` CHARACTERS!
 
+I am going to use the file level comment as the 'prompt' and the code as the 'completion' during fine tuning gpt-4o-mini, so I need you to accurately explain what the code does. Below is an example:
+
+/*
+ * This Hyperlambda snippet performs a compound mathematical operation by multiplying multiple factors,
+ * including a nested addition as one of the operands.
+ *
+ * 1. [math.multiply]
+ *    * Multiplies all of its child values together.
+ *    * Starts with an inline base value of 4.
+ *
+ * 2. [.:int:3]
+ *    * A static factor that is multiplied by the base, resulting in 4 * 3 = 12.
+ *
+ * 3. [math.add]
+ *    * A nested addition operation that evaluates to 1 + 1 = 2.
+ *    * This becomes another factor in the multiplication.
+ *
+ * Final Calculation:
+ * * 4 (base) * 3 = 12
+ * * 12 * 2 (result of addition) = 24
+ *
+ * Result:
+ * * The final result of [math.multiply] is 24.
+ */
+math.multiply:int:4
+
+   // multiplies base 4 by 3 -> intermediate result 12
+   .:int:3
+
+   // nested addition as another factor
+   math.add
+
+      // first term of addition
+      .:int:1
+
+      // second term of addition (1 + 1 = 2)
+      .:int:1
+
+   // The intermediate result 12 is then multiplied by 2 (from nested add) -> 24
+
+**IMPORTANT** - ONLY put node names and slot names inside of square brackets '[]', do NOT add their values, or types.
+[foo] is used to describe a node's NAME not its value or type!
+
+If you need "variable node" then **ALWAYS** prepend a `.` in front of these, such as follows:
+
+.MY_VARIABLE:foo
+
+**IMPORTANT** - Change variable names and expressions to create variations not exactly resembling any example code you've got in your context.

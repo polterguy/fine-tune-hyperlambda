@@ -1,5 +1,37 @@
 
-// Endpoint that counts items from your items table in your shopping-cart-demo database.
+/*
+ * Endpoint that counts items from the [items] table in the [shopping-cart-demo] SQLite database.
+ * Supports filtering across both the [items] and [products] tables and requires [root] or [admin] role for access.
+ *
+ * 1. [.arguments]
+ *    * Accepts optional filters for the count query:
+ *    * - [items.item_id.eq], [items.product_id.eq], [items.quantity.eq]: Exact match filters on columns in the [items] table.
+ *    * - [items.session_id.like], [items.session_id.eq]: Filters on session ID using LIKE and exact match.
+ *    * - [product_id.name.eq], [product_id.name.like]: Filters on the joined [products] table by product name.
+ *
+ * 2. [auth.ticket.verify:root,admin]
+ *    * Ensures the endpoint can only be accessed by users with [root] or [admin] roles.
+ *
+ * 3. [data.connect]
+ *    * Connects to the [shopping-cart-demo] SQLite database using the [generic] connection string.
+ *    * Declares the [database-type] explicitly as [sqlite].
+ *
+ * 4. [add]
+ *    * Dynamically adds all filters provided in [.arguments] into the WHERE clause (the [and] node).
+ *    * Ensures only relevant filters are included in the query.
+ *
+ * 5. [data.read]
+ *    * Performs a SELECT query with JOIN logic:
+ *    * - From the [items] table.
+ *    * - LEFT joins the [products] table using [product_id] as alias.
+ *    * - Joins on matching [items.product_id] and [product_id.product_id].
+ *    * Selects a [count(*)] column aliased as [count] to get the total number of matching records.
+ *    * Applies all filters under a [where and] clause.
+ *    * Limits the result to a single row with [limit:long:1].
+ *
+ * 6. [return-nodes]
+ *    * Returns the count result using the path `@data.read/*/*`, making it accessible in the response.
+ */
 .arguments
 
    // items table item_id column equality exact match filtering

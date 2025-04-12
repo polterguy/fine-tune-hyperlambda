@@ -1,5 +1,47 @@
 
-// Create a Hyperlambda script for a CRUD read endpoint with paging, sorting, and filtering that selects records from the questions table in the magic database, returning question_id, question, and questionnaire, ensuring authentication and authorization for root and admin roles.
+/*
+ * This Hyperlambda script defines a CRUD read endpoint for retrieving records
+ * from the [questions] table in the [magic] SQLite database.
+ * It supports paging, sorting, and filtering, and is restricted to [root] users.
+ *
+ * 1. [.arguments]
+ *    * Accepts input for:
+ *    * - [limit], [offset]: Used for pagination.
+ *    * - [order], [direction]: For sorting results.
+ *    * - Various filters for [question_id], [question], and [questionnaire]
+ *      using both [like] and [eq] operators.
+ *
+ * 2. [auth.ticket.verify]
+ *    * Restricts access to users with the [root] role.
+ *    * Ensures that unauthorized users cannot access question data.
+ *
+ * 3. [data.connect]
+ *    * Opens a connection to the [magic] database using a generic connection string.
+ *    * Specifies [database-type] as [sqlite].
+ *
+ * 4. [add] (ordering)
+ *    * Dynamically injects [order] and [direction] into the [data.read] block.
+ *    * These define how results should be sorted.
+ *    * [remove-nodes] is used afterward to avoid interference during filtering.
+ *
+ * 5. [add] (paging)
+ *    * Dynamically adds [limit] and [offset] to the [data.read] block.
+ *    * Enables control over the number of records returned and pagination.
+ *    * Removes the original argument nodes after usage.
+ *
+ * 6. [add] (filters)
+ *    * Adds all remaining argument nodes as filter conditions under the [where and] clause.
+ *    * Dynamically supports multiple filter conditions depending on which arguments are supplied.
+ *
+ * 7. [data.read]
+ *    * Executes a SELECT query against the [questions] table.
+ *    * Retrieves selected columns including:
+ *      - [question_id], [question], [questionnaire], [type], [context], and [name].
+ *    * Applies the constructed [where and] filters, sorting, and pagination.
+ *
+ * 8. [return-nodes]
+ *    * Returns the final result set to the caller using `@data.read/*`.
+ */
 .arguments
    limit:long
    offset:long

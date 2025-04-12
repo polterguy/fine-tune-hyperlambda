@@ -1,0 +1,71 @@
+
+/*
+ * Creates synthetic training data based upon slots existing in the system.
+ */
+vocabulary
+
+// Buffer for common system instruction
+.system-instruction
+io.file.load:/modules/fine-tune-hyperlambda/system-message-synthesiser.md
+
+for-each:x:@vocabulary/*
+
+   // Making sure we silently catch exceptions.
+   try
+      
+      /*
+       * Returns context for the specified [query] from the specified [type],
+       * and returns to caller.
+       *
+       * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
+       * tokens to return. [type] is a machine learning type from your ml_types database table in
+       * your magic database.
+       */
+      execute:magic.workflows.actions.execute
+         name:openai-context-from-database
+         filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+         arguments
+            type:magic-documentation
+            query:x:@.dp/#
+            threshold:decimal:0.3
+            max_tokens:int:25000
+
+
+      /*
+       * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+       * [instruction] and [query].
+       *
+       * Will use the default API key found from configurations.
+       *
+       * [context] is additional data you can supply to OpenAI such that it responds using
+       * your data as its source for information. [instruction] is a system message allowing
+       * you to change how OpenAI responds.
+       */
+      execute:magic.workflows.actions.execute
+         name:openai-query
+         filename:/modules/openai/workflows/actions/openai-query.hl
+         arguments
+            model:gpt-4-1106-preview
+            max_tokens:int:1500
+            context:x:@execute/@execute/*/context
+            instruction:x:@io.file.load
+            query:x:@.dp/#
+
+      // Saving file to '/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised2/'
+      .file
+      set-value:x:@.file
+         strings.concat
+            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised2/
+            get-value:x:@.dp/#
+            .:.hl
+      io.file.save:x:@.file
+         get-value:x:@execute/*/answer
+
+   .catch
+
+      // Logging the error
+      log.error:x:@.arguments/*/message
+         slot:x:@.dp/#
+
+      // Waiting 3 seconds in case this is a transitional error.
+      sleep:3000

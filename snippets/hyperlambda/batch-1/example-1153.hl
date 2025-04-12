@@ -1,5 +1,35 @@
 
-// Endpoint to count items from your crawl_urls table in your scraper database with filtering.
+/*
+ * Endpoint to count items from the [crawl_urls] table in the [scraper] SQLite database.
+ * Supports optional filtering and is restricted to users with [root] or [admin] roles.
+ *
+ * 1. [.arguments]
+ *    * Accepts multiple optional filters:
+ *    * - [crawl_urls.crawl_url_id.eq]: Exact match filter on the crawl URL ID.
+ *    * - [crawl_urls.url.like] and [crawl_urls.url.eq]: Filters on the URL column using SQL LIKE or exact match.
+ *    * - [crawl_urls.type.like] and [crawl_urls.type.eq]: Filters on the type column using SQL LIKE or exact match.
+ *
+ * 2. [auth.ticket.verify]
+ *    * Ensures only users with [root] or [admin] role can execute the endpoint.
+ *
+ * 3. [data.connect]
+ *    * Connects to the [scraper] SQLite database using the [generic] connection string.
+ *    * Declares the database type explicitly as [sqlite].
+ *
+ * 4. [add]
+ *    * Dynamically injects all argument-based filters into the [where] clause of the read operation.
+ *    * Ensures filtering is based only on provided arguments.
+ *
+ * 5. [data.read]
+ *    * Executes a SELECT query that counts matching records from the [crawl_urls] table.
+ *    * Uses a [where and] clause to apply all filters conjunctively.
+ *    * The result is aliased as [count].
+ *    * [limit:1] ensures the query returns a single row with the count value.
+ *
+ * 6. [return-nodes]
+ *    * Returns the result of the [data.read] operation to the caller.
+ *    * Specifically extracts the count using `@data.read/*/*`.
+ */
 .arguments
 
    // crawl_urls table crawl_url_id column equality exact match filtering

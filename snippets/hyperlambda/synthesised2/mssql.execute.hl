@@ -1,0 +1,35 @@
+/*
+ * This Hyperlambda snippet demonstrates the usage of the [mssql.execute] slot to execute an arbitrary SQL statement
+ * against a Microsoft SQL Server database. The [mssql.execute] slot is used when you want to run a SQL command that
+ * does not return any result sets, such as a DELETE, UPDATE, or INSERT statement without a RETURNING clause.
+ *
+ * 1. [mssql.connect]
+ *    * Establishes a connection to a Microsoft SQL Server database using a provided connection string.
+ *
+ * 2. [mssql.execute]
+ *    * Executes the SQL statement provided as its value.
+ *    * In this example, it deletes records from the "Orders" table where the "Status" column is "Cancelled".
+ *
+ * 3. [mssql.transaction.create]
+ *    * Starts a new database transaction to ensure that the operations are atomic.
+ *
+ * 4. [mssql.transaction.commit]
+ *    * Commits the transaction to make the changes permanent in the database.
+ *
+ * 5. [mssql.transaction.rollback]
+ *    * Rolls back the transaction in case of any errors, undoing all changes made within the transaction.
+ *
+ * Usage Note:
+ * * The [mssql.execute] slot should be used with caution as it directly executes the provided SQL statement.
+ * * Proper input validation and parameterization should be used to prevent SQL injection attacks.
+ * * Transactions are used to ensure data integrity and to roll back changes in case of an error.
+ */
+mssql.connect
+   connection-string:"Server=myServerAddress;Database=myDataBase;User Id=myUsername;Password=myPassword;"
+   mssql.transaction.create
+      mssql.execute:"DELETE FROM Orders WHERE Status = 'Cancelled'"
+      mssql.transaction.commit
+   .catch
+      mssql.transaction.rollback
+      // Handle the error, possibly logging the issue or notifying an administrator
+      log.error:x:@.arguments/*/message

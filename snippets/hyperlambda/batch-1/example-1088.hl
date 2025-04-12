@@ -1,5 +1,46 @@
 
-// Hyperlambda endpoint returning unique and distinct values from your CustomerCustomerDemo table in your northwind SQLite database, with filtering, sorting and paging
+/*
+ * Hyperlambda endpoint returning unique and distinct values from the [CustomerCustomerDemo] table
+ * in the [northwind] SQLite database. Supports filtering, sorting, and paging.
+ *
+ * 1. [.arguments]
+ *    * Accepts the following parameters:
+ *    * - [distinct_column]: Required. Must be in the format TABLE_NAME.COLUMN_NAME.
+ *    * - [limit], [offset]: Controls pagination.
+ *    * - [order], [direction]: Defines sorting logic.
+ *    * - Filtering parameters for columns [CustomerID] and [CustomerTypeID] using [like] and [eq].
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that the [distinct_column] argument is provided.
+ *
+ * 3. [validators.enum]
+ *    * Limits [distinct_column] to only two valid columns:
+ *    * - CustomerCustomerDemo.CustomerID
+ *    * - CustomerCustomerDemo.CustomerTypeID
+ *
+ * 4. [data.connect]
+ *    * Connects to the [northwind] SQLite database using the [generic] connection string.
+ *
+ * 5. [set-name]
+ *    * Constructs a valid SQL fragment: [distinct(TABLE_NAME.COLUMN_NAME)].
+ *    * This expression is injected into the [data.read] structure as [distinct_functor].
+ *
+ * 6. [remove-nodes]
+ *    * Removes [distinct_column], [order], [direction], [limit], and [offset] from [.arguments]
+ *    * after their values have been extracted and reused to avoid conflicts.
+ *
+ * 7. [add]
+ *    * Dynamically injects remaining pagination and filter parameters into the [data.read] invocation.
+ *    * Filters are added to the [where] clause.
+ *
+ * 8. [data.read]
+ *    * Executes a query on the [CustomerCustomerDemo] table.
+ *    * Applies filters, ordering, and pagination as defined.
+ *    * Returns the distinct values for the specified column via the [distinct_functor].
+ *
+ * 9. [return-nodes]
+ *    * Returns the resulting records to the client using the expression `@data.read/*/*`.
+ */
 .arguments
 
    // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
