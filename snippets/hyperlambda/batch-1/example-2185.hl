@@ -1,9 +1,43 @@
-/*
- * This Hyperlambda HTTP API file accepts a file path and a target word as arguments.
- * It reads the content of the file, splits the content into words,
- * counts how many times the specified word appears, and returns the count.
- */
 
+/*
+ * This Hyperlambda HTTP API endpoint counts how many times a specified word appears in a given text file.
+ * It accepts two arguments from the caller, processes the file's content, and returns a numeric word count.
+ *
+ * 1. [.arguments]
+ *    * Takes the following mandatory arguments:
+ *      - [file-path]: The full path to the text file to analyze.
+ *      - [word]: The specific word to count occurrences of within the file.
+ *
+ * 2. [io.file.load:x:@.arguments/*/file-path]
+ *    * Loads the content of the file at the specified path.
+ *    * `@.arguments` – Named iterator that walks up to find the [.arguments] node.
+ *    * `*` – Selects all children.
+ *    * [file-path] – Selects the node that contains the actual path to the file.
+ *
+ * 3. [strings.split:x:@io.file.load]
+ *    * Splits the file content into individual words based on space characters (' ').
+ *    * Returns a list of word fragments suitable for iteration.
+ *
+ * 4. [.counter:int:0]
+ *    * Initializes a counter to zero. This will be used to track how many times the word appears.
+ *
+ * 5. [for-each:x:@strings.split/*]
+ *    * Iterates through all individual words from the file.
+ *    * [@strings.split] – Selects the word array created from the file content.
+ *    * `*` – Targets each word node.
+ *
+ * 6. [if eq:x:@.dp/# .:x:@.arguments/*/word]
+ *    * Compares the current word to the target word provided by the caller.
+ *    * `@.dp/#` – Gets the value of the currently iterated node.
+ *    * `.:x:@.arguments/*/word` – Evaluates to the target word passed as an argument.
+ *    * If they match, the following [.lambda] is executed.
+ *
+ * 7. [math.increment:x:@.counter]
+ *    * Increments the counter by 1 for each match.
+ *
+ * 8. [yield]
+ *    * Returns the final count to the caller under the node [word-count].
+ */
 .arguments
    file-path:string
    word:string

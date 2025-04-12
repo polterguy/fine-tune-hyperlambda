@@ -1,9 +1,35 @@
 
 /*
- * How to create an endpoint that creates one record in my Carriers table in my logistics database?
- * Have the endpoint take Name, Phone, and Email, and allow admin, enterprise, and root users to invoke it.
+ * This Hyperlambda endpoint inserts a new record into the [Carriers] table in the [logistics] SQLite database.
+ * It accepts [Name], [Phone], and [Email] as inputs, and allows users with roles [admin], [enterprise], or [root] to invoke it.
+ * After successful creation, it signals the update to clients and returns the ID of the newly inserted carrier.
  *
- * Return the ID of the newly created item
+ * 1. [.arguments]
+ *    * Accepts:
+ *      - [Name]: Name of the carrier.
+ *      - [Phone]: Phone number of the carrier.
+ *      - [Email]: Email address of the carrier.
+ *
+ * 2. [auth.ticket.verify:admin,enterprise,root]
+ *    * Restricts access to users with one of the allowed roles.
+ *
+ * 3. [data.connect:[generic|logistics]]
+ *    * Connects to the [logistics] database, specifying [sqlite] as the database type.
+ *
+ * 4. [add:x:./*/data.create/*/values]
+ *    * Dynamically injects all argument values into the [data.create] operation.
+ *
+ * 5. [data.create]
+ *    * Executes an INSERT statement into the [Carriers] table.
+ *
+ * 6. [response.status.set:201]
+ *    * Sets the HTTP response code to 201 (Created).
+ *
+ * 7. [sockets.signal:logistics.Carriers.post]
+ *    * Emits a WebSocket event to notify [enterprise] and [guest] roles about the new carrier record.
+ *
+ * 8. [yield]
+ *    * Returns the ID of the newly created carrier record to the caller.
  */
 .arguments
    Name:string

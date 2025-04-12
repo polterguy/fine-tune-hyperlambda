@@ -1,12 +1,50 @@
 
 /*
- * How do I create an endpoint that allows me to calculate min, max, sum, and avg from my Artist
- * table in my chinook database? My database type is SQLite, and I want to allow everyone to execute it,
- * without requiring a JWT token.
+ * This Hyperlambda endpoint performs aggregation functions such as [min], [max], [sum], and [avg]
+ * on the [Artist] table in the [chinook] SQLite database. It is open to all users and does not require authorization.
  *
- * I want to be able to optionally filter on ArtistId and Name, and I want you to return the result as [rows].
+ * 1. [.arguments]
+ *    * Accepts the following arguments:
+ *      - [aggregate_function]: Required. Must be one of [min], [max], [sum], or [avg].
+ *      - [aggregate_column]: Required. Must be either [Artist.ArtistId] or [Artist.Name].
+ *      - [Artist.ArtistId.eq]: Optional filter by ArtistId.
+ *      - [Artist.Name.like]: Optional SQL LIKE filter on Name.
+ *      - [Artist.Name.eq]: Optional filter by exact Name.
  *
- * Return ONLY Hyperlambda code, WITHOUT comments!
+ * 2. [validators.mandatory]
+ *    * Ensures that [aggregate_function] and [aggregate_column] are provided before proceeding.
+ *
+ * 3. [validators.enum]
+ *    * Validates that [aggregate_function] is one of the supported operations.
+ *    * Ensures [aggregate_column] is a valid column in the [Artist] table.
+ *
+ * 4. [data.connect:[generic|chinook]]
+ *    * Establishes a connection to the [chinook] SQLite database using the [generic] provider.
+ *
+ * 5. [set-name:x:./*/data.read/*/columns/*/aggregate_functor]
+ *    * Dynamically sets the function name used for aggregation using [strings.concat].
+ *    * Constructs an expression such as [sum(Artist.ArtistId)] or [avg(Artist.Name)].
+ *
+ * 6. [remove-nodes:x:@.arguments/*/[0,2]]
+ *    * Removes the first and third arguments ([aggregate_function] and [aggregate_column])
+ *      so that only filtering arguments are passed to the [where] clause.
+ *
+ * 7. [add:x:+/*/where/*]
+ *    * Adds remaining filter arguments as children of the [and] node dynamically.
+ *
+ * 8. [data.read]
+ *    * Executes the SQL query:
+ *      - Reads from the [Artist] table.
+ *      - Selects the aggregated result using the function specified.
+ *      - Applies filters using [and] conditions.
+ *      - Limits result to a single row.
+ *
+ * 9. [yield]
+ *    * Returns the result as a node named [rows], pointing to the aggregated value from [data.read].
+ *
+ * Result:
+ * Allows clients to calculate statistical values (min, max, sum, avg) from the Artist table
+ * with optional filters, without requiring authentication.
  */
 .arguments
    aggregate_function:string

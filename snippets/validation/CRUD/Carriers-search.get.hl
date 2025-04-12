@@ -1,8 +1,53 @@
 
 /*
- * How do I create an endpoint that does distinct keyword search from Carriers table in logistics database.
- * 
- * I want you to return ONLY code, and no comment. I need to be able to page the result.
+ * This Hyperlambda endpoint performs a keyword-based distinct search over the [Carriers] table in the [logistics] SQLite database.
+ * The search is case-insensitive and calculates both keyword density and count to rank results.
+ * It supports paging via [limit] and [offset], and does not require authentication.
+ *
+ * 1. [.arguments]
+ *    * Accepts:
+ *      - [query]: Required. A string containing space-separated keywords.
+ *      - [limit]: Optional. Number of results to return. Defaults to 10 if not specified.
+ *      - [offset]: Optional. Offset for paginated results.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that [query] is provided.
+ *
+ * 3. [validators.default]
+ *    * Sets a default value of 10 for [limit] if not explicitly provided.
+ *
+ * 4. [.words]
+ *    * Splits the query into individual lowercase words for processing.
+ *
+ * 5. [.columns]
+ *    * Specifies the columns to be included in the keyword matching process: [Name], [Phone], and [Email].
+ *
+ * 6. [data.connect:[generic|logistics]]
+ *    * Connects to the [logistics] SQLite database.
+ *
+ * 7. Keyword density and count logic:
+ *    * Dynamically constructs a SQL query using [coalesce], [lower], [replace], and [length] functions.
+ *    * Calculates:
+ *      - [keyword_density]: Normalized occurrence density.
+ *      - [keyword_count]: Total keyword match occurrences.
+ *    * Adds [@pN] SQL parameters for safe binding.
+ *
+ * 8. SQL composition via [strings.concat]
+ *    * Builds a dynamic SQL [SELECT] query from the [Carriers] table with:
+ *      - WHERE clause: [keyword_count > 0]
+ *      - ORDER BY: [keyword_count DESC, keyword_density DESC]
+ *      - LIMIT/OFFSET based on pagination
+ *
+ * 9. [data.select]
+ *    * Executes the composed SQL string with the provided parameters.
+ *    * Returns only relevant data by removing helper columns [keyword_density] and [keyword_count].
+ *
+ * 10. [return-nodes]
+ *     * Returns the final filtered and ranked result set to the caller.
+ *
+ * Result:
+ * Publicly accessible endpoint that enables advanced full-text-like keyword search against the [Carriers] table,
+ * with ranked and paginated output.
  */
 .arguments
    query:string

@@ -1,12 +1,42 @@
 
 /*
- * How do I read rows from my Artist table in my chinook database from an endpoint?
+ * This Hyperlambda endpoint reads data from the [Artist] table in the [chinook] SQLite database.
+ * It supports filtering, sorting, and paging, and returns the result as an array.
  *
- * I want to support paging and sorting, in addition to optionally being able to filter on
- * ArtistId or Name, which are the only column my table contains.
+ * 1. [.arguments]
+ *    * Accepts the following arguments:
+ *      - [limit]: Limits the number of rows returned.
+ *      - [offset]: Skips a specified number of rows before returning results.
+ *      - [order]: Specifies the column name to sort by.
+ *      - [direction]: Sorting direction, either "asc" or "desc".
+ *      - [Artist.ArtistId.eq]: Optional filter to match specific artist ID.
+ *      - [Artist.Name.like]: Optional filter for partial name matches.
+ *      - [Artist.Name.eq]: Optional filter to match exact artist name.
  *
- * I want you to return ONLY the Hyperlambda code, without comments, and I want you to return the result
- * as a simple array.
+ * 2. [data.connect:[generic|chinook]]
+ *    * Opens a connection to the [chinook] database using the [generic] provider and sets [sqlite] as the database type.
+ *
+ * 3. [add:x:./*/data.read]
+ *    * Injects sorting and paging arguments into the [data.read] invocation.
+ *    * Sorting: [order] and [direction]
+ *    * Paging: [limit] and [offset]
+ *
+ * 4. [remove-nodes]
+ *    * Removes sorting and paging arguments from [.arguments] to avoid polluting the [where] clause.
+ *
+ * 5. [add:x:./*/data.read/*/where/*]
+ *    * Dynamically inserts any remaining filters (e.g. [Artist.ArtistId.eq], [Artist.Name.eq/like]) under the [where -> and] clause.
+ *
+ * 6. [data.read]
+ *    * Executes the actual SQL SELECT on the [Artist] table.
+ *    * Retrieves the [ArtistId] and [Name] columns.
+ *    * Applies filtering, paging, and sorting as specified.
+ *
+ * 7. [return-nodes]
+ *    * Returns all resulting rows as a flat array.
+ *
+ * Result:
+ * A public, paged, and sortable data reader endpoint for the [Artist] table with filtering support on [ArtistId] and [Name].
  */
 .arguments
    limit:long

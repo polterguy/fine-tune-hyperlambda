@@ -1,5 +1,41 @@
 
-// Hyperlambda endpoint for a CRUD create endpoint that creates an item in the users_extra table in the magic database according to specified arguments, ensuring authentication and authorization for root roles and that [type] argument validates '^[a-zA-Z0-9-_]+$' regex.
+/*
+ * This Hyperlambda endpoint creates a new record in the [users_extra] table within the [magic] database.
+ * Only users with the [root] role are allowed to invoke it. The [type] argument must match a strict regex pattern.
+ *
+ * 1. [.arguments]
+ *    * Accepts the following input parameters:
+ *      - [type]: A key or label for the extra user data. Must match the regex `^[a-zA-Z0-9-_]+$`.
+ *      - [value]: The actual data value associated with the type.
+ *      - [user]: The username this extra data applies to.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures the user invoking the endpoint has [root] authorization.
+ *
+ * 3. [validators.regex:x:@.arguments/*/type]
+ *    * Validates that the [type] argument:
+ *      - Only contains alphanumeric characters, dashes, and underscores.
+ *      - Prevents invalid characters or injection attempts.
+ *
+ * 4. [data.connect:[generic|magic]]
+ *    * Opens a connection to the [magic] SQLite database.
+ *
+ * 5. [add:x:./*/data.create/*/values]
+ *    * Dynamically injects all argument values into the [data.create] call.
+ *
+ * 6. [data.create]
+ *    * Creates a new row in the [users_extra] table with the provided values.
+ *
+ * 7. [response.status.set:201]
+ *    * Sets the HTTP status code to 201 (Created) to indicate successful creation.
+ *
+ * 8. [return]
+ *    * Returns a [result:success] node to indicate completion.
+ *
+ * Result:
+ * A new [users_extra] record is stored in the database for the specified user, with server-side validation
+ * ensuring only well-formed types and authorized requests are allowed.
+ */
 .arguments
    type:string
    value:string

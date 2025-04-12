@@ -1,5 +1,49 @@
 
-// Write a Hyperlambda endpoint to export the specified database table's content as CSV and returns to client.
+/*
+ * This Hyperlambda endpoint exports the contents of a specified table from a given database as a CSV file.
+ * It connects to the specified database using dynamic connection parameters and streams the result to the client
+ * as a downloadable file.
+ *
+ * 1. [.arguments]
+ *    * Requires the following input arguments:
+ *      - [databaseType]: The type of database (e.g., sqlite, mssql, mysql).
+ *      - [connectionString]: The full connection string to the database.
+ *      - [databaseName]: The specific database/schema to access.
+ *      - [tableName]: The name of the table to export.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures all four required arguments are provided before proceeding.
+ *
+ * 3. [strings.concat]
+ *    * Constructs the full connection identifier for [data.connect] using the format:
+ *      `[connectionString|databaseName]`.
+ *
+ * 4. [data.connect]
+ *    * Opens a connection to the specified database using the constructed connection string.
+ *    * The [type] is determined from the [databaseType] argument.
+ *
+ * 5. [data.read]
+ *    * Reads the entire contents of the specified [tableName] with no row limit.
+ *
+ * 6. [lambda2csv]
+ *    * Converts the result from [data.read] into a properly formatted CSV string.
+ *
+ * 7. [strings.concat]
+ *    * Builds a [Content-Disposition] HTTP header for the file download using the table name.
+ *    * Example: `attachment; filename="users.csv"`
+ *
+ * 8. [response.headers.set]
+ *    * Sets HTTP response headers to:
+ *      - Indicate the file type as CSV.
+ *      - Trigger a file download with a meaningful name.
+ *      - Expose the header for use in browser environments via CORS.
+ *
+ * 9. [return:x:@lambda2csv]
+ *    * Sends the generated CSV string as the HTTP response body.
+ *
+ * Result:
+ * Allows clients to export an entire table from a dynamically selected database as a downloadable CSV file.
+ */
 .arguments
    databaseType:string
    connectionString:string

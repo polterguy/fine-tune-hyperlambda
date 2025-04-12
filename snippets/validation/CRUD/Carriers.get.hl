@@ -1,10 +1,41 @@
 
 /*
- * How do I create an endpoint that selects records from the Carriers table in my logistics database?
- * I want only root users to be able to exeute the endpoint, and I'll need paging and sorting.
- * IMPORTANT! Return ONLY the code, and no comments!
+ * This Hyperlambda endpoint selects records from the 'Carriers' table in the 'logistics' SQLite database.
+ * Only 'root' users are allowed to invoke it. The endpoint supports paging, sorting, and filtering on the [Name] column,
+ * and applies a 50-second public HTTP cache to the response.
  *
- * I only need filtering on Name, and please add HTTP cache for 50 seconds.
+ * 1. [.arguments]
+ *    * Supports:
+ *      - [limit]: Number of records to return.
+ *      - [offset]: Number of records to skip.
+ *      - [order]: Column to sort by.
+ *      - [direction]: Sorting direction (asc or desc).
+ *      - [Carriers.Name.like]: SQL LIKE filter for names.
+ *      - [Carriers.Name.mt]: SQL "more than" filter for names.
+ *
+ * 2. [response.headers.set]
+ *    * Sets HTTP headers to enable 50-second public caching.
+ *
+ * 3. [auth.ticket.verify:root]
+ *    * Restricts access to users with the [root] role.
+ *
+ * 4. [data.connect:[generic|logistics]]
+ *    * Connects to the [logistics] database using [sqlite].
+ *
+ * 5. [add:x:./*/data.read]
+ *    * Injects paging and sorting parameters into the [data.read] operation.
+ *
+ * 6. [remove-nodes]
+ *    * Cleans up paging and sorting nodes to prevent accidental use in filtering.
+ *
+ * 7. [add:x:./*/data.read/*/where/*]
+ *    * Adds remaining filtering arguments into the WHERE clause dynamically.
+ *
+ * 8. [data.read]
+ *    * Executes a SELECT query on the [Carriers] table, returning ID, Name, Phone, and Email columns.
+ *
+ * 9. [return-nodes]
+ *    * Returns the result set to the client.
  */
 .arguments
    limit:long

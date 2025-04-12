@@ -1,5 +1,46 @@
-// Endpoint that attempts to register a user by invokinh HTTP POST API endpoint, throws on 500, fallback message on other errors, and return success to caller if the invocation was a success
 
+/*
+ * This Hyperlambda endpoint attempts to register a new user by invoking an external HTTP POST API.
+ * It handles both successful and failed responses with conditional logic and structured error handling.
+ *
+ * 1. [.arguments]
+ *    * Declares the start of the HTTP endpoint and allows for future extensibility.
+ *    * No user-supplied arguments are currently required.
+ *
+ * 2. [.register.status]
+ *    * A temporary node used to store the outcome of the registration process.
+ *
+ * 3. [http.post:"https://api.example.com/users/register"]
+ *    * Sends an HTTP POST request to the external API for user registration.
+ *    * [convert:true] transforms the response body into a lambda object for easier manipulation.
+ *    * The [payload] includes hardcoded fields:
+ *      - [username]: "alice"
+ *      - [email]: "alice@example.com"
+ *      - [password]: "Secure123!"
+ *
+ * 4. [if and]
+ *    * Checks whether the response is a successful 2xx code using:
+ *      - [mte] (>= 200)
+ *      - [lt] (< 300)
+ *    * If successful, sets [.register.status] to "Registration successful".
+ *
+ * 5. [else-if eq:x:@http.post .:int:500]
+ *    * If the response code is exactly 500 (Internal Server Error), throws a detailed error.
+ *    * Halts further execution and provides public visibility into the failure.
+ *
+ * 6. [else]
+ *    * Handles all other HTTP response codes not covered above.
+ *    * Sets [.register.status] to "Registration failed" as a fallback message.
+ *
+ * 7. [yield]
+ *    * Returns the value of [.register.status] to the client as the final result.
+ *
+ * Result:
+ * Attempts to register a user and returns one of three possible outcomes:
+ * - Success message (2xx)
+ * - Detailed exception on server error (500)
+ * - Fallback failure message for all other cases.
+ */
 .arguments
 
 // Status to return

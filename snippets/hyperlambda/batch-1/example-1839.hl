@@ -1,5 +1,46 @@
 
-// Hyperlambda endpoint to unzip a specified file in its current folder, with an option to create a new folder.
+/*
+ * This Hyperlambda endpoint unzips a specified file, optionally into a new folder
+ * with the same name as the zip file (excluding the extension).
+ * Only users with the [root] role are allowed to invoke it.
+ *
+ * 1. [.arguments]
+ *    * Accepts two arguments:
+ *      - [file]: The full path to the zip file to extract.
+ *      - [create_folder]: A boolean indicating whether a new folder should be created for extraction.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures that only users with the [root] role can access the endpoint.
+ *
+ * 3. [if:x:@.arguments/*/create_folder]
+ *    * Checks whether the caller wants to create a new folder for the unzipped content.
+ *
+ * 4. [strings.length], [strings.substring], [math.subtract]
+ *    * Extracts the base name of the zip file, removing the ".zip" extension.
+ *
+ * 5. [strings.concat]
+ *    * Constructs the folder path by appending a forward slash to the zip file's base name.
+ *
+ * 6. [add:x:../*/io.file.unzip]
+ *    * Dynamically injects the [folder] argument into the [io.file.unzip] call so that the contents are extracted into the correct folder.
+ *
+ * 7. [if not io.folder.exists]
+ *    * If the folder does not exist:
+ *      - [io.folder.create]: Creates the target folder.
+ *    * Otherwise:
+ *      - [io.folder.delete]: Deletes the existing folder.
+ *      - [io.folder.create]: Re-creates the folder to ensure it's empty.
+ *
+ * 8. [io.file.unzip:x:@.arguments/*/file]
+ *    * Unzips the file directly if [create_folder] is false.
+ *    * If [create_folder] is true, this serves as a fallback unzipping call without the [folder] argument, in case injection failed or was skipped.
+ *
+ * 9. [return-nodes]
+ *    * Returns a success node to indicate the operation completed.
+ *
+ * Result:
+ * Unzips the specified file into its current folder, or a newly created one, depending on the [create_folder] flag.
+ */
 .arguments
    file:string
    create_folder:bool

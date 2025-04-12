@@ -1,5 +1,38 @@
 
-// Endpoint to remove the specified [roles] from the specified [username], where [roles] is supplied as a list of strings.
+/*
+ * This Hyperlambda endpoint removes one or more roles from a specified user in the [magic] database.
+ * The endpoint ensures that both the user and the roles to remove exist before attempting deletion.
+ *
+ * 1. [.arguments]
+ *    * Accepts two mandatory arguments:
+ *      - [username]: The name of the user whose roles should be removed.
+ *      - [roles:*]: A list of roles (as strings) to be removed from the user.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures both [username] and [roles] are provided before execution.
+ *
+ * 3. [data.connect:[generic|magic]]
+ *    * Opens a connection to the [magic] SQLite database where user-role mappings are stored.
+ *
+ * 4. [data.read]
+ *    * Verifies that a user with the specified [username] exists in the [users] table.
+ *    * If no matching user is found, an exception is thrown.
+ *
+ * 5. [if not-exists:x:@data.read/*]
+ *    * Checks whether the previous [data.read] call returned any user.
+ *    * If not, triggers a [throw] with a message indicating the user does not exist.
+ *
+ * 6. [for-each:x:@.arguments/*/roles/*]
+ *    * Iterates through each role provided in the [roles] list.
+ *    * For each role:
+ *      - Executes a [data.delete] call to remove the corresponding record from the [users_roles] table.
+ *      - Filters the deletion using [user.eq] and [role.eq] conditions to ensure precise removal.
+ *      - `@.dp/#` accesses the value of the currently iterated role string.
+ *
+ * Result:
+ * Ensures clean, safe, and authenticated role removal from users in the system,
+ * while preventing accidental deletion for non-existent users.
+ */
 .arguments
    username:string
    roles:*

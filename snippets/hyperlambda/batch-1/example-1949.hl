@@ -1,5 +1,66 @@
 
-// Endpoint that returns a grouped chart image to caller. Values is a mandatory comma separated list of values.
+/*
+ * This Hyperlambda endpoint generates and returns a grouped bar chart as a PNG image,
+ * based on values passed as comma-separated strings. The legend must be explicitly provided.
+ *
+ * 1. [.arguments:*]
+ *    * Accepts any number of arguments.
+ *    * Expected keys:
+ *      - One key named [legend] (comma-separated values).
+ *      - Other keys representing bar groups (e.g., [Spring], [Summer]) with comma-separated values.
+ *
+ * 2. [validators.mandatory:x:@.arguments/*/legend]
+ *    * Validates that a [legend] argument was supplied.
+ *
+ * 3. [.bars]
+ *    * Placeholder node for building the bar chart data structure.
+ *
+ * 4. [for-each:x:@.arguments/*]
+ *    * Iterates over each argument.
+ *    * `@.arguments` – Named iterator walking upward to the [.arguments] node.
+ *    * `*` – Wildcard selects all child argument nodes.
+ *
+ * 5. [get-name:x:@.dp/#]
+ *    * Retrieves the name of the current argument key (e.g., Spring, legend).
+ *
+ * 6. [if not strings.starts-with:x:@get-name .:legend]
+ *    * Skips processing of the [legend] argument — it’s handled separately.
+ *
+ * 7. [set-name:x:+/*/*]
+ *    * Dynamically creates a new node using the group name (e.g., Spring) as its name.
+ *    * `+` – Next sibling iterator ensures correct positioning in the result tree.
+ *
+ * 8. [add:x:@.bars]
+ *    * Adds a new group node to [.bars].
+ *
+ * 9. [add:x:@.bars/0/-]
+ *    * Appends individual numeric values to the newly created group node.
+ *    * `0` – Refers to the first group just added.
+ *    * `-` – Previous sibling iterator targets the actual group node by name.
+ *
+ * 10. [strings.split:x:@.dp/#]
+ *     * Splits the comma-separated value string into multiple cells (e.g., 2,5,8).
+ *
+ * 11. [add:x:../*/image.chart/*/legend]
+ *     * Converts the [legend] string into an array and inserts it into the [image.chart] call.
+ *
+ * 12. [add:x:../*/image.chart/*/bars]
+ *     * Adds all constructed bar groups to the [image.chart] input.
+ *
+ * 13. [image.chart:grouped]
+ *     * Generates a grouped bar chart from the provided bars and legend.
+ *     * Width and height are hardcoded to 800x500 pixels.
+ *
+ * 14. [response.headers.set]
+ *     * Sets the HTTP response header to indicate a PNG image.
+ *
+ * 15. [return:x:@image.chart]
+ *     * Returns the generated chart image to the caller.
+ *
+ * Result:
+ * Returns a PNG chart where each group represents a named dataset (e.g., seasons)
+ * and the legend defines each bar in the group.
+ */
 .arguments:*
 
 // Sanity checking invocation.

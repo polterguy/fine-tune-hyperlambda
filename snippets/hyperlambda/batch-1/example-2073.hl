@@ -1,5 +1,48 @@
 
-// Write a Hyperlambda endpoint HTTP API to upload a specified backup file and restore an SQLite database.
+/*
+ * This Hyperlambda endpoint accepts a multipart file upload and restores an SQLite database from the provided backup file.
+ * The uploaded file is saved to the server’s [data] folder, and all existing SQLite connections are flushed to ensure consistency.
+ * Access is restricted to users with [root] privileges.
+ *
+ * 1. [.arguments]
+ *    * Accepts a single [file:*] argument that represents the uploaded database file.
+ *    * The wildcard allows access to child metadata nodes like [name] and [stream].
+ *
+ * 2. [.accept:multipart/form-data]
+ *    * Declares the endpoint’s capability to handle multipart/form-data MIME content,
+ *      enabling file upload via standard HTTP forms or API clients.
+ *
+ * 3. [auth.ticket.verify:root]
+ *    * Ensures that only users with the [root] role can invoke this endpoint.
+ *
+ * 4. [validators.mandatory]
+ *    * Confirms the following:
+ *      - A [file] node is provided.
+ *      - The [name] of the file is present.
+ *      - The [stream] (binary content) is provided.
+ *
+ * 5. [validators.regex]
+ *    * Validates that the uploaded file’s name ends with `.db` using the regex `\\.db$`.
+ *    * Ensures that only SQLite database files are accepted.
+ *
+ * 6. [.full-path + strings.concat]
+ *    * Dynamically constructs the full path on the server for saving the file.
+ *    * Appends the filename to the fixed path [/data/].
+ *
+ * 7. [io.stream.save-file]
+ *    * Saves the uploaded stream to the constructed path.
+ *    * Effectively overwrites any existing database with the same filename.
+ *
+ * 8. [sqlite.connections.flush]
+ *    * Flushes the SQLite connection pool to ensure that the restored database file is used
+ *      by all future database operations.
+ *
+ * 9. [return]
+ *    * Returns a [result:success] node indicating that the upload and restoration completed successfully.
+ *
+ * Result:
+ * Uploads and restores an SQLite database file securely, replacing the old version and ensuring clean connection state.
+ */
 .arguments
    file:*
 

@@ -1,5 +1,43 @@
 
-// Write a Hyperlambda API endpoint to delete a specified folder on the server, including uninstalling a module if necessary.
+/*
+ * This Hyperlambda API endpoint deletes a specified folder from the server’s file system.
+ * If the folder resides under the [modules] directory and contains an [uninstall.hl] script,
+ * that script is executed before deletion to safely uninstall the module.
+ * The endpoint is restricted to [root] users.
+ *
+ * 1. [.arguments]
+ *    * Accepts one required argument:
+ *      - [folder]: The absolute or relative path to the folder to delete.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures only users with [root] privileges can execute this operation.
+ *
+ * 3. [strings.split:x:@.arguments/*/folder]
+ *    * Splits the folder path by "/" into segments (e.g., "modules/my-module" → ["modules", "my-module"]).
+ *
+ * 4. [if and]
+ *    * Conditional logic to determine if the folder is a module:
+ *      - [get-count:x:@strings.split/*] equals 2, implying the path is like "modules/xyz".
+ *      - [get-value:x:@strings.split/0] is exactly "modules", meaning it's under the modules directory.
+ *
+ * 5. [strings.concat]
+ *    * Constructs the full path to a potential [uninstall.hl] script within the folder.
+ *
+ * 6. [if io.file.exists]
+ *    * Checks whether the [uninstall.hl] file exists inside the target folder.
+ *    * If it does, the script is executed to gracefully uninstall the module.
+ *    * A [log.info] message is written to provide traceability.
+ *
+ * 7. [io.folder.delete:x:@.arguments/*/folder]
+ *    * Deletes the folder from the file system, regardless of whether it's a module.
+ *
+ * 8. [return]
+ *    * Returns a [result:success] node indicating that the deletion was completed.
+ *
+ * Result:
+ * Deletes a given folder and conditionally uninstalls a module if the folder is in [modules/] and contains [uninstall.hl].
+ * Ensures clean teardown of resources with auditability and permission control.
+ */
 .arguments
    folder:string
 

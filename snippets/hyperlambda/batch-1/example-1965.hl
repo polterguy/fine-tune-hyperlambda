@@ -1,5 +1,36 @@
 
-// Create a Hyperlambda endpoint to schedule a task with a specified ID for execution according to specified parameters.
+/*
+ * This Hyperlambda endpoint schedules a task with a specified [id] using either a [due] or [repeats] argument.
+ * The logic dynamically determines which scheduling method to use and invokes [tasks.schedule] accordingly.
+ * Only [root] users are authorized to execute this endpoint.
+ *
+ * 1. [.arguments]
+ *    * Accepts three arguments:
+ *      - [id]: The unique identifier of the task to schedule.
+ *      - [due]: A specific date and time when the task should execute.
+ *      - [repeats]: A string interval (e.g., "5.minutes", "1.day") for recurring execution.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures that only users with the [root] role can access this endpoint.
+ *
+ * 3. [if not eq get-value:x:@.arguments/*/repeats .]
+ *    * Checks whether the [repeats] argument is not empty.
+ *    * If a [repeats] value is provided:
+ *      - Uses [add:x:../*/tasks.schedule] to inject the [repeats] node into the upcoming [tasks.schedule] call.
+ *    * Else:
+ *      - Injects the [due] argument instead.
+ *    * This approach ensures only the relevant scheduling parameter is included.
+ *
+ * 4. [tasks.schedule:x:@.arguments/*/id]
+ *    * Schedules the task with the given [id].
+ *    * Uses the previously injected [repeats] or [due] node as part of the call.
+ *
+ * 5. [return-nodes]
+ *    * Returns a success result to the caller indicating the task has been scheduled.
+ *
+ * Result:
+ * Dynamically schedules a task using either a fixed due date or recurring interval, based on caller input.
+ */
 .arguments
    id:string
    due:date

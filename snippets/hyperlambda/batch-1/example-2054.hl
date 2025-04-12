@@ -1,5 +1,36 @@
 
-// Hyperlambda endpoint that generates a long-lasting JWT token with the specified username and role, expiring on the specified date, ensuring the user is authorized.
+/*
+ * This Hyperlambda endpoint generates a long-lived JWT token using a specified username, role, and expiration date.
+ * Only users with the [root] role are authorized to invoke the endpoint, making it suitable for administrative token issuance.
+ *
+ * 1. [.arguments]
+ *    * Accepts three mandatory arguments:
+ *      - [username]: The identifier for the JWT token. It does not need to be a registered user.
+ *      - [role]: The role(s) assigned to the token (e.g., "admin", "guest").
+ *      - [expires]: A future expiration date/time for the token’s validity.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures the caller has [root] privileges to prevent unauthorized token creation.
+ *
+ * 3. [validators.mandatory]
+ *    * Enforces presence of all required arguments to prevent incomplete or invalid token configurations.
+ *
+ * 4. [auth.ticket.create]
+ *    * Creates a JWT token using the provided arguments:
+ *      - [username] becomes the token's subject.
+ *      - [expires] sets the token's expiration.
+ *      - [roles] assigns access privileges embedded in the token.
+ *
+ * 5. [unwrap:x:+/*]
+ *    * Ensures values in [auth.ticket.create] are fully evaluated before being returned.
+ *
+ * 6. [return]
+ *    * Returns the generated token to the client under the node [ticket].
+ *
+ * Result:
+ * A fully signed, long-lived JWT token is returned, configured with the specified role and expiration.
+ * Useful for service-to-service authentication, machine clients, or temporary admin access.
+ */
 .arguments
 
    // Mandatory username for token we should generate. Does not need to be an existing user from the database.

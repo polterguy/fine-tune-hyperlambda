@@ -1,5 +1,50 @@
 
-// Hyperlambda endpoint to download a folder from the server by packaging it into a zip file.
+/*
+ * This Hyperlambda endpoint packages a given folder into a ZIP archive and streams it back to the client as a downloadable file.
+ * It requires root-level authorization and prepares appropriate headers for browser-based file download.
+ *
+ * 1. [.arguments]
+ *    * Accepts one required argument:
+ *      - [folder]: The path to the folder on the server that should be zipped and downloaded.
+ *
+ * 2. [auth.ticket.verify:root]
+ *    * Ensures that only users with the [root] role can invoke the endpoint.
+ *
+ * 3. [strings.split]
+ *    * Splits the [folder] path by `/` to extract the last segment (used for naming the zip file).
+ *
+ * 4. [strings.concat]
+ *    * Constructs a [Content-Disposition] header value like:
+ *      - `attachment; filename="foldername.zip"`
+ *
+ * 5. [response.headers.set]
+ *    * Sets the following HTTP headers to facilitate file download:
+ *      - [Content-Type]: Informs the browser the response is a ZIP file.
+ *      - [Content-Disposition]: Triggers file download with a custom filename.
+ *      - [Access-Control-Expose-Headers]: Exposes [Content-Disposition] to client-side JavaScript.
+ *
+ * 6. [signal:magic.io.file.load-recursively]
+ *    * Triggers a signal that returns all files inside the specified folder recursively.
+ *    * The result includes full file paths and content streams.
+ *
+ * 7. [for-each:x:@signal/*]
+ *    * Iterates through all loaded files.
+ *    * Each file’s full path is updated using [strings.replace] to strip the leading folder path.
+ *    * This ensures that file paths inside the resulting zip archive are relative rather than absolute.
+ *
+ * 8. [add:x:+ get-nodes:x:@signal/*]
+ *    * Appends the transformed file nodes as input to the next step.
+ *
+ * 9. [io.content.zip-stream]
+ *    * Compresses the file structure into an in-memory ZIP stream.
+ *
+ * 10. [return-value:x:-]
+ *     * Returns the raw ZIP stream to the caller as the HTTP response body.
+ *
+ * Result:
+ * The specified folder is compressed into a zip archive and returned to the client as a downloadable file.
+ * All internal paths in the archive are made relative for proper folder structure within the zip.
+ */
 .arguments
    folder:string
 

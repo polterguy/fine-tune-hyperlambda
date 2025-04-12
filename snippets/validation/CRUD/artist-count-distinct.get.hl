@@ -1,11 +1,45 @@
 
 /*
- * How do I create an HTTP web API endpoint that returns distinct items from Artist on either ArtistId or Name?
- * 
- * I need the enpoint to take optional filter arguments, and my database is SQLite and named chinook.
- * I do NOT want authorization or authentication, since I want all users to be able to execute the endpoint.
- * I want you to return ONLY Hyperlambda code without comments or explanation!
- * Have the endpoint return a list of all artists.
+ * This Hyperlambda endpoint returns a list of distinct values from the [Artist] table in the [chinook] SQLite database,
+ * based on the specified [distinct_column] provided as input. It also accepts optional filter arguments.
+ * The endpoint is public and requires no authentication or authorization.
+ *
+ * 1. [.arguments]
+ *    * Accepts the following arguments:
+ *      - [distinct_column]: Mandatory. The column from which to return distinct values. Must be either [Artist.ArtistId] or [Artist.Name].
+ *      - [Artist.ArtistId.eq]: Optional filter to match a specific ArtistId.
+ *      - [Artist.Name.like]: Optional SQL LIKE filter for partial name matches.
+ *      - [Artist.Name.eq]: Optional filter to match an exact name.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that the [distinct_column] argument is provided.
+ *
+ * 3. [validators.enum]
+ *    * Restricts [distinct_column] to only two valid values: [Artist.ArtistId] or [Artist.Name].
+ *    * Prevents the execution of arbitrary or unsafe column references.
+ *
+ * 4. [data.connect:[generic|chinook]]
+ *    * Establishes a connection to the [chinook] database using the [generic] provider and sets the [sqlite] database type.
+ *
+ * 5. [remove-nodes:x:@.arguments/*/distinct_column]
+ *    * Removes [distinct_column] from the argument list so it doesn’t interfere with the [where] clause population.
+ *
+ * 6. [add:x:+/*/where/*]
+ *    * Dynamically injects all remaining arguments into the [where] clause of [data.read].
+ *    * Ensures optional filters are applied to the SQL query conditionally.
+ *
+ * 7. [data.read]
+ *    * Executes the SELECT operation on the [Artist] table.
+ *    * Selects only distinct values from the specified [distinct_column] using:
+ *      - [columns] with the target column name.
+ *      - [distinct:true] to enforce uniqueness.
+ *    * Applies filters via [where -> and] if present.
+ *
+ * 8. [return-nodes:x:@data.read/*/*]
+ *    * Returns the resulting rows to the caller, exposing the distinct values retrieved from the database.
+ *
+ * Result:
+ * A public, unauthenticated endpoint that allows users to fetch a unique list of ArtistIds or Names with optional filters.
  */
 .arguments
    distinct_column:string

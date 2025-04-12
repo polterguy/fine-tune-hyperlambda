@@ -1,5 +1,38 @@
 
-// HTTP API endpoint that deletes the user's account entirely on server. Accepts no arguments, retrieves the username from the user's JWT token.
+/*
+ * This Hyperlambda HTTP endpoint deletes the currently authenticated user's account.
+ * It ensures the user is authenticated and that no cloudlets remain before deletion.
+ * The username is automatically extracted from the user's JWT token; no input arguments are required.
+ *
+ * 1. [.arguments]
+ *    * Declares an empty arguments node since no input is required from the caller.
+ *
+ * 2. [auth.ticket.verify:guest]
+ *    * Ensures the caller is authenticated and belongs to the [guest] role or higher.
+ *
+ * 3. [auth.ticket.get]
+ *    * Retrieves the username of the currently authenticated user from the JWT token.
+ *
+ * 4. [data.connect:[generic|hub]] + [data.read]
+ *    * Opens a connection to the [hub] database and reads from the [cloudlets] table.
+ *    * Filters the records to find any cloudlets owned by the current user.
+ *
+ * 5. [if exists:x:@data.read/*/*]
+ *    * Checks if any cloudlets are found for the user.
+ *    * If so, throws an error indicating that all cloudlets must be deleted before account deletion.
+ *    * The exception is marked [public:true] and returns HTTP status code 400 (Bad Request).
+ *
+ * 6. [data.connect:[generic|magic]] + [data.delete]
+ *    * Opens a connection to the [magic] database and deletes the user record
+ *      where [username] matches the authenticated user.
+ *
+ * 7. [return]
+ *    * Returns a success response to the client confirming the account was deleted.
+ *
+ * Result:
+ * Ensures a user cannot delete their account if they still have cloudlets,
+ * and cleanly removes the user from the system when eligible.
+ */
 .arguments
 
 // Ensuring user is authenticated to invoke endpoint.

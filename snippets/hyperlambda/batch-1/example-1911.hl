@@ -1,5 +1,52 @@
 
-// Write a Hyperlambda endpoint to speak the specified content using OpenAI TTS.
+/*
+ * This Hyperlambda endpoint converts a given string into speech using OpenAI's TTS (Text-to-Speech) API,
+ * and streams the resulting audio file to a specified client session using WebSockets.
+ *
+ * 1. [.arguments]
+ *    * Defines two required arguments:
+ *      - [content]: The text string that should be spoken.
+ *      - [session]: The WebSocket session to which the generated audio should be sent.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that both [content] and [session] are provided before execution.
+ *
+ * 3. [insert-before:x:../*/fork/0]
+ *    * Injects the incoming arguments into the upcoming [fork] node, ensuring they’re available to the new thread.
+ *    * `../*/fork/0` targets the first child of the future [fork] node.
+ *
+ * 4. [fork]
+ *    * Executes the TTS request in a new thread to avoid blocking or timeouts.
+ *
+ * 5. [.token]
+ *    * Retrieves the OpenAI API key from configuration and builds the authorization token.
+ *    * Falls back to [config.get] if an [api_key] argument is not explicitly passed.
+ *
+ * 6. [http.post]
+ *    * Sends a request to OpenAI’s `/v1/audio/speech` endpoint.
+ *    * Includes necessary headers and payload:
+ *      - Model: [tts-1]
+ *      - Voice: [alloy]
+ *      - Format: [mp3]
+ *      - Speed: [1.0]
+ *    * [convert:bool:true] ensures the JSON response is transformed into a lambda object.
+ *
+ * 7. [convert:x:@http.post/*/content]
+ *    * Converts the MP3 audio from base64 encoding to a binary-safe string.
+ *    * This ensures the audio is properly decoded before broadcasting it to the WebSocket.
+ *
+ * 8. [sockets.signal:x:@.arguments/*/session]
+ *    * Sends the generated audio stream to the given session via WebSocket.
+ *    * Payload contains a single [audio] argument, which holds the binary MP3 data.
+ *
+ * 9. [yield]
+ *    * Signals to the original HTTP caller that the request has succeeded,
+ *      even though audio delivery occurs asynchronously.
+ *
+ * Result:
+ * The endpoint converts text to speech using OpenAI’s TTS API,
+ * and delivers the resulting audio in real time to the client via WebSocket.
+ */
 .arguments
    content:string
    session:string

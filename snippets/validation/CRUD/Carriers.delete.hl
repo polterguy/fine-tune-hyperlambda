@@ -1,10 +1,41 @@
 
 /*
- * Can you generate an endpoint that deletes one record from my Carriers table in my logistics database?
- * I want to be able to submit CarrierID which becomes the item deleted, and I want you to ONLY return code,
- * and no comments or explanation!
+ * This Hyperlambda endpoint deletes a single record from the [Carriers] table in the [logistics] SQLite database.
+ * Only users with [root] or [admin] roles can invoke this endpoint.
  *
- * Allow only root and admin users to execute the endpoint
+ * 1. [.arguments]
+ *    * Accepts one required argument:
+ *      - [CarrierID]: The primary key used to identify the carrier record to be deleted.
+ *
+ * 2. [auth.ticket.verify:root,admin]
+ *    * Restricts endpoint access to users with either the [root] or [admin] role.
+ *
+ * 3. [validators.mandatory]
+ *    * Ensures [CarrierID] is provided before proceeding with deletion.
+ *
+ * 4. [data.connect:[generic|logistics]]
+ *    * Connects to the [logistics] SQLite database.
+ *
+ * 5. [add:x:./*/data.delete/*/where/*/and]
+ *    * Injects the [CarrierID] argument into the WHERE clause of the deletion SQL.
+ *
+ * 6. [data.delete]
+ *    * Executes the deletion from the [Carriers] table where [CarrierID] matches.
+ *
+ * 7. [add:x:./*/sockets.signal/*/args]
+ *    * Passes deletion details into a socket message.
+ *
+ * 8. [sockets.signal:logistics.Carriers.delete]
+ *    * Notifies relevant roles ([enterprise] and [guest]) of the deletion using socket signals.
+ *
+ * 9. [unwrap:x:+/*]
+ *    * Unwraps the evaluation stack so only [return] result is surfaced.
+ *
+ * 10. [return]
+ *     * Returns a node named [affected] to the caller, indicating the number of deleted records.
+ *
+ * Result:
+ * Authenticated endpoint with access control and real-time notification, deleting records by CarrierID.
  */
 .arguments
    CarrierID:long

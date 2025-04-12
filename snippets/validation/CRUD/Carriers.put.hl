@@ -1,11 +1,38 @@
 
 /*
- * How do I write an endpoint that updates one record in the Carriers table in my logistics database?
- * I want to be able to filter on what record to update with a CarrierID argument, and I want to insert.
- * I want only admin and root users to be able to execute my endpoint.
- * Name, Phone, and Email. Do not return comments, ONLY code!
+ * This Hyperlambda endpoint updates a single record in the [Carriers] table in the [logistics] SQLite database.
+ * 
+ * 1. [.arguments]
+ *    * Accepts:
+ *      - [CarrierID]: Required. The primary key used to identify which record to update.
+ *      - [Name], [Phone], [Email]: New values for the carrier's details.
  *
- * Have the endpoint return 'affected_records' as such, and use my 'generic' connection string when connecting to the database.
+ * 2. [validators.mandatory]
+ *    * Ensures [CarrierID] is provided.
+ *
+ * 3. [auth.ticket.verify:root,admin]
+ *    * Only allows users with the [root] or [admin] role to invoke this endpoint.
+ *
+ * 4. [data.connect:[generic|logistics]]
+ *    * Connects to the [logistics] SQLite database using the generic connection string.
+ *
+ * 5. [add:x:./*/data.update/*/values]
+ *    * Adds update values ([Name], [Phone], [Email]) to the [data.update] operation.
+ *
+ * 6. [add:x:./*/data.update/*/where/*/and]
+ *    * Adds [CarrierID] to the WHERE clause to target the specific record.
+ *
+ * 7. [data.update]
+ *    * Executes the SQL UPDATE on the [Carriers] table with the given conditions and values.
+ *
+ * 8. [if -> response.status.set:404]
+ *    * If no rows were affected, sets HTTP status to 404 and returns an error message.
+ *
+ * 9. [response.status.set:202]
+ *    * If successful, sets the status code to 202 (Accepted).
+ *
+ * 10. [yield]
+ *     * Returns [affected_records] node with the number of updated rows.
  */
 .arguments
    CarrierID:long

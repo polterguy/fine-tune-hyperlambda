@@ -1,5 +1,37 @@
 
-// A dynamic Hyperlambda slot to install a specified module by executing all magic.startup Hyperlambda files inside it.
+/*
+ * This dynamic Hyperlambda slot installs a module by recursively executing all [.hl] files
+ * located inside the [magic.startup] directory of the specified module.
+ *
+ * 1. [slots.create:magic.modules.install-module]
+ *    * Declares a new slot named [magic.modules.install-module], making it invocable dynamically.
+ *
+ * 2. [validators.mandatory:x:@.arguments/*/module]
+ *    * Ensures that the [module] argument is provided by the caller.
+ *
+ * 3. [strings.concat]
+ *    * Constructs the full path to the target module's root folder using the passed [module] name.
+ *    * Joins the base path [/modules/], the module name, and a trailing slash.
+ *
+ * 4. [io.file.list-recursively:x:@strings.concat]
+ *    * Recursively lists all files within the module directory.
+ *    * Used to discover any startup logic files the module may define.
+ *
+ * 5. [for-each:x:@io.file.list-recursively/*]
+ *    * Iterates through all files found in the module folder.
+ *
+ * 6. [if and]
+ *    * Filters files to only include those that:
+ *      - Are located in a [magic.startup] folder.
+ *      - End with the [.hl] extension, indicating a Hyperlambda script.
+ *
+ * 7. [io.file.execute:x:@.dp/#]
+ *    * Executes each file that matches the above conditions.
+ *
+ * Result:
+ * Automatically runs all startup scripts in a module's [magic.startup] directory when the slot is invoked.
+ * This enables dynamic installation of modules by convention.
+ */
 slots.create:magic.modules.install-module
 
    // Sanity checking invocation.
