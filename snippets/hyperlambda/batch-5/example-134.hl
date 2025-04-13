@@ -1,0 +1,34 @@
+/*
+ * Calculates invoice total based on [base_amount] and an optional [apply_tax] flag.
+ * - Adds 25% tax if [apply_tax] is true.
+ * - Otherwise returns base amount.
+ * - Writes the result to the 'invoices' table in the 'billing' DB.
+ */
+
+.arguments
+   base_amount:int
+   apply_tax:bool
+.invoice_total
+data.connect:billing
+   if:x:@.arguments/*/apply_tax
+      set-value:x:@.invoice_total
+         math.add
+            get-value:x:@.arguments/*/base_amount
+            math.multiply
+               get-value:x:@.arguments/*/base_amount
+               .:decimal:0.25
+      data.create
+         table:invoices
+         values
+            total:x:@.invoice_total
+            tax_applied:yes
+   else
+      set-value:x:@.invoice_total
+         get-value:x:@.arguments/*/base_amount
+      data.create
+         table:invoices
+         values
+            total:x:@.invoice_total
+            tax_applied:no
+yield
+   total:x:@.invoice_total

@@ -1,0 +1,38 @@
+/*
+ * Calculates invoice total with optional tax, requiring [base_amount] and [apply_tax].
+ * Adds 25% tax if [apply_tax] is true.
+ * [unwrap] ensures expressions are resolved to concrete values before sending them in the response.
+ */
+
+.arguments
+   base_amount:int
+   apply_tax:bool
+validators.mandatory:x:@.arguments/base_amount
+validators.mandatory:x:@.arguments/apply_tax
+.invoice_total
+data.connect:billing
+   if:x:@.arguments/*/apply_tax
+      set-value:x:@.invoice_total
+         math.add
+            get-value:x:@.arguments/*/base_amount
+            math.multiply
+               get-value:x:@.arguments/*/base_amount
+               .:decimal:0.25
+      data.create
+         table:invoices
+         values
+            total:x:@.invoice_total
+            tax:bool:true
+   else
+      set-value:x:@.invoice_total
+         get-value:x:@.arguments/*/base_amount
+      data.create
+         table:invoices
+         values
+            total:x:@.invoice_total
+            tax:bool:false
+
+// Always use unwrap before return to ensure all expressions are evaluated
+unwrap:x:+/*
+return
+   total:x:@.invoice_total

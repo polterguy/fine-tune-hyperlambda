@@ -1,0 +1,42 @@
+/*
+ * This endpoint either subtracts a quantity for a sale or adds stock for a restock operation.
+ * The result is written to the [inventory_changes] table in the [inventory] database.
+ */
+
+.arguments
+   product_id:int
+   quantity:int
+   current_stock:int
+   action:string
+.new_stock
+data.connect:inventory
+   if
+      eq:x:@.arguments/*/action
+         .:restock
+      .lambda
+         set-value:x:@.new_stock
+            math.add
+               get-value:x:@.arguments/*/current_stock
+               get-value:x:@.arguments/*/quantity
+         data.create
+            table:inventory_changes
+            values
+               product_id:x:@.arguments/*/product_id
+               type:restock
+               change:x:@.arguments/*/quantity
+   else-if
+      eq:x:@.arguments/*/action
+         .:sale
+      .lambda
+         set-value:x:@.new_stock
+            math.subtract
+               get-value:x:@.arguments/*/current_stock
+               get-value:x:@.arguments/*/quantity
+         data.create
+            table:inventory_changes
+            values
+               product_id:x:@.arguments/*/product_id
+               type:sale
+               change:x:@.arguments/*/quantity
+yield
+   updated_stock:x:@.new_stock

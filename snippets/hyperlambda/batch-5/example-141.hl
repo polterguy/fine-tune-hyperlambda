@@ -1,0 +1,80 @@
+/*
+ * This slot updates inventory by restocking or subtracting sold units, based on an action string.
+ *
+ * [slots.create]
+ *   - Defines the reusable slot 'inventory.adjust-stock'.
+ *
+ * [validators.mandatory]
+ *   - Ensures the required arguments exist: 'product_id', 'quantity', 'current_stock', 'action'.
+ *
+ * [.new_stock]
+ *   - Holds the updated stock value after computation.
+ *
+ * [data.connect]
+ *   - Establishes a database connection to the 'inventory' DB.
+ *
+ * [if]
+ *   - Checks if the action is 'restock'.
+ *
+ * [else-if]
+ *   - Executes if the action is 'sale'.
+ *
+ * [eq]
+ *   - Compares the action argument against the string values.
+ *
+ * [set-value]
+ *   - Sets [.new_stock] to the result of [math.add] or [math.subtract].
+ *
+ * [math.add]
+ *   - Adds quantity to current_stock if restocking.
+ *
+ * [math.subtract]
+ *   - Subtracts quantity from current_stock if selling.
+ *
+ * [data.create]
+ *   - Logs the change in the 'inventory_changes' table.
+ *
+ * [unwrap]
+ *   - Resolves references (like x:@.new_stock) before returning.
+ *
+ * [return]
+ *   - Returns the updated stock to the caller.
+ */
+slots.create:inventory.adjust-stock
+   validators.mandatory:x:@.arguments/product_id
+   validators.mandatory:x:@.arguments/quantity
+   validators.mandatory:x:@.arguments/current_stock
+   validators.mandatory:x:@.arguments/action
+   .new_stock
+   data.connect:inventory
+      if
+         eq:x:@.arguments/*/action
+            .:restock
+         .lambda
+            set-value:x:@.new_stock
+               math.add
+                  get-value:x:@.arguments/*/current_stock
+                  get-value:x:@.arguments/*/quantity
+            data.create
+               table:inventory_changes
+               values
+                  product_id:x:@.arguments/*/product_id
+                  type:restock
+                  quantity:x:@.arguments/*/quantity
+      else-if
+         eq:x:@.arguments/*/action
+            .:sale
+         .lambda
+            set-value:x:@.new_stock
+               math.subtract
+                  get-value:x:@.arguments/*/current_stock
+                  get-value:x:@.arguments/*/quantity
+            data.create
+               table:inventory_changes
+               values
+                  product_id:x:@.arguments/*/product_id
+                  type:sale
+                  quantity:x:@.arguments/*/quantity
+   unwrap:x:+/*
+   return
+      updated_stock:x:@.new_stock

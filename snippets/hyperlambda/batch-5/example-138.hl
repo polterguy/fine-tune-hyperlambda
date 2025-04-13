@@ -1,0 +1,49 @@
+
+/*
+ * Updates stock based on [action]: 'restock' adds, 'sale' subtracts from [current_stock].
+ * Requires all relevant inventory fields.
+ * [unwrap] before [return] ensures the returned value is resolved (not an expression).
+ */
+.arguments
+   product_id:int
+   quantity:int
+   current_stock:int
+   action:string
+validators.mandatory:x:@.arguments/product_id
+validators.mandatory:x:@.arguments/quantity
+validators.mandatory:x:@.arguments/current_stock
+validators.mandatory:x:@.arguments/action
+.new_stock
+data.connect:inventory
+   if
+      eq:x:@.arguments/*/action
+         .:restock
+      .lambda
+         set-value:x:@.new_stock
+            math.add
+               get-value:x:@.arguments/*/current_stock
+               get-value:x:@.arguments/*/quantity
+         data.create
+            table:inventory_changes
+            values
+               product_id:x:@.arguments/*/product_id
+               quantity:x:@.arguments/*/quantity
+               type:restock
+   else-if
+      eq:x:@.arguments/*/action
+         .:sale
+      .lambda
+         set-value:x:@.new_stock
+            math.subtract
+               get-value:x:@.arguments/*/current_stock
+               get-value:x:@.arguments/*/quantity
+         data.create
+            table:inventory_changes
+            values
+               product_id:x:@.arguments/*/product_id
+               quantity:x:@.arguments/*/quantity
+               type:sale
+// [unwrap] ensures x:@.new_stock returns an evaluated number, not an expression
+unwrap:x:+/*
+return
+   updated_stock:x:@.new_stock

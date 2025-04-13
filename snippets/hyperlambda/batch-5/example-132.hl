@@ -1,0 +1,44 @@
+/*
+ * This endpoint takes [a], [b], and [operation] arguments. It performs addition if [operation] is "add",
+ * subtraction if "subtract", and stores the result into a [calculations] table in the "mathdb" database.
+ *
+ * [.arguments] – Incoming arguments: two integers and a string representing the operation.
+ * [if] – Controls branching logic based on the operation type.
+ * [math.add] / [math.subtract] – Executes the appropriate arithmetic.
+ * [data.create] – Stores result and operation type.
+ */
+
+.arguments
+   a:int
+   b:int
+   operation:string
+.result
+data.connect:mathdb
+   if
+      eq:x:@.arguments/*/operation
+         .:add
+      .lambda
+         set-value:x:@.result
+            math.add
+               get-value:x:@.arguments/*/a
+               get-value:x:@.arguments/*/b
+         data.create
+            table:calculations
+            values
+               result:x:@.result
+               type:addition
+   else-if
+      eq:x:@.arguments/*/operation
+         .:subtract
+      .lambda
+         set-value:x:@.result
+            math.subtract
+               get-value:x:@.arguments/*/a
+               get-value:x:@.arguments/*/b
+         data.create
+            table:calculations
+            values
+               result:x:@.result
+               type:subtraction
+yield
+   result:x:@.result

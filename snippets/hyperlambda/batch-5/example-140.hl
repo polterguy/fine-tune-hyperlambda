@@ -1,0 +1,64 @@
+/*
+ * This slot calculates an invoice total based on a base amount and an optional tax.
+ *
+ * [slots.create]
+ *   - Declares the slot 'invoice.calculate' for reuse.
+ *
+ * [validators.mandatory]
+ *   - Validates that the required input arguments 'base_amount' and 'apply_tax' exist.
+ *
+ * [.invoice_total]
+ *   - A temporary node to hold the computed result.
+ *
+ * [data.connect]
+ *   - Opens a connection to the 'billing' database.
+ *
+ * [if]
+ *   - Checks if tax should be applied (if 'apply_tax' is true).
+ *
+ * [set-value]
+ *   - Stores the result of the computation in [.invoice_total].
+ *
+ * [math.add]
+ *   - Adds base amount + tax (25%) if apply_tax is true.
+ *
+ * [math.multiply]
+ *   - Computes 25% tax by multiplying base_amount with 0.25.
+ *
+ * [data.create]
+ *   - Stores the computed invoice total in the 'invoices' table, along with the tax status.
+ *
+ * [unwrap]
+ *   - Ensures the invoice total expression is resolved to its literal value before returning.
+ *
+ * [return]
+ *   - Returns the result node to the caller.
+ */
+slots.create:invoice.calculate
+   validators.mandatory:x:@.arguments/base_amount
+   validators.mandatory:x:@.arguments/apply_tax
+   .invoice_total
+   data.connect:billing
+      if:x:@.arguments/*/apply_tax
+         set-value:x:@.invoice_total
+            math.add
+               get-value:x:@.arguments/*/base_amount
+               math.multiply
+                  get-value:x:@.arguments/*/base_amount
+                  .:decimal:0.25
+         data.create
+            table:invoices
+            values
+               total:x:@.invoice_total
+               tax:bool:true
+      else
+         set-value:x:@.invoice_total
+            get-value:x:@.arguments/*/base_amount
+         data.create
+            table:invoices
+            values
+               total:x:@.invoice_total
+               tax:bool:false
+   unwrap:x:+/*
+   return
+      total:x:@.invoice_total

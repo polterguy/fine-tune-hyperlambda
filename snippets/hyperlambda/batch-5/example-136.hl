@@ -1,0 +1,51 @@
+/*
+ * This endpoint adjusts loyalty points based on activity ("purchase" or "refund").
+ * It requires [user_id], [points], [current], and [activity].
+ * Uses [unwrap] before [return] to ensure expressions like [x:@.new_total] are fully evaluated
+ * and return literal values—not unresolved expressions.
+ */
+
+.arguments
+   user_id:int
+   points:int
+   current:int
+   activity:string
+validators.mandatory:x:@.arguments/user_id
+validators.mandatory:x:@.arguments/points
+validators.mandatory:x:@.arguments/current
+validators.mandatory:x:@.arguments/activity
+.new_total
+data.connect:customers
+   if
+      eq:x:@.arguments/*/activity
+         .:purchase
+      .lambda
+         set-value:x:@.new_total
+            math.add
+               get-value:x:@.arguments/*/current
+               get-value:x:@.arguments/*/points
+         data.create
+            table:loyalty_log
+            values
+               user_id:x:@.arguments/*/user_id
+               type:purchase
+               value:x:@.arguments/*/points
+   else-if
+      eq:x:@.arguments/*/activity
+         .:refund
+      .lambda
+         set-value:x:@.new_total
+            math.subtract
+               get-value:x:@.arguments/*/current
+               get-value:x:@.arguments/*/points
+         data.create
+            table:loyalty_log
+            values
+               user_id:x:@.arguments/*/user_id
+               type:refund
+               value:x:@.arguments/*/points
+
+// Use unwrap to forward-evaluate expressions (e.g., x:@.new_total) before returning
+unwrap:x:+/*
+return
+   total_points:x:@.new_total
