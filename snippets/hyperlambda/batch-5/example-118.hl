@@ -1,0 +1,52 @@
+/*
+ * This Hyperlambda HTTP endpoint filters a list of dynamic input values and returns only the even numbers.
+ * It uses [for-each] for iteration, [if] for conditional logic, and emphasizes the correct use of [unwrap]
+ * before [add] to ensure expressions are properly evaluated before being added to the result.
+ *
+ * [.arguments:*]
+ *   - A dynamic root node that contains one or more children, each representing a number to evaluate.
+ *
+ * [.even_numbers]
+ *   - A container node that accumulates all numbers from [.arguments] that are determined to be even.
+ *
+ * [for-each:x:@.arguments/*]
+ *   - Iterates over every direct child node of [.arguments]. Within each iteration, [.dp] represents the full node structure.
+ *
+ * [if]
+ *   - Uses [math.modulo] to check if the current value is even.
+ *   - [get-value:x:@.dp/#] retrieves the actual value from the current iteration context,
+ *     assuming the endpoint was given a list of numbers as its payload.
+ *   - [math.modulo] divides the number by 2 and checks if the remainder is 0 (i.e., even).
+ *
+ * [unwrap]
+ *   - This slot is **critical** when [add] contains nodes with expressions.
+ *   - It evaluates and resolves all expressions in the immediate next sibling node of the current scope,
+ *     which is [add] for this example.
+ *   - Without it, expressions like [x:@.dp/#] would be stored as-is (unevaluated) in [.even_numbers].
+ *
+ * [add:x:@.even_numbers]
+ *   - Appends the current even value to [.even_numbers].
+ *   - The expression `@.dp/#` retrieves and adds the numeric value by reference.
+ *
+ * [yield]
+ *   - Returns the [.even_numbers] list to the caller as a response node named [evens].
+ *
+ * Result:
+ *   - The output includes only those values from [.arguments] that are even integers.
+ */
+.arguments:*
+.even_numbers
+for-each:x:@.arguments/*
+   if
+      eq:x:@.dp/#
+         math.modulo
+            get-value:x:@.dp/#
+            .:int:2
+         .:int:0
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.even_numbers
+            .
+               .:x:@.dp/#
+yield
+   evens:x:@.even_numbers
