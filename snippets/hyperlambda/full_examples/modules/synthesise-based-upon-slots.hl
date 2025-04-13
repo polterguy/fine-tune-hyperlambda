@@ -1,0 +1,120 @@
+
+/*
+ * Automatically synthesizes training data for Hyperlambda fine-tuning by querying OpenAI using existing slots as input.
+ *
+ * ## Slot Purpose
+ * This file loops through existing vocabulary (slot names or keywords), retrieves relevant documentation as context,
+ * and sends structured queries to OpenAI. It then saves the resulting responses into training snippet files under
+ * `/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised2/` to be used for model training.
+ *
+ * ## Slot Documentation
+ *
+ * - [vocabulary]
+ *   A placeholder node representing a collection of terms (e.g., slot names, concepts) to iterate through.
+ *   Each child node is a string label passed into the query pipeline for generating training content.
+ *
+ * - [.system-instruction]
+ *   Loads a standard system instruction prompt from a Markdown file that guides OpenAI on how to respond
+ *   when generating training content. This message defines the tone and structure of expected responses.
+ *
+ * - [for-each]
+ *   Iterates through every item in [vocabulary], treating each term as a [query] to be sent to the OpenAI API.
+ *   [.dp] references the current vocabulary term during iteration.
+ *
+ * - [try]
+ *   Wraps the entire processing block for each term in a try/catch to prevent one failing query from stopping the rest.
+ *
+ * - [execute:openai-context-from-database]
+ *   Retrieves detailed documentation and examples related to the current slot or concept.
+ *   This provides grounding context so OpenAI can produce informed responses.
+ *   - [type]: Uses `'magic-documentation'` from the ML types table.
+ *   - [query]: Injects the current term from vocabulary.
+ *   - [threshold] and [max_tokens]: Optional tunables for context quality and size.
+ *
+ * - [execute:openai-query]
+ *   Invokes OpenAI’s Chat API with GPT-4 using the following:
+ *   - [context]: The documentation fetched from the previous step.
+ *   - [instruction]: The loaded system message defining prompt behavior.
+ *   - [query]: The current vocabulary term.
+ *   The result is a code/comment pair formatted to match Hyperlambda training snippet expectations.
+ *
+ * - [io.file.save]
+ *   Constructs a file path from the query term and writes OpenAI’s response into a `.hl` file
+ *   inside the synthesis output directory.
+ *
+ * - [catch]
+ *   Logs any exceptions using [log.error] and retries by sleeping for 3 seconds to handle
+ *   transient rate limit errors or network issues.
+ *
+ * ## Summary
+ * This endpoint is part of a fine-tuning pipeline that generates synthetic training data from system-defined slots.
+ * It automates the OpenAI interaction by assembling relevant context and instructions for each term,
+ * allowing continuous enrichment of the Hyperlambda model with fresh, consistent examples.
+ */
+vocabulary
+
+// Buffer for common system instruction
+.system-instruction
+io.file.load:/modules/fine-tune-hyperlambda/system-message-synthesiser.md
+
+for-each:x:@vocabulary/*
+
+   // Making sure we silently catch exceptions.
+   try
+      
+      /*
+       * Returns context for the specified [query] from the specified [type],
+       * and returns to caller.
+       *
+       * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
+       * tokens to return. [type] is a machine learning type from your ml_types database table in
+       * your magic database.
+       */
+      execute:magic.workflows.actions.execute
+         name:openai-context-from-database
+         filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+         arguments
+            type:magic-documentation
+            query:x:@.dp/#
+            threshold:decimal:0.3
+            max_tokens:int:25000
+
+
+      /*
+       * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+       * [instruction] and [query].
+       *
+       * Will use the default API key found from configurations.
+       *
+       * [context] is additional data you can supply to OpenAI such that it responds using
+       * your data as its source for information. [instruction] is a system message allowing
+       * you to change how OpenAI responds.
+       */
+      execute:magic.workflows.actions.execute
+         name:openai-query
+         filename:/modules/openai/workflows/actions/openai-query.hl
+         arguments
+            model:gpt-4-1106-preview
+            max_tokens:int:1500
+            context:x:@execute/@execute/*/context
+            instruction:x:@io.file.load
+            query:x:@.dp/#
+
+      // Saving file to '/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised2/'
+      .file
+      set-value:x:@.file
+         strings.concat
+            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised2/
+            get-value:x:@.dp/#
+            .:.hl
+      io.file.save:x:@.file
+         get-value:x:@execute/*/answer
+
+   .catch
+
+      // Logging the error
+      log.error:x:@.arguments/*/message
+         slot:x:@.dp/#
+
+      // Waiting 3 seconds in case this is a transitional error.
+      sleep:3000

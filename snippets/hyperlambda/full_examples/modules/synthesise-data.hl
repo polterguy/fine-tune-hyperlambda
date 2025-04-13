@@ -1,0 +1,155 @@
+
+/*
+ * Selects raw training records from the fine-tune database, transforms them into annotated prompts,
+ * invokes OpenAI to generate synthesized Hyperlambda code, and stores the results on disk for fine-tuning.
+ *
+ * ## Slot Documentation
+ *
+ * - [.arguments]
+ *   Accepts required [limit] and [offset] parameters to control pagination over the [hyperlambda] table.
+ *   Ensures chunked processing of records, helping to scale over large datasets.
+ *
+ * - [.type]
+ *   Declares the endpoint as [public], enabling external access without authentication.
+ *
+ * - [validators.mandatory]
+ *   Ensures both [limit] and [offset] are explicitly provided, preventing unintended full-table scans.
+ *
+ * - [.system-message]
+ *   Loads a default OpenAI system instruction prompt from a Markdown file,
+ *   which guides model behavior when generating responses.
+ *
+ * - [data.connect]
+ *   Connects to the `fine-tune` database to query and iterate over unsynthesized records.
+ *
+ * - [data.select]
+ *   Executes a SQL SELECT query to retrieve unsynthesized, non-static entries from the [hyperlambda] table,
+ *   filtering only those that already contain `.arguments` in their code. These serve as the base for training examples.
+ *
+ * - [for-each]
+ *   Iterates through the returned result set, processing one record at a time.
+ *
+ * - [hyper2lambda]
+ *   Transforms the raw Hyperlambda [code] into a comment-enhanced version using `.prompt` as a file-level comment header.
+ *   This sets the stage for OpenAI to better understand the training context.
+ *
+ * - [lambda2hyper]
+ *   Converts the in-memory node tree back into valid Hyperlambda syntax, preserving comment formatting.
+ *   This produces the final prompt sent to OpenAI.
+ *
+ * - [execute:openai-context-from-database]
+ *   Retrieves matching documentation for the query using semantic search,
+ *   ensuring OpenAI receives rich and relevant context in its response generation.
+ *
+ * - [execute:openai-query]
+ *   Sends the structured query and context to OpenAI (using GPT-4o) and receives a synthetic code example in response.
+ *   The system message sets expectations, tone, and formatting behavior of the assistant.
+ *
+ * - [io.file.save]
+ *   Writes OpenAI’s response to a new file inside `/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised/`,
+ *   using the record’s [hyperlambda_id] to uniquely name the output file.
+ *
+ * - [sleep]
+ *   Adds a 5-second delay between requests to avoid hitting OpenAI’s rate limits (e.g., HTTP 429 errors).
+ *
+ * ## Summary
+ * This endpoint implements a pipeline to generate synthetic training examples by blending
+ * database-selected prompts with OpenAI-generated completions. It wraps retrieved code and prompt data,
+ * enriches it with documentation, and saves the output as fine-tuning material to disk.
+ * It is an essential utility for building high-quality supervised datasets for training OpenAI models on Hyperlambda syntax.
+ */
+.arguments
+   limit:long
+   offset:long
+.type:public
+
+// Ensuring both arguments are specified by caller!
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+
+// Loading our system message file.
+.system-message
+set-value:x:@.system-message
+   io.file.load:/modules/fine-tune-hyperlambda/system-message-synthesiser.md
+
+// Connecting to our fine-tune database.
+data.connect:fine-tune
+
+   // Selecting records.
+   data.select:"select * from hyperlambda where code like '%.arguments%' and is_static = 0 and synthesised = 0 limit @limit offset @offset"
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   // Iterating through records.
+   for-each:x:@data.select/*
+
+      // Transforming prompt + code into a file-level comment + original code.
+      hyper2lambda:x:@.dp/#/*/code
+         comments:true
+      unwrap:x:+/*/*
+      insert-before:x:@hyper2lambda/0
+         .
+            ..:x:@.dp/#/*/prompt
+
+      // Transforming to Hyperlambda again.
+      .hl
+      set-value:x:@.hl
+         lambda2hyper:x:@hyper2lambda/*
+            comments:true
+
+      // Doing some logging.
+      log.info:Invoking OpenAI
+         prompt:x:@.hl
+         
+            
+      /*
+       * Returns context for the specified [query] from the specified [type],
+       * and returns to caller.
+       *
+       * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
+       * tokens to return. [type] is a machine learning type from your ml_types database table in
+       * your magic database.
+       */
+      execute:magic.workflows.actions.execute
+         name:openai-context-from-database
+         filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+         arguments
+            type:magic-documentation
+            query:x:@.hl
+            threshold:decimal:0.3
+            max_tokens:int:3000
+
+      /*
+       * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+       * [instruction] and [query].
+       *
+       * Will use the default API key found from configurations.
+       *
+       * [context] is additional data you can supply to OpenAI such that it responds using
+       * your data as its source for information. [instruction] is a system message allowing
+       * you to change how OpenAI responds.
+       */
+      execute:magic.workflows.actions.execute
+         name:openai-query
+         filename:/modules/openai/workflows/actions/openai-query.hl
+         arguments
+            model:gpt-4o
+            max_tokens:int:1500
+            instruction:x:@.system-message
+            context:x:@execute/@execute/*/context
+            query:x:@.hl
+
+      // Creating a unique filename
+      .filename
+      set-value:x:@.filename
+         strings.concat
+            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised/
+            get-value:x:@.dp/#/*/hyperlambda_id
+            .:.hl
+
+      // Saving to file system.
+      io.file.save:x:@.filename
+         get-value:x:@execute/*/answer
+
+      // To avoid 429 from OpenAI we wait for 5 seconds before we execute the next record.
+      sleep:5000
