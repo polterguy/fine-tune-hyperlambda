@@ -1,0 +1,44 @@
+/*
+ * This Hyperlambda snippet filters tracks from the 'Track' table where:
+ *   - Milliseconds is less than 90,000
+ *
+ * [.short_tracks]
+ *   - A result container that collects all tracks shorter than 1.5 minutes.
+ *
+ * [data.connect]
+ *   - Opens a connection to the 'chinook' database.
+ *
+ * [data.read]
+ *   - Reads up to 50 rows from the 'Track' table.
+ *
+ * [for-each]
+ *   - Iterates over each track row.
+ *
+ * [if]
+ *   - Evaluates if the current row's Milliseconds field is less than the threshold.
+ *
+ * [lt]
+ *   - Performs a "less than" comparison.
+ *
+ * [get-value]
+ *   - Retrieves the Milliseconds field from the current row.
+ *
+ * [add]
+ *   - Adds the row to [short_tracks] if it matches the condition.
+ *
+ * [get-nodes]
+ *   - Collects all child fields from the current row.
+ */
+.short_tracks
+data.connect:chinook
+   data.read
+      table:Track
+      limit:int:50
+   for-each:x:@data.read/*
+      if
+         lt
+            get-value:x:@.dp/#/*/Milliseconds
+            .:int:90000
+         .lambda
+            add:x:@.short_tracks
+               get-nodes:x:@.dp/#

@@ -1,0 +1,43 @@
+/*
+ * This Hyperlambda snippet demonstrates how to retrieve data from a SQL table using [data.read],
+ * iterate through the result set using [for-each], and collect structured rows into a container node using [add].
+ *
+ * [.artists]
+ *   - Acts as the result container. After execution, this node will contain all artist records read from the database.
+ *
+ * [data.connect]
+ *   - Opens a connection to the 'chinook' database. This is required before invoking any [data.read] operations.
+ *   - All database-related slots (like [data.read]) must be placed inside this block to operate correctly.
+ *
+ * [data.read]
+ *   - Performs a SQL SELECT operation on the 'Artist' table.
+ *   - The [table] sub-node specifies which table to read from ('Artist').
+ *   - The [limit] sub-node restricts the number of records returned to 10.
+ *   - The result is a node set where each node represents one row from the 'Artist' table,
+ *     and each row contains child nodes for each column (e.g., ArtistId, Name).
+ *
+ * [for-each:x:@data.read/*]
+ *   - Iterates through each row node returned from [data.read].
+ *   - The special node [.dp] is automatically set by [for-each] to reference the current iteration item (i.e., one row).
+ *
+ * [add:x:@.artists]
+ *   - Appends the current artist row to the [.artists] collection.
+ *   - Ensures that all child nodes (columns) of the row are preserved using [get-nodes].
+ *
+ * [get-nodes:x:@.dp/#]
+ *   - Retrieves all children (i.e., columns like ArtistId, Name, etc.) from the current row node.
+ *   - The expression [.dp/#] evaluates to the current row’s value, and [get-nodes] collects its children.
+ *   - These children are then added to the [.artists] node by [add].
+ *
+ * Result:
+ *   - After execution, [.artists] contains up to 10 records from the 'Artist' table,
+ *     each record structured with its corresponding fields (e.g., ArtistId, Name).
+ */
+.artists
+data.connect:chinook
+   data.read
+      table:Artist
+      limit:10
+   for-each:x:@data.read/*
+      add:x:@.artists
+         get-nodes:x:@.dp/#

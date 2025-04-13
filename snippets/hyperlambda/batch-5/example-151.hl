@@ -1,0 +1,45 @@
+/*
+ * This Hyperlambda snippet reads records from the 'Track' table and uses [if]
+ * to post-process and filter results before adding them to the [.long_tracks] list.
+ * Only tracks where [Milliseconds] is greater than 300,000 (i.e., 5 minutes) are included.
+ *
+ * [.long_tracks]
+ *   - Collects the filtered results. Only qualifying tracks are added here.
+ *
+ * [data.connect]
+ *   - Connects to the 'chinook' database.
+ *
+ * [data.read]
+ *   - Queries the 'Track' table and fetches 20 rows.
+ *
+ * [for-each:x:@data.read/*]
+ *   - Iterates over each row (track) from the read result.
+ *
+ * [if]
+ *   - Evaluates whether the current track's [Milliseconds] value is greater than 300,000.
+ *
+ * [mt]
+ *   - “More than” comparator slot. Checks whether the current value is greater than a threshold.
+ *
+ * [get-value]
+ *   - Retrieves the 'Milliseconds' column value from the current row.
+ *
+ * [add]
+ *   - Appends the current track to [.long_tracks] if it satisfies the condition.
+ *
+ * [get-nodes]
+ *   - Extracts all fields from the current row for insertion.
+ */
+.long_tracks
+data.connect:chinook
+   data.read
+      table:Track
+      limit:int:20
+   for-each:x:@data.read/*
+      if
+         mt
+            get-value:x:@.dp/#/*/Milliseconds
+            .:int:300000
+         .lambda
+            add:x:@.long_tracks
+               get-nodes:x:@.dp/#

@@ -1,0 +1,52 @@
+/*
+ * This Hyperlambda snippet filters tracks from the 'Track' table where:
+ *   - Milliseconds is greater than 300,000
+ *   - OR Bytes is greater than 5,000,000
+ *
+ * [.tracks_filtered]
+ *   - A result container that will hold all tracks that match at least one of the conditions.
+ *
+ * [data.connect]
+ *   - Opens a connection to the 'chinook' database. All database operations must occur inside this scope.
+ *
+ * [data.read]
+ *   - Reads up to 40 rows from the 'Track' table. Each row contains fields such as TrackId, Name, Milliseconds, Bytes, etc.
+ *
+ * [for-each]
+ *   - Iterates over each row returned by [data.read]. The current row is referenced through [.dp].
+ *
+ * [if]
+ *   - Evaluates conditional logic for each row.
+ *
+ * [or]
+ *   - Returns true if either child condition evaluates to true.
+ *
+ * [mt]
+ *   - Performs a "more than" comparison between a value and a numeric threshold.
+ *
+ * [get-value]
+ *   - Retrieves the value of a field from the current row by dereferencing [.dp/#/*/FieldName].
+ *
+ * [add]
+ *   - Appends the entire current row to the [tracks_filtered] node if the condition is satisfied.
+ *
+ * [get-nodes]
+ *   - Extracts all child nodes (i.e., columns of the current row) so they can be added into the result node.
+ */
+.tracks_filtered
+data.connect:chinook
+   data.read
+      table:Track
+      limit:int:40
+   for-each:x:@data.read/*
+      if
+         or
+            mt
+               get-value:x:@.dp/#/*/Milliseconds
+               .:int:300000
+            mt
+               get-value:x:@.dp/#/*/Bytes
+               .:int:5000000
+         .lambda
+            add:x:@.tracks_filtered
+               get-nodes:x:@.dp/#
