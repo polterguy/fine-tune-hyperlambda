@@ -1,11 +1,36 @@
 
 /*
- * Returns distinct values from a given column in the Customers table.
- * Takes a mandatory [distinct_column] argument in the format TABLE_NAME.COLUMN_NAME.
- * Optionally supports pagination via [limit] and [offset], and ordering via [order] and [direction].
- * Allows filtering using various comparison operators on all columns in the Customers table.
- * Ensures the distinct_column value is one of the allowed column names.
- * Executes a [data.read] operation returning distinct values as a flat list.
+ * This Hyperlambda endpoint retrieves distinct values from a specific column in the [Customers] table in the [Northwind] database.
+ *
+ * ## Slot Documentation
+ *
+ * - [validators.mandatory]
+ *   Ensures the required [distinct_column] argument is present. This is critical since the slot cannot operate without knowing what column to extract distinct values from.
+ *
+ * - [validators.enum]
+ *   Validates that the provided [distinct_column] value is one of the explicitly allowed columns in the [Customers] table. This provides safety against malformed or invalid column names.
+ *
+ * - [data.connect]
+ *   Connects to the Northwind database using the [generic] connection configuration. This slot must be invoked before any database-related operations such as [data.read].
+ *
+ * - [set-name]
+ *   Constructs a SQL function for distinct selection using the [distinct(...)] function. The result is set as the name of a node within the [data.read] columns collection, ensuring that the generated SQL retrieves unique values.
+ *
+ * - [remove-nodes]
+ *   Removes previously handled arguments such as [distinct_column], [limit], [offset], [order], and [direction] from the argument tree to prevent conflicts during query construction.
+ *
+ * - [add]
+ *   Dynamically injects optional pagination ([limit], [offset]), ordering ([order], [direction]), and filtering arguments into the [data.read] slot. The [where] clause is constructed based on any applicable filter fields provided by the caller.
+ *
+ * - [data.read]
+ *   Executes the query to retrieve the distinct values from the selected column, applying any optional filter, sort, or pagination constraints.
+ *
+ * - [return-nodes]
+ *   Returns the results of the [data.read] query to the caller. Each result will contain one unique value for the selected column.
+ *
+ * ## Summary
+ * This endpoint is designed for dropdowns, unique value validations, or user-defined grouping options.
+ * It provides robust safety checks, filter flexibility, and clean output for frontend or API consumers.
  */
 .arguments
 

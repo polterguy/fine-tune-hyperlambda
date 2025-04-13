@@ -1,9 +1,37 @@
 
 /*
- * Returns unique and distinct values from your CustomerCustomerDemo table in your northwind database.
+ * This Hyperlambda endpoint retrieves unique values from a specific column in the [CustomerCustomerDemo] table of the [Northwind] database.
  *
- * Requires [distinct_column] in TABLE.COLUMN format. Supports optional paging, sorting, and filtering.
- * Filters apply to CustomerID and CustomerTypeID. The endpoint returns each distinct value as its own record.
+ * ## Slot Documentation
+ *
+ * - [validators.mandatory]
+ *   Ensures the required [distinct_column] is provided, which is crucial since this defines what column to extract unique values from.
+ *
+ * - [validators.enum]
+ *   Validates that [distinct_column] is a valid column name from the [CustomerCustomerDemo] table. This avoids runtime errors and potential injection.
+ *
+ * - [data.connect]
+ *   Opens a connection to the Northwind SQLite database using the connection alias [generic].
+ *
+ * - [set-name]
+ *   Dynamically creates a SQL expression to select distinct values using `distinct(...)`. This is wrapped inside a [distinct_functor] column node to be used later in the query.
+ *
+ * - [remove-nodes]
+ *   Cleans up the [distinct_column], [order], [direction], [limit], and [offset] arguments after they've been processed, to avoid duplicate or conflicting data.
+ *
+ * - [add]
+ *   Injects the pagination ([limit], [offset]) and sorting ([order], [direction]) parameters into the [data.read] node.
+ *   Also merges all filter parameters (e.g., [.eq], [.lt], [.like]) defined under [.arguments] into the [where] clause of the read query.
+ *
+ * - [data.read]
+ *   Executes the query that retrieves distinct values for the selected column. If filters, sorting, or pagination parameters were provided, they are applied here.
+ *
+ * - [return-nodes]
+ *   Returns each distinct value as a separate node to the client.
+ *
+ * ## Summary
+ * This endpoint gives a clean and efficient way to retrieve unique entries from [CustomerCustomerDemo] columns,
+ * with flexible support for sorting, filtering, and pagination — ideal for dropdown lists, filters, or validation sets.
  */
 .arguments
 

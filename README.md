@@ -30,6 +30,9 @@ Below are some example prompts you can run through the model after fine tuning i
 * Select contacts records from my ERP database.
 * Create an endpoint taking a message only allowing admin users to execute it, then log the message
 * Create an endpoint that allows me to return records from my employees table in my hr database with paging and sorting.
+  - Make sorting optional
+  - Make paging optional
+  - Make both paging and sorting mandatory
 * Create an endpoint allowing me to create new items in my contacts table in my CRM database.
 * Generate an API endpoint allowing me to select users from employees database, with optional filtering for name, email, and phone
 * Generate an endpoint that only partner users can execute
@@ -41,14 +44,13 @@ Below are some example prompts you can run through the model after fine tuning i
 * Create an endpoint that sends an email with subject, body, name and email as arguments
 * Create an endpoint that loads a file specified as an argument and returns its content back to caller.
 * Create an upload file endpoint that saves files to /etc/temp/ folder
-* I've got a file at /etc/www/foo.zip. I want you to show me the code required to unzip it in the same folder it exists in
+* I've got a file at /etc/www/foo.zip. I want you to show me the code required to unzip it
 * Create an HTTP endpoint that invokes Chuck Norris Joke API to generate a random joke and return to caller
 * I need an endpoint that's invoking Cat fact API and returns the fact to the caller
 * How do I update a record in my HR database and its employees table?
 * Show me an endpoint concatenating name and age with a greeting and returning the result to caller
 * Generate an HTTP endpoint for me that lists all files in /etc/www/ and returns this to the caller
 * How do I concatenate two strings given to an endpoint as arguments?
-* Generate an AI function allowing me to send emails. Assume the user ID is the user's email address
 * Create an API endpoint that allows me to insert a contact into HubSpot
 * Create an endpoint allowing me to read a sitemap from a domain, and return all URLs found.
 * Create an endpoint that first fetches 10 Artist records from chinook database using SQLite, then include all their Album records for each Artist. Add filtering support for artist name.

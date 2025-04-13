@@ -1,11 +1,43 @@
 
 /*
- * Create an HTTP endpoint that does the following;
+ * This Hyperlambda endpoint serves as a dynamic OpenAI chat handler using GPT models.
  *
- * OpenAI chat endpoint, for having conversations using "gpt-xxx" models.
+ * 1. [.arguments]
+ *    * Declares input arguments such as [prompt], [type], [session], [stream], etc.
+ *    * If [stream] is true, response tokens are streamed to the specified [session].
  *
- * Notice, if you set [stream] to true the endpoint will stream response tokens over the specified
- * [session] back to caller.
+ * 2. [execute:magic.misc.execute-slots]
+ *    * Invokes interceptor slots found under the namespace [magic.openai.chat-interceptor.].
+ *    * Useful for logging, filtering, preprocessing, etc.
+ *
+ * 3. [signal:magic.ai.endpoint-common]
+ *    * Handles common logic for chat endpoints (e.g., spam filtering, lead email detection).
+ *    * Includes logic to detect if the prompt contains an email address.
+ *    * If email detection logic is satisfied and contact_us + lead_email are configured,
+ *      then [magic.ai.send-lead-email] is triggered to forward user intent.
+ *
+ * 4. [referrer] logic
+ *    * Tries to retrieve referrer either from [arguments.referrer] or HTTP [Referer] header.
+ *    * Passes it into the downstream AI model.
+ *
+ * 5. Conditional Model Routing
+ *    * Based on the model's name prefix (e.g., [gpt], [o1-], [o3-]) the appropriate
+ *      chat slot is invoked.
+ *    * If the model starts with one of the mentioned prefixes, the slot declared in
+ *      [completion_slot] is invoked (usually [magic.ai.chat]).
+ *    * If not, the generic [magic.ai.completion] slot is used.
+ *
+ * 6. Optional [max_tokens] override
+ *    * Supports dynamic override via configuration setting [magic:openai:max_tokens].
+ *    * If set, it gets injected into the invoked slot as [model_size].
+ *
+ * 7. Output
+ *    * Returns the final result from whichever slot was triggered based on model type.
+ *
+ * Use cases:
+ * * A generic HTTP entrypoint for OpenAI-based GPT chatbots.
+ * * Can be used for both synchronous and streamed token responses.
+ * * Flexible and extensible via pluggable interceptor and completion slots.
  */
 .arguments
    prompt:string

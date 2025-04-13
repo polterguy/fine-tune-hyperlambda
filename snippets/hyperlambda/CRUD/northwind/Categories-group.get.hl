@@ -1,9 +1,39 @@
 
 /*
- * Return grouped aggregates from the Categories table in the Northwind database.
+ * This Hyperlambda endpoint returns grouped aggregate data from the [Categories] table in the [northwind] database.
  * 
- * Aggregates include min, max, sum, avg, or count, grouped by a specified column given in TABLE_NAME.COLUMN_NAME format.
- * Includes optional filtering, sorting, and pagination using group_column, aggregate_column, limit, offset, order, and direction.
+ * The endpoint allows clients to retrieve summaries using SQL aggregate functions like [min], [max], [sum], [avg], and [count].
+ * Results are grouped by a specified column and support optional filtering, sorting, and pagination.
+ *
+ * 1. [.arguments]
+ *    * Accepts:
+ *      - [group_column]: Mandatory column name for grouping (must be TABLE.COLUMN format).
+ *      - [aggregate_column]: Mandatory column name to aggregate on.
+ *      - [aggregate_function]: One of [min], [max], [sum], [avg], [count].
+ *      - [limit], [offset]: Optional for paging.
+ *      - [order], [direction]: Optional for sorting.
+ *      - Multiple [Categories.*] filters for flexible conditionals.
+ *
+ * 2. [validators.enum], [validators.mandatory]
+ *    * Validates required and enumerated argument values to ensure safe SQL execution.
+ *
+ * 3. [data.read] and [aggregate_functor]
+ *    * Dynamically constructs SQL using the aggregate function and selected columns.
+ *    * Uses [group_column] for the SQL GROUP BY clause.
+ *    * Builds WHERE clause based on dynamic argument filters (e.g., eq, neq, mt).
+ *    * Applies limit/offset/order if provided.
+ *
+ * 4. [.insert-before], [.set-name], [.remove-nodes]
+ *    * Dynamically modifies nodes to insert grouping and rename the returned column from the aggregate.
+ *    * Strips parameters after use to prevent duplication and clutter in execution graph.
+ *
+ * 5. [return-nodes]
+ *    * Returns aggregated dataset with optional renamed column depending on selected function.
+ *
+ * Use Cases:
+ * * Dashboard analytics and reporting interfaces.
+ * * Extracting summary statistics grouped by categories.
+ * * Paging and sorting grouped values for frontend charts or reports.
  */
 .arguments
 

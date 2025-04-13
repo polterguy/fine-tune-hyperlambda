@@ -1,5 +1,45 @@
 
-// Evaluates a cryptographically signed HTTP REST invocation, and persists the invocation into your database.
+/*
+ * This endpoint accepts a cryptographically signed HTTP request payload in binary format using [application/octet-stream].
+ * It verifies the signature, parses the payload as Hyperlambda, safely executes the payload using a [whitelist], and persists the request and response.
+ *
+ * 1. [auth.ticket.verify]
+ *    * Not used because endpoint relies on [crypto.verify] for cryptographic validation.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures a binary payload is present in the [body] argument.
+ *
+ * 3. [io.stream.read]
+ *    * Reads the raw byte content of the provided binary stream.
+ *
+ * 4. [crypto.get-key], [signal:magic.crypto.get-public-key]
+ *    * Extracts fingerprint from stream and loads public key used to verify the request's signature.
+ *
+ * 5. [crypto.verify]
+ *    * Verifies the payload's digital signature and parses its content.
+ *
+ * 6. [hyper2lambda]
+ *    * Converts the verified payload from Hyperlambda to an executable lambda structure.
+ *
+ * 7. [whitelist]
+ *    * Ensures only authorized slots (from the user's key's [vocabulary]) can be executed.
+ *    * Also handles replay protection by checking for [request-id] uniqueness using [magic.crypto.http.has-invoked].
+ *
+ * 8. [signal:magic.crypto.http.persist-invocation]
+ *    * Stores request and response for auditing and replay protection.
+ *    * Includes raw data, parsed request, response, and public key info.
+ *
+ * 9. [crypto.sign], [signal:magic.crypto.get-server-private-key]
+ *    * Signs the result using the server's private key before returning it to ensure authenticity of the response.
+ *
+ * 10. [.catch]
+ *     * Logs and handles all verification or execution failures by returning a generic "Access denied" message to prevent information leaks.
+ *
+ * Use cases:
+ * * Secure remote invocation of server logic by authorized public keys without relying on traditional JWT-based authentication.
+ * * Cryptographically tamper-proof request/response cycle, ideal for systems requiring high trust and auditability.
+ * * Avoids replay attacks via unique request ID tracking and persistent storage of all transactions.
+ */
 .arguments
    body:*
 

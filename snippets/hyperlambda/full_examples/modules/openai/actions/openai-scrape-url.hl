@@ -1,5 +1,48 @@
 
-// Generate Hyperlambda that scrapes the specified URL and returns the content as Markdown
+/*
+ * This snippet creates an HTTP API endpoint that scrapes a given [url], extracts its HTML content, and converts it to Markdown.
+ *
+ * 1. [.arguments]
+ *    * Accepts a single required parameter:
+ *      - [url]: The URL to be scraped. Must be a valid and complete HTTP or HTTPS URL.
+ *
+ * 2. [validators.mandatory] + [validators.url]
+ *    * Ensures that the [url] argument is provided and is syntactically valid.
+ *
+ * 3. [if] - Scheme Normalization
+ *    * Checks if the given [url] includes a scheme (e.g., "http://" or "https://").
+ *    * If not, prepends "https://" to the [url] to default to a secure scheme.
+ *
+ * 4. [http.get]
+ *    * Performs a GET request on the validated [url].
+ *    * Sets headers:
+ *      - [User-Agent] to identify the scraper.
+ *      - [Accept] to specify HTML is the expected content.
+ *      - [Accept-Encoding] to avoid gzip/deflate compression complications.
+ *    * Timeout is set to 30 seconds.
+ *
+ * 5. Sanity Checks on HTTP Status
+ *    * Validates that the response status is between 200 and 299.
+ *    * If not, logs the error and returns the raw HTTP result to the caller.
+ *
+ * 6. Sanity Checks on Content
+ *    * Verifies that the response includes HTML content.
+ *    * Fails with a 415 (Unsupported Media Type) status if the returned data is missing, null, empty, or has a [Content-Type] other than [text/html].
+ *
+ * 7. [html2markdown]
+ *    * Converts the fetched HTML content into Markdown format.
+ *    * Passes the original URL as context to improve relative link handling in the Markdown output.
+ *
+ * 8. [yield]
+ *    * Returns:
+ *      - [result]: The converted Markdown content.
+ *      - [urls]: List of URLs extracted during the conversion (e.g., hyperlinks, image sources).
+ *
+ * **Use cases:**
+ * * Importing blog posts or documentation from websites for training or storage.
+ * * Creating offline-readable Markdown content from webpages.
+ * * Crawling specific HTML sources to extract readable, clean documentation.
+ */
 .arguments
    url:string
 

@@ -1,10 +1,29 @@
 
 /*
- * Distinct Keyword Search from CustomerDemographics table in northwind database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first. It uses keyword count and density
- * logic applied to [CustomerTypeID] and [CustomerDesc] columns. Supports optional [limit] and [offset] for paging.
+ * Performs a distinct keyword search on the [CustomerDemographics] table in the 'northwind' SQLite database.
+ *
+ * 1. [query] is split into individual space-separated keywords using [strings.split].
+ *    Each word is then normalized to lowercase to ensure case-insensitive matching.
+ *
+ * 2. The [CustomerTypeID] and [CustomerDesc] columns are combined into a single searchable string
+ *    using [coalesce] and string concatenation. This aggregated text is used to calculate keyword density.
+ *
+ * 3. The logic dynamically builds a SQL expression to:
+ *    - Count the number of times each keyword appears (i.e., density).
+ *    - Count the number of *distinct* keywords found in each record (i.e., uniqueness).
+ *    These scores are used to rank the results.
+ *
+ * 4. Filtering is done via a WHERE clause that only returns rows where at least one keyword was matched.
+ *    Results are sorted by:
+ *      - [keyword_count] (distinct keyword matches, descending)
+ *      - [keyword_density] (overall match frequency, descending)
+ *
+ * 5. Supports pagination using [limit] and [offset] arguments.
+ *
+ * 6. Removes helper fields like [keyword_density] and [keyword_count] before returning final results.
+ *
+ * This endpoint provides an efficient, SQL-based approximation of full-text search capabilities in
+ * environments that lack native full-text indexing support.
  */
 .arguments
 

@@ -1,22 +1,45 @@
 
 /*
- * Create a chat slot for having conversations with Ollama models.
+ * This Hyperlambda slot [magic.ai.chat.ollama] allows for conversations using Ollama-based models.
+ * It acts as a full drop-in replacement for the default [magic.ai.chat] slot, enabling dynamic switching
+ * between OpenAI and Ollama-based AI engines.
  *
- * This creates a slot you can override your chat slot with, such allowing you to exchange
- * your default dynamic [magic.ai.chat] slot with an 'override' that's using Ollama instead
- * of OpenAI.
+ * 1. [slots.create]
+ *    * Declares a new dynamic slot named [magic.ai.chat.ollama] for use as a custom chat backend.
  *
- * This slot will first retrieve context from your machine learning type using [magic.ai.get-context].
- * Then it will check if it finds the specified prompt in the cache, at which point it will return
- * the cached version.
+ * 2. [validators.default]
+ *    * Applies default argument values, such as setting [stream] to false if not provided.
  *
- * Then it will create a list of messages it stores in [.session], the first which is the system message,
- * before it retrieves questionnaire answers from its database. Then it will prune messages to avoid overflowing
- * the machine learning type's maximum context token setting, before it adds additional data which might be for
- * instance an existing Hyperlambda file or something that the user wants the LLM to modify. Finally it prunes the
- * messages, to avoid overflowing the model's max context size, before it sends the messages to Ollama.
+ * 3. [signal:magic.ai.get-context]
+ *    * Retrieves machine learning context relevant to the current conversation, including cached results.
  *
- * It allows for choosing if you want to stream response tokens or not from a [stream] argument that defaults to false.
+ * 4. [cache.get], [cache.set]
+ *    * Checks if the prompt result is already cached, and avoids recomputation by returning the cached value.
+ *
+ * 5. [.session]
+ *    * Builds a message history that includes system messages, context, questionnaires, and prior user messages.
+ *    * This history is later pruned to fit within the model’s token limits.
+ *
+ * 6. [http.post]
+ *    * Makes the actual HTTP request to the Ollama API to get a completion from the language model.
+ *    * Supports [stream:true] for real-time streaming responses using sockets.
+ *
+ * 7. [execute:magic.ai.functions.invoke]
+ *    * Handles inline [FUNCTION_INVOCATION]s within the response text. Executes them and appends results.
+ *
+ * 8. [data.create]
+ *    * Stores all completions in the [ml_requests] table for auditing and history purposes if [supervised=1].
+ *
+ * 9. [sockets.signal]
+ *    * Streams response tokens live to the frontend, handles function results, errors, and status changes.
+ *
+ * 10. [lambda2hyper], [hyper2lambda], [openai.tokenize]
+ *     * Used throughout the pruning, cache, and response handling logic for transformations and token control.
+ *
+ * Use cases:
+ * * Enables self-hosted AI LLMs like Ollama to act as chatbots.
+ * * Useful for companies that want to own their AI models or require offline capabilities.
+ * * Supports advanced prompts with function calling, user context, session persistence, and live token streaming.
  */
 slots.create:magic.ai.chat.ollama
 

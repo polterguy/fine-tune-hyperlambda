@@ -1,10 +1,38 @@
 
 /*
- * Distinct Keyword Search from CustomerCustomerDemo table in northwind database.
+ * This Hyperlambda endpoint performs a distinct keyword-based search on the [CustomerCustomerDemo] table
+ * in the [northwind] database. It performs a ranked full-text search across [CustomerID] and [CustomerTypeID] fields.
  *
- * Returns only records that contain one or more words from the [query] string in either CustomerID or CustomerTypeID columns.
- * Results are ranked by how many distinct keywords were matched and their keyword density.
- * Optional [limit] and [offset] arguments control pagination.
+ * 1. [.arguments]
+ *    - Accepts a [query] string to search, with optional [limit] and [offset] for pagination.
+ *    - Defaults [limit] to 10 if not provided.
+ *
+ * 2. [.words]
+ *    - Splits the [query] into lowercase keywords using space as a delimiter.
+ *
+ * 3. [.columns]
+ *    - Defines which columns to search: [CustomerID], [CustomerTypeID].
+ *
+ * 4. [data.connect]
+ *    - Opens a connection to the [northwind] SQLite database.
+ *
+ * 5. [.sql]
+ *    - Dynamically generates a SQL SELECT statement that:
+ *      - Calculates [keyword_density] = frequency of keyword matches normalized by text length.
+ *      - Calculates [keyword_count] = number of unique matched keywords per row.
+ *      - Adds SQL WHERE clause to filter only rows with [keyword_count > 0].
+ *      - Sorts results by [keyword_count] and [keyword_density].
+ *
+ * 6. [data.select]
+ *    - Executes the constructed SQL statement using the parameters built dynamically.
+ *
+ * 7. [remove-nodes]
+ *    - Removes helper fields [keyword_density] and [keyword_count] before returning.
+ *
+ * 8. [return-nodes]
+ *    - Returns the filtered and ranked dataset to the client.
+ *
+ * This endpoint is ideal for implementing fuzzy text search with ranked scoring, enabling full-text discovery across composite fields.
  */
 .arguments
 

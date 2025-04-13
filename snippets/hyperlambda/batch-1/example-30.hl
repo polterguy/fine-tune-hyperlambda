@@ -1,7 +1,38 @@
 
 /*
- * Create an endpoint that returns minimum, maximum, average, or sum from your SQLite CustomerDemographics table in your northwind database,
- * using the 'generic' connection string, with optional filtering on CustomerTypeID and CustomerDesc.
+ * This Hyperlambda endpoint computes an aggregate (min, max, sum, or avg) over a column in the [CustomerDemographics] table of the [northwind] SQLite database.
+ * Filtering is optionally supported for [CustomerTypeID] and [CustomerDesc] fields.
+ *
+ * 1. [.arguments]
+ *    * Declares the expected input arguments for the endpoint.
+ *    * Includes [aggregate_function], [aggregate_column], and optional filtering fields.
+
+ * 2. [validators.mandatory]
+ *    * Ensures that [aggregate_function] and [aggregate_column] are supplied.
+
+ * 3. [validators.enum]
+ *    * Restricts [aggregate_function] to one of [min], [max], [sum], or [avg].
+ *    * Ensures [aggregate_column] is a valid column from the [CustomerDemographics] table.
+
+ * 4. [data.connect]
+ *    * Opens a connection to the [northwind] database using the [generic] connection string.
+ *    * Declares the database type as [sqlite].
+
+ * 5. [set-name]
+ *    * Dynamically creates the SQL aggregate function expression (e.g., `avg(CustomerDemographics.CustomerTypeID)`) and stores it in a node named [aggregate_functor].
+
+ * 6. [remove-nodes]
+ *    * Removes the original aggregate-related arguments to simplify node structure before passing to [data.read].
+
+ * 7. [add]
+ *    * Appends all remaining arguments (filter conditions) into the [where] clause of [data.read].
+
+ * 8. [data.read]
+ *    * Executes a SQL read query on the [CustomerDemographics] table with optional filtering.
+ *    * Selects the computed [aggregate_functor] result using the alias [result].
+
+ * 9. [return-nodes]
+ *    * Returns the result from the SQL read operation to the HTTP caller.
  */
 .arguments
 

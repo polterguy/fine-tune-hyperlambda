@@ -1,6 +1,62 @@
 
 /*
- * Show me endpoint taking [session] argument that confirms a payment
+ * This Hyperlambda snippet defines an HTTP API endpoint that confirms a payment
+ * using a [session] ID as input, retrieving related data, invoking optional post-payment
+ * hooks, and returning success or a dynamic response.
+ *
+ * 1. [.arguments]
+ *    * Declares expected input parameters for the endpoint.
+ *    * Accepts a single [session] string of exactly 25 characters.
+
+ * 2. [validators.mandatory]
+ *    * Ensures the [session] argument is provided.
+
+ * 3. [validators.string]
+ *    * Applies validation rules ensuring that the [session] is exactly 25 characters long.
+
+ * 4. [.session]
+ *    * Prepares a buffer to hold data related to the session retrieved from the database.
+
+ * 5. [data.connect:stripe]
+ *    * Connects to the [stripe] named database.
+
+ * 6. [data.read]
+ *    * Fetches the [username] and [price] for the session with the specified [session_id].
+
+ * 7. [add:x:@.session]
+ *    * Adds the retrieved session data into the [.session] node.
+
+ * 8. [data.delete]
+ *    * Deletes the session from the [checkout_sessions] table after reading it.
+
+ * 9. [slots.vocabulary]:stripe.subscriptions.accepted.
+ *    * Retrieves all dynamic slots whose names start with [stripe.subscriptions.accepted.].
+ *    * These slots are expected to handle specific payment workflows (e.g., different products or tiers).
+
+ * 10. [for-each]
+ *     * Loops through each returned slot and attempts to invoke it with session values.
+
+ * 11. [set-value]
+ *     * Sets the slot name to be executed dynamically during each iteration.
+
+ * 12. [add]
+ *     * Adds all session data nodes as arguments to the dynamically selected slot.
+
+ * 13. [execute]
+ *     * Executes the dynamic slot defined earlier.
+
+ * 14. [if] / [exists]
+ *     * If any slot invocation returns a result, it's returned immediately as the response.
+ *     * This ensures the first slot that can handle the payment ends the process early.
+
+ * 15. [return] / [result]:success
+ *     * If no handler matched, returns a fallback success message.
+
+ *
+ * Use cases:
+ * * Handling post-payment logic for Stripe sessions dynamically based on product types.
+ * * Invoking dynamic workflow logic such as assigning roles, sending email, or logging analytics.
+ * * Supporting pluggable post-checkout features without changing the main endpoint code.
  */
 .arguments
    session:string

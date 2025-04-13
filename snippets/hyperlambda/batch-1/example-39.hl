@@ -1,8 +1,26 @@
 
 /*
- * Create Hyperlambda endpoint taking arguments that does the following:
- * SQL query selects media types and their aggregate counts,
- * ordering the results by count in descending order, filtered by a specified name pattern.
+ * This Hyperlambda endpoint performs an aggregated SQL query on the [MediaType] table in the [chinook] SQLite database.
+ * It returns the number of tracks associated with each media type, filtered by a name pattern, and ordered by count in descending order.
+ *
+ * 1. [.arguments]
+ *    * Declares an input argument named [filter] of type [string], used for filtering media types via SQL `LIKE`.
+
+ * 2. [data.connect]
+ *    * Opens a connection to the [chinook] database using SQLite as the database type.
+
+ * 3. [add]
+ *    * Appends all argument nodes (in this case, [filter]) to the child scope of [data.select].
+ *    * Ensures that the SQL query can use `@filter` as a bound parameter.
+
+ * 4. [data.select]
+ *    * Executes a raw SQL query joining [MediaType] and [Track] tables.
+ *    * Aggregates the number of tracks per media type using `count(mt.MediaTypeId) as Amount`.
+ *    * Applies a `LIKE` filter on the media type name using the [filter] argument.
+ *    * Results are grouped by media type and ordered descending by the count.
+
+ * 5. [return-nodes]
+ *    * Returns the query result to the HTTP caller as a structured node set.
  */
 .arguments
    filter:string

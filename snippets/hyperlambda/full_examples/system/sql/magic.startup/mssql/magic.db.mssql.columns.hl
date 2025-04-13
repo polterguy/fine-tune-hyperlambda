@@ -1,14 +1,61 @@
 
 /*
- * Create a dynamic Hyperlambda slot that does the following;
+ * The [magic.db.mssql.columns] slot dynamically introspects a Microsoft SQL Server (MSSQL) table
+ * and returns a Hyperlambda-friendly structure describing the schema of the specified table.
  *
- * Lists all columns in some SQL Server database table.
+ * Arguments:
  * 
- * Arguments
+ * - [connection-string] (optional) – A named connection string to the MSSQL instance.
+ * - [database] (required) – The database name where the table resides.
+ * - [table] (required) – The name of the table to inspect.
+ *
+ * 1. [validators.mandatory]
+ *    * Ensures [database] and [table] arguments are provided.
+ *
+ * 2. Connection String Construction
+ *    * If a [connection-string] is given, it's combined with the database name using the format '[name|db]'.
+ *    * Otherwise defaults to '[generic|database]'.
+ *
+ * 3. [mssql.connect]
+ *    * Establishes a connection to the SQL Server database using the assembled connection string.
+ *
+ * 4. [mssql.select]
+ *    * Executes a query against the system tables (`sys.columns`, `sys.types`, `sys.index_columns`, and `sys.indexes`)
+ *      to retrieve detailed metadata for all columns of the specified table.
+ *    * Information returned includes:
+ *      - Column name
+ *      - Data type
+ *      - Nullability
+ *      - Whether it's part of a primary key
+ *      - If it's an identity/auto-increment column
+ *      - If it has a default value
+ *
+ * 5. Schema Normalization
+ *    * For each column:
+ *      - Normalizes MSSQL data types to equivalent Hyperlambda types ([hl] node).
+ *      - Determines if the column is [nullable], [primary], and/or [automatic].
+ *      - Uses logic to infer [automatic:true] from identity or default value.
+ *      - Adds all details to a [return-nodes] structure for the final response.
+ *
+ * 6. Type Mapping to Hyperlambda:
  * 
- * - [connection-string] - What connection string to use
- * - [database] - What database you want to check
- * - [table] - What table you want to check
+ * | SQL Server Type        | Hyperlambda Type |
+ * |------------------------|------------------|
+ * | int, bigint, smallint  | long             |
+ * | float, real, money     | decimal          |
+ * | datetime, date, time   | date             |
+ * | bit                    | bool             |
+ * | varchar, ntext, uuid   | string           |
+ * | timestamp, rowversion  | string + automatic:true |
+ *
+ * 7. [return-nodes]
+ *    * Returns a list of column metadata nodes to the caller.
+ *
+ * Use Cases:
+ * * Dynamic form generation
+ * * Code scaffolding
+ * * Runtime validation
+ * * Model discovery and documentation tools
  */
 slots.create:magic.db.mssql.columns
 

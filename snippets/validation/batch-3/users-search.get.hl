@@ -1,10 +1,39 @@
 
 /*
- * Perform a distinct keyword search on the users table in your CRM database.
- * 
- * Requires a [query] string of space-separated keywords, and optionally [limit] and [offset] for pagination.
- * The logic ranks rows by the number of distinct matched keywords first, and keyword density second.
- * Searches the [username], [password], [email], and [role] columns using full-text style logic.
+ * This HTTP Web API endpoint performs a full-text style distinct keyword search against the [users] table in the [crm] SQLite database.
+ *
+ * 1. [.arguments]
+ *    - Requires a [query] argument, which is space-separated keywords.
+ *    - Supports pagination through optional [limit] and [offset] parameters.
+ *
+ * 2. [validators]
+ *    - Validates that the [query] argument is provided and sets a default [limit] of 10 records if not explicitly given.
+ *
+ * 3. [.words] and [.columns]
+ *    - Splits the [query] string into individual lowercase keywords.
+ *    - Specifies which columns in the table to search: [username], [password], [email], and [role].
+ *
+ * 4. [data.connect]
+ *    - Opens a connection to the [crm] SQLite database.
+ *
+ * 5. [.sql]
+ *    - Dynamically builds a complex SQL query that:
+ *      - Computes a [keyword_density] score using string length and replacement functions to assess keyword repetition.
+ *      - Computes a [keyword_count] score based on how many distinct keywords match in the concatenated string of the selected columns.
+ *      - Filters rows to only include those with at least one matched keyword.
+ *      - Orders results by [keyword_count] (descending) and [keyword_density] (descending) to prioritize relevance.
+ *      - Paginates results using [limit] and optional [offset].
+ *
+ * 6. [data.select]
+ *    - Executes the dynamically built SQL against the database.
+ *
+ * 7. [remove-nodes]
+ *    - Cleans up helper fields ([keyword_density] and [keyword_count]) before returning data.
+ *
+ * 8. [return-nodes]
+ *    - Returns the filtered and ranked list of users that matched the search query.
+ *
+ * This endpoint is useful for implementing intelligent user search features in CRM dashboards or administration panels.
  */
 .arguments
 

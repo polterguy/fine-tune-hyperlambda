@@ -1,15 +1,34 @@
 
 /*
- * Write a Hyperlambda HTTP endpoint that does the following;
- *
- * Adds the specified link table to the specified database.
+ * This Hyperlambda HTTP endpoint dynamically creates a many-to-many link table in a SQL database.
  * 
- * Arguments;
- * - [databaseType] - Database type, typically 'mssql' or 'mysql'.
- * - [connectionString] - Connection string to use
- * - [databaseName] - Name of database
- * - [args] - Link table declaration
- * - [generate] - If true will not execute SQL but only return DDL to caller
+ * 1. [.arguments]
+ *    - Accepts the database type, connection string, database name, and the link table schema including PK columns from [table1] and [table2].
+ *    - Supports an optional [generate] argument to return the DDL SQL without executing it.
+ *
+ * 2. [auth.ticket.verify]
+ *    - Ensures only users with [root] privileges can invoke this endpoint.
+ *
+ * 3. [validators.mandatory], [validators.enum]
+ *    - Validates that essential inputs like [databaseType], [connectionString], and [args] are present and legal.
+ *
+ * 4. [.sql], [.pk], [.fk], [.first]
+ *    - Constructs the SQL DDL string by:
+ *      - Declaring each primary key column from both tables.
+ *      - Including optional foreign key references (if not MySQL).
+ *      - Composing a [primary key(...)] constraint combining all PKs.
+ *
+ * 5. [generate]
+ *    - If [generate] is true, returns the composed SQL to the client without executing it.
+ *
+ * 6. [data.connect], [data.execute]
+ *    - Executes the generated SQL to create the link table in the target database.
+ *    - Clears any cached metadata for the given connection to refresh schema state.
+ *
+ * 7. [return]
+ *    - Returns a success response with the raw SQL statement for audit or debugging purposes.
+ *
+ * This endpoint is ideal for auto-generating normalized relational schemas when defining join/link tables in dynamic database modeling tools.
  */
 .arguments
    databaseType:string

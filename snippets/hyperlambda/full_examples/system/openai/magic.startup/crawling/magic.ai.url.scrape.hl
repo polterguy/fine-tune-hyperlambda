@@ -1,19 +1,41 @@
 
 /*
- * Generate a slot that does the following;
+ * Creates a dynamic slot named [magic.ai.url.scrape] that scrapes a web page and generates machine learning training snippets from the content.
  *
- * Scrapes specified [url] and creates machine learning training snippets from page,
- * by semantically chopping up page into training snippets.
+ * 1. [slots.create]
+ *    * Declares a new reusable slot named [magic.ai.url.scrape] for use in training data automation.
  *
- * Arguments:
+ * 2. [validators.mandatory], [validators.url], and [validators.default]
+ *    * Validates required input like [url] and [type], and applies default values to optional parameters like [summarize], [images], [lists], and [code].
  *
- * - [url] - What URL to scrape.
- * - [type] - What type to import training snippets into.
- * - [summarize] - If true will summarize all training snippets that are larger than 1,000 tokens.
- * - [headers] - Optional collection of HTTML headers we should associate with HTTP request.
- * - [images] - If true will import images
- * - [lists] - If true will import lists
- * - [code] - If true will import code
+ * 3. [sockets.signal]
+ *    * Sends feedback messages to the frontend or user interface in real-time using a specified [feedback-channel].
+ *
+ * 4. [signal:magic.ai.url.get]
+ *    * Scrapes the target URL and returns its HTML content.
+ *
+ * 5. [signal:magic.ai.html.extract]
+ *    * Parses the HTML into semantically meaningful snippets, supporting optional extraction of images, lists, and code.
+ *
+ * 6. [openai.tokenize] + [http.post]
+ *    * Uses OpenAI to summarize snippets that exceed 80% of the model's max token context, ensuring training data remains concise.
+ *
+ * 7. [data.connect] + [data.create] + [data.update] + [data.read]
+ *    * Performs CRUD operations to persist new snippets or update existing ones, based on content similarity and prompts.
+ *
+ * 8. [data.execute]
+ *    * Ensures VSS indexes are clean by deleting linked vector references when snippets are updated or deleted.
+ *
+ * 9. [lambda2hyper] + [strings.concat] + [context:fingerprint]
+ *    * Handles formatting, context management, and payload conversion as needed.
+ *
+ * 10. [return]
+ *    * Returns any URLs found during scraping for further crawling or reporting.
+ *
+ * Use cases:
+ * * Automatically populating an AI system with curated content from a webpage.
+ * * Reducing manual labor by summarizing and extracting structured data from URLs.
+ * * Integrating real-time feedback during data processing to improve UX for admins or curators.
  */
 slots.create:magic.ai.url.scrape
 

@@ -1,5 +1,40 @@
 
-// Returns a JWT token wrapping the user associated with the public key used to verify the cryptographic signature used to sign the payload.
+/*
+ * Implements a secure cryptographic authentication mechanism using signed payloads and public key infrastructure (PKI).
+ *
+ * 1. [.arguments]
+ *    - Accepts a [challenge] string, which is expected to be a signed payload.
+ *
+ * 2. [crypto.get-key]
+ *    - Extracts the fingerprint of the public key used to sign the challenge.
+ *    - This allows lookup of the key in the [crypto_keys] table to ensure validity and trust.
+ *
+ * 3. [data.read] (first)
+ *    - Reads the [crypto_keys] table to retrieve the actual public key content and key ID matching the extracted fingerprint.
+ *    - Ensures the key is enabled before proceeding.
+ *
+ * 4. [crypto.verify]
+ *    - Verifies the signature of the [challenge] using the previously retrieved public key content.
+ *    - If the signature is invalid, an exception is thrown and processing stops.
+ *
+ * 5. [cache.get]
+ *    - Ensures that the challenge corresponds to a known valid session marker ("VALID") to mitigate replay attacks.
+ *    - If it does not match, the process is aborted with an HTTP 401 Unauthorized error.
+ *
+ * 6. [data.read] (second)
+ *    - Uses the verified key ID to find the associated username from the [users_crypto_keys] mapping table.
+ *
+ * 7. [signal:magic.auth.authenticate]
+ *    - Issues a JWT token for the associated user without checking password credentials (passwordless auth).
+ *
+ * 8. [cache.set]
+ *    - Invalidates the challenge key in cache to enforce one-time use and prevent replay attacks.
+ *
+ * 9. [return]
+ *    - Returns the JWT token to the caller under the [result] node.
+ *
+ * This logic provides a stateless authentication system using cryptographically signed payloads and enforces strict one-time use guarantees.
+ */
 .arguments
    challenge:string
 

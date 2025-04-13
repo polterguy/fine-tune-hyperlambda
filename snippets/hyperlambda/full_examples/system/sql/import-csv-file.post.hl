@@ -1,14 +1,24 @@
-/*
- * Create an HTTP API endpoint that imports a CSV file into a specified database table.
- *
- * - Accepts [databaseType], [connectionString], [databaseName], and a CSV [file] as arguments.
- * - Reads and sanitizes the CSV file, inferring column types as 'numeric' or 'text' based on data.
- * - Automatically creates a new table and columns based on the file structure (if not already existing).
- * - Inserts all records from the CSV file into the generated table using the appropriate database connector.
- * - Sends socket signals to the frontend for status updates and logs key steps.
- * - Uses a background thread ([fork]) to handle the import to avoid server timeouts.
- */
 
+/*
+ * This endpoint enables automated CSV imports into a dynamic database table.
+ *
+ * # Features:
+ * - Accepts a CSV [file] with connection information ([connectionString], [databaseType], and [databaseName]).
+ * - Infers column types automatically (text vs. numeric) based on content.
+ * - Creates a new table dynamically based on sanitized CSV headers.
+ * - Inserts all CSV data into the created table, using the correct database connector.
+ * - Sends status updates to frontend via [sockets.signal] and writes logs using [log.info] and [log.error].
+ * - Uses [fork] to run the heavy import task on a background thread to avoid HTTP timeouts.
+ * - Applies data sanitation via [strings.replace-not-of], [strings.to-lower], and [remove-nodes].
+ * - Uses [csv2lambda] to convert raw CSV data into a Hyperlambda node structure.
+ * - Caches database structure after DDL operations to avoid stale state using [cache.set].
+ *
+ * # Notes:
+ * - Table and column names are normalized to lowercase alphanumerics using underscore separators.
+ * - Primary key is automatically named '[tableName]_id'.
+ * - If table already exists, import proceeds with insert-only logic.
+ * - All type detection and DDL creation steps are guarded with fallback logic to avoid breaking the import.
+ */
 .arguments
    databaseType:string
    connectionString:string

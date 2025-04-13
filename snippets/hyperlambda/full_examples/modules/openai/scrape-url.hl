@@ -1,10 +1,32 @@
 
 /*
- * Write Hyperlambda that scrapes a URL
- * 
- * Hyperlambda code is an HTTP web API endpoint file
+ * This Hyperlambda HTTP web API endpoint scrapes a specified [url] and returns the content in Markdown format,
+ * while ensuring that the result does not exceed the context size limitations of a machine learning [type], if specified.
  *
- * Scrapes the specified [url] and returns the result to caller as Markdown.
+ * 1. [.arguments]
+ *    * Declares the HTTP API parameters for the endpoint.
+ *    * [_type] is optional and refers to a machine learning type (e.g., for later use in OpenAI context).
+ *    * [url] is mandatory and indicates the target URL to scrape.
+
+ * 2. [execute:magic.workflows.actions.execute]
+ *    * Executes the scraping logic defined in the [openai-scrape-url.hl] file.
+ *    * It retrieves the raw content and Markdown conversion for the specified URL.
+
+ * 3. [.max-tokens]
+ *    * Defaults to 100,000 tokens unless overridden by the context limit of a specific ML type.
+ *    * If [_type] is provided, the actual max context tokens are fetched from the [ml_types] table.
+
+ * 4. Pruning logic
+ *    * Ensures the result remains below the max context token limit.
+ *    * If the [urls] content is too long, it starts removing URLs from the response.
+ *    * If that’s not enough, it trims the Markdown content until it fits within the limits.
+
+ * 5. [return-nodes]
+ *    * Returns the final scraped and pruned content back to the client.
+ *    * This will be Markdown text and optionally a [urls] list if not pruned entirely.
+
+ * Use case:
+ * * Ensures safe scraping and dynamic context trimming for downstream AI workflows, especially OpenAI-based contexts.
  */
 .arguments
 

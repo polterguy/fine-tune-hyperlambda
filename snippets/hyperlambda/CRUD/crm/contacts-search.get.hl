@@ -1,9 +1,49 @@
 
 /*
- * Distinct Keyword Search from contacts table in crm database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * This endpoint performs a keyword search against the [contacts] table in the 'crm' database using multiple fields.
+ *
+ * 1. [.arguments]
+ *    * Takes the following parameters:
+ *      - [query]: Required. A string containing space-separated keywords to search for.
+ *      - [limit]: Optional. Maximum number of rows to return. Defaults to 10. Use -1 for no limit.
+ *      - [offset]: Optional. For paginated results.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that the [query] argument is present before proceeding.
+ *
+ * 3. [validators.default]
+ *    * Sets default for [limit] if the user does not specify it.
+ *
+ * 4. [.words]
+ *    * Splits the [query] string into multiple lowercase keyword tokens for full-text matching.
+ *
+ * 5. [.columns]
+ *    * Defines which columns in the [contacts] table are used for keyword matching:
+ *      - [name], [email], [phone], and [position]
+ *
+ * 6. [data.connect]
+ *    * Connects to the 'crm' database via the [generic] connection string using SQLite driver.
+ *
+ * 7. [.sql]
+ *    * Dynamically constructs SQL with two computed fields:
+ *      - [keyword_density]: Reflects how many times the keywords appear (ratio).
+ *      - [keyword_count]: Number of distinct keywords matched.
+ *    * Each keyword is securely passed in via dynamic parameters (e.g., [@p0], [@p1]).
+ *
+ * 8. [data.select]
+ *    * Executes the dynamically constructed SQL and retrieves records where at least one keyword is found.
+ *    * Results are sorted by [keyword_count] descending, then [keyword_density] descending for relevance.
+ *
+ * 9. [remove-nodes]
+ *    * Cleans up temporary metadata columns [keyword_density] and [keyword_count] before returning the data.
+ *
+ * 10. [return-nodes]
+ *     * Returns a filtered and sorted list of matching contacts to the caller.
+ *
+ * **Use cases:**
+ * * CRM interfaces enabling users to search for contacts by free-text queries.
+ * * Implementing smart search across fields such as name, email, and job title.
+ * * Enhancing sales workflows with keyword-filtered contact lists.
  */
 .arguments
 

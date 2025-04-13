@@ -1,6 +1,52 @@
 
 /*
- * Show me an endpoint taking no arguments that's cancelling the user's active subscriptions
+ * This Hyperlambda endpoint cancels all active subscriptions for the currently authenticated user.
+ *
+ * 1. [.arguments]
+ *    * Empty to prevent arguments from being passed in by the caller.
+ *
+ * 2. [.extra]
+ *    * Buffer to hold metadata from the [users_extra] table, such as the user's [email] and [name].
+
+ * 3. [auth.ticket.get]
+ *    * Retrieves the username from the currently authenticated JWT token.
+
+ * 4. [execute:magic.workflows.actions.execute]
+ *    * Executes a workflow file that searches for all Stripe subscriptions associated with the current user.
+ *    * The [username] argument filters results to only the subscriptions belonging to the invoking user.
+
+ * 5. [for-each:x:@execute/*]
+ *    * Iterates over each active subscription returned by the previous step.
+
+ * 6. [execute:magic.workflows.actions.execute]
+ *    * Executes a workflow that deletes the Stripe subscription identified by the [subscription_id].
+
+ * 7. [try/.catch]
+ *    * Wraps each subscription deletion in error handling logic to log failures without interrupting the flow.
+
+ * 8. [data.connect:magic]
+ *    * Opens a connection to the "magic" database.
+
+ * 9. [data.delete]
+ *    * Deletes all user roles except for [guest] and [root], effectively removing paid-tier roles.
+
+ * 10. [data.read]
+ *     * Reads extra information such as [name] and [email] from [users_extra] table for the current user.
+
+ * 11. [for-each:x:@data.read/*]
+ *     * Loops through the result set, extracting [type] and [value] as key-value pairs, then adds them to [.extra].
+
+ * 12. [execute:magic.auth.authenticate]
+ *     * Re-authenticates the user to reflect updated roles and generates a new JWT token.
+
+ * 13. [yield]
+ *     * Returns the new authentication [ticket] and the user's extra data in [extra] to the caller.
+ *
+ *
+ * **Use cases:**
+ * * Enables end-users to cancel their own subscriptions.
+ * * Useful in customer self-service portals or account termination workflows.
+ * * Ensures clean revocation of privileges and data removal for compliant account offboarding.
  */
 .arguments
 

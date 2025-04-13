@@ -1,14 +1,51 @@
 
 /*
- * Generate a dynamic Hyperlambda slot that does the following;
+ * This dynamic slot [magic.db.mysql.columns] returns standardized metadata for each column in a given MySQL table.
  *
- * Lists all columns in some MySQL table.
- * 
- * Arguments
- * 
- * - [connection-string] - What connection string to use
- * - [database] - What database you want to check
- * - [table] - What table you want to check
+ * 1. [.arguments]
+ *    * Accepts the following parameters:
+ *      - [connection-string]: Optional. If omitted, the slot defaults to [generic] connection.
+ *      - [database]: Required. The target MySQL database name.
+ *      - [table]: Required. The name of the table whose column structure you want to retrieve.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that [database] and [table] are specified.
+ *
+ * 3. [.connection]
+ *    * Composes the full connection string from [connection-string] and [database], falling back to [generic] if not provided.
+ *
+ * 4. [mysql.connect]
+ *    * Establishes a connection to the MySQL database using the assembled connection string.
+ *
+ * 5. [mysql.select:"describe `table`"]
+ *    * Executes a DESCRIBE query to fetch column metadata such as type, nullability, default values, etc.
+ *
+ * 6. [for-each:x:@mysql.select/*]
+ *    * Iterates over each column returned by the DESCRIBE query.
+ *
+ * 7. [.tmp]
+ *    * Holds metadata for a single column including:
+ *      - [name]: Name of the column.
+ *      - [db]: The database type string (e.g., 'varchar(255)', 'tinyint(1)', etc.).
+ *      - [nullable]: Boolean indicating if the column is nullable.
+ *      - [primary]: Boolean indicating if the column is part of the primary key.
+ *      - [automatic]: Boolean indicating if the column has a default or is auto-incremented.
+ *
+ * 8. [.type] and [switch]
+ *    * Cleans and maps the [db] column type into a Hyperlambda type:
+ *      - MySQL types are normalized by removing precision (e.g., 'varchar(255)' -> 'varchar').
+ *      - Types are mapped into: [string], [long], [bool], [decimal], [date] based on matching cases.
+ *
+ * 9. [unwrap] and [add]
+ *    * Composes the full column metadata structure for output by attaching the resolved [hl] Hyperlambda type.
+ *
+ * 10. [return-nodes]
+ *     * Returns the complete list of structured column metadata to the caller.
+ *
+ * **Use cases:**
+ * * Great for introspecting MySQL table schemas in dynamic environments.
+ * * Useful in admin panels or automation tools to generate forms and APIs.
+ * * Assists machine learning pipelines by exposing column structures for model input mapping.
  */
 slots.create:magic.db.mysql.columns
 

@@ -1,9 +1,44 @@
 
 /*
- * Distinct Keyword Search from Regions table in northwind database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * Performs a distinct keyword search from the [Regions] table in the [northwind] SQLite database.
+ *
+ * 1. [.arguments]
+ *    * Accepts:
+ *      - [query] (required): the search string containing space-separated keywords.
+ *      - [limit] (optional): max number of results, defaults to 10.
+ *      - [offset] (optional): number of records to skip (used for pagination).
+ *
+ * 2. [validators.mandatory], [validators.default]
+ *    * Validates that [query] is supplied and applies a default [limit] of 10.
+ *
+ * 3. [.words]
+ *    * Splits [query] into individual keywords and ensures all are in lowercase.
+ *
+ * 4. [.columns]
+ *    * Specifies the searchable columns in the [Regions] table: [RegionDescription].
+ *
+ * 5. [data.connect]
+ *    * Connects to the [northwind] SQLite database using a generic connection string.
+ *
+ * 6. [.sql] logic
+ *    * Dynamically constructs a SQL query that:
+ *      - Calculates a [keyword_density] score based on frequency of keywords.
+ *      - Counts how many distinct keywords are matched in each row as [keyword_count].
+ *      - Filters out records that match none of the keywords.
+ *      - Orders results by [keyword_count] (descending), then [keyword_density].
+ *
+ * 7. [set-name], [unwrap]
+ *    * Dynamically creates query parameters for safe SQL substitution.
+ *
+ * 8. [remove-nodes]
+ *    * Cleans up temporary scoring fields before returning results to the caller.
+ *
+ * 9. [return-nodes]
+ *    * Sends the final filtered and sorted dataset back to the API client.
+ *
+ * Use cases:
+ * * Keyword-based search across geographic region metadata.
+ * * Interactive region lookup with full-text relevance ranking.
  */
 .arguments
 

@@ -1,9 +1,42 @@
 
 /*
- * Distinct Keyword Search from Categories table in northwind database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * Performs a distinct keyword search from the [Categories] table in the [northwind] SQLite database.
+ *
+ * 1. [.arguments]
+ *    * Accepts a mandatory [query] for keyword input, along with optional [limit] and [offset] values.
+ *    * The [limit] defaults to 10 if not specified, and -1 returns all matching rows.
+ *
+ * 2. [validators.mandatory], [validators.default]
+ *    * Ensures [query] is provided and sets a default limit.
+ *
+ * 3. [.words]
+ *    * Tokenizes the query into lowercase words using space as the delimiter, to support multi-word search input.
+ *
+ * 4. [.columns]
+ *    * Declares which columns to search across in the [Categories] table: [CategoryName], [Description], and [Picture].
+ *
+ * 5. [data.connect]
+ *    * Opens a connection to the [northwind] SQLite database using the configured connection string.
+ *
+ * 6. [.sql] generation
+ *    * Dynamically builds a SQL query that:
+ *       - Calculates a [keyword_density] using frequency of all keywords in selected text.
+ *       - Calculates a [keyword_count] based on the number of distinct keywords matched.
+ *       - Filters results to only include rows where at least one keyword is present.
+ *       - Orders by [keyword_count] and [keyword_density] to prioritize most relevant rows.
+ *
+ * 7. [set-name], [unwrap]
+ *    * Adds dynamic SQL parameters for each keyword and ensures safe substitution to prevent SQL injection.
+ *
+ * 8. [remove-nodes]
+ *    * Removes helper columns ([keyword_density] and [keyword_count]) from the final result for cleaner output.
+ *
+ * 9. [return-nodes]
+ *    * Returns the filtered, sorted, and structured result set to the caller as a plain list of matching rows.
+ *
+ * Use cases:
+ * * Searching product categories with relevance-based ranking.
+ * * Implementing full-text search across semi-structured textual data in SQLite.
  */
 .arguments
 

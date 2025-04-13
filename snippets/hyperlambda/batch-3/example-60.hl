@@ -1,4 +1,39 @@
-// Accepts CSV files and stores them in [/var/import/staging/] for later processing
+
+/*
+ * This Hyperlambda HTTP endpoint allows uploading CSV files to the '/var/import/staging/' directory.
+ *
+ * ## Slot Documentation
+ *
+ * - [validators.mandatory]
+ *   Ensures that the specified nodes exist and are not null. This slot is used to validate the presence of:
+ *     - [file]
+ *     - [file/*/name]
+ *     - [file/*/stream]
+ *
+ * - [.accept]
+ *   Declares the MIME type(s) the endpoint can consume. In this case, it accepts 'multipart/form-data' for file uploads.
+ *
+ * - [strings.end-with]
+ *   Checks if the uploaded filename ends with the '.csv' extension. If not, an exception is thrown.
+ *
+ * - [throw]
+ *   Used to return an error to the client if the uploaded file is not a CSV. This halts execution and returns a descriptive error.
+ *
+ * - [strings.concat]
+ *   Concatenates the target folder path and uploaded file's name to produce the full file path.
+ *
+ * - [set-value]
+ *   Assigns the resulting file path from the concatenation into [.staging-file-path] for use in file saving.
+ *
+ * - [io.stream.save-file]
+ *   Streams the uploaded file directly to disk at the specified path, preventing memory overload for large files.
+ *
+ * - [yield]
+ *   Returns a result to the client, here providing a human-readable confirmation message of the successful upload.
+ *
+ * ## Summary
+ * The endpoint is safe, memory-efficient, and file-type aware, and provides feedback to the user upon success or failure.
+ */
 .arguments
    file:*
 
@@ -16,7 +51,7 @@ if
          .:.csv
    .lambda
 
-      throw:I can only deal with PDF files
+      throw:I can only deal with CSV files
 
 // Define a variable [.staging-file-path] that holds the full path to save the file
 .staging-file-path

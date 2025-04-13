@@ -1,11 +1,27 @@
 
 /*
- * Create an HTTP endpoint that does the following;
+ * This HTTP POST endpoint forwards OpenAI chat requests to its GET-based equivalent [chat.get.hl],
+ * allowing for consistent chat behavior regardless of HTTP method.
  *
- * OpenAI chat endpoint, for having conversations using "gpt-xxx" models.
+ * 1. [.arguments]
+ *    * Declares all expected input fields such as [prompt], [type], [stream], [session], etc.
+ *    * These arguments are forwarded to the GET version of the chat handler.
  *
- * Notice, if you set [stream] to true the endpoint will stream response tokens over the specified
- * [session] back to caller. Forwards the heavy lifting to its HTTP GET equivalent
+ * 2. [add:x:+]
+ *    * Prepares the full argument set dynamically by copying all [arguments/*] into the current execution context.
+ *    * This ensures the downstream file receives the complete context without needing explicit parameter mapping.
+ *
+ * 3. [execute-file:/system/openai/chat.get.hl]
+ *    * Executes the GET-based chat handler.
+ *    * This centralizes the actual chat logic in a single Hyperlambda file and reduces duplication.
+ *
+ * 4. [return-nodes:x:-/*]
+ *    * Forwards the result returned from the GET-based chat logic directly to the HTTP response.
+ *
+ * Use cases:
+ * * Provides POST-based invocation to match frontend expectations or allow for larger payloads.
+ * * Useful in scenarios where the HTTP GET version is used internally or cached, and POST is public.
+ * * Supports streaming or synchronous token delivery via [stream] and [session].
  */
 .arguments
    prompt:string

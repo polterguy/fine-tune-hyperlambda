@@ -1,14 +1,27 @@
+
 /*
- * Create a slot that ingests the products for the specified Woocommerce account into ml_training_data.
- * The slot should be named [woocommerce.products.ingest], and it requires the following arguments:
+ * Creates the slot [woocommerce.products.ingest] to import products from a WooCommerce store into [ml_training_snippets].
  *
- * - [type], machine learning type to ingest products into
- * - [base-url], the base URL of the WooCommerce shop. Needed to correctly insert image URLs
- * - [username], WooCommerce username required to authenticate towards WooCommerce
- * - [password], WooCommerce password
- * - [secret], WooCommerce secret
+ * Required arguments:
+ * - [type] : The machine learning type to insert snippets into.
+ * - [base-url] : The base URL of the WooCommerce shop.
+ * - [username] : The WooCommerce API username for authentication.
+ * - [secret] : The WooCommerce API secret (API key).
  *
- * In addition it can optionally take additional arguments, such as [quantity], [vectorize], [max_tokens], etc.
+ * Optional arguments include:
+ * - [quantity] : Whether to include quantity (default is true).
+ * - [vectorize] : If true, the slot triggers a [magic.ai.vectorise] call after import (default is true).
+ * - [max_tokens] : Maximum allowed tokens per context (default is 1000).
+ *
+ * The slot performs the following:
+ * - Deletes any previously imported WooCommerce snippets tagged with [woocommerce-import].
+ * - Iteratively fetches products from the WooCommerce REST API using Basic Auth.
+ * - For each product:
+ *     - Converts HTML descriptions to Markdown via [html2markdown].
+ *     - Constructs a prompt from product description and a completion including price, link, and images.
+ *     - Inserts the product into the [ml_training_snippets] table.
+ * - Optionally vectorizes the model after import.
+ * - Catches and logs any exception that occurs during the import process.
  */
 slots.create:woocommerce.products.ingest
 

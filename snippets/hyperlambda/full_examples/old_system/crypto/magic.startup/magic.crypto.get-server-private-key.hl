@@ -1,5 +1,30 @@
 
-// Returns the private server key.
+/*
+ * This slot [magic.crypto.get-server-private-key] returns the server's RSA private key along with its fingerprint.
+ *
+ * 1. [io.file.load:/etc/system/crypto/keys/public.key]
+ *    * Loads the public key from disk to generate its fingerprint.
+ *    * This fingerprint uniquely identifies the key pair and ensures the integrity of the keys.
+ *
+ * 2. [crypto.fingerprint]
+ *    * Creates a cryptographic fingerprint from the loaded public key.
+ *    * Used to validate that the private key matches its corresponding public key.
+ *
+ * 3. [io.file.load:/etc/system/crypto/keys/private.key]
+ *    * Loads the corresponding private key from the file system for return.
+ *    * The private key is assumed to be safely stored and only accessible by root or privileged roles.
+ *
+ * 4. [unwrap]
+ *    * Ensures that child values such as private key and fingerprint are evaluated and passed to the [return-nodes] slot.
+ *
+ * 5. [return-nodes]
+ *    * Returns a response containing both the [private-key] and its [fingerprint] to the caller.
+ *
+ * Use Cases:
+ * * Needed for internal cryptographic operations, like signing payloads.
+ * * Facilitates secure machine-to-machine authentication where the private key is required.
+ * * Should be protected to prevent unauthorized access to private credentials.
+ */
 slots.create:magic.crypto.get-server-private-key
 
    // Loading public key, since we generate the key pair's fingerprint from it.

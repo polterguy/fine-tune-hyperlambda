@@ -1,10 +1,39 @@
 
 /*
- * Returns minimum, maximum, average, sum or count from your activities table in your crm database grouped by a column.
+ * This HTTP Web API endpoint performs grouped aggregation operations on the [activities] table in the [crm] SQLite database.
  *
- * Endpoint will apply 300 seconds of HTTP cache returning a Cache-Control HTTP header to the client.
- * Only guest users can execute the endpoint, and you can optionally apply filtering on any column
- * that exists in the activities table.
+ * 1. [.arguments]
+ *    - Accepts various parameters for grouping, aggregation, pagination, ordering, and filtering.
+ *    - Mandatory arguments include:
+ *        - [group_column]: The column to group by.
+ *        - [aggregate_function]: One of min, max, sum, avg, or count.
+ *        - [aggregate_column]: The column to aggregate.
+ *    - Also includes filtering options across all available fields in the [activities] table and related [clients] table.
+ *
+ * 2. [validators]
+ *    - Validates mandatory inputs and ensures [aggregate_function], [group_column], and [aggregate_column] are within predefined values.
+ *
+ * 3. [response.headers.set]
+ *    - Adds HTTP cache control to the response with a max-age of 300 seconds to improve frontend performance and reduce load.
+ *
+ * 4. [auth.ticket.verify]
+ *    - Restricts access to the endpoint to guest users only, making it publicly accessible but not writable.
+ *
+ * 5. [data.connect]
+ *    - Opens a connection to the 'crm' SQLite database.
+ *
+ * 6. [data.read]
+ *    - Executes an SQL query with:
+ *        - A LEFT JOIN to the [clients] table (aliased as [client_id]).
+ *        - Aggregate function applied to [aggregate_column].
+ *        - Results grouped by [group_column].
+ *        - Filters applied from input arguments.
+ *        - Supports [limit], [offset], and [order] with [direction].
+ *
+ * 7. [return-nodes]
+ *    - Returns the aggregated results to the client.
+ *
+ * This endpoint is ideal for reporting or dashboard purposes, where grouped summary statistics of activities are needed.
  */
 .arguments
 

@@ -1,9 +1,47 @@
 
 /*
- * Distinct Keyword Search from Employees table in northwind database.
- * 
- * This endpoint will return only records containing one or more of the keywords from the specified [query],
- * with rows containing the most distinct matched keywords appearing first.
+ * This Hyperlambda endpoint performs a keyword search on the [Employees] table in the 'northwind' database,
+ * and returns all matching records containing one or more distinct keywords.
+ *
+ * 1. [.arguments]
+ *    * Declares required input arguments:
+ *      - [query]: A string of space-separated keywords to search for (mandatory).
+ *      - [limit]: Optional number of rows to return, default is 10.
+ *      - [offset]: Optional pagination offset for results.
+ *
+ * 2. [validators.mandatory]
+ *    * Ensures that the [query] argument is present.
+ *
+ * 3. [validators.default]
+ *    * Sets [limit] to 10 if the user did not specify it.
+ *
+ * 4. [.words]
+ *    * Splits the [query] into separate lowercase keywords for processing and comparison.
+ *
+ * 5. [.columns]
+ *    * Defines a list of columns to search across in the [Employees] table. This list is used to construct a unified search expression.
+ *
+ * 6. [data.connect]
+ *    * Opens a connection to the 'northwind' database using the [generic] connection string and sets [database-type] to 'sqlite'.
+ *
+ * 7. [.sql]
+ *    * Dynamically composes a SQL SELECT query with the following computed fields:
+ *      - [keyword_density]: A floating-point value estimating how dense keyword matches are across text.
+ *      - [keyword_count]: An integer count of how many distinct keywords were found in the record.
+ *
+ * 8. [data.select]
+ *    * Executes the fully composed SQL query and uses parameters to safely search for each keyword, avoiding SQL injection.
+ *
+ * 9. [remove-nodes]
+ *    * Removes intermediate helper fields ([keyword_density], [keyword_count]) before sending the response to keep output clean.
+ *
+ * 10. [return-nodes]
+ *     * Returns all records matching the keyword(s), ordered by distinct match count and density.
+ *
+ * **Use cases:**
+ * * Create intelligent keyword-based filtering/search on personnel data.
+ * * Power advanced admin dashboards and search forms.
+ * * Reuse the logic with minimal adjustments for other tables and databases.
  */
 .arguments
 
