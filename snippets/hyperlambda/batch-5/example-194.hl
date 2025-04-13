@@ -1,0 +1,65 @@
+
+/*
+ * Loads a file, filters lines containing a hash symbol (#), and returns those lines to the caller.
+ *
+ * ## Slot Documentation
+ *
+ * - [.arguments]
+ *   Declares the input parameters for the endpoint. This file requires a single argument:
+ *   - [file]: A string representing the path to the file that should be read and processed.
+ *
+ * - [auth.ticket.verify]
+ *   Ensures the user has administrative (root) permissions before continuing.
+ *   This step enforces endpoint security and protects sensitive filesystem operations.
+ *
+ * - [io.file.load]
+ *   Loads the full content of the specified file from disk. The input path is resolved via the [file] argument.
+ *   The result is a single string containing all file content, which is passed to the next processing step.
+ *
+ * - [strings.split]
+ *   Splits the loaded file content into a list of strings based on newline characters (`\n`),
+ *   effectively transforming it into an array of individual lines for filtering.
+ *
+ * - [.lines] and [for-each]
+ *   Initializes an output container [.lines] to hold matching results.
+ *   Then iterates over every line using [for-each], checking if the line contains a hash character (`#`).
+ *   This check is done using [strings.contains], and if the line matches, it's unwrapped and added to [.lines].
+ *
+ * - [yield]
+ *   Returns the final list of filtered lines to the caller.
+ *   The use of `x:@.lines/*` ensures only lines with a `#` are included in the response.
+ *   The output is a clean array of matched strings, suitable for client consumption.
+ *
+ * ## Summary
+ * This endpoint reads a file, parses it line-by-line, and filters for lines containing `#` symbols—
+ * commonly used for comments or tags. It’s useful for extracting metadata, annotations, or comment blocks
+ * from configuration or script files. The use of [yield] ensures that the resulting output is unwrapped and properly formatted.
+ */
+.arguments
+   file:string
+
+// Ensures user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Loads file's content.
+io.file.load:x:@.arguments/*/file
+
+// Splits file into lines.
+strings.split:x:@io.file.load
+   .:"\n"
+
+// Filters lines containing '#'
+.lines
+for-each:x:@strings.split/*
+   if
+      strings.contains:x:@.dp/#
+         .:#
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.lines
+            .
+               .:x:@.dp/#
+
+// Returns filtered lines to caller.
+yield
+   content:x:@.lines/*

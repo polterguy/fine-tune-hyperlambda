@@ -1,0 +1,48 @@
+/*
+ * Loads a file and returns all lines that begin with `//`, indicating single-line comments in many programming languages.
+ *
+ * ## Slot Documentation
+ *
+ * - [.arguments]
+ *   Declares the required input: [file], which is the file path to load and process.
+ *
+ * - [auth.ticket.verify]
+ *   Restricts access to the endpoint to users with root-level permissions.
+ *
+ * - [io.file.load]
+ *   Loads the content of the provided file path into memory as a raw string.
+ *
+ * - [strings.split]
+ *   Breaks the loaded file content into individual lines using newline (`\n`) as the delimiter.
+ *
+ * - [.lines] and [for-each]
+ *   Iterates over each line and checks if it starts with `//` using [strings.starts-with].
+ *   If the condition is met, the line is added to [.lines].
+ *
+ * - [yield]
+ *   Returns all matched comment lines in a clean array to the client.
+ *
+ * ## Summary
+ * This snippet is ideal for extracting code comments from source files.
+ * It demonstrates how to combine file parsing, filtering, and secure access control.
+ */
+.arguments
+   file:string
+
+auth.ticket.verify:root
+io.file.load:x:@.arguments/*/file
+strings.split:x:@io.file.load
+   .:"\n"
+
+.lines
+for-each:x:@strings.split/*
+   if
+      strings.starts-with:x:@.dp/#
+         .://
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.lines
+            .
+               .:x:@.dp/#
+yield
+   comments:x:@.lines/*

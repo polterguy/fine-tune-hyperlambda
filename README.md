@@ -28,7 +28,12 @@ Below are some example prompts you can run through the model after fine tuning i
 * How do I send an email?
 * Write an endpoint taking age and name, and responding with a personal greeting
 * Select contacts records from my ERP database.
+  - Wrap it into an endpoint and returns contacts.
+  - Add paging arguments
+  - Add filtering on name
 * Create an endpoint taking a message only allowing admin users to execute it, then log the message
+  - Return success
+  - Add 30 seconds of http caching
 * Create an endpoint that allows me to return records from my employees table in my hr database with paging and sorting.
   - Make sorting optional
   - Make paging optional
@@ -37,6 +42,8 @@ Below are some example prompts you can run through the model after fine tuning i
 * Create an endpoint allowing me to create new items in my contacts table in my CRM database.
   - Make email mandatory
   - Make sure email is a valid email address
+  - Return result of data.create as [result]
+  - remove message from return
 * Generate an API endpoint allowing me to select users from employees database, with optional filtering for name, email, and phone
 * Generate an endpoint that only partner users can execute
 * How do I retrieve a configuration value named 'foo' inside of my 'magic' section?

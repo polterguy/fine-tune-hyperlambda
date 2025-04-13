@@ -1,0 +1,42 @@
+/*
+ * Reads a file and returns the number of lines that contain the word "ERROR".
+ *
+ * ## Slot Documentation
+ *
+ * - [.arguments]
+ *   The [file] argument specifies which file to load from the filesystem.
+ *
+ * - [auth.ticket.verify]
+ *   Validates that the caller has root access to prevent unauthorized reads.
+ *
+ * - [io.file.load] + [strings.split]
+ *   Loads the full file content and splits it into individual lines using newline delimiters.
+ *
+ * - [for-each] and [.count]
+ *   Iterates over each line and checks for the substring `"ERROR"` using [strings.contains].
+ *   A counter is incremented for each match.
+ *
+ * - [yield]
+ *   Returns the final count of error lines to the caller.
+ *
+ * ## Summary
+ * This logic is suitable for simple log scanning or alerting systems that report the number
+ * of error entries in a server or application log.
+ */
+.arguments
+   file:string
+
+auth.ticket.verify:root
+io.file.load:x:@.arguments/*/file
+strings.split:x:@io.file.load
+   .:"\n"
+
+.count:int:0
+for-each:x:@strings.split/*
+   if
+      strings.contains:x:@.dp/#
+         .:ERROR
+      .lambda
+         math.increment:x:@.count
+yield
+   error_count:x:@.count

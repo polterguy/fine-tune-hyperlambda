@@ -1,0 +1,45 @@
+/*
+ * Loads a file and returns only non-empty lines, removing any blank or whitespace-only entries.
+ *
+ * ## Slot Documentation
+ *
+ * - [.arguments]
+ *   Accepts a single [file] string argument representing the file to read.
+ *
+ * - [auth.ticket.verify]
+ *   Ensures only root users can access this endpoint for security purposes.
+ *
+ * - [io.file.load] + [strings.split]
+ *   Loads file contents and splits it into individual lines.
+ *
+ * - [.lines] and [for-each]
+ *   Filters out empty lines using [strings.trim] + [neq] to ignore whitespace-only lines.
+ *
+ * - [yield]
+ *   Returns a clean list of all non-empty lines.
+ *
+ * ## Summary
+ * Useful for pre-processing or sanitizing files by eliminating empty lines,
+ * making the output suitable for log display, script parsing, or text normalization.
+ */
+.arguments
+   file:string
+
+auth.ticket.verify:root
+io.file.load:x:@.arguments/*/file
+strings.split:x:@io.file.load
+   .:"\n"
+
+.lines
+for-each:x:@strings.split/*
+   if
+      neq
+         strings.trim:x:@.dp/#
+         .:
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.lines
+            .
+               .:x:@.dp/#
+yield
+   content:x:@.lines/*
