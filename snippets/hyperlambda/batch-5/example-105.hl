@@ -1,0 +1,73 @@
+
+/*
+ * This Hyperlambda file demonstrates conditional data retrieval based on a provided input parameter.
+ * It uses several core slots including [data.connect], [if], [else-if], [else], [eq], [add], and [yield]
+ * to evaluate input, query the appropriate database table, and return the result dynamically.
+ *
+ * [.arguments]
+ *   - A root-level node representing incoming arguments to the lambda.
+ *   - It defines one argument: [type], which is a string and determines which table to query.
+ *
+ * [.result]
+ *   - A placeholder node used to store the output of the conditional database read operation.
+ *
+ * [data.connect:supply_chain]
+ *   - Opens a connection to the 'supply_chain' database.
+ *   - All [data.read] operations must be executed inside an open [data.connect] block.
+ *
+ * [if], [else-if], [else]
+ *   - These slots control conditional branching.
+ *   - [if] evaluates if [type] equals 'customer'.
+ *   - [else-if] evaluates if [type] equals 'vendor'.
+ *   - [else] serves as a fallback, triggered if neither of the above conditions is met.
+ *
+ * [eq:x:@.arguments/*/type .:customer]
+ *   - Compares the value of the [type] argument to the string 'customer'.
+ *   - This is a standard equality comparison that returns true or false.
+ *
+ * [.lambda]
+ *   - Encapsulates logic to execute only if the associated condition is met.
+ *   - Required inside [if] and [else-if] when executing multiple nodes.
+ *
+ * [add:x:@.result]
+ *   - Adds child nodes to the [.result] node.
+ *   - Used here to store the output of the [data.read] slot inside [.result].
+ *
+ * [data.read]
+ *   - Reads data from a table in the connected database.
+ *   - The [table] sub-node specifies which table to read from (e.g. 'customers', 'vendors', or 'partners').
+ *
+ * [yield]
+ *   - Used to return a value or structure from a lambda function.
+ *   - In this case, returns the [.result] node contents to the caller.
+ *
+ * Result:
+ *   - If 'type' is 'customer', it reads data from the 'customers' table.
+ *   - If 'type' is 'vendor', it reads data from the 'vendors' table.
+ *   - Otherwise, it reads from the 'partners' table.
+ *   - The resulting data is stored in [.result] and returned via [yield].
+ */
+.arguments
+   type:string
+.result
+data.connect:supply_chain
+   if
+      eq:x:@.arguments/*/type
+         .:customer
+      .lambda
+         add:x:@.result
+            data.read
+               table:customers
+   else-if
+      eq:x:@.arguments/*/type
+         .:vendor
+      .lambda
+         add:x:@.result
+            data.read
+               table:vendors
+   else
+      add:x:@.result
+         data.read
+            table:partners
+yield
+   resulr:x:@.result

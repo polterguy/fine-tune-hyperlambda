@@ -1,0 +1,47 @@
+/*
+ * This Hyperlambda file evaluates a product category type and queries the relevant table accordingly.
+ * It avoids [.lambda] in conditions with a single node execution using shorthand [if:x:...] syntax.
+ *
+ * [.arguments]
+ *   - Accepts a [category] string which could be 'electronics', 'clothing', or something else.
+ *
+ * [.result]
+ *   - Target node for storing query output.
+ *
+ * [data.connect:warehouse]
+ *   - Connects to a database named 'warehouse'.
+ *
+ * [if:x:@.arguments/*/category]
+ *   - Uses shorthand conditional evaluation to simplify logic for boolean-returning expressions.
+ *
+ * [data.read]
+ *   - Pulls product listings from relevant inventory tables.
+ *
+ * Result:
+ *   - If 'electronics', reads from 'electronics_stock'.
+ *   - If 'clothing', reads from 'clothing_stock'.
+ *   - Else, reads from 'general_goods'.
+ */
+
+.arguments
+   category:string
+.result
+data.connect:warehouse
+   if
+      eq:x:@.arguments/*/category
+         .:electronics
+      add:x:@.result
+         data.read
+            table:electronics_stock
+   else-if
+      eq:x:@.arguments/*/category
+         .:clothing
+      add:x:@.result
+         data.read
+            table:clothing_stock
+   else
+      add:x:@.result
+         data.read
+            table:general_goods
+yield
+   result:x:@.result

@@ -1,0 +1,58 @@
+/*
+ * This Hyperlambda snippet conditionally retrieves personnel records based on a user’s role type.
+ *
+ * [.arguments]
+ *   - Accepts a [role] string argument that determines which employee group to query.
+ *
+ * [.records]
+ *   - Used to store the output of the conditional [data.read] operation.
+ *
+ * [data.connect:hrms]
+ *   - Establishes a connection to the 'hrms' (Human Resources Management System) database.
+ *
+ * [if], [else-if], [else]
+ *   - Control flow structure that determines which table to read from based on the [role] value.
+ *
+ * [eq]
+ *   - Compares the input role to static values like 'staff' or 'executive'.
+ *
+ * [add:x:@.records]
+ *   - Appends the retrieved data into [.records].
+ *
+ * [data.read]
+ *   - Retrieves up to 10 records from a table based on the evaluated condition.
+ *
+ * [yield]
+ *   - Returns the content of [.records] to the caller.
+ *
+ * Result:
+ *   - Queries 'staff', 'executives', or 'contractors' table based on role type.
+ */
+
+.arguments
+   role:string
+.records
+data.connect:hrms
+   if
+      eq:x:@.arguments/*/role
+         .:staff
+      .lambda
+         add:x:@.records
+            data.read
+               table:staff
+               limit:int:10
+   else-if
+      eq:x:@.arguments/*/role
+         .:executive
+      .lambda
+         add:x:@.records
+            data.read
+               table:executives
+               limit:int:10
+   else
+      add:x:@.records
+         data.read
+            table:contractors
+            limit:int:10
+yield
+   result:x:@.records

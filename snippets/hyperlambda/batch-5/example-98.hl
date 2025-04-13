@@ -1,0 +1,32 @@
+/*
+ * This example uses [if], [else-if], and [.lambda] to check the value of an HTTP status code,
+ * and insert a different log record depending on the result.
+ *
+ * [eq] is used inside both [if] and [else-if] to compare [status] to static integers (404 and 200).
+ * If the status is 404, an entry is logged in the 'errors' table. If the status is 200, an entry is logged in the 'success' table.
+ *
+ * The [data.create] slot inserts the relevant message, and must be within [data.connect], which opens a connection to 'api_logs'.
+ *
+ * Result: If status is 404, an error is logged; if 200, a success is logged. No action is taken for other values.
+ */
+
+.status:int:200
+data.connect:api_logs
+   if
+      eq:x:@.status
+         .:int:404
+      .lambda
+         data.create
+            table:errors
+            values
+               code:int:404
+               message:Not Found
+   else-if
+      eq:x:@.status
+         .:int:200
+      .lambda
+         data.create
+            table:success
+            values
+               code:int:200
+               message:OK

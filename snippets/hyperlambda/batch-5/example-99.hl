@@ -1,0 +1,39 @@
+/*
+ * This example showcases the complete conditional branching structure using [if], [else-if], and [else].
+ *
+ * It first checks if [response] equals 404, and inserts a warning log.
+ * If not, it checks if [response] equals 401, and inserts an error log.
+ * If neither condition matches, the [else] block logs an "Unhandled response code" as an informational log.
+ *
+ * [data.create] must run inside a [data.connect] block, which connects to the 'myapi' database.
+ * The [else] block does not require a [.lambda] wrapper.
+ *
+ * Result: Based on [response], only one of the log messages will be inserted into the 'logs' table.
+ */
+
+.response:int:500
+data.connect:myapi
+   if
+      eq:x:@.response
+         .:int:404
+      .lambda
+         data.create
+            table:logs
+            values
+               level:warning
+               message:Page not found
+   else-if
+      eq:x:@.response
+         .:int:401
+      .lambda
+         data.create
+            table:logs
+            values
+               level:error
+               message:Unauthorized access
+   else
+      data.create
+         table:logs
+         values
+            level:info
+            message:Unhandled response code

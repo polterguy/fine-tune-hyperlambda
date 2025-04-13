@@ -1,0 +1,52 @@
+/*
+ * This variation evaluates a geographic input and queries different facility records accordingly.
+ *
+ * [.arguments]
+ *   - Accepts a [location] argument to determine which facility data to return.
+ *
+ * [.response]
+ *   - Output node to hold data returned from [data.read].
+ *
+ * [data.connect:facilities]
+ *   - Connects to a physical infrastructure management database.
+ *
+ * [if], [else-if], [else]
+ *   - Implements control flow based on the provided location.
+ *
+ * [eq]
+ *   - Compares [location] to 'north', 'south', or falls back to 'central' facilities.
+ *
+ * [add:x:@.response]
+ *   - Appends the result of the query.
+ *
+ * [yield]
+ *   - Returns the final response to the caller.
+ *
+ * Result:
+ *   - Returns facilities data filtered by region.
+ */
+
+.arguments
+   location:string
+.response
+data.connect:facilities
+   if
+      eq:x:@.arguments/*/location
+         .:north
+      .lambda
+         add:x:@.response
+            data.read
+               table:north_facilities
+   else-if
+      eq:x:@.arguments/*/location
+         .:south
+      .lambda
+         add:x:@.response
+            data.read
+               table:south_facilities
+   else
+      add:x:@.response
+         data.read
+            table:central_facilities
+yield
+   result:x:@.response
