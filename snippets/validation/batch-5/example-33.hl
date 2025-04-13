@@ -1,0 +1,44 @@
+/*
+ * Create a slot named [loyalty.adjust] that adjusts a user's loyalty points based on their [activity],
+ * which must be either 'purchase' or 'refund'. Validate that [user_id], [points], [current], and [activity]
+ * are present. Add [points] to [current] for 'purchase', subtract them for 'refund', and store the result
+ * in [.new_total]. Log the operation in the [loyalty_log] table and 'customers' database. Return the resolved result as [total_points].
+ */
+slots.create:loyalty.adjust
+   validators.mandatory:x:@.arguments/user_id
+   validators.mandatory:x:@.arguments/points
+   validators.mandatory:x:@.arguments/current
+   validators.mandatory:x:@.arguments/activity
+   .new_total
+   data.connect:customers
+      if
+         eq:x:@.arguments/*/activity
+            .:purchase
+         .lambda
+            set-value:x:@.new_total
+               math.add
+                  get-value:x:@.arguments/*/current
+                  get-value:x:@.arguments/*/points
+            data.create
+               table:loyalty_log
+               values
+                  user_id:x:@.arguments/*/user_id
+                  type:purchase
+                  value:x:@.arguments/*/points
+      else-if
+         eq:x:@.arguments/*/activity
+            .:refund
+         .lambda
+            set-value:x:@.new_total
+               math.subtract
+                  get-value:x:@.arguments/*/current
+                  get-value:x:@.arguments/*/points
+            data.create
+               table:loyalty_log
+               values
+                  user_id:x:@.arguments/*/user_id
+                  type:refund
+                  value:x:@.arguments/*/points
+   unwrap:x:+/*
+   return
+      total_points:x:@.new_total
