@@ -1,0 +1,51 @@
+/*
+ * Loads external user records from a JSON file and enriches each user with internal employee details from the [hr] database.
+ *
+ * ## Slot Documentation
+ *
+ * - [io.file.load]
+ *   Loads the content of `/users.json` from the filesystem. This file is expected to be an array of user records,
+ *   where each record contains at least an [external_id] field that can be used to match an internal employee.
+ *
+ * - [.users]
+ *   A container node used to hold the deserialized user data from the JSON file. This becomes the working list
+ *   of users that will later be augmented with internal employee information.
+ *
+ * - [add]
+ *   Populates the [.users] node with parsed records using [json2lambda]. This transforms the raw JSON string
+ *   into a navigable Hyperlambda structure, enabling iteration and manipulation using standard syntax.
+ *
+ * - [data.connect]
+ *   Opens a connection to the [hr] database. All child operations that require database access must be
+ *   executed within the context of this connection.
+ *
+ * - [for-each]
+ *   Iterates over every user record stored in [.users]. Each iteration context is represented by [.dp],
+ *   which provides scoped access to the currently iterated user node.
+ *
+ * - [add]
+ *   For each user, an additional [data.read] query is executed as a child node under the user object.
+ *   This appends the result of the [data.read] invocation to the currently iterated user, allowing for
+ *   further decorating the result from the JSON file with data from our database.
+ *
+ * - [data.read]
+ *   Performs a SQL SELECT query on the [employees] table, looking up internal employee records where the [id]
+ *   matches the user’s [external_id] field. The condition `id.eq` ensures a precise one-to-one match.
+ *
+ * ## Summary
+ * This file demonstrates how to combine file-based data sources with live database lookups to perform data enrichment.
+ * It reads a list of external users, then augments each one with internal employee data using a database join pattern.
+ * The result is a unified data tree where each user includes both external metadata and internal system information.
+ */
+io.file.load:/users.json
+.users
+add:x:@.users
+   json2lambda:x:@io.file.load
+data.connect:hr
+   for-each:x:@.users/*
+      add:x:@.dp/#
+         data.read
+            table:employees
+            where
+               and
+                  id.eq:x:@.dp/#/*/external_id

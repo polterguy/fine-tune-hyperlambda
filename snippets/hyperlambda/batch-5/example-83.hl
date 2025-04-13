@@ -1,0 +1,41 @@
+/*
+ * Loads a list of users from a JSON file and sends an invitation email to each contact
+ * for an upcoming webinar using [mail.smtp.send].
+ *
+ * ## Slot Documentation
+ *
+ * - [io.file.load]
+ *   Loads the contents of `/users.json`, a file containing an array of user records.
+ *   The file is expected to be in JSON format, where each entry contains fields like [name] and [email].
+ *
+ * - [json2lambda]
+ *   Transforms the raw JSON string into a Hyperlambda-compatible structure.
+ *   This enables us to easily loop through each user object and access fields like [name] and [email].
+ *
+ * - [for-each]
+ *   Iterates through every user node. Each iteration references a single user via the [.dp] node.
+ *   This allows you to apply logic per contact.
+ *
+ * - [mail.smtp.send]
+ *   Sends an email invitation to the current user in the loop. The message structure includes:
+ *   - [to]: Populated with the user’s [name] and [email].
+ *   - [subject]: Contains a static subject line about the upcoming webinar.
+ *   - [entity]: HTML content describing the event and call to action.
+ *
+ * ## Summary
+ * This pattern is great for automating announcements like webinar invites. It combines
+ * file access, dynamic parsing of user data, and outbound communication into a compact
+ * and highly reusable Hyperlambda process.
+ */
+io.file.load:/users.json
+json2lambda:x:@io.file.load
+for-each:x:@json2lambda/*
+   mail.smtp.send
+      message
+         to
+            .
+               name:x:@.dp/#/*/name
+               email:x:@.dp/#/*/email
+         subject:You're invited to our upcoming Webinar!
+         entity:text/html
+            content:Join us for a live session on the future of tech. RSVP now!

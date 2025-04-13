@@ -1,0 +1,41 @@
+/*
+ * Loads customer contact records from a JSON file and notifies each contact of scheduled downtime via [mail.smtp.send].
+ *
+ * ## Slot Documentation
+ *
+ * - [io.file.load]
+ *   Reads the `/customers.json` file from the filesystem.
+ *   The content should be an array of customer objects, each with a [name] and [email] field.
+ *
+ * - [json2lambda]
+ *   Converts the JSON string into a lambda-compatible structure so that each contact
+ *   can be accessed and processed individually in a for-each loop.
+ *
+ * - [for-each]
+ *   Iterates over each customer node from the parsed JSON. The [.dp] node context
+ *   holds the current record being processed.
+ *
+ * - [mail.smtp.send]
+ *   Sends an email to the customer about the upcoming maintenance window.
+ *   Each message includes:
+ *   - [to]: Email and name pulled from the current record.
+ *   - [subject]: A static subject describing the downtime.
+ *   - [entity]: The HTML body explaining when and why the system will be unavailable.
+ *
+ * ## Summary
+ * This snippet illustrates how to send automated notifications to customers from a JSON source file.
+ * It is especially useful for operational communication, including alerts, status updates,
+ * and infrastructure notifications.
+ */
+io.file.load:/customers.json
+json2lambda:x:@io.file.load
+for-each:x:@json2lambda/*
+   mail.smtp.send
+      message
+         to
+            .
+               name:x:@.dp/#/*/name
+               email:x:@.dp/#/*/email
+         subject:Scheduled Downtime Notification
+         entity:text/html
+            content:Please be advised that our services will be unavailable this Saturday from 1am to 3am UTC for maintenance.

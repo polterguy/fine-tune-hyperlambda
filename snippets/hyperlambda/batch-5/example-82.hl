@@ -1,0 +1,44 @@
+/*
+ * Loads contact information from a JSON file and sends a personalized email to each contact using [mail.smtp.send].
+ *
+ * ## Slot Documentation
+ *
+ * - [io.file.load]
+ *   Loads the raw content of the file `/contacts.json`, which is expected to contain a list of contact objects.
+ *   This slot returns the file content as a string, typically in JSON format.
+ *
+ * - [json2lambda]
+ *   Converts the JSON string loaded from the file into a Hyperlambda node structure.
+ *   This enables traversal of JSON objects as if they were native Hyperlambda nodes,
+ *   allowing simple iteration and field access.
+ *
+ * - [for-each]
+ *   Iterates through each top-level contact node in the converted JSON structure.
+ *   Each contact is processed individually inside the loop, with [.dp] referencing the current contact node.
+ *
+ * - [mail.smtp.send]
+ *   Sends an email to the current contact. The email payload is defined under the [message] node and includes:
+ *   - [to]: Contains a single recipient constructed from:
+ *     - [name]: Pulled from the contact’s [name] field.
+ *     - [email]: Pulled from the contact’s [email] field.
+ *   - [subject]: A hardcoded subject line announcing the new CEO.
+ *   - [entity]: An HTML body with the message content.
+ *
+ * ## Summary
+ * This Hyperlambda endpoint demonstrates how to load, parse, and iterate over a JSON contact list to
+ * send out bulk email messages. It highlights integration between file system access, JSON manipulation,
+ * and outbound email delivery. This pattern is useful for building custom email campaigns,
+ * personalized notifications, or lightweight CRM tasks.
+ */
+io.file.load:/contacts.json
+json2lambda:x:@io.file.load
+for-each:x:@json2lambda/*
+   mail.smtp.send
+      message
+         to
+            .
+               name:x:@.dp/#/*/name
+               email:x:@.dp/#/*/email
+         subject:Meet our new CEO
+         entity:text/html
+            content:Johnny is our new CEO

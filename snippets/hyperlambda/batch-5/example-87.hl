@@ -1,0 +1,42 @@
+/*
+ * Imports external partner company data and links each company to its CRM profile via database lookup.
+ *
+ * ## Slot Documentation
+ *
+ * - [io.file.load]
+ *   Loads `/partners.json`, which is expected to contain an array of external partner profiles with a [crm_id] field.
+ *
+ * - [.partners]
+ *   Stores the deserialized JSON records, which are later updated with internal CRM data.
+ *
+ * - [add]
+ *   Converts the JSON content into Hyperlambda nodes using [json2lambda] and attaches the result to [.partners].
+ *
+ * - [data.connect]
+ *   Connects to the [crm] database, required for all SQL operations scoped under this node.
+ *
+ * - [for-each]
+ *   Loops through each partner record to look up and attach internal CRM profile details.
+ *
+ * - [add]
+ *   Appends the query result from [data.read] into each current partner record node.
+ *
+ * - [data.read]
+ *   Fetches company profile data from the [companies] table where [id] matches the provided [crm_id].
+ *
+ * ## Summary
+ * This Hyperlambda script performs a merge between static partner records and live CRM data.
+ * It ensures each company from the file is linked to internal system data using the [crm_id] field.
+ */
+io.file.load:/partners.json
+.partners
+add:x:@.partners
+   json2lambda:x:@io.file.load
+data.connect:crm
+   for-each:x:@.partners/*
+      add:x:@.dp/#
+         data.read
+            table:companies
+            where
+               and
+                  id.eq:x:@.dp/#/*/crm_id

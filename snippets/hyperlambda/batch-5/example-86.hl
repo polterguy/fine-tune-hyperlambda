@@ -1,0 +1,44 @@
+/*
+ * Loads external student applications from a JSON file and augments each student with internal university records.
+ *
+ * ## Slot Documentation
+ *
+ * - [io.file.load]
+ *   Loads the contents of `/applicants.json` from the server's file system. This file is expected to contain
+ *   an array of student application records, each having a unique [application_id].
+ *
+ * - [.students]
+ *   A container node to hold the parsed applicant data as structured Hyperlambda. This node will be enriched
+ *   with internal records in the next step.
+ *
+ * - [add]
+ *   Parses the raw JSON string into a tree of Hyperlambda nodes using [json2lambda] and appends it to [.students].
+ *
+ * - [data.connect]
+ *   Establishes a connection to the [university] database. Required to perform queries for enriching student data.
+ *
+ * - [for-each]
+ *   Iterates over each student in [.students] and provides scoped access via [.dp] to modify individual nodes.
+ *
+ * - [add]
+ *   For each student, adds the result of a query that finds their internal record using the [application_id].
+ *
+ * - [data.read]
+ *   Queries the [student_records] table for rows where [applicant_id] matches the external [application_id].
+ *
+ * ## Summary
+ * This script loads a list of student applicants from disk and enhances each record with official university data.
+ * The result is a rich dataset combining external application metadata with validated internal student records.
+ */
+io.file.load:/applicants.json
+.students
+add:x:@.students
+   json2lambda:x:@io.file.load
+data.connect:university
+   for-each:x:@.students/*
+      add:x:@.dp/#
+         data.read
+            table:student_records
+            where
+               and
+                  applicant_id.eq:x:@.dp/#/*/application_id

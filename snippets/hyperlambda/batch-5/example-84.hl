@@ -1,0 +1,42 @@
+/*
+ * Loads product SKUs from a JSON catalog and appends stock data from the internal inventory database.
+ *
+ * ## Slot Documentation
+ *
+ * - [io.file.load]
+ *   Reads `/product-catalog.json` from disk. This file contains an array of product entries with a [sku] field.
+ *
+ * - [.products]
+ *   Holds the structured product data after converting it from JSON using [json2lambda].
+ *
+ * - [add]
+ *   Parses and adds the JSON structure under the [.products] node.
+ *
+ * - [data.connect]
+ *   Connects to the [warehouse] database to fetch stock levels or availability details.
+ *
+ * - [for-each]
+ *   Loops through each product to retrieve associated inventory data based on its [sku] identifier.
+ *
+ * - [add]
+ *   Injects the result of the inventory lookup into the product record under construction.
+ *
+ * - [data.read]
+ *   Searches the [inventory] table where [sku] matches the product SKU to determine stock levels.
+ *
+ * ## Summary
+ * This script creates a full view of each product by combining catalog metadata with dynamic inventory levels.
+ * It's ideal for syncing static product files with real-time stock data before sending to a frontend or API.
+ */
+io.file.load:/product-catalog.json
+.products
+add:x:@.products
+   json2lambda:x:@io.file.load
+data.connect:warehouse
+   for-each:x:@.products/*
+      add:x:@.dp/#
+         data.read
+            table:inventory
+            where
+               and
+                  sku.eq:x:@.dp/#/*/sku
