@@ -1,0 +1,44 @@
+/*
+ * This slot loads a CSV file from disk and parses its contents into a structured lambda list.
+ *
+ * [slots.create]
+ *   - Declares a reusable slot named 'data.parse-csv-from-file'.
+ *
+ * [validators.mandatory]
+ *   - Ensures the 'path' argument is present before proceeding.
+ *     Without this, [io.file.load] cannot resolve the file, resulting in an error.
+ *
+ * [io.file.load]
+ *   - Loads the entire content of the file specified by the given path as a raw string.
+ *
+ * [csv2lambda]
+ *   - Parses the loaded CSV string into structured lambda records.
+ *     The first row must be headers matching the field names in the rows below.
+ *
+ * [unwrap]
+ *   - Resolves all expressions before returning the data to the caller.
+ *
+ * [return]
+ *   - Returns the parsed lambda list as the result.
+ *
+ * Example input:
+ *   path: "/data/users.csv"
+ *
+ * Expected file content:
+ *   name,age
+ *   Alice,30
+ *   Bob,42
+ *
+ * Output:
+ *   [
+ *     { name: "Alice", age: "30" },
+ *     { name: "Bob", age: "42" }
+ *   ]
+ */
+slots.create:data.parse-csv-from-file
+   validators.mandatory:x:@.arguments/*/path
+   io.file.load:x:@.arguments/*/path
+   csv2lambda:x:@io.file.load
+   unwrap:x:+/*
+   return
+      data:x:@csv2lambda
