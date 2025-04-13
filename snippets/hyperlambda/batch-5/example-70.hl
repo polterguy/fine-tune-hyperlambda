@@ -1,0 +1,60 @@
+/*
+ * Flags each book in the [.library] list as a bestseller based on its [rating] using [for-each] and [if].
+ *
+ * ## Slot Documentation
+ *
+ * - [.library]
+ *   This node defines a static collection of book records. Each book is represented by:
+ *   - [title]: The name of the book.
+ *   - [author]: The author's full name.
+ *   - [rating]: A decimal value indicating how highly the book is rated.
+ *   Three well-known titles are hardcoded as sample data, simulating a basic book catalog.
+ *
+ * - [for-each]
+ *   Iterates through each book in the [.library] list using `x:@.library/*`.
+ *   Within the loop, the current context node is referenced via [.dp], enabling access to its fields.
+ *
+ * - [if]
+ *   A conditional branch that checks the rating of each book to determine whether it should be marked as a bestseller.
+ *   The expression retrieves the [rating] node of the current book by reference.
+ *   The [mt] (more than) operator compares it against the threshold `4.8`.
+ *   - If the rating is greater than `4.8`, the block under [.lambda] executes.
+ *   - Otherwise, the [else] block runs instead.
+ *
+ * - [add]
+ *   Adds a new [bestseller] boolean field to each book node.
+ *   - If the rating is greater than 4.8, [bestseller:bool:true] is added.
+ *   - Otherwise, [bestseller:bool:false] is added.
+ *   This dynamically enhances each book object with a popularity flag.
+ *
+ * ## Summary
+ * This code snippet demonstrates conditional logic in Hyperlambda to enrich records based on data attributes.
+ * It uses [for-each], [if], and [add] to calculate and annotate whether each book qualifies as a bestseller,
+ * based on its rating. The result is a modified in-memory dataset that includes an evaluative field
+ * for downstream use or output.
+ */
+.library
+   .
+      title:The Hobbit
+      author:J.R.R. Tolkien
+      rating:decimal:4.9
+   .
+      title:To Kill a Mockingbird
+      author:Harper Lee
+      rating:decimal:4.8
+   .
+      title:1984
+      author:George Orwell
+      rating:decimal:4.7
+for-each:x:@.library/*
+   if
+      mt:x:@.dp/#/*/rating
+         .:decimal:4.8
+      .lambda
+         add:x:@.dp/#
+            .
+               bestseller:bool:true
+   else
+      add:x:@.dp/#
+         .
+            bestseller:bool:false
