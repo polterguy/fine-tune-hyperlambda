@@ -1,0 +1,48 @@
+/*
+ * This Hyperlambda file demonstrates how to issue an HTTP GET request using [http.get] 
+ * toward the public testing API at https://httpbin.org/get, then extract both the client's 
+ * IP address and all HTTP response headers from the returned data structure.
+ *
+ * [.url]
+ * - Stores the target URL as a string, which serves as the input to the [http.get] slot.
+ *
+ * [http.get]
+ * - Performs an HTTP GET request to the URL stored in [.url].
+ * - The [convert] node is set to [true], which instructs the system to automatically parse 
+ *   the JSON response into a lambda-compatible structure.
+ * - The result of this operation is a rich, structured dataset stored as child nodes under [http.get].
+ *
+ * [.client_ip]
+ * - A new node used to store the client’s public IP address as reported by the httpbin.org service.
+ *
+ * [set-value]
+ * - Extracts the value of the [origin] node from the response content and assigns it to [.client_ip].
+ * - The [origin] node in the JSON structure returned by httpbin contains the public IP address 
+ *   of the caller.
+ *
+ * [.headers]
+ * - Used as a container to hold the response headers.
+ *
+ * [add]
+ * - Copies all child nodes of the [headers] object found inside the response content 
+ *   and appends them as children of [.headers].
+ * - This results in a mirror of the original HTTP response headers being placed inside [.headers].
+ *
+ * Overall, this code snippet illustrates how to:
+ * - Invoke an external public API.
+ * - Automatically convert and traverse the resulting JSON response.
+ * - Extract and organize key parts of the response (e.g., IP address and headers) 
+ *   into a custom, clean node structure.
+ */
+.url:"https://httpbin.org/get"
+
+http.get:x:@.url
+   convert:bool:true
+
+.client_ip
+set-value:x:@.client_ip
+   get-value:x:@http.get/*/content/*/origin
+
+.headers
+add:x:@.headers
+   get-nodes:x:@http.get/*/content/*/headers

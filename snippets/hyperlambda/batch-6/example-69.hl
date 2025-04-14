@@ -1,0 +1,50 @@
+/*
+ * This Hyperlambda file demonstrates how to perform an HTTP GET request using the [http.get] slot, 
+ * including how to append query parameters, parse the JSON response, and extract useful data 
+ * such as the client’s public IP address and all HTTP response headers.
+ *
+ * [.endpoint]
+ * - Stores the target URL for the HTTP GET request, pointing to https://httpbin.org/get — a public API 
+ *   used for testing HTTP clients.
+ *
+ * [http.get]
+ * - Performs an HTTP GET request to the URL specified in [.endpoint].
+ * - The [convert] node is set to [true], which causes the JSON response body to be automatically 
+ *   parsed into a Hyperlambda node structure.
+ * - The [query] node defines two query parameters:
+ *   - [language] is set to "Norwegian"
+ *   - [name] is set to "Thomas"
+ * - These parameters will be appended to the outgoing request as a query string (e.g., `?language=Norwegian&name=Thomas`).
+ *
+ * [.ip_address]
+ * - A custom node used to store the client’s IP address as returned by the API.
+ *
+ * [set-value]
+ * - Assigns the value of the [origin] field in the response content to [.ip_address].
+ * - The [origin] field in httpbin.org’s response structure represents the public IP address of the client.
+ *
+ * [.response_headers]
+ * - Used to store all HTTP response headers returned by the server.
+ *
+ * [add]
+ * - Appends all child nodes of the [headers] object in the response content to [.response_headers].
+ * - This effectively mirrors the headers returned from the server into the local Hyperlambda structure.
+ *
+ * Overall, this snippet showcases how to send parameterized GET requests to an external API, 
+ * interpret the response structure, and extract specific values for use in further logic.
+ */
+.endpoint:"https://httpbin.org/get"
+
+http.get:x:@.endpoint
+   convert:bool:true
+   query
+      language:Norwegian
+      name:Thomas
+
+.ip_address
+set-value:x:@.ip_address
+   get-value:x:@http.get/*/content/*/origin
+
+.response_headers
+add:x:@.response_headers
+   get-nodes:x:@http.get/*/content/*/headers
