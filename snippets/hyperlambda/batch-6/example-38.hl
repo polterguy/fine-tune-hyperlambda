@@ -1,0 +1,39 @@
+/*
+ * This [HTTP endpoint] accepts a file stream via a multipart/form-data request, and stores the uploaded file
+ * directly to the server’s local file system under the [/var/tmp/] directory.
+ *
+ * 1. [.arguments] defines an [upload:*] parameter that represents a streamed file input.
+ *
+ * 2. [.accept] is set to [multipart/form-data] to allow multipart submissions.
+ *
+ * 3. [validators.mandatory] ensures:
+ *    - [upload] is provided
+ *    - [name] exists inside [upload] (used for the filename)
+ *    - [stream] exists to access the file content
+ *
+ * 4. [.upload-path] is created using [strings.concat] to combine the destination directory with the file name.
+ *
+ * 5. [io.stream.save-file] saves the file directly to disk at the resolved [.upload-path].
+ *
+ * 6. [yield] returns a confirmation message.
+ */
+.arguments
+   upload:*
+
+.accept:multipart/form-data
+
+validators.mandatory:x:@.arguments/*/upload
+validators.mandatory:x:@.arguments/*/upload/*/name
+validators.mandatory:x:@.arguments/*/upload/*/stream
+
+.upload-path
+set-value:x:@.upload-path
+   strings.concat
+      .:/var/tmp/
+      get-value:x:@.arguments/*/upload/*/name
+
+io.stream.save-file:x:@.upload-path
+   get-value:x:@.arguments/*/upload/*/stream
+
+yield
+   message:File uploaded successfully

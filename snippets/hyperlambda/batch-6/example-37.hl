@@ -1,0 +1,42 @@
+/*
+ * This [HTTP endpoint] handles secure file uploads for users with the [editor] role.
+ *
+ * 1. [auth.ticket.verify:editor] enforces role-based access control—only users in the "editor" group can use this endpoint.
+ *
+ * 2. [.arguments] accepts a [media:*] parameter representing the uploaded file as a stream.
+ *
+ * 3. [.accept] is set to [multipart/form-data] to support standard form uploads.
+ *
+ * 4. [validators.mandatory] ensures:
+ *    - [media] is provided
+ *    - [name] inside [media] is specified
+ *    - [stream] includes the file content
+ *
+ * 5. [.media-path] is dynamically built by joining "/var/media/uploads/" with the uploaded file name using [strings.concat].
+ *
+ * 6. [io.stream.save-file] writes the file directly to disk using streaming (no in-memory buffering).
+ *
+ * 7. [yield] returns a success message on successful completion.
+ */
+.arguments
+   media:*
+
+.accept:multipart/form-data
+
+auth.ticket.verify:editor
+
+validators.mandatory:x:@.arguments/*/media
+validators.mandatory:x:@.arguments/*/media/*/name
+validators.mandatory:x:@.arguments/*/media/*/stream
+
+.media-path
+set-value:x:@.media-path
+   strings.concat
+      .:/var/media/uploads/
+      get-value:x:@.arguments/*/media/*/name
+
+io.stream.save-file:x:@.media-path
+   get-value:x:@.arguments/*/media/*/stream
+
+yield
+   message:File uploaded successfully

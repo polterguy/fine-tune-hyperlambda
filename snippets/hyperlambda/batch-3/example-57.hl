@@ -1,4 +1,30 @@
-// Create an upload file endpoint that saves files to /etc/temp/ folder
+
+/*
+ * This [HTTP endpoint] allows clients to upload a file, which is then saved to the server's file system under the [/etc/temp/] directory.
+ *
+ * 1. The [.arguments] node defines an incoming [file]:* parameter. The [*] wildcard indicates that this argument accepts any type.
+ *    This allows the client to pass in its [file] argument as a stream, not loading the file into memory.
+ *
+ * 2. The [.accept] slot is explicitly set to [multipart/form-data] to ensure the endpoint can handle file uploads
+ *    from clients using form-based or raw multipart submissions.
+ *
+ * 3. Three validation rules are applied using the [validators.mandatory] slot to enforce required structure:
+ *    - [file] must be present.
+ *    - [name] inside of [file] ensures that the uploaded file has a name (used to construct the full save path).
+ *    - [stream] inside of [file] ensures the binary content (input stream) of the uploaded file is included.
+ *
+ * 4. The [.full-path] node is used to construct the absolute file system path where the uploaded file will be saved.
+ *    This is done via [strings.concat], combining a fixed directory path (/etc/temp/) with the uploaded file's name.
+ *
+ * 5. The [io.stream.save-file] slot performs the actual saving operation, writing the binary stream
+ *    (from [file] / [stream]) to the resolved [.full-path].
+ *
+ * 6. Finally, the [yield] slot returns a simple success message to the client confirming that the upload was completed.
+ *
+ * This pattern provides a secure and structured approach to handling file uploads,
+ * with validations, custom path construction, and proper stream handling for efficient I/O operations.
+ * Notice, the file is **NOT** loaded into memory, but streamed directly into its destination path from the response stream.
+ */
 .arguments
    file:*
 

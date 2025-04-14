@@ -22,6 +22,7 @@ Below are some example prompts you can run through the model after fine tuning i
 * Generate a list of strings containing names of famous books
   - Add 3 items to it
 * Generate a list of objects being employees
+  - Add one item to it
   - Loop through them and remove their names
 * How do I open a database connection?
 * How do I concatenate 2 strings?
@@ -31,6 +32,8 @@ Below are some example prompts you can run through the model after fine tuning i
 * Select contacts records from my ERP database.
   - Wrap it into an endpoint and returns contacts.
   - Add paging arguments
+  - Make paging arguments optional
+  - Add sorting arguments
   - Add filtering on name
 * Create an endpoint taking a message only allowing admin users to execute it, then log the message
   - Return success
@@ -44,16 +47,19 @@ Below are some example prompts you can run through the model after fine tuning i
   - Make email mandatory
   - Make sure email is a valid email address
   - Return result of data.create as [result]
-  - remove message from return
 * Generate an API endpoint allowing me to select users from employees database, with optional filtering for name, email, and phone
+  - Add paging
+  - Make paging optional
 * Generate an endpoint that only partner users can execute
 * How do I retrieve a configuration value named 'foo' inside of my 'magic' section?
 * Select all contacts from CRM, loop through all of these and update these one at the time and change their names to 'REDACTED' and save your changes
 * Generate code for an endpoint allowing me to update items in my stock table in my logistics database
+  - Make updated values optional such that I can provide any values I wish
 * How do I delete a record from contacts in crm database?
 * Create an endpoint taking a name filter that's using SQL slots to return customers from my sales db
 * Create an endpoint that sends an email with subject, body, name and email as arguments
 * Create an endpoint that loads a file specified as an argument and returns its content back to caller.
+  - Assume file is only filename and ONLY return files from /etc/www/
   - Split the files into lines and return individual lines
 * Create an upload file endpoint that saves files to /etc/temp/ folder
 * I've got a file at /etc/www/foo.zip. I want you to show me the code required to unzip it
@@ -66,6 +72,7 @@ Below are some example prompts you can run through the model after fine tuning i
 * How do I concatenate two strings given to an endpoint as arguments?
   - Return the concatenated result, and put a space between arguments
 * Create an API endpoint that allows me to insert a contact into HubSpot
+  - Retrieve hubspot token from config
 * Create an endpoint allowing me to read a sitemap from a domain, and return all URLs found.
 * Create an endpoint that first fetches 10 Artist records from chinook database using SQLite, then include all their Album records for each Artist. Add filtering support for artist name.
 

@@ -1,0 +1,39 @@
+/*
+ * This [HTTP endpoint] supports streaming media uploads and saves the file directly
+ * to the [/tmp/uploads/media/] directory using efficient I/O handling.
+ *
+ * 1. [.arguments] defines a [media:*] parameter used for binary file streaming.
+ *
+ * 2. [.accept] is explicitly set to [multipart/form-data], allowing the server to process file upload requests.
+ *
+ * 3. [validators.mandatory] ensures:
+ *    - [media] is present in the request
+ *    - [name] exists inside [media] and is used to name the output file
+ *    - [stream] is present for actual file data
+ *
+ * 4. [.output-path] is constructed using [strings.concat] to generate the destination path.
+ *
+ * 5. [io.stream.save-file] saves the streamed file content to [.output-path] directly.
+ *
+ * 6. [yield] returns a success message to the client.
+ */
+.arguments
+   media:*
+
+.accept:multipart/form-data
+
+validators.mandatory:x:@.arguments/*/media
+validators.mandatory:x:@.arguments/*/media/*/name
+validators.mandatory:x:@.arguments/*/media/*/stream
+
+.output-path
+set-value:x:@.output-path
+   strings.concat
+      .:/tmp/uploads/media/
+      get-value:x:@.arguments/*/media/*/name
+
+io.stream.save-file:x:@.output-path
+   get-value:x:@.arguments/*/media/*/stream
+
+yield
+   message:File uploaded successfully

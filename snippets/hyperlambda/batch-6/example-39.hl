@@ -1,0 +1,40 @@
+/*
+ * This [HTTP endpoint] handles document uploads and stores the received file
+ * into the [/opt/data/uploads/] directory on the server.
+ *
+ * 1. [.arguments] defines a [document:*] input, suitable for streamed file transfers.
+ *
+ * 2. [.accept] is set to [multipart/form-data] to enable multipart file uploads.
+ *
+ * 3. [validators.mandatory] ensures:
+ *    - [document] exists
+ *    - [name] is present inside [document]
+ *    - [stream] is included for binary content
+ *
+ * 4. [.destination-path] is dynamically constructed using [strings.concat]
+ *    to combine the folder path and file name.
+ *
+ * 5. [io.stream.save-file] writes the stream to disk using the value in [.destination-path].
+ *
+ * 6. A [yield] slot confirms the successful upload.
+ */
+.arguments
+   document:*
+
+.accept:multipart/form-data
+
+validators.mandatory:x:@.arguments/*/document
+validators.mandatory:x:@.arguments/*/document/*/name
+validators.mandatory:x:@.arguments/*/document/*/stream
+
+.destination-path
+set-value:x:@.destination-path
+   strings.concat
+      .:/opt/data/uploads/
+      get-value:x:@.arguments/*/document/*/name
+
+io.stream.save-file:x:@.destination-path
+   get-value:x:@.arguments/*/document/*/stream
+
+yield
+   message:File uploaded successfully
