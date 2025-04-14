@@ -1,0 +1,65 @@
+/*
+ * This Hyperlambda file illustrates the **dynamic and meta-programming capabilities** of the language,
+ * showcasing how slots can be **constructed and executed at runtime** based on input arguments.
+ * It demonstrates how to dynamically control which slot to invoke, pass arguments to it,
+ * and extract its result — all without statically referencing any specific function.
+ *
+ * [.arguments]
+ * - Declares two required arguments that drive the dynamic behavior:
+ *   - [slot]: A string representing the name of the slot to invoke (e.g., "math.add", "strings.length").
+ *   - [argument]: A string value to be passed into the dynamically selected slot.
+ * - This structure makes the logic generic and reusable for many possible function invocations.
+ *
+ * [set-name]
+ * - Dynamically **renames the node [foo]** to whatever slot name was passed via [.arguments/slot].
+ * - This effectively rewires the tree structure, transforming the upcoming node into 
+ *   an executable invocation of the desired slot.
+ * - It uses [get-value] to resolve the value of [.arguments] / [slot] and assigns that 
+ *   as the name of the node [foo], meaning the next sibling [foo] node will be renamed.
+ *
+ * [foo]
+ * - This node is just a placeholder — its original name "foo" is irrelevant.
+ * - Its name is changed at runtime by [set-name] to the value of [.arguments] / [slot], 
+ *   making it an actual slot invocation.
+ * - The dynamic slot will then receive one argument: the value of [.arguments] / [argument].
+ * - The value is passed using an extrapolated expression, so it can dynamically resolve the correct input.
+ *
+ * [yield]
+ * - Returns the result of the dynamically invoked slot.
+ * - The [result] node uses **extrapolated expression syntax**.
+ *   - This causes Hyperlambda to resolve the string inside the curly braces into a node name (e.g., "math.add").
+ *   - It then navigates to the dynamic node with that name and accesses its result using `/*`.
+ * - This allows full reflection and dynamic evaluation, retrieving the output of whatever slot was executed above.
+ *
+ * In summary, this file exemplifies:
+ * - How slot names can be **decided at runtime**.
+ * - How **arguments can be passed dynamically** to any slot.
+ * - How **results can be evaluated and returned** regardless of the slot invoked.
+ *
+ * This is a core example of Hyperlambda's **meta-programming model**, making it suitable for 
+ * interpreters, plugin engines, and abstract slot routers.
+ */
+.arguments
+   slot:string
+   argument:string
+
+// This changes the name of the node below, effectively changing what slot we will execute **DYNAMICALLY**!
+set-name:x:../*/foo
+   get-value:x:@.arguments/*/slot
+
+/*
+ * This serves as a place holder and will have its name dynamicall changed by the above [set-name]
+ * invocation, and therefore allows us to dynamicall decide what slot to actually execute, and
+ * what argument to pass into it.
+ */
+foo:x:@.arguments/*/argument
+
+/*
+ * This returns the result of our above slot invocation.
+ * Notice, [result] contains an extrapolated expression, which will evaluate the extrapolated expression
+ * first, which will resolve to the value of whatever value we gave it as our [slot] argument,
+ * implying it will retrieve the children nodes of the above slot invocation, becoming the result of whatever
+ * the above slot returned.
+ */
+yield
+   result:x:../*/{@.arguments/*/slot}/*
