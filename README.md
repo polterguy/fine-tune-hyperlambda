@@ -25,6 +25,7 @@ Below are some example prompts you can run through the model after fine tuning i
   - Loop through them and remove their names
 * How do I open a database connection?
 * How do I concatenate 2 strings?
+  - Add a space between
 * How do I send an email?
 * Write an endpoint taking age and name, and responding with a personal greeting
 * Select contacts records from my ERP database.
