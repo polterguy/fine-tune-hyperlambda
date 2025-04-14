@@ -1,0 +1,42 @@
+/*
+ * This Hyperlambda endpoint returns a nested graph of customers and their corresponding orders 
+ * from the 'crm' database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Establishes a connection to the 'crm' database.
+ *
+ * [data.read] (first)
+ * - Reads from the 'Customer' table.
+ * - [columns] selects [CustomerID] and [CompanyName].
+ * - [where] filters only active customers.
+ * - [limit] is set to 6.
+ *
+ * [include]
+ * - Iterates over each customer to retrieve their related orders.
+ *
+ * [data.read] (nested inside [include])
+ * - Queries the 'Order' table where [CustomerID] matches the current customer.
+ *
+ * [yield]
+ * - Returns the order list under a [orders] node for each customer.
+ */
+data.connect:crm
+   data.read
+      table:Customer
+      columns
+         CustomerID
+         CompanyName
+      where
+         and
+            Status.eq:Active
+      limit:6
+   include:x:@data.read/*
+      data.read
+         table:Order
+         where
+            and
+               CustomerID.eq:x:@.dp/#/*/CustomerID
+      yield
+         orders:x:@data.read/*

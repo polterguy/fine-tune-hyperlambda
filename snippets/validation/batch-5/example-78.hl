@@ -1,0 +1,42 @@
+/*
+ * This Hyperlambda endpoint returns a nested graph of traders and their cargo shipments 
+ * from the 'intergalactic-trade' database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Establishes a connection to the 'intergalactic-trade' database.
+ *
+ * [data.read] (first)
+ * - Reads from the 'Trader' table.
+ * - [columns] selects [TraderID] and [AliasName].
+ * - [where] filters traders licensed for Class-A cargo.
+ * - [limit] is set to 8.
+ *
+ * [include]
+ * - Iterates over each trader to retrieve their related shipments.
+ *
+ * [data.read] (nested inside [include])
+ * - Queries the 'Shipment' table where [TraderID] matches the current trader.
+ *
+ * [yield]
+ * - Returns the shipment list under a [shipments] node for each trader.
+ */
+data.connect:intergalactic-trade
+   data.read
+      table:Trader
+      columns
+         TraderID
+         AliasName
+      where
+         and
+            LicenseClass.eq:A
+      limit:8
+   include:x:@data.read/*
+      data.read
+         table:Shipment
+         where
+            and
+               TraderID.eq:x:@.dp/#/*/TraderID
+      yield
+         shipments:x:@data.read/*

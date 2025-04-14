@@ -1,0 +1,43 @@
+/*
+ * This file defines an HTTP endpoint that returns a nested object graph of product categories 
+ * and their associated products from the e-commerce database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Connects to the 'ecommerce' database.
+ *
+ * [data.read] (first)
+ * - Reads from the 'Category' table.
+ * - [columns] selects [CategoryID] and [CategoryName].
+ * - [where] filters only categories containing "Electronics".
+ * - [limit] is set to 3.
+ *
+ * [include]
+ * - Executes once for each category, forming the root of the hierarchy.
+ *
+ * [data.read] (nested inside [include])
+ * - Reads all products belonging to the current category from the 'Product' table.
+ * - Filters based on [CategoryID].
+ *
+ * [yield]
+ * - Returns the list of products as [products] under each category node.
+ */
+data.connect:ecommerce
+   data.read
+      table:Category
+      columns
+         CategoryID
+         CategoryName
+      where
+         and
+            CategoryName.like:%Electronics%
+      limit:3
+   include:x:@data.read/*
+      data.read
+         table:Product
+         where
+            and
+               CategoryID.eq:x:@.dp/#/*/CategoryID
+      yield
+         products:x:@data.read/*

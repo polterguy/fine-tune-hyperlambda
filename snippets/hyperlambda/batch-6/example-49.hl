@@ -1,0 +1,41 @@
+/*
+ * This Hyperlambda file defines an HTTP endpoint returning classes and their enrolled students 
+ * from the 'school' database in a graph-style format.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Opens a connection to the 'school' database.
+ *
+ * [data.read] (first)
+ * - Selects from the 'Class' table.
+ * - Filters classes for grade level "10".
+ * - Limits to 4 classes.
+ *
+ * [include]
+ * - Iterates over each class to retrieve related student records.
+ *
+ * [data.read] (nested inside [include])
+ * - Queries the 'Student' table using the [ClassID] as foreign key.
+ *
+ * [yield]
+ * - Returns the students as a nested [students] array under each class.
+ */
+data.connect:school
+   data.read
+      table:Class
+      columns
+         ClassID
+         ClassName
+      where
+         and
+            Grade.eq:10
+      limit:4
+   include:x:@data.read/*
+      data.read
+         table:Student
+         where
+            and
+               ClassID.eq:x:@.dp/#/*/ClassID
+      yield
+         students:x:@data.read/*

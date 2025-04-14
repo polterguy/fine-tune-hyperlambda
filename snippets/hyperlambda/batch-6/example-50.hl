@@ -1,0 +1,42 @@
+/*
+ * This file defines a graph-style HTTP endpoint returning a list of warehouses 
+ * and their stocked items from the 'inventory' database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Connects to the 'inventory' database.
+ *
+ * [data.read] (first)
+ * - Reads from the 'Warehouse' table.
+ * - [columns] selects [WarehouseID] and [Location].
+ * - [where] filters warehouses located in "New York".
+ * - [limit] is set to 2.
+ *
+ * [include]
+ * - Executes for each warehouse.
+ *
+ * [data.read] (nested inside [include])
+ * - Retrieves items from 'StockItem' for each warehouse by [WarehouseID].
+ *
+ * [yield]
+ * - Returns the items under the [items] node of each warehouse.
+ */
+data.connect:inventory
+   data.read
+      table:Warehouse
+      columns
+         WarehouseID
+         Location
+      where
+         and
+            Location.eq:New York
+      limit:2
+   include:x:@data.read/*
+      data.read
+         table:StockItem
+         where
+            and
+               WarehouseID.eq:x:@.dp/#/*/WarehouseID
+      yield
+         items:x:@data.read/*

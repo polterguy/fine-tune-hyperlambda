@@ -1,0 +1,42 @@
+/*
+ * This Hyperlambda endpoint returns a nested graph of starships and their assigned missions 
+ * from the 'starfleet' database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Establishes a connection to the 'starfleet' database.
+ *
+ * [data.read] (first)
+ * - Reads from the 'Starship' table.
+ * - [columns] selects [StarshipID] and [RegistryName].
+ * - [where] filters only starships marked as active.
+ * - [limit] is set to 5.
+ *
+ * [include]
+ * - Iterates over each starship to retrieve their related missions.
+ *
+ * [data.read] (nested inside [include])
+ * - Queries the 'Mission' table where [StarshipID] matches the current starship.
+ *
+ * [yield]
+ * - Returns the mission list under a [missions] node for each starship.
+ */
+data.connect:starfleet
+   data.read
+      table:Starship
+      columns
+         StarshipID
+         RegistryName
+      where
+         and
+            Status.eq:Active
+      limit:5
+   include:x:@data.read/*
+      data.read
+         table:Mission
+         where
+            and
+               StarshipID.eq:x:@.dp/#/*/StarshipID
+      yield
+         missions:x:@data.read/*

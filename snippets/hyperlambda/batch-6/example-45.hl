@@ -1,0 +1,71 @@
+/*
+ * This Hyperlambda file defines a dynamic graph-style HTTP endpoint that returns a nested 
+ * object graph of artists and their associated albums from the Chinook database.
+ *
+ * The structure implies this is not just a flat list query — it returns **parent-child relationships**, 
+ * where each artist node includes its own list of related albums. This is often used to simulate 
+ * object graphs similar to what you would see in ORM or GraphQL-style APIs.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Opens a connection to the 'chinook' database.
+ * - This is required to issue any subsequent [data.read] operations.
+ *
+ * [data.read] (first)
+ * - Queries the 'Artist' table.
+ * - [columns] selects the [ArtistID] and [Name] fields.
+ * - The [where] clause filters artists based on the [Name] column.
+ * - The [limit] restricts the result to a maximum of 10 artist records.
+ * - The result of this read is a list of artist nodes with basic details.
+ *
+ * [include]
+ * - Iterates over each item from the first [data.read] call (i.e., the list of artists).
+ * - For **each individual artist**, it creates a new execution context and executes the child nodes.
+ * - This allows for executing logic **per item**, building a nested result graph.
+ *
+ * [data.read] (nested inside [include])
+ * - Executes **for each artist** due to the enclosing [include] block.
+ * - Queries the 'Album' table, selecting all albums for the current artist.
+ * - The [where] clause restricts albums to those that match the artist’s ID.
+ *
+ * [yield]
+ * - Returns the result of the nested [data.read] (albums) back to the parent [include] node.
+ * - The [albums] node ensures the albums are returned as a child node named [albums] 
+ *   for each artist, building a **graph-style JSON object**.
+ *
+ * The overall effect is a hierarchical data structure like this:
+ * ```json
+ * [
+ *   {
+ *     "ArtistID": 1,
+ *     "Name": "AC/DC",
+ *     "albums": [
+ *       { "Title": "For Those About To Rock", "AlbumId": 1 },
+ *       ...
+ *     ]
+ *   },
+ *   ...
+ * ]
+ * ```
+ * This structure is ideal for use cases requiring relational data output in a single call, 
+ * such as frontend apps, APIs, or reports.
+ */
+data.connect:chinook
+   data.read
+      table:Artist
+      columns
+         ArtistID
+         Name
+      where
+         and
+            Name.like:%AC%
+      limit:10
+   include:x:@data.read/*
+      data.read
+         table:Album
+         where
+            and
+               AlbumId.eq:x:@.dp/#/*/ArtistId
+      yield
+         albums:x:@data.read/*

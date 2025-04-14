@@ -1,0 +1,45 @@
+/*
+ * This Hyperlambda file defines an HTTP endpoint that returns a nested object graph 
+ * of departments and their associated employees from the HR database.
+ *
+ * This is a graph-style query that structures relational data into a parent-child hierarchy.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Opens a connection to the 'hr' database.
+ *
+ * [data.read] (first)
+ * - Queries the 'Department' table.
+ * - [columns] selects the [DepartmentID] and [DepartmentName].
+ * - [where] filters departments whose name contains "Sales".
+ * - [limit] restricts the result to 5 departments.
+ *
+ * [include]
+ * - Iterates over each department returned from the first [data.read].
+ *
+ * [data.read] (nested inside [include])
+ * - For each department, retrieves all employees from the 'Employee' table.
+ * - The [where] clause filters employees by [DepartmentID].
+ *
+ * [yield]
+ * - Returns the employees under a node named [employees] for each department.
+ */
+data.connect:hr
+   data.read
+      table:Department
+      columns
+         DepartmentID
+         DepartmentName
+      where
+         and
+            DepartmentName.like:%Sales%
+      limit:5
+   include:x:@data.read/*
+      data.read
+         table:Employee
+         where
+            and
+               DepartmentID.eq:x:@.dp/#/*/DepartmentID
+      yield
+         employees:x:@data.read/*
