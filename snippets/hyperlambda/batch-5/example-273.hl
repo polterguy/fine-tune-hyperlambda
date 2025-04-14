@@ -1,0 +1,43 @@
+/*
+ * This code dynamically invokes a custom slot (e.g. an API or utility function)
+ * that returns two nodes: [status] and [headers]. These represent the HTTP status code
+ * and one or more HTTP response headers to be returned to the client.
+ *
+ * The [execute] slot is used to run a custom slot dynamically. It expects a slot name
+ * and optional argument nodes. Its return value is a lambda object containing the result
+ * of the executed slot. In this context, the returned lambda contains two child nodes:
+ * 
+ * - [status]: The HTTP status code that should be returned.
+ * - [headers]: A set of named child nodes representing individual HTTP headers and their values.
+ *
+ * After the slot is executed, we:
+ *
+ * 1. Use [response.status.set] with an expression to retrieve the value of [status]
+ *    returned by the slot. This updates the actual HTTP response status code that will be
+ *    sent to the client.
+ *
+ * 2. Use [get-nodes] to fetch the entire node set under [headers], dynamically returned by
+ *    the executed slot. This results in a collection of key-value nodes like 'Content-Type',
+ *    'Cache-Control', etc.
+ *
+ * 3. Use [add] to inject those header nodes into the HTTP response and the
+ *    [response.headers.set] slot that explicitly sets the HTTP headers returned from endpoint.
+ *
+ * 4. A final invocation of [response.headers.set] ensures the modified node structure
+ *    triggers the actual HTTP header setting logic at runtime.
+ *
+ * Together, this structure allows dynamic, slot-driven HTTP response behavior—custom headers
+ * and status codes can be controlled by any backend slot, increasing flexibility for APIs,
+ * middlewares, and logic encapsulation.
+ */
+
+ // Invoking some slot that return HTTP status code as [status] and HTTP headers as [headers]
+execute:whatever.slot.returning.status.and.headers
+
+// Changing HTTP status code we return
+response.status.set:x:@execute/*/status
+
+// Adding HTTP headers returned from slot to response
+add:x:./*/response.headers.set
+   get-nodes:x:@execute/*/headers
+response.headers.set
