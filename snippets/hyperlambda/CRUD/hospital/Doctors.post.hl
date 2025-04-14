@@ -1,0 +1,95 @@
+
+/*
+ * This endpoint creates a new record in the 'Doctors' table of a hospital database, 
+ * accepting all necessary doctor-related fields and returning the ID of the newly inserted entry.
+ *
+ * The [.arguments] node defines the input fields required to create a doctor record:
+ * - [FirstName], [LastName], [Specialty], [PhoneNumber], and [Email] are all expected 
+ *   and correspond to columns in the 'Doctors' table.
+ *
+ * The [auth.ticket.verify] slot ensures that only authenticated users with roles 
+ * 'admin', 'guest', or 'root' are allowed to create doctor entries.
+ *
+ * The [auth.ticket.get] slot retrieves the current user's identity.
+ *
+ * The [lambda2hyper] slot transforms the incoming arguments into Hyperlambda format, 
+ * which is passed to [log.info] to log the creation action, including the username 
+ * and input arguments for auditing purposes.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 
+ * 'sqlite' engine and the 'generic' connector.
+ *
+ * Inside the connection context:
+ * - The [add] slot dynamically transfers all input arguments to the [values] section 
+ *   of the [data.create] operation, ensuring the new doctor record is constructed from 
+ *   the user-supplied data.
+ *
+ * - The [data.create] slot executes the SQL insert into the 'Doctors' table. 
+ *   The [return-id:bool:true] directive instructs the system to return the primary key 
+ *   (ID) of the newly created record.
+ *
+ * - The [response.status.set] slot sets the HTTP status code to 201 (Created), indicating 
+ *   the operation was successful and a new resource has been created.
+ *
+ * - A [sockets.signal] is broadcast to notify subscribed clients (with roles 'admin' or 'root') 
+ *   that a new doctor record has been added. The original arguments are passed in the signal payload.
+ *
+ * - The [unwrap] slot makes the generated ID from [data.create] accessible to the [return] slot.
+ * - The [return] slot responds to the client with the ID of the newly created doctor record.
+ */
+.arguments
+
+   // FirstName column value
+   FirstName:string
+
+   // LastName column value
+   LastName:string
+
+   // Specialty column value
+   Specialty:string
+
+   // PhoneNumber column value
+   PhoneNumber:string
+
+   // Email column value
+   Email:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Doctors entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Doctors
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Doctors.post
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

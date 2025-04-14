@@ -1,0 +1,138 @@
+
+/*
+ * This endpoint returns **unique and distinct values** from a specified column in the 
+ * 'Doctors' table of a hospital database, with optional support for pagination, sorting, 
+ * and dynamic filtering based on client input.
+ *
+ * The [.arguments] node includes:
+ * - [distinct_column], which is **mandatory** and specifies the column from which to 
+ *   extract distinct values. It must follow the format 'TABLE_NAME.COLUMN_NAME', such as 
+ *   'Doctors.Specialty'.
+ * - [limit] and [offset] control how many distinct records to return and from where in the dataset.
+ * - [order] and [direction] allow sorting of the result set.
+ * - A comprehensive set of **optional filtering arguments** like 'Doctors.FirstName.like' 
+ *   and 'Doctors.Specialty.eq' provide the ability to narrow the dataset before extracting 
+ *   distinct values.
+ *
+ * The [validators.mandatory] slot ensures that the required [distinct_column] is provided.
+ *
+ * The [validators.enum] slot restricts [distinct_column] to a known, safe list of fields 
+ * in the 'Doctors' table, ensuring only valid columns are used.
+ *
+ * The [response.headers.set] slot sets the 'Cache-Control' HTTP header to allow caching 
+ * for 300 seconds, improving efficiency for repeat queries.
+ *
+ * The [auth.ticket.verify] slot limits access to users with roles 'admin', 'guest', or 'root'.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using the 
+ * 'sqlite' engine via the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The [set-name] slot constructs a dynamic SQL function like `distinct(Doctors.Specialty)` 
+ *   using [strings.concat], assigning it to [distinct_functor] in the [columns] node of the 
+ *   upcoming query.
+ *
+ * - The [remove-nodes] slot removes the processed [distinct_column] argument to reduce clutter.
+ *
+ * - The [add] slot moves [limit], [offset], [order], and [direction] into the [data.read] node 
+ *   to control pagination and sorting. These arguments are subsequently cleaned up with 
+ *   corresponding [remove-nodes] calls.
+ *
+ * - Another [add] slot dynamically inserts any **remaining filtering arguments** into the [where] 
+ *   clause of the SQL query. This approach supports **fully dynamic filtering**—only the filters 
+ *   provided at runtime are applied. If none are passed, the endpoint returns all distinct values 
+ *   from the specified column.
+ *
+ * The [data.read] slot executes the actual query:
+ * - It reads from the 'Doctors' table, applying the [distinct_functor] aggregation.
+ * - Filtering conditions are populated into an initially empty [and] block based on 
+ *   optional user-provided filters.
+ *
+ * Finally, the [return-nodes] slot returns the distinct result set to the client.
+ */
+.arguments
+
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+   Doctors.DoctorID.eq:long
+   Doctors.FirstName.like:string
+   Doctors.FirstName.eq:string
+   Doctors.LastName.like:string
+   Doctors.LastName.eq:string
+   Doctors.Specialty.like:string
+   Doctors.Specialty.eq:string
+   Doctors.PhoneNumber.like:string
+   Doctors.PhoneNumber.eq:string
+   Doctors.Email.like:string
+   Doctors.Email.eq:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Doctors.DoctorID
+   .:Doctors.FirstName
+   .:Doctors.LastName
+   .:Doctors.Specialty
+   .:Doctors.PhoneNumber
+   .:Doctors.Email
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Doctors
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

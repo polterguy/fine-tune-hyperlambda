@@ -1,0 +1,91 @@
+
+/*
+ * This endpoint creates a new record in the 'Treatments' table of a hospital database. 
+ * It accepts structured treatment data, inserts it into the database, and returns the ID 
+ * of the newly created entry.
+ *
+ * The [.arguments] node contains:
+ * - [PatientID]: Identifies the patient receiving the treatment.
+ * - [TreatmentDate]: Specifies the date the treatment occurred.
+ * - [Description]: A textual description of the treatment.
+ * All arguments are required to ensure a complete and valid treatment record is stored.
+ *
+ * The [auth.ticket.verify] slot ensures only users with roles 'admin', 'guest', or 'root' 
+ * are authorized to create treatment entries.
+ *
+ * The [auth.ticket.get] and [lambda2hyper] slots retrieve the current user's identity 
+ * and serialize the input arguments. These are passed to [log.info] to log the operation 
+ * for audit and traceability, including the username and the new treatment data.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using the 
+ * 'sqlite' engine via the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The [add] slot inserts all input arguments into the [values] node of the [data.create] operation.
+ *
+ * - The [data.create] slot performs the insertion into the 'Treatments' table. 
+ *   The [return-id:bool:true] option ensures the primary key (ID) of the new record is returned.
+ *
+ * - The [response.status.set] slot sets the HTTP response status code to 201 (Created), 
+ *   signaling successful creation of the new record.
+ *
+ * - A [sockets.signal] is emitted to notify subscribed clients (with roles 'admin' or 'root') 
+ *   that a treatment record was created. The original arguments are included in the payload.
+ *
+ * - The [unwrap] slot is **critical** here: it evaluates the result of the [data.create] operation 
+ *   so that the following [return] node returns the **actual value** (i.e., the ID), rather than 
+ *   just a reference expression.
+ *
+ * - The [return] node then sends the resolved ID back to the client under the key [id], 
+ *   allowing the caller to track the newly created treatment.
+ */
+.arguments
+
+   // PatientID column value
+   PatientID:long
+
+   // TreatmentDate column value
+   TreatmentDate:date
+
+   // Description column value
+   Description:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Treatments entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Treatments
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Treatments.post
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

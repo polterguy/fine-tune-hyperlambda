@@ -1,0 +1,94 @@
+
+/*
+ * This endpoint creates a new record in the 'Medications' table of a hospital database, 
+ * using input values related to a patient's prescribed medication. Upon success, it returns 
+ * the ID of the newly inserted record.
+ *
+ * The [.arguments] node defines the required input fields:
+ * - [PatientID], [MedicationName], [Dosage], [StartDate], and [EndDate] are all used to populate 
+ *   the new record in the 'Medications' table.
+ *
+ * The [auth.ticket.verify] slot ensures that only authenticated users with roles 
+ * 'admin', 'guest', or 'root' are authorized to create new medication entries.
+ *
+ * The [auth.ticket.get] slot retrieves the identity of the current user.
+ * The [lambda2hyper] slot converts the input arguments into Hyperlambda format, which is passed 
+ * to [log.info] for logging purposes. This audit log includes the invoking username and the 
+ * input arguments used to create the new record.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 'sqlite' 
+ * engine through the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The [add] slot dynamically injects all input arguments into the [values] node of the 
+ *   upcoming [data.create] operation.
+ *
+ * - The [data.create] slot performs the insert into the 'Medications' table using the provided values. 
+ *   The [return-id:bool:true] directive ensures that the primary key of the newly created record 
+ *   is returned.
+ *
+ * - The [response.status.set] slot sets the HTTP status code to 201 (Created), indicating 
+ *   the operation was successful.
+ *
+ * - A [sockets.signal] is published to notify all connected clients (with roles 'admin' or 'root') 
+ *   that a new medication record has been created. The original arguments are included in the payload.
+ *
+ * - Finally, the [unwrap] slot extracts the returned ID from the result of [data.create], and the 
+ *   [return] slot sends it back to the client under the key [id].
+ */
+.arguments
+
+   // PatientID column value
+   PatientID:long
+
+   // MedicationName column value
+   MedicationName:string
+
+   // Dosage column value
+   Dosage:string
+
+   // StartDate column value
+   StartDate:date
+
+   // EndDate column value
+   EndDate:date
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Medications entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Medications
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Medications.post
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

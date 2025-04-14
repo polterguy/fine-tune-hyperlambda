@@ -1,0 +1,74 @@
+
+/*
+ * This endpoint counts the number of records in the 'Doctors' table of a hospital database, 
+ * with support for **optional dynamic filtering** to restrict the scope of the count.
+ *
+ * The [.arguments] node defines a range of **optional filtering arguments**, including fields like 
+ * 'Doctors.FirstName.like', 'Doctors.Specialty.eq', and 'Doctors.Email.eq'. These filters 
+ * are not required by default and can be included individually or in combination to 
+ * narrow the dataset being counted.
+ *
+ * The [response.headers.set] slot adds an HTTP header for client-side caching by setting 
+ * 'Cache-Control: public, max-age=300', allowing responses to be cached for 300 seconds.
+ *
+ * The [auth.ticket.verify] slot ensures that only authenticated users with roles 
+ * 'admin', 'guest', or 'root' are authorized to access this endpoint.
+ *
+ * The [data.connect] slot establishes a database connection to the 'hospital' database 
+ * using the 'sqlite' engine and the 'generic' connector.
+ *
+ * Within the connection context:
+ * - The [add] slot dynamically inserts **only the filtering arguments provided** by the 
+ *   client into the [where] clause of the upcoming query. Since these arguments are optional, 
+ *   this allows for **flexible filtering** based on runtime input. If no filters are provided, 
+ *   the query defaults to counting all records in the 'Doctors' table.
+ *
+ * The [data.read] slot executes the SQL query:
+ * - It queries the 'Doctors' table and includes a [columns] node that performs a 
+ *   `count(*)` aggregation, aliased as [count].
+ * - The [where] clause is initialized as an empty [and] block, which is dynamically populated 
+ *   with filtering expressions if any are present.
+ * - The [limit] is set to 1 since the operation returns a single aggregated value.
+ *
+ * The [return-nodes] slot extracts and returns the result of the [data.read] operation, 
+ * providing the caller with the count of matching records.
+ */
+.arguments
+   Doctors.DoctorID.eq:long
+   Doctors.FirstName.like:string
+   Doctors.FirstName.eq:string
+   Doctors.LastName.like:string
+   Doctors.LastName.eq:string
+   Doctors.Specialty.like:string
+   Doctors.Specialty.eq:string
+   Doctors.PhoneNumber.like:string
+   Doctors.PhoneNumber.eq:string
+   Doctors.Email.like:string
+   Doctors.Email.eq:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Doctors
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

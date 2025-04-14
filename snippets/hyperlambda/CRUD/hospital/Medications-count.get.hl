@@ -1,0 +1,81 @@
+
+/*
+ * This endpoint returns a **count of records** from the 'Medications' table in a hospital database, 
+ * with support for **optional filtering** based on various medication and patient-related fields.
+ *
+ * The [.arguments] node includes a variety of **optional filtering parameters**:
+ * - Fields from the 'Medications' table such as 'Medications.MedicationName.eq', 
+ *   'Medications.Dosage.like', and date-based filters like 'Medications.StartDate.eq'.
+ * - Fields from the 'Patients' table via joined columns like 'PatientID.FirstName.eq'.
+ * These filtering arguments are completely optional and may be omitted. If not provided, 
+ * the query will count all records in the table. When provided, only matching records will be counted.
+ *
+ * The [response.headers.set] slot adds the HTTP header 'Cache-Control: public, max-age=300', 
+ * enabling client-side caching of the result for 300 seconds.
+ *
+ * The [auth.ticket.verify] slot ensures that the operation is restricted to users with roles 
+ * 'admin', 'guest', or 'root'.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 
+ * 'sqlite' engine via the 'generic' connector.
+ *
+ * Inside the database connection context:
+ * - The [add] slot dynamically injects any provided filtering arguments into the [where] clause 
+ *   of the [data.read] operation. This enables **dynamic filtering**: only filters present in the 
+ *   request are applied, allowing for flexible and adaptive behavior.
+ *
+ * The [data.read] slot performs the actual SQL query:
+ * - It targets the 'Medications' table and includes a left join with the 'Patients' table 
+ *   to allow filtering based on patient-related fields.
+ * - The [columns] node contains a single expression: `count(*)`, aliased as [count], 
+ *   which returns the number of records matching the filter criteria.
+ * - The [where] clause is initialized with an empty [and] node, populated at runtime 
+ *   by any filter arguments passed.
+ * - The [limit] is set to 1 since the result is a single numeric value.
+ *
+ * Finally, the [return-nodes] slot extracts and returns the count result to the caller.
+ */
+.arguments
+   Medications.MedicationID.eq:long
+   Medications.PatientID.eq:long
+   Medications.MedicationName.like:string
+   Medications.MedicationName.eq:string
+   Medications.Dosage.like:string
+   Medications.Dosage.eq:string
+   Medications.StartDate.eq:date
+   Medications.EndDate.eq:date
+   PatientID.FirstName.eq:string
+   PatientID.FirstName.like:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Medications
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Medications.PatientID:PatientID.PatientID
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,122 @@
+
+/*
+ * This endpoint updates an existing record in the 'Appointments' table of a hospital database. 
+ * It requires the primary key to identify the record and allows updating one or more column values.
+ *
+ * The [.arguments] node defines the input parameters:
+ * - [AppointmentID] is **mandatory** and serves as the primary key used to locate the record to update.
+ * - [PatientID], [DoctorID], [AppointmentDate], and [Reason] are optional update targets 
+ *   representing the new values for their respective columns.
+ *
+ * The [validators.mandatory] slot ensures that [AppointmentID] is included in the request, 
+ * as it is required to identify the record to modify.
+ *
+ * The [auth.ticket.verify] slot limits access to users with 'root' or 'admin' roles, 
+ * ensuring only authorized clients may perform updates.
+ *
+ * The [auth.ticket.get] slot retrieves the identity of the authenticated user.
+ *
+ * The [lambda2hyper] slot transforms the argument payload into a Hyperlambda structure, 
+ * which is passed to [log.info] to create an audit log entry indicating the update event, 
+ * including the username and updated values.
+ *
+ * The [data.connect] slot initiates a connection to the 'hospital' database using the 
+ * 'sqlite' engine via the 'generic' connector.
+ *
+ * Within the connection context:
+ * - The first [add] block dynamically extracts all updateable fields (everything **except** 
+ *   the primary key at index 0) and adds them under the [values] node of the [data.update] 
+ *   slot, preparing them for the update operation.
+ *
+ * - The second [add] block extracts the [AppointmentID] field (index 0) and adds it to the 
+ *   [where] clause using an [and] filter, ensuring that only the intended record is modified.
+ *
+ * The [data.update] slot executes the update operation on the 'Appointments' table using the 
+ * defined [values] and [where] filters.
+ *
+ * The [if] slot performs a post-check to determine whether the update affected any rows. 
+ * If no records were updated (i.e., [data.update] returns 0), a '404 Not Found' status is 
+ * returned along with an appropriate error message.
+ *
+ * If the update succeeds, the [response.status.set] slot sets the HTTP status code to 202, 
+ * indicating that the request was accepted and processed.
+ *
+ * A [sockets.signal] is then broadcast to subscribed clients (roles: 'admin', 'root') 
+ * to notify them that an appointment has been updated. The original arguments are 
+ * included as part of the payload.
+ *
+ * Finally, the [unwrap] slot extracts the number of updated records, and the [return] 
+ * slot sends this result back to the client under the key [affected].
+ */
+.arguments
+
+   // AppointmentID column value being primary key of record to update, mandatory argument
+   AppointmentID:long
+
+   // PatientID column's new value
+   PatientID:long
+
+   // DoctorID column's new value
+   DoctorID:long
+
+   // AppointmentDate column's new value
+   AppointmentDate:date
+
+   // Reason column's new value
+   Reason:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/AppointmentID
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Appointments entry updated
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Appointments
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Appointments.put
+      args
+      roles:admin,root
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

@@ -1,0 +1,125 @@
+
+/*
+ * This endpoint retrieves a list of patient records from the 'Patients' table in a hospital database. 
+ * It supports **dynamic filtering**, **pagination**, and **sorting** through optional input arguments.
+ *
+ * The [.arguments] node includes:
+ * - [limit] and [offset] for controlling pagination (e.g., how many records to return and where to start).
+ * - [order] and [direction] allow results to be sorted by a specified column and order (ascending or descending).
+ * - A comprehensive set of **optional filtering arguments** such as 'Patients.LastName.like', 
+ *   'Patients.Gender.eq', and 'Patients.AdmissionDate.eq'. These enable highly specific record selection 
+ *   and are **dynamically injected** into the query only if provided.
+ *
+ * The [response.headers.set] slot adds a 'Cache-Control' header to cache the result on the client 
+ * for up to 300 seconds.
+ *
+ * The [auth.ticket.verify] slot ensures access is granted only to authorized users in roles 
+ * 'admin', 'guest', or 'root'.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 'sqlite' engine 
+ * via the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The first [add] block dynamically inserts [order] and [direction] into the [data.read] query 
+ *   to apply optional sorting, followed by their removal from the argument set with [remove-nodes].
+ *
+ * - The second [add] block does the same for [limit] and [offset], enabling pagination support.
+ *
+ * - The third [add] block dynamically includes any **remaining filtering arguments** into the [where] clause. 
+ *   This supports **dynamic filtering**, ensuring that only the specified conditions are applied at runtime.
+ *
+ * The [data.read] slot performs the actual SQL read operation:
+ * - It targets the 'Patients' table and retrieves a detailed list of fields such as patient contact info, 
+ *   emergency contacts, admission/discharge dates, etc.
+ * - The [where] clause starts with an empty [and] block and is dynamically populated with user-supplied filters.
+ *
+ * The [yield] slot returns the result set to the caller under the [patients] key. This is useful 
+ * for providing a named structure in the response, which can be helpful for front-end consumers 
+ * or downstream processing.
+ */
+.arguments
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+   Patients.PatientID.eq:long
+   Patients.FirstName.like:string
+   Patients.FirstName.eq:string
+   Patients.LastName.like:string
+   Patients.LastName.eq:string
+   Patients.DateOfBirth.eq:date
+   Patients.Gender.like:string
+   Patients.Gender.eq:string
+   Patients.Address.like:string
+   Patients.Address.eq:string
+   Patients.PhoneNumber.like:string
+   Patients.PhoneNumber.eq:string
+   Patients.Email.like:string
+   Patients.Email.eq:string
+   Patients.EmergencyContactName.like:string
+   Patients.EmergencyContactName.eq:string
+   Patients.EmergencyContactPhone.like:string
+   Patients.EmergencyContactPhone.eq:string
+   Patients.AdmissionDate.eq:date
+   Patients.DischargeDate.eq:date
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Patients
+      columns
+         Patients.PatientID
+         Patients.FirstName
+         Patients.LastName
+         Patients.DateOfBirth
+         Patients.Gender
+         Patients.Address
+         Patients.PhoneNumber
+         Patients.Email
+         Patients.EmergencyContactName
+         Patients.EmergencyContactPhone
+         Patients.AdmissionDate
+         Patients.DischargeDate
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   yield
+      patients:x:@data.read/*

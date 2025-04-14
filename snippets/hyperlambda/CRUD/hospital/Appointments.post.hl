@@ -1,0 +1,92 @@
+
+/*
+ * This endpoint creates a new record in the 'Appointments' table of a hospital database, 
+ * accepting all necessary input fields and returning the ID of the newly inserted entry.
+ *
+ * The [.arguments] node defines the input parameters required to create a new appointment:
+ * - [PatientID], [DoctorID], [AppointmentDate], and [Reason] must all be provided, 
+ *   corresponding to their respective columns in the 'Appointments' table.
+ *
+ * The [auth.ticket.verify] slot ensures that only authenticated users with roles 
+ * 'admin', 'guest', or 'root' are authorized to create new appointment entries.
+ *
+ * The [auth.ticket.get] slot retrieves information about the current authenticated user.
+ *
+ * The [lambda2hyper] slot converts the incoming arguments to a Hyperlambda-compatible structure, 
+ * which is passed to [log.info] to log the creation of the new appointment record along with 
+ * the username and payload for audit purposes.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using 
+ * the 'sqlite' engine via the 'generic' connector.
+ *
+ * Inside the database connection context:
+ * - The [add] slot dynamically moves the input arguments into the [values] section 
+ *   of the upcoming [data.create] invocation, ensuring all input fields are included 
+ *   in the SQL insert operation.
+ *
+ * - The [data.create] slot performs the actual insert into the 'Appointments' table.
+ *   The [return-id:bool:true] setting instructs the operation to return the ID of 
+ *   the newly created record.
+ *
+ * - The [response.status.set] slot sets the HTTP status code to '201 Created', indicating 
+ *   that a new resource was successfully created.
+ *
+ * - A [sockets.signal] is published to notify subscribed clients (with roles 'admin' or 'root') 
+ *   about the new appointment. The input arguments are included in the signal payload.
+ *
+ * - Finally, the [unwrap] slot extracts the generated ID from the result of [data.create], 
+ *   and the [return] slot sends it back to the client under the key [id].
+ */
+.arguments
+
+   // PatientID column value
+   PatientID:long
+
+   // DoctorID column value
+   DoctorID:long
+
+   // AppointmentDate column value
+   AppointmentDate:date
+
+   // Reason column value
+   Reason:string
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Appointments entry created
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Appointments
+      return-id:bool:true
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Appointments.post
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      id:x:@data.create

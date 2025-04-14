@@ -1,0 +1,201 @@
+
+/*
+ * This endpoint performs grouped aggregation queries (min, max, avg, sum, or count) 
+ * on the 'Doctors' table in a hospital database, grouped by a specified column and 
+ * optionally filtered, ordered, and paginated.
+ *
+ * The [.arguments] node includes:
+ * - [group_column], [aggregate_function], and [aggregate_column] — all **mandatory** — to define 
+ *   the grouping key, the aggregation function (e.g., 'avg', 'count'), and the column 
+ *   to aggregate.
+ * - [limit], [offset], [order], and [direction] are **optional** and support pagination 
+ *   and sorting of grouped results.
+ * - Several **optional filtering arguments** (e.g., 'Doctors.Email.like', 'Doctors.Specialty.eq') 
+ *   allow clients to narrow the dataset before grouping and aggregation.
+ *
+ * The [validators.mandatory] slots ensure that all required parameters are present.
+ *
+ * The [validators.enum] slots strictly enforce valid values for [aggregate_function], [group_column], 
+ * and [aggregate_column], restricting them to known, safe columns within the 'Doctors' table.
+ *
+ * The [response.headers.set] slot sets a 'Cache-Control' HTTP header, enabling public caching 
+ * of the response for 300 seconds.
+ *
+ * The [auth.ticket.verify] slot ensures the endpoint is only accessible to users with 
+ * 'admin', 'guest', or 'root' roles.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 'sqlite' 
+ * engine and the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The [set-name] slot dynamically sets the [group_column] name inside the [group] node 
+ *   for the upcoming [data.read] operation.
+ *
+ * - Another [set-name] adds the grouped column as part of the result set, and [insert-before] 
+ *   ensures it is included before the aggregation result in the output columns.
+ *
+ * - [set-value] assigns a name to the returned aggregation value using the name of the 
+ *   selected [aggregate_function] (e.g., 'sum', 'min').
+ *
+ * - [remove-nodes] clears [group_column] from the argument set now that it has been processed.
+ *
+ * - [add] and [remove-nodes] manage optional pagination parameters [limit] and [offset], 
+ *   adding them to [data.read] if present.
+ *
+ * - Additional [add] and [remove-nodes] manage optional ordering parameters [order] and [direction].
+ *
+ * - [set-name] constructs the full aggregation function (e.g., `avg(Doctors.DoctorID)`) 
+ *   using [strings.concat] and assigns it to [aggregate_functor].
+ *
+ * - [remove-nodes] clears out [aggregate_function] and [aggregate_column] from the argument list 
+ *   to simplify downstream logic.
+ *
+ * - The [add] slot dynamically injects any **remaining filtering arguments** into the [where] 
+ *   clause. This ensures only the filters provided at runtime are applied, allowing the query 
+ *   to adapt dynamically to client input. If no filters are supplied, the [where] clause remains 
+ *   empty (but valid).
+ *
+ * The [data.read] slot performs the grouped aggregation query:
+ * - It queries the 'Doctors' table.
+ * - The [columns] section includes the dynamic [aggregate_functor], aliased as [result], 
+ *   and the grouping column.
+ * - The [where] clause uses an [and] node to collect optional filters dynamically.
+ * - The [group] node groups the result by the specified [group_column].
+ *
+ * Finally, the [return-nodes] slot returns the grouped and aggregated result set to the client.
+ */
+.arguments
+
+   // Mandatory argument being column to group by and must be in the format of TABLE_NAME.COLUMN_NAME
+   group_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum, avg or count
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+   Doctors.DoctorID.eq:long
+   Doctors.FirstName.like:string
+   Doctors.FirstName.eq:string
+   Doctors.LastName.like:string
+   Doctors.LastName.eq:string
+   Doctors.Specialty.like:string
+   Doctors.Specialty.eq:string
+   Doctors.PhoneNumber.like:string
+   Doctors.PhoneNumber.eq:string
+   Doctors.Email.like:string
+   Doctors.Email.eq:string
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/group_column
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+   .:count
+
+// Sanity checking group column.
+validators.enum:x:@.arguments/*/group_column
+   .:Doctors.DoctorID
+   .:Doctors.FirstName
+   .:Doctors.LastName
+   .:Doctors.Specialty
+   .:Doctors.PhoneNumber
+   .:Doctors.Email
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:Doctors.DoctorID
+   .:Doctors.FirstName
+   .:Doctors.LastName
+   .:Doctors.Specialty
+   .:Doctors.PhoneNumber
+   .:Doctors.Email
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Making sure we're using the correct group column
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+
+   // Making sure we return group column as a part of the result
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+
+   // Changing name of aggregate column returned to caller.
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+
+   // Removing group column to simplify adding other arguments
+   remove-nodes:x:@.arguments/*/group_column
+
+   // Adding paging arguments
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Doctors
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

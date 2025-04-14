@@ -1,0 +1,80 @@
+
+/*
+ * This endpoint deletes a single record from the 'Patients' table in a hospital database 
+ * based on the provided primary key [PatientID]. It includes authorization, logging, 
+ * signaling, and returns the number of records affected.
+ *
+ * The [.arguments] node defines:
+ * - [PatientID], which is a **mandatory** parameter used to identify the patient record to delete.
+ *
+ * The [auth.ticket.verify] slot ensures only users with the 'root' role can perform this sensitive operation.
+ *
+ * The [auth.ticket.get] and [lambda2hyper] slots capture the current user and input data 
+ * in a structured format, which is then passed to [log.info] to log the deletion event 
+ * for audit purposes.
+ *
+ * The [validators.mandatory] slot confirms that the [PatientID] argument is present before execution continues.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using the 'sqlite' engine 
+ * through the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The [add] slot dynamically adds the [PatientID] argument to the [where] clause 
+ *   of the [data.delete] node, ensuring that the correct record is targeted for deletion.
+ *
+ * - The [data.delete] slot performs the actual deletion from the 'Patients' table using 
+ *   the constructed [where] condition.
+ *
+ * - After deletion, a [sockets.signal] is sent to notify connected clients (with roles 
+ *   'admin' or 'root') that a patient record was deleted. The original input arguments 
+ *   are included in the signal payload.
+ *
+ * - The [unwrap] slot is **critical** here: it **evaluates the result of the [data.delete] operation** 
+ *   before executing the [return] node. Without [unwrap], the [return] node would attempt to return 
+ *   a reference expression (e.g., `@data.delete`) instead of the actual value produced by the delete operation.
+ *   This guarantees the caller receives the evaluated number of records affected.
+ *
+ * - Finally, the [return] node returns the result (number of deleted records) under the key [affected].
+ */
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   PatientID:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Patients entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/PatientID
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Patients
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Patients.delete
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

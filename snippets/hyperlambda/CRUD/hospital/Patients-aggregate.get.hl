@@ -1,0 +1,142 @@
+
+/*
+ * This endpoint performs an **aggregation operation** (min, max, avg, or sum) on a specified column 
+ * in the 'Patients' table of a hospital database. The query supports **optional dynamic filtering**, 
+ * allowing the result to be narrowed down based on various patient-related criteria.
+ *
+ * The [.arguments] node includes:
+ * - [aggregate_function], a **mandatory** argument specifying the type of aggregation to apply. 
+ *   Allowed values are: 'min', 'max', 'sum', and 'avg'.
+ * - [aggregate_column], a **mandatory** argument identifying the column to apply the aggregation on. 
+ *   It must follow the 'TABLE_NAME.COLUMN_NAME' format (e.g., 'Patients.AdmissionDate').
+ * - Additional **optional filtering arguments** such as 'Patients.FirstName.like', 'Patients.DateOfBirth.eq', 
+ *   and 'Patients.AdmissionDate.eq' that allow clients to restrict the aggregation scope. 
+ *   These are dynamically included at runtime if provided.
+ *
+ * The [validators.mandatory] slots ensure that both [aggregate_function] and [aggregate_column] 
+ * are included in the request.
+ *
+ * The [validators.enum] slots enforce that:
+ * - [aggregate_function] is one of the accepted function names.
+ * - [aggregate_column] is one of the approved columns from the 'Patients' table.
+ *
+ * The [response.headers.set] slot configures caching on the client side by setting 
+ * 'Cache-Control: public, max-age=300'.
+ *
+ * The [auth.ticket.verify] slot ensures access is restricted to users with roles 
+ * 'admin', 'guest', or 'root'.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using the 
+ * 'sqlite' engine through the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The [set-name] slot constructs a dynamic aggregation expression such as 
+ *   `avg(Patients.AdmissionDate)` using [strings.concat] and stores it in a node 
+ *   named [aggregate_functor] within the [columns] node of the upcoming query.
+ *
+ * - The [remove-nodes] slot removes both the [aggregate_function] and [aggregate_column] arguments 
+ *   to simplify the remaining structure.
+ *
+ * - The [add] slot dynamically adds any remaining **optional filtering arguments** to the [where] clause. 
+ *   This supports **dynamic filtering**, ensuring only the filters provided by the client 
+ *   are applied to the aggregation query.
+ *
+ * The [data.read] slot executes the SQL aggregation query:
+ * - It targets the 'Patients' table.
+ * - The [columns] section includes the dynamically constructed [aggregate_functor], aliased as [result].
+ * - The [where] clause starts as an empty [and] node, filled with filters only if specified.
+ * - The [limit] is set to 1, as only one aggregated value is expected in the result.
+ *
+ * Finally, the [return-nodes] slot extracts and returns the result of the aggregation to the caller.
+ */
+.arguments
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+   Patients.PatientID.eq:long
+   Patients.FirstName.like:string
+   Patients.FirstName.eq:string
+   Patients.LastName.like:string
+   Patients.LastName.eq:string
+   Patients.DateOfBirth.eq:date
+   Patients.Gender.like:string
+   Patients.Gender.eq:string
+   Patients.Address.like:string
+   Patients.Address.eq:string
+   Patients.PhoneNumber.like:string
+   Patients.PhoneNumber.eq:string
+   Patients.Email.like:string
+   Patients.Email.eq:string
+   Patients.EmergencyContactName.like:string
+   Patients.EmergencyContactName.eq:string
+   Patients.EmergencyContactPhone.like:string
+   Patients.EmergencyContactPhone.eq:string
+   Patients.AdmissionDate.eq:date
+   Patients.DischargeDate.eq:date
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:Patients.PatientID
+   .:Patients.FirstName
+   .:Patients.LastName
+   .:Patients.DateOfBirth
+   .:Patients.Gender
+   .:Patients.Address
+   .:Patients.PhoneNumber
+   .:Patients.Email
+   .:Patients.EmergencyContactName
+   .:Patients.EmergencyContactPhone
+   .:Patients.AdmissionDate
+   .:Patients.DischargeDate
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Patients
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

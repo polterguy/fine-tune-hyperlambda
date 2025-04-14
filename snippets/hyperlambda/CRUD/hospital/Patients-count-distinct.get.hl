@@ -1,0 +1,124 @@
+
+/*
+ * This endpoint returns the **count of unique and distinct values** from a specified column 
+ * in the 'Patients' table of a hospital database. It supports optional dynamic filtering 
+ * to count only a subset of records based on user-supplied criteria.
+ *
+ * The [.arguments] node includes:
+ * - [distinct_column], a **mandatory** argument that specifies which column to count distinct values from. 
+ *   The format must be 'TABLE_NAME.COLUMN_NAME', such as 'Patients.Email'.
+ * - A collection of **optional filtering arguments** (e.g., 'Patients.Gender.eq', 'Patients.AdmissionDate.eq') 
+ *   that allow narrowing the query to a specific subset of patient records. These are dynamically included 
+ *   in the query at runtime only if provided.
+ *
+ * The [validators.mandatory] slot ensures that the [distinct_column] argument is present.
+ *
+ * The [validators.enum] slot validates that [distinct_column] matches one of the approved columns 
+ * in the 'Patients' table, ensuring safe and valid execution.
+ *
+ * The [response.headers.set] slot configures the HTTP response to be cacheable by setting 
+ * 'Cache-Control: public, max-age=300'.
+ *
+ * The [auth.ticket.verify] slot ensures the endpoint is accessible only to users with roles 
+ * 'admin', 'guest', or 'root'.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 'sqlite' engine 
+ * through the 'generic' connector.
+ *
+ * Inside the database connection context:
+ * - The [set-name] slot constructs a dynamic SQL expression like `count(distinct Patients.Email)` 
+ *   using [strings.concat], and assigns it to a node called [distinct_functor] inside the [columns] block.
+ *
+ * - The [remove-nodes] slot removes the [distinct_column] argument after it has been used, 
+ *   simplifying the structure for the next steps.
+ *
+ * - The [add] slot dynamically inserts any remaining **optional filtering arguments** into the [where] clause 
+ *   of the SQL query. This enables **dynamic filtering**, where only user-supplied filters are applied. 
+ *   If no filters are provided, the count applies to the entire table.
+ *
+ * The [data.read] slot executes the SQL query:
+ * - It queries the 'Patients' table and returns a single value representing the number of distinct values 
+ *   in the specified column.
+ * - The [columns] node includes only the [distinct_functor], aliased as [count].
+ * - The [where] clause is initialized as an [and] block and populated dynamically based on any provided filters.
+ *
+ * The [return-nodes] slot returns the result of the [data.read] operation to the caller.
+ */
+.arguments
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+   Patients.PatientID.eq:long
+   Patients.FirstName.like:string
+   Patients.FirstName.eq:string
+   Patients.LastName.like:string
+   Patients.LastName.eq:string
+   Patients.DateOfBirth.eq:date
+   Patients.Gender.like:string
+   Patients.Gender.eq:string
+   Patients.Address.like:string
+   Patients.Address.eq:string
+   Patients.PhoneNumber.like:string
+   Patients.PhoneNumber.eq:string
+   Patients.Email.like:string
+   Patients.Email.eq:string
+   Patients.EmergencyContactName.like:string
+   Patients.EmergencyContactName.eq:string
+   Patients.EmergencyContactPhone.like:string
+   Patients.EmergencyContactPhone.eq:string
+   Patients.AdmissionDate.eq:date
+   Patients.DischargeDate.eq:date
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Patients.PatientID
+   .:Patients.FirstName
+   .:Patients.LastName
+   .:Patients.DateOfBirth
+   .:Patients.Gender
+   .:Patients.Address
+   .:Patients.PhoneNumber
+   .:Patients.Email
+   .:Patients.EmergencyContactName
+   .:Patients.EmergencyContactPhone
+   .:Patients.AdmissionDate
+   .:Patients.DischargeDate
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Patients
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

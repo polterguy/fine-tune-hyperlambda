@@ -1,0 +1,85 @@
+
+/*
+ * This code defines an endpoint that counts the total number of entries in the 'Appointments' table 
+ * of a hospital database, optionally applying filters based on a wide set of possible criteria.
+ *
+ * The [.arguments] node defines a collection of **optional** filtering parameters, such as 
+ * 'Appointments.AppointmentDate.eq', 'Appointments.Reason.like', and 'DoctorID.FirstName.eq'.
+ * These filters allow clients to narrow down the scope of the count operation but are not 
+ * required—if no filters are provided, the endpoint will count all records.
+ *
+ * The [response.headers.set] slot adds the HTTP header 'Cache-Control' with a value of 
+ * 'public, max-age=300', allowing clients to cache the response for up to 300 seconds.
+ *
+ * The [auth.ticket.verify] slot ensures that only authenticated users with roles 'admin', 
+ * 'guest', or 'root' are authorized to access this endpoint.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using the 
+ * 'sqlite' engine through the 'generic' connector.
+ *
+ * Inside the database connection context:
+ * - The [add] slot dynamically inserts all optional filtering arguments into the [where] clause 
+ *   of the upcoming query, allowing for flexible runtime filtering.
+ *
+ * - The [data.read] slot performs the actual read operation from the 'Appointments' table.
+ *   - It includes left joins to the 'Patients' and 'Doctors' tables using foreign key 
+ *     relationships to enrich the data scope.
+ *   - The [columns] node specifies a 'count(*)' aggregation that is aliased as 'count', 
+ *     representing the total number of records matching the optional filter criteria.
+ *   - The [where] clause is initialized as an empty [and] condition and is populated at 
+ *     runtime if any filter arguments are passed.
+ *   - The [limit] node ensures only a single aggregated count result is returned.
+ *
+ * The [return-nodes] slot retrieves and returns the result of the [data.read] operation, 
+ * providing the caller with the final count.
+ */
+.arguments
+   Appointments.AppointmentID.eq:long
+   Appointments.PatientID.eq:long
+   Appointments.DoctorID.eq:long
+   Appointments.AppointmentDate.eq:date
+   Appointments.Reason.like:string
+   Appointments.Reason.eq:string
+   PatientID.FirstName.eq:string
+   PatientID.FirstName.like:string
+   DoctorID.FirstName.eq:string
+   DoctorID.FirstName.like:string
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Appointments
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Appointments.PatientID:PatientID.PatientID
+         join:Doctors
+            as:DoctorID
+            type:left
+            on
+               and
+                  Appointments.DoctorID:DoctorID.DoctorID
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

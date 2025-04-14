@@ -1,0 +1,116 @@
+
+/*
+ * This endpoint updates an existing record in the 'Treatments' table of a hospital database.
+ * It accepts updated treatment values, applies them to the record identified by [TreatmentID], 
+ * and returns the number of affected rows.
+ *
+ * The [.arguments] node includes:
+ * - [TreatmentID]: A **mandatory** primary key used to identify which record to update.
+ * - [PatientID], [TreatmentDate], and [Description]: New values to assign to the record.
+ *
+ * The [validators.mandatory] slot ensures that [TreatmentID] is present, which is required 
+ * to safely target and modify the correct treatment entry.
+ *
+ * The [auth.ticket.verify] slot restricts access to users with roles 'root' or 'admin', 
+ * ensuring that only authorized personnel may modify treatment data.
+ *
+ * The [auth.ticket.get] and [lambda2hyper] slots are used for structured logging:
+ * - They capture the username and the exact update payload.
+ * - The information is passed to [log.info] for audit purposes, ensuring full traceability.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using the 'sqlite' engine.
+ *
+ * Inside the database context:
+ * - The first [add] block selects all arguments except [TreatmentID] (indices 1 and up), 
+ *   placing them in the [values] section of the [data.update] operation.
+ *
+ * - The second [add] block targets the record by placing [TreatmentID] into the [where] clause 
+ *   under an [and] condition.
+ *
+ * - The [data.update] slot executes the update against the 'Treatments' table, applying 
+ *   the new values to the specified record.
+ *
+ * - The [if] block checks the result of [data.update] using [get-value] and [eq]:
+ *   - If zero records were affected, the endpoint responds with a 404 status and 
+ *     returns a message indicating that the record could not be found.
+ *
+ * - If the update was successful, [response.status.set] sets the HTTP response status to 202 (Accepted).
+ *
+ * - A [sockets.signal] is broadcast to notify subscribed clients (with 'admin' or 'root' roles) 
+ *   that a treatment record was updated. The signal payload includes the original arguments.
+ *
+ * - The [unwrap] slot is **essential**: it evaluates the [@data.update] reference, 
+ *   ensuring that the [return] node returns the actual number of affected rows—not a reference expression.
+ *
+ * - The [return] node responds with the number of updated rows under the key [affected], 
+ *   confirming success to the caller.
+ */
+.arguments
+
+   // TreatmentID column value being primary key of record to update, mandatory argument
+   TreatmentID:long
+
+   // PatientID column's new value
+   PatientID:long
+
+   // TreatmentDate column's new value
+   TreatmentDate:date
+
+   // Description column's new value
+   Description:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/TreatmentID
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Treatments entry updated
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Treatments
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Treatments.put
+      args
+      roles:admin,root
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

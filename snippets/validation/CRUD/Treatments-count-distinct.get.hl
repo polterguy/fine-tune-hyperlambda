@@ -1,0 +1,110 @@
+
+/*
+ * This endpoint returns the **count of unique and distinct values** from a specified column 
+ * in the 'Treatments' table of a hospital database. It supports optional filtering using 
+ * dynamic conditions supplied at runtime.
+ *
+ * The [.arguments] node defines:
+ * - [distinct_column], a **mandatory** argument indicating the column to count distinct values from.
+ *   This must follow the 'TABLE_NAME.COLUMN_NAME' format (e.g., 'Treatments.Description').
+ * - A set of **optional filtering arguments** (such as 'Treatments.TreatmentDate.eq' or 
+ *   'PatientID.FirstName.like') that allow narrowing the count to a specific subset of records. 
+ *   These are **dynamically applied** only if provided.
+ *
+ * The [validators.mandatory] slot ensures the required [distinct_column] is supplied.
+ *
+ * The [validators.enum] slot validates that [distinct_column] is one of a predefined list 
+ * of safe and valid columns from either the 'Treatments' table or the joined 'Patients' table.
+ *
+ * The [response.headers.set] slot sets a caching policy via 'Cache-Control: public, max-age=300' 
+ * to optimize performance.
+ *
+ * The [auth.ticket.verify] slot ensures access is granted only to authorized users with roles 
+ * 'admin', 'guest', or 'root'.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 'sqlite' engine 
+ * via the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The [set-name] slot dynamically constructs the aggregation function `count(distinct ...)` 
+ *   using [strings.concat], and assigns it to [distinct_functor] inside the [columns] node 
+ *   for later execution.
+ *
+ * - The [remove-nodes] slot removes the [distinct_column] argument from the request once it's been consumed.
+ *
+ * - The [add] slot dynamically inserts any **remaining optional arguments** into the [where] clause. 
+ *   These filtering expressions are only included if present, enabling **dynamic filtering** behavior.
+ *
+ * The [data.read] slot runs the SQL query:
+ * - It reads from the 'Treatments' table and performs a left join with the 'Patients' table 
+ *   to support filtering by patient fields.
+ * - The [columns] node includes only the dynamically created [distinct_functor], aliased as [count].
+ * - The [where] clause begins as an [and] node and is populated based on supplied filters.
+ *
+ * Finally, the [return-nodes] slot extracts the evaluated result from the [data.read] operation 
+ * and returns it to the caller.
+ */
+.arguments
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+   Treatments.TreatmentID.eq:long
+   Treatments.PatientID.eq:long
+   Treatments.TreatmentDate.eq:date
+   Treatments.Description.like:string
+   Treatments.Description.eq:string
+   PatientID.FirstName.eq:string
+   PatientID.FirstName.like:string
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Treatments.TreatmentID
+   .:Treatments.PatientID
+   .:Treatments.TreatmentDate
+   .:Treatments.Description
+   .:PatientID.FirstName
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Treatments
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Treatments.PatientID:PatientID.PatientID
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

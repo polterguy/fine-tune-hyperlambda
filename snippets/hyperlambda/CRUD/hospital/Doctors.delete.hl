@@ -1,0 +1,79 @@
+
+/*
+ * This endpoint deletes a single record from the 'Doctors' table in a hospital database 
+ * using the primary key [DoctorID] to identify the target entry.
+ *
+ * The [.arguments] node includes:
+ * - [DoctorID], a **mandatory** argument that uniquely identifies the doctor record to delete.
+ *
+ * The [auth.ticket.verify] slot ensures that only users with the 'root' role are authorized 
+ * to execute this sensitive operation, enforcing strict access control.
+ *
+ * The [auth.ticket.get] slot retrieves the authenticated user's identity, and [lambda2hyper] 
+ * converts the input arguments into a Hyperlambda-friendly format. These are passed to 
+ * [log.info], which logs the deletion event for audit purposes, including the invoking user 
+ * and the arguments used.
+ *
+ * The [validators.mandatory] slot enforces that [DoctorID] is provided before continuing.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 
+ * 'sqlite' engine and the 'generic' connector.
+ *
+ * Within the database connection context:
+ * - The [add] slot dynamically inserts the [DoctorID] parameter into the [where] clause 
+ *   under an [and] node for the upcoming deletion. This ensures the SQL query targets 
+ *   the correct record.
+ *
+ * - The [data.delete] slot executes the deletion from the 'Doctors' table using the 
+ *   constructed [where] clause.
+ *
+ * - A [sockets.signal] is emitted after deletion to inform subscribed clients (with 
+ *   roles 'admin' or 'root') that a doctor entry has been deleted. The original input 
+ *   arguments are included in the signal payload.
+ *
+ * - The [unwrap] slot makes the result of [data.delete] accessible for response formatting.
+ * - The [return] slot returns the number of affected records (usually 1 if deletion succeeded) 
+ *   under the key [affected].
+ */
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   DoctorID:long
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Doctors entry deleted
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+validators.mandatory:x:@.arguments/*/DoctorID
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Doctors
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Doctors.delete
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

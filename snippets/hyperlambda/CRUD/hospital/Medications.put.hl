@@ -1,0 +1,116 @@
+
+/*
+ * This endpoint updates an existing record in the 'Medications' table of a hospital database, 
+ * using the primary key [MedicationID] to locate the record and applying new values to selected fields.
+ *
+ * The [.arguments] node includes:
+ * - [MedicationID], which is **mandatory** and uniquely identifies the record to update.
+ * - [PatientID], [MedicationName], [Dosage], [StartDate], and [EndDate] represent the new values 
+ *   to assign to the corresponding columns.
+ *
+ * The [validators.mandatory] slot ensures [MedicationID] is provided, preventing execution without a valid target record.
+ *
+ * The [auth.ticket.verify] slot restricts access to users with roles 'admin' or 'root', safeguarding data modification.
+ *
+ * The [auth.ticket.get] slot retrieves the identity of the authenticated user.
+ * The [lambda2hyper] slot transforms the input arguments into a Hyperlambda structure, 
+ * and [log.info] logs the update operation, including the username and provided values for auditing.
+ *
+ * The [data.connect] slot opens a connection to the 'hospital' database using the 'sqlite' engine 
+ * via the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The first [add] block collects all updateable fields (indices 1 through 1000, i.e., everything except [MedicationID]) 
+ *   and adds them to the [values] node of the [data.update] slot.
+ *
+ * - The second [add] block inserts the [MedicationID] as a filter in the [where] clause under an [and] node 
+ *   to ensure the correct record is targeted.
+ *
+ * - The [data.update] slot performs the SQL update operation using the specified filter and values.
+ *
+ * - The [if] condition checks if the update affected any records. If [data.update] returns 0, 
+ *   indicating no matching record was found, it returns a 404 response and a "Record not found" message.
+ *
+ * - If the update is successful, [response.status.set] sets the HTTP status code to 202 (Accepted).
+ *
+ * - A [sockets.signal] is sent to notify all subscribed clients (roles: 'admin', 'root') 
+ *   that a medication record has been updated, including the original arguments in the signal payload.
+ *
+ * - Finally, [unwrap] extracts the result of the [data.update] operation, and [return] sends 
+ *   back the number of affected rows under the key [affected].
+ */
+.arguments
+
+   // MedicationID column value being primary key of record to update, mandatory argument
+   MedicationID:long
+
+   // PatientID column's new value
+   PatientID:long
+
+   // MedicationName column's new value
+   MedicationName:string
+
+   // Dosage column's new value
+   Dosage:string
+
+   // StartDate column's new value
+   StartDate:date
+
+   // EndDate column's new value
+   EndDate:date
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/MedicationID
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Medications entry updated
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Medications
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Medications.put
+      args
+      roles:admin,root
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

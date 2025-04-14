@@ -1,0 +1,122 @@
+
+/*
+ * This endpoint updates an existing record in the 'Doctors' table of a hospital database 
+ * based on a specified [DoctorID], allowing modification of various doctor-related fields.
+ *
+ * The [.arguments] node includes:
+ * - [DoctorID], a **mandatory** parameter used as the primary key to locate the record to update.
+ * - [FirstName], [LastName], [Specialty], [PhoneNumber], and [Email] are optional and represent 
+ *   new values to assign to their respective columns in the database.
+ *
+ * The [validators.mandatory] slot ensures that [DoctorID] is provided, as it is required to 
+ * identify which record should be updated.
+ *
+ * The [auth.ticket.verify] slot restricts access to users with 'admin' or 'root' roles, 
+ * ensuring that only authorized users can perform updates on doctor records.
+ *
+ * The [auth.ticket.get] slot retrieves the authenticated user's identity.
+ * The [lambda2hyper] slot converts the input arguments into a Hyperlambda structure, which is 
+ * then logged via [log.info] to document the update action along with the username and the 
+ * updated data for auditing purposes.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using 
+ * the 'sqlite' engine via the 'generic' connector.
+ *
+ * Inside the database connection context:
+ * - The first [add] block collects all updateable fields (everything except index 0, the [DoctorID]) 
+ *   and places them under the [values] node of the [data.update] operation.
+ *
+ * - The second [add] block ensures [DoctorID] is included in the [where] clause under an [and] node 
+ *   to precisely target the record to be updated.
+ *
+ * - The [data.update] slot then performs the actual update on the 'Doctors' table using the 
+ *   provided values and condition.
+ *
+ * - The [if] condition checks whether any records were affected by the update using [eq] 
+ *   and [get-value]. If no records were modified (i.e., the record does not exist), it returns 
+ *   a 404 response with an appropriate message.
+ *
+ * - If the update was successful, [response.status.set] is called with a 202 status code 
+ *   to indicate the update was accepted and processed.
+ *
+ * - A [sockets.signal] is emitted to notify subscribed clients (roles: 'admin', 'root') 
+ *   of the update, along with the full argument payload used.
+ *
+ * - Finally, [unwrap] extracts the result of the [data.update] operation, and [return] sends 
+ *   the number of affected records back to the caller under the key [affected].
+ */
+.arguments
+
+   // DoctorID column value being primary key of record to update, mandatory argument
+   DoctorID:long
+
+   // FirstName column's new value
+   FirstName:string
+
+   // LastName column's new value
+   LastName:string
+
+   // Specialty column's new value
+   Specialty:string
+
+   // PhoneNumber column's new value
+   PhoneNumber:string
+
+   // Email column's new value
+   Email:string
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/DoctorID
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Doctors entry updated
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Doctors
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Doctors.put
+      args
+      roles:admin,root
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

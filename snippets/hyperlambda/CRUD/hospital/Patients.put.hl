@@ -1,0 +1,141 @@
+
+/*
+ * This endpoint updates an existing record in the 'Patients' table of a hospital database 
+ * using the specified [PatientID] as the primary key. It accepts a full set of patient fields 
+ * to apply updates, and returns the number of affected records.
+ *
+ * The [.arguments] node includes:
+ * - [PatientID] is a **mandatory** argument used to identify the record to update.
+ * - All other fields (e.g., [FirstName], [Email], [AdmissionDate], etc.) represent new values 
+ *   to update in the existing patient record.
+ *
+ * The [validators.mandatory] slot ensures that [PatientID] is provided, preventing updates 
+ * from executing without a defined target.
+ *
+ * The [auth.ticket.verify] slot limits access to users with 'admin' or 'root' roles, enforcing 
+ * strict authorization for modification of patient data.
+ *
+ * The [auth.ticket.get] and [lambda2hyper] slots gather the authenticated user's identity and 
+ * convert the request arguments into Hyperlambda format. These are passed to [log.info] to log 
+ * the update operation with full user context and payload for audit tracking.
+ *
+ * The [data.connect] slot establishes a connection to the 'hospital' database using the 'sqlite' 
+ * engine via the 'generic' connector.
+ *
+ * Inside the database context:
+ * - The first [add] block pulls in all updateable arguments (excluding the primary key) into 
+ *   the [values] section of the [data.update] operation.
+ * - The second [add] block uses [PatientID] to construct a [where] clause under an [and] node, 
+ *   targeting the correct patient record.
+ *
+ * - The [data.update] slot executes the SQL UPDATE statement using the constructed [values] 
+ *   and [where] conditions.
+ *
+ * - An [if] block checks whether the update affected any records using [get-value] and [eq]. 
+ *   If no records were updated (indicating the record was not found), it returns a 404 response 
+ *   with a descriptive message.
+ *
+ * - If the update is successful, [response.status.set] sets the HTTP response to 202 (Accepted).
+ *
+ * - A [sockets.signal] is broadcast to notify connected clients (with roles 'admin' or 'root') 
+ *   that a patient record was updated. The signal includes the original arguments used.
+ *
+ * - The [unwrap] slot is executed before [return] to **ensure the reference to the affected record count 
+ *   is fully evaluated**. Without [unwrap], [return] would return a pointer to the node instead of its value.
+ *   This step is essential for accurate and readable API responses.
+ *
+ * - The [return] node sends back the evaluated number of affected rows under the key [affected].
+ */
+.arguments
+
+   // PatientID column value being primary key of record to update, mandatory argument
+   PatientID:long
+
+   // FirstName column's new value
+   FirstName:string
+
+   // LastName column's new value
+   LastName:string
+
+   // DateOfBirth column's new value
+   DateOfBirth:date
+
+   // Gender column's new value
+   Gender:string
+
+   // Address column's new value
+   Address:string
+
+   // PhoneNumber column's new value
+   PhoneNumber:string
+
+   // Email column's new value
+   Email:string
+
+   // EmergencyContactName column's new value
+   EmergencyContactName:string
+
+   // EmergencyContactPhone column's new value
+   EmergencyContactPhone:string
+
+   // AdmissionDate column's new value
+   AdmissionDate:date
+
+   // DischargeDate column's new value
+   DischargeDate:date
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/PatientID
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Logging invocation.
+auth.ticket.get
+lambda2hyper:x:@.arguments/*
+log.info:hospital.Patients entry updated
+   username:x:@auth.ticket.get
+   arguments:x:@lambda2hyper
+
+// Opening up our database connection.
+data.connect:[generic|hospital]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Patients
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Patients.put
+      args
+      roles:admin,root
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update
