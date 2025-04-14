@@ -23,7 +23,7 @@ Create code that does what my comment says the file does
 .type:public
 data.connect:chinook
 
-   add:x:+/*/where/*/and
+   add:x:./*/data.read/*/where/*/and
       get-nodes:x:@.arguments/*/name.eq
       get-nodes:x:@.arguments/*/name.like
    data.read

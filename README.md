@@ -23,11 +23,13 @@ Below are some example prompts you can run through the model after fine tuning i
   - Add 3 items to it
 * Generate a list of objects being employees
   - Add one item to it
+  - Wrap it into and endpoint and return all employees
   - Loop through them and remove their names
   - Loop through them and add department
 * How do I open a database connection?
 * How do I concatenate 2 strings?
   - Add a space between
+  - Remove the space
 * How do I send an email?
   - Change it such that it becomes and endpoint taking arguments for email message
   - Add name

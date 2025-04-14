@@ -30,7 +30,7 @@ data.connect:some_db
 .type:public
 data.connect:some_db
 
-   add:x:+/*/where/*/and
+   add:x:./*/data.read/*/where/*/and
       get-nodes:x:@.arguments/*/name.like
       get-nodes:x:@.arguments/*/email.like
    data.read
