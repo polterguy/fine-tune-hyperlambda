@@ -1,0 +1,42 @@
+/*
+ * This endpoint returns a graph of dragons and the treasures they hoard 
+ * from the 'mountdoom' database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Connects to the 'mountdoom' database.
+ *
+ * [data.read]
+ * - Reads from 'Dragon'.
+ * - [columns] selects [DragonID] and [Name].
+ * - [where] filters dragons older than 500 years.
+ * - [limit] is set to 3.
+ *
+ * [include]
+ * - For each dragon, retrieves hoarded treasure.
+ *
+ * [data.read] (nested)
+ * - Queries 'Treasure' table by [DragonID].
+ *
+ * [yield]
+ * - Returns the treasure list under [hoard].
+ */
+data.connect:mountdoom
+   data.read
+      table:Dragon
+      columns
+         DragonID
+         Name
+      where
+         and
+            Age.gt:500
+      limit:3
+   include:x:@data.read/*
+      data.read
+         table:Treasure
+         where
+            and
+               DragonID.eq:x:@.dp/#/*/DragonID
+      yield
+         hoard:x:@data.read/*

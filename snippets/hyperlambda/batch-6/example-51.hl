@@ -1,0 +1,42 @@
+/*
+ * This endpoint returns a nested graph of necromancers and their summoned creatures 
+ * from the 'shadowlands' database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Connects to the 'shadowlands' database.
+ *
+ * [data.read]
+ * - Reads from 'Necromancer'.
+ * - Selects [NecromancerID] and [Alias].
+ * - Filters by rank "Dark Lord".
+ * - Limit set to 2.
+ *
+ * [include]
+ * - Retrieves summoned creatures for each necromancer.
+ *
+ * [data.read] (nested)
+ * - Queries 'Creature' table using [NecromancerID].
+ *
+ * [yield]
+ * - Returns summoned creatures under [creatures].
+ */
+data.connect:shadowlands
+   data.read
+      table:Necromancer
+      columns
+         NecromancerID
+         Alias
+      where
+         and
+            Rank.eq:Dark Lord
+      limit:2
+   include:x:@data.read/*
+      data.read
+         table:Creature
+         where
+            and
+               NecromancerID.eq:x:@.dp/#/*/NecromancerID
+      yield
+         creatures:x:@data.read/*

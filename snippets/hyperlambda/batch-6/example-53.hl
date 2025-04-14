@@ -1,0 +1,43 @@
+/*
+ * This Hyperlambda endpoint returns a nested graph of elves and their enchanted artifacts 
+ * from the 'middleearth' database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Connects to the 'middleearth' database.
+ *
+ * [data.read]
+ * - Queries the 'Elf' table.
+ * - [columns] includes [ElfID] and [Name].
+ * - [where] restricts to elves from the "Lothlórien" region.
+ * - [limit] is set to 3.
+ *
+ * [include]
+ * - For each elf, fetches all linked artifacts.
+ *
+ * [data.read] (nested)
+ * - Queries the 'Artifact' table.
+ * - Filters by [ElfID].
+ *
+ * [yield]
+ * - Returns artifacts under [artifacts] for each elf.
+ */
+data.connect:middleearth
+   data.read
+      table:Elf
+      columns
+         ElfID
+         Name
+      where
+         and
+            Region.eq:Lothlórien
+      limit:3
+   include:x:@data.read/*
+      data.read
+         table:Artifact
+         where
+            and
+               ElfID.eq:x:@.dp/#/*/ElfID
+      yield
+         artifacts:x:@data.read/*

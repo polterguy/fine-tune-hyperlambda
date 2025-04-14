@@ -1,0 +1,42 @@
+/*
+ * This Hyperlambda file defines an endpoint returning rangers and their quests 
+ * from the 'gondor' database in a graph-style structure.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Connects to the 'gondor' database.
+ *
+ * [data.read]
+ * - Queries 'Ranger'.
+ * - [columns] selects [RangerID] and [Name].
+ * - [where] filters rangers whose faction is "Dúnedain".
+ * - [limit] is 4.
+ *
+ * [include]
+ * - Fetches quests assigned to each ranger.
+ *
+ * [data.read] (nested)
+ * - Retrieves from 'Quest' where [RangerID] matches.
+ *
+ * [yield]
+ * - Returns quests under [quests].
+ */
+data.connect:gondor
+   data.read
+      table:Ranger
+      columns
+         RangerID
+         Name
+      where
+         and
+            Faction.eq:Dúnedain
+      limit:4
+   include:x:@data.read/*
+      data.read
+         table:Quest
+         where
+            and
+               RangerID.eq:x:@.dp/#/*/RangerID
+      yield
+         quests:x:@data.read/*

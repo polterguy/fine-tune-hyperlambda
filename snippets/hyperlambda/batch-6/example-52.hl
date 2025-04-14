@@ -1,0 +1,43 @@
+/*
+ * This Hyperlambda file defines a dynamic graph-style HTTP endpoint that returns a nested 
+ * object graph of wizards and their known spells from the 'middleearth' database.
+ *
+ * Below is a breakdown of the slots and their function:
+ *
+ * [data.connect]
+ * - Opens a connection to the 'middleearth' database.
+ *
+ * [data.read] (first)
+ * - Queries the 'Wizard' table.
+ * - [columns] selects the [WizardID] and [Name] fields.
+ * - [where] filters wizards whose name contains "Gand".
+ * - [limit] restricts the result to 5 wizard records.
+ *
+ * [include]
+ * - Iterates over each wizard to retrieve their related spells.
+ *
+ * [data.read] (nested inside [include])
+ * - Queries the 'Spell' table for spells associated with the wizard.
+ * - [where] filters by matching [WizardID].
+ *
+ * [yield]
+ * - Returns the spells under a [spells] node for each wizard.
+ */
+data.connect:middleearth
+   data.read
+      table:Wizard
+      columns
+         WizardID
+         Name
+      where
+         and
+            Name.like:%Gand%
+      limit:5
+   include:x:@data.read/*
+      data.read
+         table:Spell
+         where
+            and
+               WizardID.eq:x:@.dp/#/*/WizardID
+      yield
+         spells:x:@data.read/*
