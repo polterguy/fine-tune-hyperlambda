@@ -1,0 +1,101 @@
+/*
+ * This Hyperlambda file demonstrates how to recursively traverse a folder structure,
+ * locate all Hyperlambda files, and insert a copyright notice into their first-level comment,
+ * if one exists. It showcases core concepts such as file system access, conditional logic,
+ * Hyperlambda parsing, and lambda-to-Hyperlambda transformations.
+ *
+ * [io.file.list-recursively]
+ * - Scans the '/modules/cms/' directory and all its subdirectories.
+ * - Returns a list of file paths found recursively beneath the provided folder.
+ *
+ * [for-each]
+ * - Iterates over every file path returned from [io.file.list-recursively].
+ * - The current file path is injected into the context for subsequent operations.
+ *
+ * [if] (checking for .hl extension)
+ * - Uses [strings.ends-with] to verify if the current file ends with ".hl".
+ * - Ensures we only process Hyperlambda files in this workflow.
+ *
+ * [io.file.load]
+ * - Loads the full content of the matched .hl file as plain text.
+ * - This is the raw source of the Hyperlambda file.
+ *
+ * [hyper2lambda]
+ * - Parses the raw Hyperlambda source into a structured lambda object.
+ * - The [comments:true] option ensures that comments are preserved in the resulting tree.
+ * - This is essential for traversing and modifying comment nodes.
+ *
+ * [if] (checking if first node is a comment)
+ * - Verifies whether the first node in the parsed tree is a comment.
+ * - In Hyperlambda, comments are given the name [".."] by [hyper2lambda].
+ * - This ensures we only modify files that begin with a comment.
+ *
+ * [set-value]
+ * - Updates the value of the first comment node in the parsed tree.
+ * - Prepends "Copyright Thomas Hansen 2025\n" to the existing comment text.
+ * - Uses [strings.concat] to concatenate the copyright notice and original comment.
+ *
+ * [lambda2hyper]
+ * - Converts the modified lambda structure back to Hyperlambda syntax.
+ * - The [comments:true] flag ensures comments are preserved in the final output.
+ *
+ * [io.file.save]
+ * - Overwrites the original file with the modified Hyperlambda source.
+ * - Ensures the file now begins with an updated comment containing the copyright.
+ *
+ * In summary, this file automates the process of inserting standardized license headers
+ * into Hyperlambda files that begin with a comment block. It demonstrates:
+ * - Recursion through file paths
+ * - Dynamic file loading and saving
+ * - Meta-programming using [hyper2lambda] and [lambda2hyper]
+ * - Safe comment manipulation
+ *
+ * This technique is ideal for legal compliance, automated auditing, or metadata injection
+ * into Hyperlambda codebases.
+ */
+
+// Listing all files recursively inside of our '/modules/cms/' folder.
+io.file.list-recursively:/modules/cms/
+
+
+// Looping through all files listed above.
+for-each:x:@io.file.list-recursively/*
+
+   // Verifying this is a Hyperlambda file.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Loading the file as a text file.
+         io.file.load:x:@.dp/#
+
+         // Transforming file content to a lambda object such that we can traverse it
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         // Verifying that the first node in the file actually is a comment.
+         if
+            eq
+
+               /*
+                * When preserving comments during [hyper2lambda] all comments are given a name of '..'.
+                * This implies the current [if] is basically checking if the first line in the file is a comment.
+                */
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+
+               // Changing the comment by prepending "Copyright Thomas Hansen 2025\n" to it
+               set-value:x:@hyper2lambda/0
+                  strings.concat
+                     .:"Copyright Thomas Hansen 2025\n"
+                     get-value:x:@hyper2lambda/0
+
+               // Transforming lambda object to Hyperlambda again.
+               lambda2hyper:x:@hyper2lambda/*
+                  comments:true
+
+               // Overwriting old file, now with a copyright in its first file level comment.
+               io.file.save:x:@.dp/#
+                  get-value:x:@lambda2hyper

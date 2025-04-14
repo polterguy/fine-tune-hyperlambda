@@ -1,0 +1,85 @@
+
+/*
+ * This Hyperlambda file automates a cleanup operation across all Hyperlambda (.hl) files located
+ * under the `/modules/cms/` directory. It removes all instances of the [database-type] node, which
+ * is deemed redundant when the default database engine is SQLite.
+ *
+ * The file demonstrates a full static analysis and transformation pipeline using Hyperlambda’s 
+ * filesystem access, introspection, and code rewriting features.
+ *
+ * [io.file.list-recursively]
+ * - Recursively lists all files under the `/modules/cms/` folder.
+ * - Returns a flat list of full file paths from the directory and its subfolders.
+ *
+ * [for-each]
+ * - Iterates over each file path produced by the recursive listing.
+ * - Each file is handled individually in its own scoped context.
+ *
+ * [if]
+ * - Filters the list of files to only process those with a `.hl` extension using [strings.ends-with].
+ * - Ensures the logic applies only to Hyperlambda files and skips unrelated formats.
+ *
+ * [io.file.load]
+ * - Loads the contents of the file at the current path as a plain string.
+ * - This source string is used as input to the next parsing step.
+ *
+ * [hyper2lambda]
+ * - Converts the raw Hyperlambda text into a structured lambda tree that can be navigated and manipulated.
+ * - The [comments:true] flag ensures that file comments are preserved during transformation.
+ *
+ * [remove-nodes]
+ * - Traverses the entire lambda tree and removes every node named [database-type] from any depth.
+ * - The path expression allows recursive, deep search into all subtrees.
+ * - This is safe because SQLite is the default database for the application, so [database-type]
+ *   declarations are not needed unless another type is specified.
+ *
+ * [lambda2hyper]
+ * - Converts the modified lambda tree back to valid Hyperlambda source code.
+ * - [comments:true] ensures that original comments (if untouched) are retained in the output.
+ *
+ * [io.file.save]
+ * - Overwrites the current file with the new, cleaned-up Hyperlambda source.
+ * - Uses [get-value:x:@lambda2hyper] to extract the string representation of the transformed code.
+ *
+ * In summary, this script provides an automated code cleanup tool that:
+ * - Applies consistent structural rules across all relevant files
+ * - Minimizes unnecessary configuration noise
+ * - Preserves comments and formatting
+ *
+ * It's ideal for maintaining clean, declarative, and standards-compliant Hyperlambda modules.
+ */
+// Listing all files recursively inside of our '/modules/cms/' folder.
+io.file.list-recursively:/modules/cms/
+
+// Looping through all files listed above.
+for-each:x:@io.file.list-recursively/*
+
+   // Verifying this is a Hyperlambda file.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Loading the file as a text file.
+         io.file.load:x:@.dp/#
+
+         // Transforming file content to a lambda object such that we can traverse it
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         /*
+          * Removing all instances of [database-type]
+          *
+          * This works because SQLite is the **DEFAULT** database type, so
+          * arguably [database-type] is redundant for this module.
+          */
+         remove-nodes:x:@hyper2lambda/**/database-type
+
+         // Transforming lambda object to Hyperlambda again.
+         lambda2hyper:x:@hyper2lambda/*
+            comments:true
+
+         // Overwriting old file, now with a copyright in its first file level comment.
+         io.file.save:x:@.dp/#
+            get-value:x:@lambda2hyper
+

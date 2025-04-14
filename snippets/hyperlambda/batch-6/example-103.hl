@@ -1,0 +1,118 @@
+
+/*
+ * This Hyperlambda file performs an automated transformation on all Hyperlambda (.hl) files
+ * inside the `/modules/cms/` folder. It locates files whose first node is a comment and rewrites
+ * specific data access slots to their corresponding MySQL-prefixed equivalents.
+ *
+ * This script is useful when migrating from a generic or SQLite-specific data access layer 
+ * to a MySQL-specific one while preserving the file structure and comments.
+ *
+ * [io.file.list-recursively]
+ * - Recursively scans all directories and subdirectories under `/modules/cms/`.
+ * - Returns a flat list of file paths to be processed.
+ *
+ * [for-each]
+ * - Iterates over each file path returned by the recursive listing.
+ * - The current file path is bound to the context and made available for processing via [.dp].
+ *
+ * [if] (Hyperlambda file filter)
+ * - Uses [strings.ends-with] to determine if the current file ends with `.hl`.
+ * - Only files with the `.hl` extension are considered for transformation.
+ *
+ * [io.file.load]
+ * - Loads the full content of the current `.hl` file into memory as a plain string.
+ * - Prepares the file for parsing by [hyper2lambda].
+ *
+ * [hyper2lambda]
+ * - Converts the raw Hyperlambda text into a structured lambda tree.
+ * - [comments:true] ensures that any comments in the original source are preserved.
+ * - This parsed structure allows node-wise introspection and transformation.
+ *
+ * [if] (comment check)
+ * - Verifies that the first node in the lambda tree is a comment.
+ * - Comments are named [".."] when [comments:true] is enabled in [hyper2lambda].
+ * - This serves as a safeguard to ensure only well-structured files are modified.
+ *
+ * [set-name] (replacements)
+ * - The following five [set-name] slots perform a bulk transformation of key data access nodes:
+ *   - [data.connect] → [mysql.connect]
+ *   - [data.create] → [mysql.create]
+ *   - [data.read]   → [mysql.read]
+ *   - [data.update] → [mysql.update]
+ *   - [data.delete] → [mysql.delete]
+ * - Each transformation will recursively traverse the 
+ *   lambda tree to rename **all instances** of the specified slot.
+ * - This conversion targets all CRUD operations and connection logic to transform these into MySQL-specific variants.
+ *
+ * [lambda2hyper]
+ * - Converts the modified lambda tree back to its textual Hyperlambda format.
+ * - [comments:true] retains any original comments in the output.
+ *
+ * [io.file.save]
+ * - Saves the newly generated Hyperlambda source back to the same file path.
+ * - Overwrites the original file, replacing generic slots with MySQL-specific equivalents.
+ *
+ * In summary, this script enables safe, automated refactoring of a Hyperlambda codebase:
+ * - Supports conditional logic to avoid breaking malformed files
+ * - Performs deep structural slot renaming
+ * - Preserves original comments and formatting
+ * - Facilitates environment-specific adjustments, such as switching from SQLite to MySQL
+ *
+ * It’s particularly useful in deployment pipelines, framework migrations, and batch maintenance of modules.
+ */
+
+// Listing all files recursively inside of our '/modules/cms/' folder.
+io.file.list-recursively:/modules/cms/
+
+
+// Looping through all files listed above.
+for-each:x:@io.file.list-recursively/*
+
+   // Verifying this is a Hyperlambda file.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Loading the file as a text file.
+         io.file.load:x:@.dp/#
+
+         // Transforming file content to a lambda object such that we can traverse it
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         // Verifying that the first node in the file actually is a comment.
+         if
+            eq
+
+               /*
+                * When preserving comments during [hyper2lambda] all comments are given a name of '..'.
+                * This implies the current [if] is basically checking if the first line in the file is a comment.
+                */
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+
+               /*
+                * Changing all occurencies of [data.connect], [data.read],
+                * [data.update], [data.create], [data.delete] to their
+                * equivalent MySQL versions
+                */
+               set-name:x:@hyper2lambda/**/data.connect
+                  .:mysql.connect
+               set-name:x:@hyper2lambda/**/data.create
+                  .:mysql.create
+               set-name:x:@hyper2lambda/**/data.read
+                  .:mysql.read
+               set-name:x:@hyper2lambda/**/data.update
+                  .:mysql.update
+               set-name:x:@hyper2lambda/**/data.delete
+                  .:mysql.delete
+
+               // Transforming lambda object to Hyperlambda again.
+               lambda2hyper:x:@hyper2lambda/*
+                  comments:true
+
+               // Overwriting old file, now with a copyright in its first file level comment.
+               io.file.save:x:@.dp/#
+                  get-value:x:@lambda2hyper

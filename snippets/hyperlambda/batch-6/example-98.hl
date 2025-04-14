@@ -1,0 +1,87 @@
+/*
+ * This Hyperlambda file showcases a complete workflow that recursively loads all files inside a 
+ * specific directory, concatenates their contents, and stores the result in a buffer node. 
+ * It highlights Hyperlambda’s support for filesystem access, iteration, dynamic string processing, 
+ * and memory-efficient string concatenation via [strings.builder].
+ *
+ * [.result]
+ * - A placeholder node used to store the final result.
+ * - At the end of execution, this node will contain the full merged content from all discovered files.
+ *
+ * [io.file.list-recursively]
+ * - Recursively lists all files in the "/modules/cms/" directory.
+ * - Returns a list of file paths, including nested files in subdirectories.
+ * - This list will be iterated over to load and process each file's content individually.
+ *
+ * [strings.builder]
+ * - Initializes an in-memory string builder object.
+ * - This node provides an efficient mechanism to concatenate multiple strings.
+ * - Inside this block, [strings.builder.append] is scoped and can be used to append strings.
+ * - This is significantly more memory- and CPU-efficient than [strings.concat], especially when 
+ *   building up large texts like source code, logs, or file merges.
+ *
+ * [for-each]
+ * - Iterates over each file path returned from [io.file.list-recursively].
+ * - The loop context is set up using the current file path as the iteration item.
+ *
+ * [io.file.load]
+ * - Loads the content of the currently iterated file as plain text.
+ * - Accepts a file path and returns the contents of that file.
+ * - This is executed once per file during the loop.
+ *
+ * [strings.builder.append] (first)
+ * - Appends the content of the loaded file into the string builder.
+ * - As this is inside the [strings.builder] block, it contributes directly to the builder’s result.
+ *
+ * [strings.builder.append] (second)
+ * - Appends a separator ("\n---\n") between file contents.
+ * - This visually separates the content of each file in the final output, making it more readable.
+ *
+ * [set-value]
+ * - Assigns the final built string from [strings.builder] to [.result].
+ * - Uses [get-value:x:@strings.builder] to extract the complete built string from the builder.
+ *
+ * In summary, this file demonstrates how to:
+ * - Traverse the filesystem recursively
+ * - Load and process text files dynamically
+ * - Concatenate large volumes of string data efficiently
+ * - Return a final string result using reusable logic
+ *
+ * This pattern is excellent for scenarios such as:
+ * - Merging multiple templates or scripts
+ * - Aggregating logs or configuration files
+ * - Building CMS deployment bundles dynamically
+ */
+
+// Buffer node used to holde the final result
+.result
+
+// Listing all files recursively inside of our '/modules/cms/' folder.
+io.file.list-recursively:/modules/cms/
+
+/*
+ * Creating a string builder allowing us to append strings to
+ *
+ * Notice, inside the scope of [strings.builder] we can use [strings.builder.append]
+ * to append to the currently scoped string builder.
+ * The string builder is fast and doesn't consume a lot of memory, so for
+ * string concatenations with lots of data, and many strings, it's typically
+ * much faster than [strings.concat].
+ */
+strings.builder
+
+   // Looping through all files listed above.
+   for-each:x:@io.file.list-recursively/*
+
+      // Loading the file as a text file.
+      io.file.load:x:@.dp/#
+
+      // Appending the content of the currently iterated file.
+      strings.builder.append:x:@io.file.load
+
+      // Adding some spacing between files and --- characters to separate these in the filal output.
+      strings.builder.append:"\n---\n"
+
+// Assigning the result of the operation to the above [.result] node's value.
+set-value:x:@.result
+   get-value:x:@strings.builder

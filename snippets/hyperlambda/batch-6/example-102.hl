@@ -1,0 +1,84 @@
+
+/*
+ * This Hyperlambda file performs a security-conscious audit of the '/modules/cms/' folder,
+ * automatically deleting any Hyperlambda (.hl) file that contains [data.delete] slot invocations.
+ * The goal is to remove any file that is capable of issuing database delete operations — 
+ * helping reduce the risk of accidental or malicious data loss in a production environment.
+ *
+ * [io.file.list-recursively]
+ * - Scans the entire '/modules/cms/' directory, including all subdirectories.
+ * - Returns a list of file paths, enabling recursive analysis of deeply nested files.
+ *
+ * [.count]
+ * - Declares an integer variable initialized to 0.
+ * - Although not used in the logic shown, this node may have been previously intended for 
+ *   counting occurrences or tracking deleted files.
+ *
+ * [for-each]
+ * - Iterates through each file path returned from the recursive listing.
+ * - Each file is processed in its own scoped execution context.
+ *
+ * [if] (extension check)
+ * - Filters out non-Hyperlambda files by checking if the filename ends in '.hl' 
+ *   using [strings.ends-with].
+ *
+ * [io.file.load]
+ * - Loads the file content as raw text for further parsing.
+ * - Required as input to the [hyper2lambda] slot.
+ *
+ * [hyper2lambda]
+ * - Converts the loaded Hyperlambda text into a structured lambda tree.
+ * - The [comments:true] flag ensures that comments are retained in the tree.
+ * - This parsed structure enables deep inspection of the code for specific slot usage.
+ *
+ * [if] (checking for [data.delete])
+ * - Uses [exists:x:@hyper2lambda/**/data.delete] to recursively search the lambda tree.
+ * - If the file contains any usage of the [data.delete] slot — regardless of depth or context —
+ *   the [if] evaluates to true.
+ *
+ * [io.file.delete]
+ * - Deletes the current file from the filesystem.
+ * - Executed only if [data.delete] was found in the parsed lambda tree.
+ *
+ * In summary, this Hyperlambda file implements:
+ * - Recursive filesystem traversal
+ * - Syntax parsing and introspection via [hyper2lambda]
+ * - Detection of sensitive operations ([data.delete])
+ * - Automated cleanup of risky or dangerous Hyperlambda files
+ *
+ * This approach is ideal for security-focused environments, compliance enforcement,
+ * or sandboxed module validation during deployment.
+ */
+// Listing all files recursively inside of our '/modules/cms/' folder.
+io.file.list-recursively:/modules/cms/
+
+// Serves as a count of how many [data.connect] nodes we found in folder
+.count:int:0
+
+// Looping through all files listed above.
+for-each:x:@io.file.list-recursively/*
+
+   // Verifying this is a Hyperlambda file.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Loading the file as a text file.
+         io.file.load:x:@.dp/#
+
+         // Transforming file content to a lambda object such that we can traverse it
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         /*
+          * Checking if file contains [data.delete] slot invocations.
+          * If it does, we simply delete the file, to remove all Hyperlambda
+          * file that can somehow delete database items.
+          */
+         if
+            exists:x:@hyper2lambda/**/data.delete
+            .lambda
+
+               // Deleting file.
+               io.file.delete:x:@.dp/#

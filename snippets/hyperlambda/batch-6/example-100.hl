@@ -1,0 +1,70 @@
+/*
+ * This Hyperlambda file performs a static code analysis task where it recursively scans all 
+ * `.hl` files under the `/modules/cms/` folder and counts how many times the slot [data.connect] 
+ * is used across the entire codebase. The result is stored in the [.count] node.
+ *
+ * [io.file.list-recursively]
+ * - Recursively traverses the file system starting at '/modules/cms/'.
+ * - Returns a list of file paths including those inside nested directories.
+ *
+ * [.count]
+ * - Initializes a counter with an integer value of 0.
+ * - This will be used to accumulate the number of [data.connect] occurrences across all files.
+ *
+ * [for-each]
+ * - Iterates over each file path returned by [io.file.list-recursively].
+ * - Each file path becomes available to the current execution context via [.dp].
+ *
+ * [if] (extension check)
+ * - Verifies that the current file has a ".hl" extension using [strings.ends-with].
+ * - Ensures that only Hyperlambda files are processed.
+ *
+ * [io.file.load]
+ * - Loads the content of the file as a plain string.
+ * - Used as the source input for syntax parsing.
+ *
+ * [hyper2lambda]
+ * - Parses the loaded file content into a structured lambda node tree.
+ * - The [comments:true] argument ensures comments are preserved in the tree structure.
+ * - This enables deeper, comment-aware analysis of the code structure.
+ *
+ * [set-value]
+ * - Updates the [.count] node by incrementing it with the number of [data.connect] nodes found in the file.
+ * - [get-count] searches for all instances of [data.connect] within the parsed lambda tree using `**` (recursive search).
+ * - [math.add] adds the result of [get-count] to the existing count.
+ *
+ * In summary, this file showcases a simple static code analysis pattern that combines:
+ * - Recursive file scanning
+ * - File content parsing and introspection
+ * - Pattern-based slot counting using XPath-like expressions
+ *
+ * This technique is ideal for reporting, quality checks, or enforcing architectural consistency in large Hyperlambda projects.
+ */
+
+// Listing all files recursively inside of our '/modules/cms/' folder.
+io.file.list-recursively:/modules/cms/
+
+// Serves as a count of how many [data.connect] nodes we found in folder
+.count:int:0
+
+// Looping through all files listed above.
+for-each:x:@io.file.list-recursively/*
+
+   // Verifying this is a Hyperlambda file.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Loading the file as a text file.
+         io.file.load:x:@.dp/#
+
+         // Transforming file content to a lambda object such that we can traverse it
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         // Counting how many instances of [data.connect] file contains.
+         set-value:x:@.count
+            math.add:x:@.count
+               get-count:x:@hyper2lambda/**/data.connect
+
