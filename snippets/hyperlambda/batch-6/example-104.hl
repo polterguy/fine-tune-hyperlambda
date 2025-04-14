@@ -1,0 +1,74 @@
+
+/*
+ * This Hyperlambda file demonstrates concurrent HTTP requests using [fork] and [join] to parallelize
+ * I/O-bound operations — specifically fetching HTML documents from three websites simultaneously.
+ * It highlights Hyperlambda’s native support for multithreading and synchronization, enabling 
+ * efficient non-blocking execution patterns.
+ *
+ * [.arguments]
+ * - Declares that this is an HTTP-invokable endpoint, making the logic callable over HTTP.
+ * - No arguments are required for this specific example, but its presence marks the file as executable.
+ *
+ * [join]
+ * - Serves as a synchronization point that waits for all child threads (created via [fork]) to complete.
+ * - Execution of the logic inside [join] is suspended until all spawned threads are done.
+ *
+ * [fork] (x3)
+ * - Each [fork] block starts a new thread.
+ * - Inside each thread, [http.get] is called to fetch content from a different public website:
+ *   - First fork retrieves the home page of ainiro.io.
+ *   - Second fork targets microsoft.com.
+ *   - Third fork loads dzone.com.
+ * - These requests are initiated in parallel, allowing all three sites to load simultaneously.
+ *
+ * [http.get]
+ * - Performs an HTTP GET request to the specified URL.
+ * - The response is automatically parsed and stored in a node tree, which can be navigated using expressions.
+ * - Each invocation happens inside its own thread context.
+ *
+ * [yield]
+ * - Collects and returns the HTML content from each completed thread.
+ * - Uses expressions to retrieve the output of each [http.get].
+ *   - [0,1], [1,1], and [2,1] refer to the specific fork thread positions in the result set.
+ *   - Each output is returned under a named node: [ainiro], [microsoft], and [dzone].
+ *
+ * The result is a response structure like:
+ * ```json
+ * {
+ *   "ainiro": "<html>...</html>",
+ *   "microsoft": "<html>...</html>",
+ *   "dzone": "<html>...</html>"
+ * }
+ * ```
+ *
+ * This pattern is ideal for:
+ * - Performing parallel API requests
+ * - Scraping content from multiple websites
+ * - Speeding up slow I/O tasks by running them concurrently
+ *
+ * Hyperlambda's native concurrency model makes this both elegant and memory-efficient.
+ */
+.arguments
+
+/*
+ * Waits for all 3 [fork] threads to finish their work.
+ */
+join
+
+   // Creates a new thread
+   fork
+      http.get:"https://ainiro.io"
+
+   // Creates a new thread
+   fork
+      http.get:"https://microsoft.com"
+
+   // Creates a new thread
+   fork
+      http.get:"https://dzone.com"
+
+// Returns all HTML documents to caller.
+yield
+   ainiro:x:@join/*/fork/[0,1]/*/http.get/*/content
+   microsoft:x:@join/*/fork/[1,1]/*/http.get/*/content
+   dzone:x:@join/*/fork/[2,1]/*/http.get/*/content
