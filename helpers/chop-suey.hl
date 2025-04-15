@@ -1,0 +1,51 @@
+/*
+ * Loads large Hyperlambda files, finds all individual comments in these, and
+ * create a training snippet of whatever these comments are actually documenting.
+ *
+ * This breaks up larger pieces of code into smaller snippets.
+ */
+.arguments
+   limit:long
+   offset:long
+.type:public
+
+// Ensuring both arguments are specified by caller!
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+
+// Connecting to our fine-tune database.
+data.connect:fine-tune
+
+   // Selecting records.
+   data.select:"select * from hyperlambda where is_static = 0 and synthesised = 0 order by length(code) + length(prompt) desc limit @limit offset @offset"
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   // Looping through each record returned from above.
+   for-each:x:@data.select/*
+
+      // Converting code to lambda
+      hyper2lambda:x:@.dp/#/*/code
+
+      // Looping through all comments in lambda object.
+      for-each:x:@hyper2lambda/*/**/\..
+
+         // Creating a lambda object exclusively containing the comment and its NEXT node.
+         .tmp
+         add:x:@.tmp
+            get-nodes:x:@.dp/#
+            get-nodes:x:@.dp/#/+
+
+         // Converting lambda object to Hyperlambda
+         lambda2hyper:x:@.tmp/*
+
+         // Saving with a random filename in /synthesised4/ folder
+         .filename
+         set-value:x:@.filename
+            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
+            crypto.random
+               min:10
+               max:10
+            .:.hl
+         io.file.save:x:@.filename
+            get-value:x:@lambda2hyper
