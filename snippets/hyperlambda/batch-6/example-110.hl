@@ -1,0 +1,91 @@
+
+/*
+ * This Hyperlambda endpoint inspects a single `.hl` (Hyperlambda) file and checks whether it begins
+ * with a file-level comment. If the first node is a comment node, the comment is returned to the caller.
+ * Otherwise, a default message is returned indicating that no file-level comment was found.
+ *
+ * [.arguments]
+ * - Declares the required [filename] argument, which must contain the path to a `.hl` file on disk.
+ *
+ * [vocabulary]
+ * - Loads the system's registered slot names. Although unused here, this node is common in reusable templates.
+ *
+ * [auth.ticket.verify]
+ * - Restricts access to users with the [root] or [admin] roles.
+ * - Ensures only privileged users can access file inspection functionality.
+ *
+ * [validators.mandatory]
+ * - Enforces that the [filename] argument is provided. If not, an error is thrown.
+ *
+ * [if] (validation checks)
+ * - The first check uses [strings.ends-with] to ensure that the file ends in `.hl`.
+ *   - If it does not, it throws an error: `"Not a Hyperlambda file"`.
+ * - The second check uses [io.file.exists] to verify that the file actually exists.
+ *   - If not, it throws an error: `"File does not exist!"`.
+ *
+ * [io.file.load]
+ * - Loads the raw contents of the file as plain text.
+ *
+ * [hyper2lambda]
+ * - Parses the file into a structured lambda tree.
+ * - [comments:true] ensures that all file comments are preserved in the resulting tree.
+ * - Comments are stored as nodes named [..] at their respective positions.
+ *
+ * [if] (comment detection)
+ * - Checks whether the first node in the parsed lambda tree is named [..], which indicates a comment.
+ * - If a comment exists, it is returned in the [comment] node using [yield].
+ *
+ * [return]
+ * - If the file does not start with a comment, returns a result node with a value of `"No comment!"`.
+ *
+ * Use Cases:
+ * - Enforcing documentation standards (e.g. license headers, doc comments)
+ * - Static code analysis or auto-documentation
+ * - Linting workflows for Hyperlambda modules
+ */
+.arguments
+   filename:string
+
+// Getting the name of every single slot in the system.
+vocabulary
+
+// Endpoint is only accessible for root users
+auth.ticket.verify:root, admin
+
+// Making sure [filename] was provided.
+validators.mandatory:x:@.arguments/*/filename
+
+// Making sure this is a Hyperlambda file, and that it exists in file system.
+if
+   not
+      strings.ends-with:x:@.arguments/*/filename
+         .:.hl
+   .lambda
+      throw:Not a Hyperlambda file
+else-if
+   not
+      io.file.exists:x:@.arguments/*/filename
+   .lambda
+      throw:File does not exist!
+
+// Load and parse the Hyperlambda file into a lambda tree.
+io.file.load:x:@.arguments/*/filename
+hyper2lambda:x:@io.file.load
+   comments:true
+
+/*
+ * Checking if first node is a comment node.
+ * Comment nodes are added as [..] nodes with `..` being their name.
+ */
+if
+   eq
+      get-name:x:@hyper2lambda/0
+      .:..
+   .lambda
+   
+      yield
+         comment:x:@hyper2lambda/0
+
+// Returning nothing to caller.
+return
+   result:No comment!
