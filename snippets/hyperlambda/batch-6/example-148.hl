@@ -1,0 +1,58 @@
+/*
+ * This Hyperlambda file defines an HTTP endpoint that returns a paginated and sorted list of cities 
+ * from the 'world-data' database. It requires the client to explicitly specify sorting and paging 
+ * arguments in order to retrieve data, making it well-suited for building sortable and paginated lists 
+ * in front-end applications.
+ *
+ * [.arguments]
+ * - Declares four arguments used for ordering and paging:
+ *   - [sort]: A column name such as "Name", "Population", or "State".
+ *   - [direction]: Either "asc" or "desc" to determine the sort direction.
+ *   - [limit]: The number of records to return per page.
+ *   - [offset]: The number of records to skip from the beginning of the dataset.
+ * - These arguments are effectively **mandatory** because they are statically referenced 
+ *   inside the [data.read] invocation. If omitted, the query will fail to execute properly.
+ *
+ * [validators.default]
+ * - Provides a fallback value of 25 for [limit] when the caller does not explicitly provide it.
+ * - This helps avoid accidentally returning massive result sets.
+ *
+ * [data.connect]
+ * - Opens a database connection to the SQLite-compatible 'world-data' database using the [generic] connector.
+ *
+ * [data.read]
+ * - Retrieves a list of cities from the [Cities] table.
+ * - Sorting and paging parameters are applied directly from [.arguments], 
+ *   reinforcing their required presence unless made optional via [add].
+ *
+ * [yield]
+ * - Returns the resulting dataset as a [cities] node in the response.
+ *
+ * Example Output:
+ * ```json
+ * {
+ *   "cities": [
+ *     { "CityId": 1, "Name": "New York", "Population": 8419000 },
+ *     { "CityId": 2, "Name": "Los Angeles", "Population": 3980000 }
+ *   ]
+ * }
+ * ```
+ */
+.arguments
+   sort:string
+   direction:string
+   limit:long
+   offset:long
+
+validators.default:x:@.arguments
+   limit:long:25
+
+data.connect:[generic|world-data]
+   data.read
+      table:Cities
+      order:x:@.arguments/*/sort
+      direction:x:@.arguments/*/direction
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+   yield
+      cities:x:@data.read/*

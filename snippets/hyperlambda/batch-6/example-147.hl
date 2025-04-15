@@ -1,0 +1,89 @@
+
+/*
+ * This Hyperlambda file defines an HTTP endpoint that returns a paginated and sorted list of artists 
+ * from the 'chinook' database. The endpoint requires the caller to specify how results should be 
+ * ordered and limited — making it suitable for use in data grids, tables, and pagination-driven APIs.
+ *
+ * [.arguments]
+ * - Declares all input parameters required to execute the query:
+ *   - [sort]: A string that must reference a valid column name used for sorting.
+ *   - [direction]: Must be either "asc" or "desc", determining sort direction.
+ *   - [limit]: A long integer indicating how many records to return.
+ *   - [offset]: A long integer indicating how many records to skip from the start.
+ * - These parameters are considered mandatory to ensure predictable sorting and paging behavior.
+ *
+ * [validators.default]
+ * - Assigns a default value of 25 to [limit] if the caller doesn't explicitly specify it.
+ * - This prevents the system from returning unbounded results and supports safe pagination.
+ *
+ * [data.connect]
+ * - Establishes a connection to the 'chinook' SQLite-compatible database using a generic connector.
+ * - All following database operations will execute within this connection context.
+ *
+ * [data.read]
+ * - Performs a query against the 'Artist' table.
+ * - The query is augmented with explicit sorting and paging parameters:
+ *   - [order], [direction]: These dictate how the result is sorted.
+ *   - [limit], [offset]: Define the result window, enabling paginated access to the data.
+ * - Note: All arguments are passed statically, meaning they must be present at runtime.
+ *   For optional parameters, the [add] slot could be used before this block to dynamically decorate the query.
+ *
+ * [yield]
+ * - Returns the resulting list of artists to the caller, wrapped inside an [employees] node.
+ * - The response is structured for easy consumption by frontend applications or API clients.
+ *
+ * This endpoint illustrates best practices for:
+ * - Enforcing required sorting and paging parameters.
+ * - Providing defaults using [validators.default].
+ * - Executing SQL queries with structured result formatting.
+ *
+ * Example Output:
+ * ```json
+ * {
+ *   "employees": [
+ *     { "ArtistId": 1, "Name": "AC/DC" },
+ *     { "ArtistId": 2, "Name": "Accept" },
+ *     ...
+ *   ]
+ * }
+ * ```
+ */
+.arguments
+
+   // Mandatory argument being the name of column to sort on
+   sort:string
+
+   // Mandatory argument being 'asc' or 'desc' implying sorting direction
+   direction:string
+
+   // Mandatory argument being the number of records to return, defaults to 25 if not specified
+   limit:long
+
+   // Mandatory argument being the offset into the dataset of where to start retrieving records
+   offset:long
+
+// Make sure we return the correct default number of items unless caller explicitly told us how many items he wanted.
+validators.default:x:@.arguments
+   limit:long:25
+
+// Connect to the specified database
+data.connect:[generic|chinook]
+
+   // Apply sorting and paging
+   data.read
+      table:Artist
+      
+      /*
+       * When we include paging and sorting arguments like this, they effectively become
+       * mandatory. If you want optional sorting and paging parameters, you need to dynamically
+       * [add] them before executing the slot.
+       */
+      order:x:@.arguments/*/sort
+      direction:x:@.arguments/*/direction
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+
+   // Return the result of our read invocation to caller
+   yield
+      employees:x:@data.read/*
+

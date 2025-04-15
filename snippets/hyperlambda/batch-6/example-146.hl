@@ -1,0 +1,53 @@
+/*
+ * This Hyperlambda endpoint returns a sorted and paginated list of planets from the 'galaxy-db' database.
+ * The caller must specify sort direction, column, limit, and offset. These parameters are required because 
+ * they are referenced directly in the [data.read] block.
+ *
+ * [.arguments]
+ * - [sort]: Column to sort planets by (e.g., "Name", "Sector").
+ * - [direction]: Must be "asc" or "desc" to define the order.
+ * - [limit]: Max number of records to return.
+ * - [offset]: Where to begin in the result set.
+ * - These are **mandatory** because they are accessed explicitly, rather than added dynamically with [add].
+ *
+ * [validators.default]
+ * - Ensures that [limit] has a default of 25 if the user omits it.
+ *
+ * [data.connect]
+ * - Connects to the [galaxy-db] SQLite-compatible database.
+ *
+ * [data.read]
+ * - Queries the [Planets] table with strict paging and sort constraints.
+ * - Direct references mean the endpoint assumes the client will always provide these arguments.
+ *
+ * [yield]
+ * - Returns the list of planets in a [planets] wrapper node.
+ *
+ * Example Output:
+ * ```json
+ * {
+ *   "planets": [
+ *     { "PlanetId": 101, "Name": "Tatooine", "Sector": "Arkanis" },
+ *     { "PlanetId": 102, "Name": "Naboo", "Sector": "Chommell" }
+ *   ]
+ * }
+ * ```
+ */
+.arguments
+   sort:string
+   direction:string
+   limit:long
+   offset:long
+
+validators.default:x:@.arguments
+   limit:long:25
+
+data.connect:[generic|galaxy-db]
+   data.read
+      table:Planets
+      order:x:@.arguments/*/sort
+      direction:x:@.arguments/*/direction
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+   yield
+      planets:x:@data.read/*
