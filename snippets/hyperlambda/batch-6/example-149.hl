@@ -1,0 +1,59 @@
+
+/*
+ * This Hyperlambda file defines a minimal HTTP endpoint to insert new contacts into the 'contacts' table
+ * of the 'crm' database. It demonstrates how to dynamically construct the insert statement such that
+ * only the provided arguments are included in the final database operation.
+ *
+ * [.arguments]
+ * - Declares two input parameters:
+ *   - [name]: A string representing the contact's name.
+ *   - [email]: A string representing the contact's email address.
+ * - These parameters are **optional**, as they are not statically referenced within [data.create],
+ *   but instead dynamically injected through [add].
+ *
+ * [data.connect]
+ * - Establishes a database connection to the 'crm' database using the [generic] connector.
+ * - This connection scopes the following database operations, ensuring they execute against the correct source.
+ *
+ * [add]
+ * - Dynamically inserts argument nodes under the [values] node of the upcoming [data.create] invocation.
+ * - The use of [get-nodes] ensures that only arguments explicitly passed in the HTTP request are included.
+ * - As a result, the caller can choose to provide just one of the arguments (e.g., only [email]) and still
+ *   trigger a valid insert operation with the partial data.
+ * - This pattern enables flexible and fault-tolerant input handling without requiring conditional logic or defaults.
+ *
+ * [data.create]
+ * - Executes the actual SQL INSERT command against the [contacts] table.
+ * - The [values] node is decorated at runtime with the exact fields provided by the caller.
+ * - This approach results in a minimal and accurate INSERT payload based on real user input.
+ *
+ * [return]
+ * - Returns a success message once the contact is created.
+ * - The response uses a [message] node with a confirmation string.
+ *
+ * This endpoint illustrates:
+ * - How to implement flexible INSERT operations using [add] and [get-nodes].
+ * - How to build fault-tolerant APIs that gracefully support partial input.
+ * - Clean separation of argument declaration, database logic, and response formatting.
+ */
+.arguments
+   name:string
+   email:string
+data.connect:crm
+
+   /*
+    * The important parts to understand here is that this way of using [add]
+    * to dynamically add arguments from the [.arguments] collection into the
+    * [values] node (child of [data.create]), results in that all arguments
+    * are optional, allowing the caller to ommit eitehr [name] or [email],
+    * and only insert other fields.
+    */
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*/name
+      get-nodes:x:@.arguments/*/email
+   data.create
+      table:contacts
+      values
+return
+   message:Contact created successfully
+
