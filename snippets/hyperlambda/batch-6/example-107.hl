@@ -1,0 +1,114 @@
+
+/*
+ * This Hyperlambda endpoint returns a list of **all valid slot names** used by a specific module,
+ * based on the Hyperlambda files found in a directory specified by the [folder] argument.
+ * It filters out invalid or unknown identifiers by comparing them against the system [vocabulary].
+ * 
+ * The endpoint is restricted to [root] users only.
+ *
+ * [.arguments]
+ * - Declares a required [folder] argument, indicating the module or directory to analyze.
+ *
+ * [.result]
+ * - Acts as a buffer to collect unique slot names found across all parsed Hyperlambda files.
+ *
+ * [vocabulary]
+ * - Retrieves a full list of all known slot names registered in the current system.
+ * - Used later to validate whether an identifier found in the code is a real, callable slot.
+ *
+ * [auth.ticket.verify]
+ * - Restricts access to the endpoint to [root] users only.
+ * - Enforces security since this endpoint introspects all source code under a directory.
+ *
+ * [io.file.list-recursively]
+ * - Recursively retrieves all files under the given [folder] path.
+ * - Returns a flat list of absolute file paths.
+ *
+ * [for-each] (file iterator)
+ * - Iterates through every file returned by [io.file.list-recursively].
+ *
+ * [if] (file extension filter)
+ * - Ensures the file ends with `.hl` using [strings.ends-with].
+ * - Limits parsing and analysis to valid Hyperlambda source files only.
+ *
+ * [io.file.load]
+ * - Loads the contents of each `.hl` file as a string.
+ *
+ * [hyper2lambda]
+ * - Parses the file content into a structured lambda tree.
+ * - The [comments:true] flag ensures that comments are preserved.
+ *
+ * [for-each] (node iterator)
+ * - Recursively traverses every node (including deeply nested ones) in the lambda tree.
+ * - This allows detection of slot names at all levels of the code structure.
+ *
+ * [get-name]
+ * - Retrieves the name of the current node being examined.
+ *
+ * [if] (slot validity and uniqueness check)
+ * - Uses a combination of:
+ *   - [not-exists]: Ensures the slot name hasn't already been added to [.result].
+ *   - [exists]: Checks if the name is present in the [vocabulary], confirming it is a valid system slot.
+ *
+ * [unwrap] + [add]
+ * - Adds the valid, unique slot name to the [.result] buffer.
+ * - [unwrap:x:+/*/*] ensures the correct evaluation of extrapolated expressions before adding.
+ *
+ * [yield]
+ * - Returns the final result to the client as [slots], which is a list of slot names used 
+ *   across all Hyperlambda files in the specified directory.
+ *
+ * Use Cases:
+ * - Introspection and module analysis
+ * - Developer documentation and slot usage reports
+ * - Audit tools for reviewing slot usage across a module
+ */
+.arguments
+   folder:string
+
+// Buffer for holding names of every single slot we find in specified folder
+.result
+
+// Getting the name of every single slot in the system.
+vocabulary
+
+// Endpoint is only accessible for root users
+auth.ticket.verify:root
+
+// Listing files recursively in [folder] specified as an argument.
+io.file.list-recursively:x:@.arguments/*/folder
+
+// Looping through each file.
+for-each:x:@io.file.list-recursively/*
+
+   // Ensure we're only working with .hl (Hyperlambda) files.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Load and parse the Hyperlambda file into a lambda tree.
+         io.file.load:x:@.dp/#
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         // Looping through ALL nodes in file.
+         for-each:x:@hyper2lambda/*/**
+
+            // Checking if name has already been added to above [result], and that it is an existing slot.
+            get-name:x:@.dp/#
+            if
+               and
+                  not-exists:x:@.result/*/={@get-name}
+                  exists:x:@vocabulary/*/={@get-name}
+               .lambda
+
+                  // Adding name to above [.result].
+                  unwrap:x:+/*/*
+                  add:x:@.result
+                     .
+                        .:x:@get-name
+
+// Return all slots we found in all Hyperlambda files inside of folder to caller.
+yield
+   slots:x:@.result/*

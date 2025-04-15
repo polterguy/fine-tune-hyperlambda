@@ -1,0 +1,83 @@
+
+/*
+ * This Hyperlambda HTTP endpoint scans all `.hl` (Hyperlambda) files inside the `/modules/cms/` directory 
+ * and returns a list of those that do **not** begin with a file-level comment.
+ * This is useful for quality assurance, documentation auditing, or enforcing code standards.
+ *
+ * [.arguments]
+ * - Declares that this file can be executed as an HTTP endpoint.
+ * - No specific arguments are required for this operation.
+ *
+ * [.result]
+ * - Acts as a buffer to collect file paths of all `.hl` files that lack a top-level comment.
+ *
+ * [io.file.list-recursively]
+ * - Recursively lists all files within the `/modules/cms/` folder.
+ * - Returns an array of file paths to be examined.
+ *
+ * [for-each]
+ * - Iterates over each file returned by [io.file.list-recursively].
+ * - The current file path is accessible via [.dp] during each iteration.
+ *
+ * [if] (file extension check)
+ * - Uses [strings.ends-with] to verify the file has a `.hl` extension.
+ * - Ensures that only Hyperlambda files are analyzed.
+ *
+ * [io.file.load]
+ * - Loads the contents of the current `.hl` file as raw text.
+ *
+ * [hyper2lambda]
+ * - Converts the loaded Hyperlambda text into a structured lambda tree.
+ * - [comments:true] enables the parser to preserve comment nodes, which are given the special name ['..'].
+ *
+ * [if] (first-node-is-not-comment)
+ * - Uses [get-name] and [neq] to check if the first node is **not** a comment node.
+ * - This indicates that the file does not start with a documentation or licensing comment.
+ *
+ * [unwrap] and [add]
+ * - Adds the file path to [.result] if it fails the comment check.
+ * - [unwrap] ensures correct tree structure before appending.
+ *   Its expression evaluates the expression inside of its [.] node's grand child.
+ * - [add] inserts a new node containing the file path.
+ *
+ * [yield]
+ * - Returns the accumulated list under the key [files_without_file_level_comment].
+ * - This provides the caller with a JSON list of files that need attention.
+ *
+ * Summary:
+ * - This script audits documentation hygiene.
+ * - It helps teams enforce that every Hyperlambda file begins with a meaningful file-level comment.
+ * - Easily integrated into CI pipelines, code reviews, or admin dashboards.
+ */
+.arguments
+.result
+io.file.list-recursively:/modules/cms/
+for-each:x:@io.file.list-recursively/*
+
+   // Ensure we're only working with .hl (Hyperlambda) files.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Load and parse the Hyperlambda file into a lambda tree.
+         io.file.load:x:@.dp/#
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         // Checking if the first node is NOT a comment.
+         if
+            neq
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+
+               // Adding currently iterated file as a list item to [.result].
+               unwrap:x:+/*/*
+               add:x:@.result
+                  .
+                     .:x:@.dp/#
+
+// Returning a list of all Hyperlambda files without a file level comment as its first node.
+yield
+   files_without_file_level_comment:x:@.result/*

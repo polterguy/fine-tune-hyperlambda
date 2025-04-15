@@ -1,0 +1,164 @@
+
+/*
+ * This Hyperlambda endpoint analyzes a **single .hl (Hyperlambda)** file and returns a sorted list 
+ * of all **valid slots used in that file**, along with how many times each slot appears.
+ * 
+ * The result is sorted in ascending order — showing **least frequently used slots first** — 
+ * which can help identify rare or potentially misused logic.
+ *
+ * [.arguments]
+ * - Declares one required argument: [filename], which must be a valid `.hl` file path on disk.
+ *
+ * [.result]
+ * - Acts as a buffer that collects the names and usage counts of valid slots found in the file.
+ * - Each node name in [.result] becomes a slot name, and the value indicates how many times it appears.
+ *
+ * [vocabulary]
+ * - Loads the system-wide list of available slot names.
+ * - Used to validate whether a node name found in the file represents a real, executable slot.
+ *
+ * [auth.ticket.verify]
+ * - Restricts access to [root] and [admin] roles.
+ * - Ensures only authorized users can introspect file content for auditing or debugging.
+ *
+ * [validators.mandatory]
+ * - Validates that [filename] was provided as input.
+ * - Throws an error if omitted.
+ *
+ * [if] (extension and existence check)
+ * - Uses [strings.ends-with] to ensure the file ends in `.hl`.
+ * - Uses [io.file.exists] to confirm the file actually exists.
+ * - Each validation branch throws a helpful error message using [throw] if checks fail.
+ *
+ * [io.file.load]
+ * - Loads the raw content of the given `.hl` file as plain text.
+ *
+ * [hyper2lambda]
+ * - Parses the file into a structured lambda node tree.
+ * - [comments:true] preserves comment nodes for potential future use.
+ *
+ * [for-each]
+ * - Recursively iterates over all nodes in the parsed file structure.
+ * - Its expression ensures traversal of every node, also deeply nested nodes.
+ *   Basically loops over all descendants of the [hyper2lambda] node.
+ *
+ * [get-name]
+ * - Retrieves the name of the currently iterated node.
+ *
+ * [if] (slot name validation)
+ * - Checks whether the node name exists in the [vocabulary] — i.e., it's a valid slot.
+ *
+ * [if] (counting logic)
+ * - If the slot hasn't been counted yet:
+ *   - [set-name] dynamically renames a generic node to match the slot name.
+ *   - [add] inserts a new node under [.result] with a value of 1.
+ * - If the slot has already been added:
+ *   - [math.add] increments its count by 1.
+ *
+ * [sort]
+ * - Sorts the slots by usage frequency using custom comparison logic:
+ *   - [lt]: Sort ascending (least-used first).
+ *   - [mt]: Sort descending (more-used after).
+ *   - [else]: Equal values are returned as-is.
+ *
+ * [yield]
+ * - Returns the final sorted list under the [slots] node.
+ * - Each node name corresponds to a valid slot, and its value is the usage count within the file.
+ *
+ * Use cases:
+ * - 🔍 Analyzing how a particular file uses system slots.
+ * - ✅ Ensuring code quality or identifying uncommon patterns.
+ * - 📊 Building slot usage metrics for documentation, linting, or optimization.
+ */
+.arguments
+   filename:string
+
+// Buffer for holding names of every single slot we find in specified folder
+.result
+
+// Getting the name of every single slot in the system.
+vocabulary
+
+// Endpoint is only accessible for root users
+auth.ticket.verify:root, admin
+
+// Making sure [filename] was provided.
+validators.mandatory:x:@.arguments/*/filename
+
+// Making sure this is a Hyperlambda file, and that it exists in file system.
+if
+   not
+      strings.ends-with:x:@.arguments/*/filename
+         .:.hl
+   .lambda
+      throw:Not a Hyperlambda file
+else-if
+   not
+      io.file.exists:x:@.arguments/*/filename
+   .lambda
+      throw:File does not exist!
+
+// Load and parse the Hyperlambda file into a lambda tree.
+io.file.load:x:@.arguments/*/filename
+hyper2lambda:x:@io.file.load
+   comments:true
+
+// Looping through ALL nodes in file.
+for-each:x:@hyper2lambda/*/**
+
+   // Retrieving name of currently iterated node.
+   get-name:x:@.dp/#
+
+   // Making sure currently iterated node is an existing slot.
+   if
+      exists:x:@vocabulary/*/={@get-name}
+      .lambda
+
+         // Checking if slot has previously been added
+         if
+            not-exists:x:@.result/*/{@get-name}
+            .lambda
+
+               /*
+                * Adding name to above [.result].
+                * This changes the NAME of the second [.] node (grand child).
+                * The new name becomes the name of the currently iterated node.
+                */
+               set-name:x:+/*/*
+                  get-value:x:@get-name
+               add:x:@.result
+                  .
+                     .:int:1
+
+         else
+
+            // Increasing its value by one.
+            set-value:x:@.result/*/{@get-name}
+               math.add
+                  get-value:x:@.result/*/{@get-name}
+                  .:int:1
+
+// Sorting nodes such that the ones mentioned the LEAST times in module are returned first.
+sort:x:@.result/*
+   if
+      lt:x:@.lhs/#
+         get-value:x:@.rhs/#
+      .lambda
+         set-value:x:@.result
+            .:int:-1
+   else-if
+      mt:x:@.lhs/#
+         get-value:x:@.rhs/#
+      .lambda
+         set-value:x:@.result
+            .:int:1
+   else
+      set-value:x:@.result
+         .:int:0
+
+/*
+ * Return all slots we found in all Hyperlambda files inside of folder to caller.
+ * In addition to the number of times we found each slot in the folder.
+ */
+yield
+   slots:x:@sort/*

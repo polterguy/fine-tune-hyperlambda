@@ -1,0 +1,160 @@
+
+/*
+ * This Hyperlambda file defines an HTTP endpoint that **analyzes all .hl files** in a specified folder
+ * and returns a list of **all valid slot names used** — along with how many times each one appears.
+ * 
+ * The list is sorted in descending order of frequency, helping developers understand 
+ * which slots are most commonly used across a module or directory.
+ *
+ * [.arguments]
+ * - Declares a single required argument: [folder], specifying the directory to scan for .hl files.
+ *
+ * [.result]
+ * - Serves as a buffer to collect slot names and the number of times they appear.
+ * - Slot names become node names, and their usage count becomes the node's value.
+ *
+ * [vocabulary]
+ * - Retrieves the full set of all available slot names in the system.
+ * - This is used for validation, ensuring that only actual slot invocations are counted.
+ *
+ * [auth.ticket.verify]
+ * - Restricts access to the endpoint to [root] users for security reasons.
+ * - Prevents unauthorized access to introspect or analyze source code.
+ *
+ * [io.file.list-recursively]
+ * - Recursively lists all files in the folder passed via [.arguments/folder].
+ * - Returns a list of full file paths for later processing.
+ *
+ * [for-each] (outer loop)
+ * - Iterates through each file returned by [io.file.list-recursively].
+ *
+ * [if] (file type filter)
+ * - Checks if the file extension ends with `.hl` to ensure only Hyperlambda files are parsed.
+ *
+ * [io.file.load]
+ * - Loads the current file’s contents as a plain text string.
+ *
+ * [hyper2lambda]
+ * - Parses the file into a lambda-compatible object model.
+ * - [comments:true] ensures that comments are preserved.
+ *
+ * [for-each] (deep node traversal)
+ * - Iterates through all nodes in the lambda structure at all depths using the `/*/**` selector.
+ * - This ensures that deeply nested slot invocations are also counted.
+ *
+ * [get-name]
+ * - Retrieves the name of the currently iterated node.
+ *
+ * [if] (slot validation)
+ * - Checks if the retrieved name exists in the system [vocabulary], ensuring it’s a valid slot.
+ *
+ * [if] (count logic)
+ * - [not-exists]: If this is the first time we've seen this slot, add it to [.result] and initialize its count to 1.
+ * - [set-name]: Dynamically renames the child node inside [add] to match the slot name.
+ * - [else]: If the slot has already been seen, increment its count using [math.add].
+ *
+ * [sort]
+ * - Sorts the resulting list of slot names by their count in descending order.
+ * - [lt] and [mt] branches determine ordering by comparing the count values of each pair.
+ * - Slots used more frequently will appear earlier in the final result.
+ *
+ * [yield]
+ * - Returns the sorted result list to the caller under the [slots] node.
+ * - Each entry is named after a slot and contains its corresponding usage count.
+ *
+ * Summary:
+ * - 🔍 **Purpose**: Slot frequency analysis across all Hyperlambda files in a given folder.
+ * - ✅ **Validates**: That each identifier is a real slot via [vocabulary].
+ * - 📊 **Returns**: Slot names sorted by usage count.
+ * - 🔐 **Secured by**: [auth.ticket.verify:root]
+ * 
+ * This is ideal for refactoring, documentation, usage auditing, or learning which patterns dominate in a given module.
+ */
+.arguments
+   folder:string
+
+// Buffer for holding names of every single slot we find in specified folder
+.result
+
+// Getting the name of every single slot in the system.
+vocabulary
+
+// Endpoint is only accessible for root users
+auth.ticket.verify:root
+
+// Listing files recursively in [folder] specified as an argument.
+io.file.list-recursively:x:@.arguments/*/folder
+
+// Looping through each file.
+for-each:x:@io.file.list-recursively/*
+
+   // Ensure we're only working with .hl (Hyperlambda) files.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Load and parse the Hyperlambda file into a lambda tree.
+         io.file.load:x:@.dp/#
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         // Looping through ALL nodes in file.
+         for-each:x:@hyper2lambda/*/**
+
+            // Retrieving name of currently iterated node.
+            get-name:x:@.dp/#
+
+            // Making sure currently iterated node is an existing slot.
+            if
+               exists:x:@vocabulary/*/={@get-name}
+               .lambda
+
+                  // Checking if slot has previously been added
+                  if
+                     not-exists:x:@.result/*/{@get-name}
+                     .lambda
+
+                        /*
+                         * Adding name to above [.result].
+                         * This changes the NAME of the second [.] node (grand child).
+                         * The new name becomes the name of the currently iterated node.
+                         */
+                        set-name:x:+/*/*
+                           get-value:x:@get-name
+                        add:x:@.result
+                           .
+                              .:int:1
+
+                  else
+
+                     // Increasing its value by one.
+                     set-value:x:@.result/*/{@get-name}
+                        math.add
+                           get-value:x:@.result/*/{@get-name}
+                           .:int:1
+
+// Sorting nodes such that the ones mentioned the most times in module are returned first.
+sort:x:@.result/*
+   if
+      lt:x:@.lhs/#
+         get-value:x:@.rhs/#
+      .lambda
+         set-value:x:@.result
+            .:int:1
+   else-if
+      mt:x:@.lhs/#
+         get-value:x:@.rhs/#
+      .lambda
+         set-value:x:@.result
+            .:int:-1
+   else
+      set-value:x:@.result
+         .:int:0
+
+/*
+ * Return all slots we found in all Hyperlambda files inside of folder to caller.
+ * In addition to the number of times we found each slot in the folder.
+ */
+yield
+   slots:x:@sort/*

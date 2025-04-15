@@ -1,0 +1,75 @@
+
+/*
+ * This Hyperlambda file automates the extraction of the **first file-level comment**
+ * from every `.hl` (Hyperlambda) file within the `/modules/cms/` directory and saves
+ * it as a Markdown `.md` file. This is useful for generating documentation from inline
+ * comments written by developers.
+ *
+ * [io.file.list-recursively]
+ * - Recursively lists all files inside the `/modules/cms/` folder.
+ * - Returns a flat list of file paths to be processed in subsequent logic.
+ *
+ * [for-each]
+ * - Iterates over each file path found by the recursive listing.
+ * - Each iteration scopes the current file path under [.dp] for internal access.
+ *
+ * [if] (extension check)
+ * - Uses [strings.ends-with] to ensure the current file has a `.hl` extension.
+ * - This check filters the set to only process valid Hyperlambda files.
+ *
+ * [io.file.load]
+ * - Loads the raw content of the current `.hl` file as a plain string.
+ * - This content will be passed to [hyper2lambda] for structured introspection.
+ *
+ * [hyper2lambda]
+ * - Parses the raw Hyperlambda code into a structured lambda tree.
+ * - [comments:true] ensures that all comments in the file are preserved in the parsed tree.
+ *
+ * [if] (comment detection)
+ * - Checks if the first node in the parsed lambda tree has the name ['..'].
+ * - When [comments:true] is enabled, all comments are given this special name.
+ * - This logic ensures we only extract and save files that begin with a comment.
+ *
+ * [strings.replace]
+ * - Transforms the file path from `.hl` to `.md` by replacing the extension.
+ * - This creates a new output path suitable for saving Markdown files.
+ *
+ * [io.file.save]
+ * - Writes the value of the first comment node to the `.md` file path created above.
+ * - The comment is preserved as plain text and saved in Markdown format.
+ *
+ * This pattern is useful for:
+ * - Generating technical documentation
+ * - Extracting metadata from code
+ * - Auditing file-level annotations across modules
+ */
+io.file.list-recursively:/modules/cms/
+
+for-each:x:@io.file.list-recursively/*
+
+   // Ensure we're only working with .hl (Hyperlambda) files.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Load and parse the Hyperlambda file into a lambda tree.
+         io.file.load:x:@.dp/#
+         hyper2lambda:x:@io.file.load
+            comments:true
+
+         // If the first node is a comment node ('..'), save it as Markdown.
+         if
+            eq
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+
+               // Build Markdown output path by swapping `.hl` with `.md`
+               strings.replace:x:@.dp/#
+                  .:.hl
+                  .:.md
+
+               // Save the comment node as a .md file.
+               io.file.save:x:@strings.replace
+                  get-value:x:@hyper2lambda/0
