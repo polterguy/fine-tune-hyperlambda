@@ -1,0 +1,82 @@
+
+/*
+ * This Hyperlambda endpoint returns a list of all `.hl` (Hyperlambda) files found recursively 
+ * within a specified folder. The returned paths are **relative to the input folder**, making 
+ * the output clean and portable. This is useful for module indexing, documentation generators, 
+ * or admin tools needing file discovery.
+ *
+ * [.arguments]
+ * - Declares a single required argument: [folder].
+ * - Represents the root directory to scan for `.hl` files.
+ *
+ * [.result]
+ * - Acts as a buffer to accumulate all matching file paths.
+ * - Each item added is a relative path to a Hyperlambda file.
+ *
+ * [auth.ticket.verify]
+ * - Restricts access to users with the [root] role.
+ * - This protects internal filesystem inspection capabilities.
+ *
+ * [io.file.list-recursively]
+ * - Scans the specified folder recursively for all files.
+ * - Returns a flat list of full paths.
+ *
+ * [for-each]
+ * - Iterates over each file returned by the recursive scan.
+ * - The current file is accessible via [.dp].
+ *
+ * [if] (file type filter)
+ * - Filters to include only files with a `.hl` extension.
+ * - This ensures only Hyperlambda files are processed.
+ *
+ * [strings.replace]
+ * - Removes the full folder prefix from the absolute path.
+ * - For example, `/modules/cms/test.hl` becomes `test.hl` when folder is `/modules/cms/`.
+ * - The goal is to return clean, relative file paths to the caller.
+ *
+ * [unwrap] and [add]
+ * - [unwrap] ensures the string result of [strings.replace] is properly resolved.
+ * - [add] inserts the resulting relative file path into the [.result] list.
+ *
+ * [yield]
+ * - Returns the final list under the [files] node.
+ * - Each entry is a relative path to a `.hl` file found within the specified folder.
+ *
+ * This endpoint is useful for:
+ * - Building menus or file explorers in admin UIs
+ * - Listing module contents
+ * - Preprocessing file paths for batch operations
+ */
+.arguments
+   folder:string
+
+// Buffer for holding names of every single Hyperlambda file we find in specified folder.
+.result
+
+// Endpoint is only accessible for root users
+auth.ticket.verify:root
+
+// Listing files recursively in [folder] specified as an argument.
+io.file.list-recursively:x:@.arguments/*/folder
+
+// Looping through each file.
+for-each:x:@io.file.list-recursively/*
+
+   // Ensure we're only working with .hl (Hyperlambda) files.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+
+         // Making sure we return currently iterated file, but REMOVING its folder path first.
+         strings.replace:x:@.dp/#
+            get-value:x:@.arguments/*/folder
+            .:
+         unwrap:x:+/*/*
+         add:x:@.result
+            .
+               .:x:@strings.replace
+
+// Return all slots we found in all Hyperlambda files inside of folder to caller.
+yield
+   files:x:@.result/*

@@ -1,0 +1,95 @@
+
+/*
+ * This Hyperlambda endpoint recursively scans a specified folder for all `.md` (Markdown) files, 
+ * loads each file's content, and returns a collection of filename–content pairs.
+ * Each Markdown file becomes a node in the response, where the node name is the filename 
+ * and the value is the file's content.
+ *
+ * [.arguments]
+ * - Declares a required [folder] argument indicating the root directory to scan for Markdown files.
+ *
+ * [.result]
+ * - Acts as a buffer node where each child represents one Markdown file.
+ * - The child node's name will be the filename and its value the Markdown content.
+ *
+ * [auth.ticket.verify]
+ * - Restricts access to [root] users to ensure only trusted users can inspect file content.
+ *
+ * [io.file.list-recursively]
+ * - Lists all files under the given folder path recursively.
+ * - Returns a flat list of full file paths.
+ *
+ * [for-each]
+ * - Iterates over each file found in the recursive list.
+ *
+ * [if] (Markdown file filter)
+ * - Uses [strings.ends-with] to check whether the current file ends with `.md`.
+ * - Only Markdown files are processed further.
+ *
+ * [io.file.load]
+ * - Loads the content of the currently iterated Markdown file.
+ *
+ * [set-name]
+ * - Dynamically renames the placeholder [foo] node (defined below inside [add]) to the name of the file.
+ * - This ensures the resulting node inside [.result] is labeled with the actual filename.
+ * - Uses two `+` iterators to navigate to the correct scope due to nesting.
+ *
+ * [unwrap]
+ * - Resolves the dynamic filename set earlier using [set-name], preparing the node for insertion.
+ *
+ * [add]
+ * - Inserts a new child node into [.result].
+ * - The node has a dynamic name (resolved from [set-name]) and its value is the content of the Markdown file.
+ *
+ * [yield]
+ * - Returns the final list of Markdown files under the [markdown_files] node.
+ * - Each child node represents one file, where the name is the filename and the value is its content.
+ *
+ * Use cases:
+ * - Dynamically building documentation navigation structures.
+ * - Markdown file aggregation for reporting or transformation.
+ * - Server-side preview or search indexing of Markdown content.
+ */
+.arguments
+   folder:string
+
+// Buffer for holding names of every single Markdown file we find in specified folder, and its content.
+.result
+
+// Endpoint is only accessible for root users
+auth.ticket.verify:root
+
+// Listing files recursively in [folder] specified as an argument.
+io.file.list-recursively:x:@.arguments/*/folder
+
+// Looping through each file.
+for-each:x:@io.file.list-recursively/*
+
+   // Ensure we're only working with .md (Markdown) files.
+   if
+      strings.ends-with:x:@.dp/#
+         .:.md
+      .lambda
+
+         // Loding the file.
+         io.file.load:x:@.dp/#
+
+         /*
+          * Changing the name of the [foo] node inside of [add] such that it becomes the filename.
+          *
+          * Notice, because of the [unwrap] following this node, we'll need **TWO** `+` iterators to reach our [add] node.
+          */
+         set-name:x:+/+/*/*/foo
+            get-value:x:@.dp/#
+
+         // Evaluating the expression inside of [add]'s gran child.
+         unwrap:x:+/*/*
+
+         // Adding the currently iterated Markdown file into above [.result] node.
+         add:x:@.result
+            .
+               foo:x:@io.file.load
+
+// Return all slots we found in all Hyperlambda files inside of folder to caller.
+yield
+   markdown_files:x:@.result/*
