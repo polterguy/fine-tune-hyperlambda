@@ -1,0 +1,64 @@
+/*
+ * This Hyperlambda file defines an HTTP endpoint that queries the [employees] table in the 'employees' database,
+ * and supports **optional sorting and pagination** parameters.
+ * It demonstrates how to selectively apply parameters to specific parts of the [data.read] operation, 
+ * allowing flexible and dynamic query composition.
+ *
+ * [.arguments]
+ * - Declares optional input parameters for pagination and sorting:
+ *   - [order]: A string representing the column name to sort by.
+ *   - [direction]: A string indicating sorting direction ("asc" or "desc").
+ *   - [limit]: An integer that specifies how many records to return.
+ *   - [offset]: An integer that specifies how many records to skip.
+ * - These parameters are used **only if provided**, thanks to dynamic injection using [add].
+ *
+ * [data.connect]
+ * - Establishes a connection to the 'employees' database using a generic database connector.
+ * - All subsequent [data.read] logic is scoped within this connection block.
+ *
+ * [add]
+ * - Dynamically injects arguments into the [data.read] node itself.
+ * - Specifically targets arguments like [order], [direction], [limit], and [offset] that belong directly under [data.read].
+ * - Since [get-nodes] only adds parameters that are present, all sorting and pagination fields remain optional.
+ * - This ensures that if no arguments are passed, a full unfiltered result is returned.
+ *
+ * ⚠️ Since we are modifying the root of [data.read], only non-[where] parameters are allowed here.
+ *   Filtering arguments (e.g., [name.eq], [email.like]) must be added separately into [where]/[and] if used.
+ *   If we had filtering arguments we'd have to explicitly add paging and sorting arguments, and could not rely upon
+ *   simply "adding all arguments" as we're doing in the [add] invocation.
+ *
+ * [data.read]
+ * - Executes the actual query against the [employees] table.
+ * - May include paging and sorting attributes injected by the earlier [add] call.
+ *
+ * [yield]
+ * - Returns the result as a list under [employees], ready to be consumed by API clients or frontends.
+ *
+ * This pattern is optimal for:
+ * - Adding pagination/sorting controls without requiring the caller to send all parameters.
+ * - Building scalable and extensible list endpoints.
+ */
+.arguments
+
+   // Optional sorting parameters
+   order:string
+   direction:string
+
+   // Optional paging parameters
+   limit:long
+   offset:long
+
+// Connect to the database
+data.connect:employees
+
+   // Dynamically decorate the [data.read] call with optional arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*
+
+   // Perform query against employees table
+   data.read
+      table:employees
+
+   // Return the result to the caller
+   yield
+      employees:x:@data.read/*

@@ -1,0 +1,81 @@
+/*
+ * This Hyperlambda file defines a flexible and dynamic HTTP endpoint for querying the [employees] table
+ * in the 'employees' database. It supports **both pagination/sorting** and **filtering**,
+ * illustrating how to inject arguments into multiple parts of a [data.read] invocation using two [add] blocks.
+ *
+ * [.arguments]
+ * - Declares all parameters that can be provided by the caller:
+ *   - Filtering arguments:
+ *     - [name.eq]: Filters employees by exact name match.
+ *     - [email.like]: Filters by partial email match.
+ *   - Paging and sorting arguments:
+ *     - [order]: Column to sort by.
+ *     - [direction]: Sorting direction ("asc" or "desc").
+ *     - [limit]: How many records to return.
+ *     - [offset]: How many records to skip.
+ * - All parameters are optional due to the use of [get-nodes] inside [add], ensuring dynamic query composition.
+ *
+ * [data.connect]
+ * - Connects to the 'employees' database using the [generic] connector.
+ *
+ * [add] (to [data.read])
+ * - Dynamically inserts [order], [direction], [limit], and [offset] directly under [data.read].
+ * - These arguments influence how results are paginated and sorted.
+ * - Since they target the top level of the [data.read] node, they must be added separately from filters.
+ *
+ * [add] (to [where]/[and])
+ * - Separately adds filtering conditions ([name.eq], [email.like]) to the [and] clause of the [where] block.
+ * - This ensures that filters are only applied when passed in, and that they are combined using logical AND.
+ *
+ * ⚠️ Important:
+ * - You must use **two distinct [add] blocks** when decorating different levels of [data.read].
+ * - Failing to isolate the argument targets will result in invalid or incomplete query generation.
+ *
+ * [data.read]
+ * - Executes the actual SQL query on the [employees] table.
+ * - Combines optional filters and paging/sorting parameters into a unified read operation.
+ *
+ * [yield]
+ * - Returns the final list of employee records to the caller, under a [employees] node.
+ * - The result reflects any filters and pagination controls applied by the user.
+ *
+ * This endpoint pattern is ideal for:
+ * - Building interactive search tables.
+ * - Backends for pagination-aware UIs with server-side filtering and sorting.
+ * - Flexible, declarative APIs that can adapt to caller preferences without boilerplate logic.
+ */
+.arguments
+   // Filtering arguments
+   name.eq:string
+   email.like:string
+
+   // Paging and sorting arguments
+   order:string
+   direction:string
+   limit:long
+   offset:long
+
+// Open connection to the 'employees' database
+data.connect:employees
+
+   // Add paging and sorting arguments to [data.read] root
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+
+   // Add filtering arguments into [where] / [and]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/name.eq
+      get-nodes:x:@.arguments/*/email.like
+
+   // Execute data read from 'employees' table
+   data.read
+      table:employees
+      where
+         and
+
+   // Return the result to the caller
+   yield
+      employees:x:@data.read/*

@@ -1,0 +1,78 @@
+
+/*
+ * This Hyperlambda file defines an HTTP endpoint that returns filtered employee records 
+ * from the [employees] table in the 'employees' database. The endpoint supports optional 
+ * filtering via [name.eq], [email.like], and [phone.like] parameters.
+ *
+ * [.arguments]
+ * - Declares optional filter parameters for:
+ *   - [name.eq]: Matches employees with exact name.
+ *   - [email.like]: Filters based on partial email match.
+ *   - [phone.like]: Filters based on partial phone number.
+ * - These filters are optional and only applied if provided by the caller.
+ *
+ * [data.connect]
+ * - Establishes a database connection to the 'employees' database using the [generic] connector.
+ * - All subsequent operations (including the data read) are scoped within this connection.
+ *
+ * [add]
+ * - Dynamically decorates the [where] clause of [data.read] with any filters provided via [.arguments].
+ * - The expression inside [add] uses [get-nodes] to select **all** arguments passed into the endpoint.
+ * - Since all defined arguments are filter conditions and belong under the same [and] clause,
+ *   this approach allows us to inject them wholesale into the filter structure.
+ *
+ *   ⚠️ This works **only** because there are no pagination or sorting arguments — if such were present,
+ *   they would have to be handled separately (e.g., added to the root [data.read] node instead).
+ *
+ * [data.read]
+ * - Queries the [employees] table, applying all dynamically added filters under a [where]/[and] clause.
+ * - The invocation remains clean and flexible thanks to the earlier [add] composition.
+ *
+ * [yield]
+ * - Returns the query result to the client, wrapped inside a node named [employees].
+ *
+ * This pattern is ideal for building dynamic and reusable filtering endpoints that:
+ * - Accept zero or many filter parameters.
+ * - Avoid repetitive conditional logic.
+ * - Cleanly separate parameter declaration from execution.
+ */
+.arguments
+
+   // Optional filtering for name
+   name.eq:string
+
+   // Optional filtering for email
+   email.like:string
+
+   // Optional filtering for phone
+   phone.like:string
+
+// Opening up our database connection.
+data.connect:employees
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*/and
+   
+      /*
+       * Notice, the above [add] invocation adds *ALL* arguments to the below
+       * [where] / [and] node because of the following [get-nodes] selecting
+       * ALL arguments. This is only possible because all arguments
+       * are going into the same child node of [data.read].
+       *
+       * If we had paging or sorting arguments, we would have to make sure we
+       * ONLY add filtering arguments into [and] and paging arguments into [data.read].
+       * Since we only have filter arguments, we can get away with simply adding all
+       * arguments specified to the endpoint.
+       */
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      table:employees
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   yield
+      employees:x:@data.read/*
+
