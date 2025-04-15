@@ -5,7 +5,6 @@ set-value:x:@.status
    .:complete
 ```
 ---
-.execute:bool:true
 if:x:@.execute
    set-value:x:@.status
       .:complete

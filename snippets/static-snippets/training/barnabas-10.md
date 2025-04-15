@@ -5,9 +5,6 @@ data.connect:[generic|inventory]
    data.scalar:select count(*) from products
 ```
 ---
-/*
- * Returns count of products from inventory database using the generic connection string
- */
 .arguments
 data.connect:[generic|inventory]
    data.scalar:select count(*) from products

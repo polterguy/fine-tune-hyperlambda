@@ -9,9 +9,6 @@ data.connect:crm
          email:jane.doe@example.com
 ```
 ---
-/*
- * HTTP endpoint returning contacts from crm database
- */
 .arguments
 data.connect:crm
    data.create
