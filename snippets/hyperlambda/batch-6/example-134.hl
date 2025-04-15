@@ -1,0 +1,76 @@
+
+/*
+ * This Hyperlambda file defines a REST-style HTTP endpoint that returns a paginated, enriched list of Jedi records,
+ * where each Jedi is accompanied by their corresponding lightsaber(s).
+ * 
+ * ### How it works:
+ * - The endpoint accepts four optional arguments: [offset], [limit], [order], and [direction].
+ * - It queries the 'Jedi' table from a database named 'republic-db'.
+ * - It decorates the query with optional sorting and pagination parameters, if provided.
+ * - For each Jedi, it performs a nested query to the 'Lightsaber' table to find lightsabers associated with that Jedi.
+ * - It returns a full object graph where each Jedi includes a [lightsabers] list.
+ * 
+ * ### Final Response Example:
+ * ```json
+ * {
+ *   "jedi": [
+ *     {
+ *       "JediId": 1,
+ *       "Name": "Obi-Wan Kenobi",
+ *       "lightsabers": [
+ *         { "Color": "Blue", "Type": "Single-blade" }
+ *       ]
+ *     },
+ *     {
+ *       "JediId": 2,
+ *       "Name": "Yoda",
+ *       "lightsabers": [
+ *         { "Color": "Green", "Type": "Short" }
+ *       ]
+ *     }
+ *   ]
+ * }
+ * ```
+ * 
+ * This is ideal for frontends that need rich, relational data in a single API call.
+ */
+// Declares file as an HTTP endpoint by defining incoming parameters
+.arguments
+   offset:int
+   limit:int
+   order:string
+   direction:string
+
+// Opens a connection to the 'republic-db' SQLite database
+data.connect:republic-db
+
+   // Dynamically adds optional query arguments to the upcoming [data.read]
+   // This pattern ensures that only provided arguments are added
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+
+   // Primary query that fetches Jedi records
+   data.read
+      table:Jedi
+
+   // For every Jedi returned above, perform a nested query to fetch their lightsabers
+   include:x:@data.read/*
+
+      // Queries the 'Lightsaber' table for each Jedi
+      data.read
+         table:Lightsaber
+         where
+            and
+               // Ensures we only fetch lightsabers belonging to the current Jedi
+               JediId.eq:x:@.dp/#/*/JediId
+
+      // Attaches the result as a child node called [lightsabers] to each Jedi
+      yield
+         lightsabers:x:@data.read/*
+
+   // Returns the final graph of Jedi enriched with their lightsabers
+   yield
+      jedi:x:@data.read/*

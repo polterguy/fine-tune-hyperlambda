@@ -1,0 +1,52 @@
+/*
+ * This Hyperlambda file defines a REST-style endpoint that returns a paginated list of starships from the 'galactic-fleet' database.
+ * Each starship is augmented with a list of pilots who are assigned to it.
+ *
+ * The endpoint accepts optional pagination and sorting parameters, and returns a nested result containing a starship–pilot relationship.
+ *
+ * Final JSON Example:
+ * ```json
+ * {
+ *   "starships": [
+ *     {
+ *       "ShipId": 1,
+ *       "Name": "Millennium Falcon",
+ *       "pilots": [
+ *         { "Name": "Han Solo" },
+ *         { "Name": "Chewbacca" }
+ *       ]
+ *     }
+ *   ]
+ * }
+ * ```
+ */
+.arguments
+   offset:int
+   limit:int
+   order:string
+   direction:string
+
+data.connect:galactic-fleet
+
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+
+   data.read
+      table:Starship
+
+   include:x:@data.read/*
+
+      data.read
+         table:Pilot
+         where
+            and
+               ShipId.eq:x:@.dp/#/*/ShipId
+
+      yield
+         pilots:x:@data.read/*
+
+   yield
+      starships:x:@data.read/*

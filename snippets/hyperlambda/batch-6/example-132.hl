@@ -1,0 +1,113 @@
+
+/*
+ * This Hyperlambda file defines an HTTP endpoint that dynamically queries the Chinook database for a paginated list
+ * of artists and augments each artist with a list of their albums. The structure combines optional query parameters,
+ * dynamic decoration of the SQL invocation, and hierarchical enrichment of results via [include].
+ *
+ * [.arguments]
+ * - Declares the endpoint’s query parameters:
+ *   - [offset]: Integer that skips a number of records.
+ *   - [limit]: Integer that limits the number of results returned.
+ *   - [order]: Column name to sort the records by.
+ *   - [direction]: Sorting direction ("asc" or "desc").
+ * - These arguments are optional, making the endpoint flexible for callers to paginate or sort data as needed.
+ *
+ * [data.connect]
+ * - Establishes a connection to the 'chinook' SQLite database.
+ * - All subsequent database operations are executed within this connection context.
+ *
+ * [add]
+ * - Dynamically adds optional arguments to the [data.read] operation.
+ * - Each [get-nodes] retrieves one of the defined query parameters *if it was provided*.
+ * - If a parameter is omitted by the caller, it won’t be added — allowing for a clean, dynamic invocation.
+ * - This pattern enables **optional argument handling** without cluttering logic with conditional checks.
+ *
+ * [data.read]
+ * - Queries the [Artist] table from the Chinook database.
+ * - The invocation may be enhanced with [limit], [offset], [order], and [direction] parameters
+ *   depending on what the caller passed into the endpoint.
+ *
+ * [include]
+ * - Iterates over each artist returned by [data.read].
+ * - For each artist, it performs a nested query to the [Album] table to fetch albums
+ *   where [ArtistId] matches the current artist's ID.
+ * - The returned albums are attached as a child node named [albums] to the current artist.
+ *
+ * [yield] (inside [include])
+ * - Returns the result of the nested album query from [data.read] to the [include] slot.
+ * - By returning this under [albums], the albums are grouped under each artist in the final output.
+ *
+ * [yield] (final)
+ * - Returns the fully built object graph to the caller, where each artist includes an [albums] array.
+ *
+ * Example Output:
+ * ```json
+ * {
+ *   "contacts": [
+ *     {
+ *       "ArtistId": 1,
+ *       "Name": "AC/DC",
+ *       "albums": [
+ *         { "AlbumId": 1, "Title": "For Those About To Rock" },
+ *         ...
+ *       ]
+ *     },
+ *     ...
+ *   ]
+ * }
+ * ```
+ *
+ * This pattern is ideal for building REST-style endpoints that support optional pagination
+ * and relational enrichment in a single HTTP call.
+ */
+// Declares file as an HTTP endpoint
+.arguments
+   offset:int
+   limit:int
+   order:string
+   direction:string
+
+// Connecting to chinook database
+data.connect:chinook
+
+   /*
+    * Adding arguments.
+    *
+    * Notice, kthe point with doing it this way is that all arguments added like this become **OPTIONAL**,
+    * since the [add] invocation will only add arguments specified by caller.
+    * If the argument is not specified by caller, it will not be used to decorate the [data.read] invocation!
+    */
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+
+   /*
+    * Reading records, now with a possibly decorated invocation, decorated with the above [add] invocation.
+    */
+   data.read
+      table:Artist
+
+   /*
+    * This effectively loops through each artist and **includes** all albums for artists.
+    *
+    * Notice, this is actually a loop, passing in the [.dp] pointer for each record returned from above,
+    * for then to inject into the currently iterated item whatever the [include] invocation returns.
+    */
+   include:x:@data.read/*
+
+      // Reading albums for currently iterated artist.
+      data.read
+         table:Album
+         where
+            and
+               ArtistId.eq:x:@.dp/#/*/ArtistId
+
+      // Returning [albums] out from [include], resulting in "attaching" it to the currently iterated artist.
+      yield
+         albums:x:@data.read/*
+
+   // Returning artists, now decorated with every single album released by artist.
+   yield
+      contacts:x:@data.read/*

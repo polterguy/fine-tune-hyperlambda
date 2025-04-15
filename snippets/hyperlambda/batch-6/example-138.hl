@@ -1,0 +1,28 @@
+/*
+ * This Hyperlambda file returns a list of products from the 'inventory' database,
+ * optionally filtered by [category.eq] and [price.lt].
+ *
+ * Both arguments are passed through an [add] operation to dynamically decorate the 
+ * [data.read] invocation. This ensures these parameters are **OPTIONAL** — if they are 
+ * not provided, they won't affect the SQL logic.
+ *
+ * This structure keeps your endpoint flexible and clean while enabling precise filtering.
+ */
+.arguments
+   category.eq:string
+   price.lt:double
+
+data.connect:inventory
+
+   // Only include filters that the caller has actually specified.
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/category.eq
+      get-nodes:x:@.arguments/*/price.lt
+
+   data.read
+      table:products
+      where
+         and
+
+   yield
+      products:x:@data.read/*

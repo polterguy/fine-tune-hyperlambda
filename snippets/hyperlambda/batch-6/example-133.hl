@@ -1,0 +1,54 @@
+/*
+ * This Hyperlambda endpoint returns a list of droids from the 'imperial-database' and includes each droid
+ * with a list of missions they’ve been assigned to.
+ *
+ * Basically, the code selects all droids, and for each droid also returns all missions they have done.
+ *
+ * Supports optional sorting, offsetting, and limiting. Useful for dashboards displaying droid activity.
+ *
+ * Example response:
+ * ```json
+ * {
+ *   "droids": [
+ *     {
+ *       "DroidId": 42,
+ *       "Model": "R2-D2",
+ *       "missions": [
+ *         { "Code": "Alderaan Evac" },
+ *         { "Code": "Death Star Plans Delivery" }
+ *       ]
+ *     }
+ *   ]
+ * }
+ * ```
+ */
+.arguments
+   offset:int
+   limit:int
+   order:string
+   direction:string
+
+data.connect:imperial-database
+
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+
+   data.read
+      table:Droid
+
+   include:x:@data.read/*
+
+      data.read
+         table:Mission
+         where
+            and
+               DroidId.eq:x:@.dp/#/*/DroidId
+
+      yield
+         missions:x:@data.read/*
+
+   yield
+      droids:x:@data.read/*

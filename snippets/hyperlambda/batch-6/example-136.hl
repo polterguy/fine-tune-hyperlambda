@@ -1,0 +1,95 @@
+
+/*
+ * This Hyperlambda file defines a minimal HTTP endpoint for querying a list of contacts from the 'erp' database,
+ * optionally filtering the results by name using a [name.like] argument. It demonstrates the use of dynamic slot decoration
+ * to support optional query parameters and structured SQL generation through Hyperlambda's declarative design.
+ *
+ * [.arguments]
+ * - Declares an optional argument:
+ *   - [name.like]: A string used to perform a wildcard (LIKE) search on the contact's name.
+ * - Since it's wrapped in a [get-nodes] and used within an [add] invocation, it is entirely optional — the filter will only be applied
+ *   if the caller provides the [name.like] parameter.
+ *
+ * [data.connect]
+ * - Establishes a connection to the 'erp' SQLite database.
+ * - All subsequent database operations are scoped within this connection.
+ *
+ * [add]
+ * - Dynamically injects any provided arguments into the [data.read] invocation.
+ * - Specifically targets the [and] clause of the [where] condition, ensuring that
+ *   any filters added here will be logically combined with AND.
+ * - If the caller does not provide the [name.like] parameter, no filter will be added — resulting in a full list of contacts.
+ * - This dynamic composition of filters allows flexible query construction with minimal code duplication.
+ *
+ * [data.read]
+ * - Performs the actual database query.
+ * - Targets the [contacts] table.
+ * - Contains a [where] clause with an [and] block that may be dynamically populated via the preceding [add].
+ * - The query will return all contacts or just those whose names match the provided [name.like] pattern.
+ *
+ * [yield]
+ * - Returns the final list of contacts retrieved from the database to the client.
+ * - The output will be wrapped in a [contacts] node.
+ *
+ * Example Outputs:
+ *
+ * If no argument is provided:
+ * ```json
+ * {
+ *   "contacts": [
+ *     { "ContactId": 1, "Name": "Alice" },
+ *     { "ContactId": 2, "Name": "Bob" }
+ *   ]
+ * }
+ * ```
+ *
+ * If the caller provides ?name.like=Al%:
+ * ```json
+ * {
+ *   "contacts": [
+ *     { "ContactId": 1, "Name": "Alice" }
+ *   ]
+ * }
+ * ```
+ *
+ * This pattern is ideal for building clean and composable REST-style endpoints that support optional search parameters
+ * without adding clutter or conditional logic.
+ */
+.arguments
+   name.like:string
+data.connect:erp
+
+   /*
+    * By dynamically adding arguments the way we do here, ensures that ONLY arguments
+    * actually provided by the caller are added, resulting in that the [name.like]
+    * argument is **OPTIONAL**!
+    *
+    * It is crucial that the lambda expression points to the [and] node!
+    */
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/name.like
+   data.read
+      table:contacts
+      where
+         and
+   yield
+      contacts:x:@data.read/*
+.arguments
+   name.like:string
+data.connect:erp
+
+   /*
+    * By dynamically adding arguments the way we do here, ensures that ONLY arguments
+    * actually provided by the caller are added, resulting in that the [name.like]
+    * argument is **OPTIONAL**!
+    *
+    * It is crucial that the lambda expression points to the [and] node!
+    */
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/name.like
+   data.read
+      table:contacts
+      where
+         and
+   yield
+      contacts:x:@data.read/*
