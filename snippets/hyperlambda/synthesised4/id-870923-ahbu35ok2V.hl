@@ -1,0 +1,30 @@
+
+// This Hyperlambda code connects to a database and checks if a user exists in the "users" table based on the provided username. If the user exists, it changes their password using [magic.auth.change-password]. If not, it creates a new user with specified details using [magic.auth.create-user]. Afterward, it generates a JWT token for the user with the role "root" using [auth.ticket.create] and returns the token. The code ensures user authentication and management by dynamically handling user existence and creating or updating user credentials accordingly.
+data.connect:[generic|magic]
+   data.read
+      table:users
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   if
+      exists:x:@data.read/*/*
+      .lambda
+         execute:magic.auth.change-password
+            password:x:@.arguments/*/password
+            is_hashed:x:@.arguments/*/is_hashed
+   else
+      execute:magic.auth.create-user
+         username:x:@.arguments/*/username
+         password:x:@.arguments/*/password
+         is_hashed:x:@.arguments/*/is_hashed
+         roles
+            .:root
+         extra
+            email:x:@.arguments/*/email
+            name:x:@.arguments/*/name
+   auth.ticket.create
+      username:x:@.arguments/*/username
+      roles
+         .:root
+   yield
+      ticket:x:@auth.ticket.create

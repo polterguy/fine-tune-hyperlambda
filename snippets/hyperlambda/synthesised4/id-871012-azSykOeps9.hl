@@ -1,0 +1,94 @@
+
+// This Hyperlambda code defines a dynamic slot named "magic.ai.create-system-message" that generates a system message using OpenAI's API. It validates mandatory arguments, scrapes a URL, and constructs a context while ensuring token limits. It then makes a POST request to OpenAI's chat completions endpoint, handling errors and formatting the response before returning it. Key slots used include [validators.mandatory], [execute], [if], [while], [http.post], and [strings.replace].
+slots.create:magic.ai.create-system-message
+   validators.mandatory:x:@.arguments/*/url
+   validators.mandatory:x:@.arguments/*/template
+   validators.mandatory:x:@.arguments/*/instruction
+   validators.url:x:@.arguments/*/url
+   execute:magic.http.scrape-url
+      url:x:@.arguments/*/url
+   if
+      not-null:x:@execute
+      .lambda
+         throw:Could not scrape URL
+            public:bool:true
+            status:x:@execute
+   .context:
+   while
+      and
+         exists:x:@execute/0
+         lt
+            openai.tokenize:x:@.context
+            .:int:4000
+      .lambda
+         .tmp
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.context
+               .:"\n\n"
+               get-value:x:@execute/0/*/prompt
+               .:"\n\n"
+               get-value:x:@execute/0/*/completion
+         if
+            lt
+               openai.tokenize:x:@.tmp
+               .:int:4000
+            .lambda
+               set-value:x:@.context
+                  get-value:x:@.tmp
+         remove-nodes:x:@execute/0/*/snippets/0
+         if
+            not-exists:x:@execute/0/*/snippets/0
+            .lambda
+               remove-nodes:x:@execute/0
+   set-value:x:@.context
+      strings.trim:x:@.context
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:gpt-4o
+         max_tokens:int:3600
+         temperature:decimal:0.3
+         messages
+            .
+               role:system
+               content:x:@.arguments/*/instruction
+            .
+               role:user
+               content:x:@.arguments/*/template
+            .
+               role:user
+               content:x:@.context
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+         throw:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   strings.replace:x:@http.post/*/content/*/choices/0/*/message/*/content
+      .:"\r"
+      .:
+   strings.replace:x:-
+      .:"\n"
+      .:@"
+"
+   return:x:-
