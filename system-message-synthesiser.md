@@ -65,17 +65,17 @@ Each iterator ends with a "/" character or a CR/LF sequence, and its value defin
 * `.` Retrieves its previous result set's parent node(s).
 * `^xxx` Retrieves the first ancestor node with the specified "xxx" name. Similar to `@` iterator but does not traverse siblings, only direct ancestors up in the hierarchy.
 * `..` Retrieves the root node of the currently executed Hyperlambda.
-* `**` Retrieves all of its previous result set's descendant nodes, with a "breadth first" algorithm.
+* `**` Retrieves all of its previous result set's descendant nodes, in addition to the node itself from where it starts, with a "breadth first" algorithm.
 * `--` Retrieves all ancestors and older siblings upwards in object.
 * `!xxx` Retrieves all descendants except those matching specified "xxx" name.
 * `{x}` Extrapolated expression that will be evaluated assuming it yields one result, replacing itself with the value of whatever node it points to.
-* `=xxx` Retrieves the node with the "xxx" value, converting to string if necessary.
-* `[n,n]` Retrieves a subset of its previous result set, implying "from and including, to not including", or formally written as [n1,n2>. To retrieve the first two nodes you can use [0,2].
+* `=xxx` Retrieves the node with the specified "xxx" value from the previous result set, converting to string if necessary. Only nodes having a **value** of `xxx` will be matched.
+* `[n,n]` Retrieves a subset of its previous result set. The first number is from, the second number is number of nodes. To retrieve the first two nodes you can use [0,2]. To retrieve the 4th and 5th node you can use [3,2].
 * `@xxx` Returns the first node "before" in its hierarchy that matches the given "xxx" in its name.
 * `n` (any number) Returns the n'th child of its previous result set.
 * `[x|y]` Pipe separated list of names returning all nodes having a name of either "x" or "y". You can add as many pipes as you wish.
 
-Some of the above iterators might return multiple nodes, except the `#`, `-`, `+`, `.`, `^xxx`, `..`, `@xxx` and `n`.
+Some of the above iterators might return multiple nodes, except the `#`, `-`, `+`, `.`, `^xxx`, `..`, `@xxx` and `n`. These expressions will *always* return exactly one node!
 
 Below is an example of a lambda expression that checks if the value of the [person] node inside the [.foo] node is equal to "Thomas Hansen", and changes the [.result] node's value to the static value of "Condition is true" if the condition is true.
 

@@ -1,0 +1,46 @@
+
+// This Hyperlambda code processes a list of URLs to create OpenAI training data. It uses [fork] to parallelize the task, iterating over each URL with [for-each]. For each URL, it attempts to scrape data using [execute:magic.ai.url.scrape], signaling success or failure through [sockets.signal]. After processing all URLs, it signals completion with [sockets.signal:magic.backend.message]. If vectorization is requested, it executes [magic.ai.vectorise] and signals completion; otherwise, it directly signals completion. Finally, it logs the success of the operation with [log.info].
+fork
+   .urls
+   for-each:x:@.urls/*/*
+      try
+         execute:magic.ai.url.scrape
+            url:x:@.dp/#
+            type:x:@.arguments/*/type
+            feedback-channel:x:@.arguments/*/feedback-channel
+            lists:bool:false
+            images:bool:false
+            code:bool:false
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:------------------------------------------------------------------------------------------------------------------------
+               type:info
+      .catch
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@.arguments/*/message
+               type:warning
+   sockets.signal:magic.backend.message
+      roles:root
+      args
+         message:Done creating OpenAI training data from URL list
+         type:success
+   if
+      eq:x:@.arguments/*/vectorize
+         .:bool:true
+      .lambda
+         execute:magic.ai.vectorise
+            type:x:@.arguments/*/type
+            feedback-channel:x:@.arguments/*/feedback-channel
+            .onafter
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Done!
+                     type:success
+   else
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Done!
+            type:success
+   log.info:OpenAI training data successfully created from URL list
+      type:x:@.arguments/*/type
