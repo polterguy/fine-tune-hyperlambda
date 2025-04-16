@@ -1,0 +1,280 @@
+
+/*
+ * This Hyperlambda code creates a slot named [magic.ai.import-zip-file] that processes a ZIP file uploaded to a server. It validates the presence of necessary arguments, checks for and manages temporary directories, and saves the uploaded file. The code unzips the file, identifies file types, and optionally generates summaries using OpenAI's API. It stores the results in a database and sends feedback through a socket signal. The slot handles errors by logging them and notifying through a socket signal.
+ * 
+ * 1. [validators.mandatory] - Ensures required arguments are present.
+ * 2. [if] - Checks if a temporary folder exists and creates it if not.
+ * 3. [else] - Cleans up temporary files and folders if the folder exists.
+ * 4. [set-value] - Sets the filename for saving the uploaded file.
+ * 5. [io.stream.save-file] - Saves the uploaded file stream to the server.
+ * 6. [insert-before] - Inserts nodes before the fork node.
+ * 7. [fork] - Executes the following code in parallel.
+ * 8. [try] - Attempts to process the files within the ZIP.
+ * 9. [io.file.unzip] - Unzips the uploaded file.
+ * 10. [switch] - Determines the file type based on the file extension.
+ * 11. [if] - Checks if the file should be processed.
+ * 12. [http.post] - Sends a request to OpenAI's API for generating file summaries.
+ * 13. [data.connect] - Connects to a database to store processed data.
+ * 14. [.catch] - Handles errors during processing.
+ * 15. [return] - Returns a result indicating the process is pending.
+ */
+slots.create:magic.ai.import-zip-file
+   validators.mandatory:x:@.arguments/*/file
+   validators.mandatory:x:@.arguments/*/file/*/name
+   validators.mandatory:x:@.arguments/*/file/*/stream
+   if
+      not
+         io.folder.exists:/etc/system/openai/temp/
+      .lambda
+         io.folder.create:/etc/system/openai/temp/
+   else
+      io.file.list:/etc/system/openai/temp/
+      for-each:x:@io.file.list/*
+         if
+            neq:x:@.dp/#
+               .:/etc/system/openai/temp/README.md
+            .lambda
+               io.file.delete:x:@.dp/#
+      io.folder.list:/etc/system/openai/temp/
+      for-each:x:@io.folder.list/*
+         io.folder.delete:x:@.dp/#
+   .filename
+   set-value:x:@.filename
+      strings.concat
+         .:/etc/system/openai/temp/
+         get-value:x:@.arguments/*/file/*/name
+   io.stream.save-file:x:@.filename
+      get-value:x:@.arguments/*/file/*/stream
+   insert-before:x:./*/fork/0
+      get-nodes:x:@.arguments
+      get-nodes:x:@.filename
+   fork
+      try
+         .token
+         set-value:x:@.token
+            strings.concat
+               .:"Bearer "
+               config.get:"magic:openai:key"
+         io.file.unzip:x:@.filename
+         io.file.delete:x:@.filename
+         io.file.list-recursively:/etc/system/openai/temp/
+         for-each:x:@io.file.list-recursively/*
+            .handle:bool:false
+            .file-meta:
+            strings.split:x:@.dp/#
+               .:.
+            switch:x:@strings.split/0/-
+               case:cs
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"File type: VB.NET"
+               case:vb
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: VB.NET"
+               case:py
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: Python"
+               case:rb
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: Ruby"
+               case:js
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: JavaScript"
+               case:ts
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:"Programming language: TypeScript"
+               case:txt
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:Text file
+               case:css
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:CSS file
+               case:html
+               case:htm
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:HTML file
+               case:sass
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:SASS file
+               case:scss
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:SCSS file
+               case:sql
+                  set-value:x:@.handle
+                     .:bool:true
+                  set-value:x:@.file-meta
+                     strings.concat
+                        get-value:x:@.file-meta
+                        .:SQL file
+               case:md
+                  if
+                     neq:x:@.dp/#
+                        .:/etc/system/openai/temp/README.md
+                     .lambda
+                        set-value:x:@.handle
+                           .:bool:true
+                        set-value:x:@.file-meta
+                           strings.concat
+                              get-value:x:@.file-meta
+                              .:Markdown file
+               default
+                  strings.concat
+                     .:"File: "
+                     get-value:x:@.dp/#
+                     .:" is ignored"
+                  unwrap:x:+/*/*/message
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:x:@strings.concat
+                        type:info
+            if:x:@.handle
+               set-value:x:@.file-meta
+                  strings.concat
+                     get-value:x:@.file-meta
+                     .:" - Filename: "
+                     get-value:x:@.dp/#
+               .content
+               set-value:x:@.content
+                  io.file.load:x:@.dp/#
+               .snippets
+               if
+                  and
+                     exists:x:@.arguments/*/massage
+                     neq:x:@.arguments/*/massage
+                        .
+                     neq:x:@.arguments/*/massage
+                        .:
+                     lt
+                        openai.tokenize:x:@.content
+                        .:int:15000
+                  .lambda
+                     strings.concat
+                        .:"Creating summary for file: "
+                        get-value:x:@.dp/#
+                     unwrap:x:+/*/*/message
+                     sockets.signal:x:@.arguments/*/feedback-channel
+                        args
+                           message:x:@strings.concat
+                           type:info
+                     http.post:"https://api.openai.com/v1/chat/completions"
+                        headers
+                           Authorization:x:@.token
+                           Content-Type:application/json
+                        payload
+                           model:gpt-3.5-turbo-1106
+                           max_tokens:int:2000
+                           temperature:decimal:0.5
+                           messages
+                              .
+                                 role:system
+                                 content:x:@.arguments/*/massage
+                              .
+                                 role:system
+                                 content:x:@.content
+                        convert:true
+                     if
+                        and
+                           mte:x:@http.post
+                              .:int:200
+                           lt:x:@http.post
+                              .:int:300
+                        .lambda
+                           unwrap:x:+/*/*/*
+                           add:x:@.snippets
+                              .
+                                 .
+                                    prompt:x:@http.post/*/content/*/choices/0/*/message/*/content
+                                    completion:x:@.content
+                     else
+                        strings.concat
+                           .:"Could not create summary for file: "
+                           get-value:x:@.dp/#
+                        unwrap:x:+/*/*/message
+                        sockets.signal:x:@.arguments/*/feedback-channel
+                           args
+                              message:x:@strings.concat
+                              type:warning
+                        unwrap:x:+/*/*/*
+                        add:x:@.snippets
+                           .
+                              .
+                                 prompt:x:@.file-meta
+                                 completion:x:@.content
+               else
+                  unwrap:x:+/*/*/*
+                  add:x:@.snippets
+                     .
+                        .
+                           prompt:x:@.file-meta
+                           completion:x:@.content
+               data.connect:[generic|magic]
+                  for-each:x:@.snippets/*
+                     data.create
+                        table:ml_training_snippets
+                        values
+                           type:x:@.arguments/*/type
+                           prompt:x:@.dp/#/*/prompt
+                           completion:x:@.dp/#/*/completion
+                           filename:x:@.dp/@.dp/#
+                           cached:int:0
+         strings.concat
+            .:"Done importing "
+            get-count:x:@.snippets/*
+            .:" training snippets, now vectorising model"
+         unwrap:x:+/*/*/message
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:done_crawling
+      .catch
+         log.error:x:@.arguments/*/message
+         sockets.signal:x:@.arguments/@.arguments/*/feedback-channel
+            roles:root
+            args
+               message:Something went wrong as we tried to import your file.
+               type:error
+   return
+      result:pending

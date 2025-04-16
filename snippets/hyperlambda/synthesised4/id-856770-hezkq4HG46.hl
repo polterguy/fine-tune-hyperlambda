@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code connects to a database and reads specific columns from the "ml_types" table, filtering by a provided type. It then sets the value of a node to the retrieved "vector_model" value. If the "api_key" value is not null and not an empty string, it sets another node's value to the "api_key". The code uses slots like [data.connect], [data.read], [set-value], and [if] for database operations and conditional logic.
+ * 
+ * 1. [data.connect] - Connects to a database, either generic or magic.
+ * 2. [data.read] - Reads data from the specified table and columns.
+ * 3. [table] - Specifies the table "ml_types" to read from.
+ * 4. [columns] - Lists the columns "vector_model" and "api_key" to retrieve.
+ * 5. [where] - Applies a filter condition based on the "type" argument.
+ * 6. [set-value] - Sets the value of the "vector-model" node to the retrieved "vector_model".
+ * 7. [if] - Checks conditions on the "api_key" value.
+ * 8. [and] - Combines multiple conditions to be checked.
+ * 9. [not-null] - Checks if the "api_key" is not null.
+ * 10. [neq] - Checks if the "api_key" is not an empty string.
+ * 11. [.lambda] - Executes the block if the conditions are true.
+ * 12. [set-value] - Sets the value of the "token" node to the "api_key".
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         vector_model
+         api_key
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   set-value:x:@.vector-model
+      get-value:x:@data.read/*/*/vector_model
+   if
+      and
+         not-null:x:@data.read/*/*/api_key
+         neq:x:@data.read/*/*/api_key
+            .:
+      .lambda
+         set-value:x:@.token
+            get-value:x:@data.read/*/*/api_key

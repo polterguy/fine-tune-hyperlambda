@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code connects to a database and performs a scalar query to count records in the "ml_training_snippets" table where the "embedding" is not null and the "type" matches the provided argument. If the count is zero, it returns "context" and "snippets". Otherwise, it reads the "vector_model" from the "ml_types" table for the given type and sets the "embeddings-model" node with this value. 
+ * 
+ * 1. [data.connect] - Opens a database connection using a specified connection string.
+ * 2. [data.scalar] - Executes a scalar SQL query to count records in a table.
+ * 3. [@type] - Retrieves the "type" argument value for the SQL query.
+ * 4. [if] - Checks if the scalar query result is zero.
+ * 5. [eq] - Compares the scalar result to zero.
+ * 6. [convert] - Converts the scalar result to an integer.
+ * 7. [return] - Returns "context" and "snippets" if the condition is true.
+ * 8. [data.read] - Reads the "vector_model" column from the "ml_types" table.
+ * 9. [table] - Specifies the table to read from.
+ * 10. [columns] - Specifies the columns to retrieve.
+ * 11. [where] - Adds a condition to filter the query.
+ * 12. [and] - Combines multiple conditions in the query.
+ * 13. [type.eq] - Compares the "type" column to the provided argument.
+ * 14. [set-value] - Sets the value of the "embeddings-model" node.
+ * 15. [get-value] - Retrieves the "vector_model" value from the query result.
+ */
+data.connect:[generic|magic]
+   data.scalar:select count(*) from ml_training_snippets where embedding is not null and type = @type
+      @type:x:@.arguments/*/type
+   if
+      eq
+         convert:x:@data.scalar
+            type:int
+         .:int:0
+      .lambda
+         return
+            context
+            snippets
+   data.read
+      table:ml_types
+      columns
+         vector_model
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   set-value:x:@.embeddings-model
+      get-value:x:@data.read/*/*/vector_model

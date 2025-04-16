@@ -1,0 +1,79 @@
+
+/*
+ * This Hyperlambda code processes an incoming signal, conditionally setting up and executing a webhook. It first checks if the incoming signal is not null and not empty, then sets a webhook URL based on configuration or model data. If both "to" and "from" arguments exist and contain a colon, it splits these arguments and adds them to the signal. Otherwise, it directly adds the "to" and "from" arguments to the signal. Finally, it evaluates the constructed execution block. 
+ * 
+ * 1. [if] - Checks if the incoming signal is not null and not empty.
+ * 2. [not-null] - Verifies the existence of the incoming signal.
+ * 3. [neq] - Ensures the incoming signal is not an empty string.
+ * 4. [.lambda] - Contains the execution logic if the condition is true.
+ * 5. [.exe] - Prepares the execution environment for the webhook.
+ * 6. [set-value] - Sets the webhook URL based on configuration or model data.
+ * 7. [unwrap] - Processes the URL for the signal.
+ * 8. [signal] - Sends the signal with the constructed URL.
+ * 9. [if] - Checks conditions for "to" and "from" arguments.
+ * 10. [and] - Ensures multiple conditions are met for "to" and "from".
+ * 11. [exists] - Checks if "to" and "from" arguments exist.
+ * 12. [strings.contains] - Verifies if "to" and "from" contain a colon.
+ * 13. [.lambda] - Executes logic if "to" and "from" conditions are met.
+ * 14. [strings.split] - Splits "to" and "from" arguments by colon.
+ * 15. [set-value] - Assigns split values to "channel", "to", and "from".
+ * 16. [add] - Adds nodes to the signal.
+ * 17. [unwrap] - Processes added nodes.
+ * 18. [else] - Handles the case where "to" and "from" conditions are not met.
+ * 19. [eval] - Executes the constructed execution block.
+ */
+if
+   and
+      not-null:x:@.incoming
+      neq:x:@.incoming
+         .:
+   .lambda
+      .exe
+         .hook-url
+         set-value:x:@.hook-url
+            get-first-value
+               get-value:x:@.model/*/webhook_incoming_url
+               config.get:"magic:openai:integrations:incoming:url"
+         unwrap:x:./*/signal/*/url
+         signal:x:@.incoming
+            url:x:@.hook-url
+      if
+         and
+            exists:x:@.arguments/*/to
+            exists:x:@.arguments/*/from
+            not-null:x:@.arguments/*/to
+            not-null:x:@.arguments/*/from
+            strings.contains:x:@.arguments/*/to
+               .:":"
+            strings.contains:x:@.arguments/*/from
+               .:":"
+         .lambda
+            .channel
+            .to
+            .from
+            strings.split:x:@.arguments/*/to
+               .:":"
+            set-value:x:@.channel
+               get-value:x:@strings.split/0
+            set-value:x:@.to
+               get-value:x:@strings.split/1
+            strings.split:x:@.arguments/*/from
+               .:":"
+            set-value:x:@.from
+               get-value:x:@strings.split/1
+            add:x:@.exe/*/signal
+               get-nodes:x:@.arguments/*/prompt
+               get-nodes:x:@.arguments/*/session
+            unwrap:x:+/*/*
+            add:x:@.exe/*/signal
+               .
+                  to:x:@.to
+                  from:x:@.from
+                  channel:x:@.channel
+      else
+         add:x:@.exe/*/signal
+            get-nodes:x:@.arguments/*/to
+            get-nodes:x:@.arguments/*/from
+            get-nodes:x:@.arguments/*/prompt
+            get-nodes:x:@.arguments/*/session
+      eval:x:@.exe

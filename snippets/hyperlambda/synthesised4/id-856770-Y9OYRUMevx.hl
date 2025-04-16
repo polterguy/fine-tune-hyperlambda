@@ -1,0 +1,13 @@
+
+// This Hyperlambda code snippet performs a loop to insert records into the "vss_ml_training_snippets" table from the "ml_training_snippets" table, where the "embedding" is not null, and a specific "type" is provided. It continues executing until fewer than 500 records are inserted in one batch, at which point it stops the loop. The code uses [while] to iterate, [data.connect] to establish a connection, [data.execute] to run the SQL command, [if] to check the number of inserted records, and [set-value] to update the loop condition.
+while:x:@.more
+   .sql:"\ninsert into vss_ml_training_snippets (rowid, embedding_vss)\n   select id as rowid, embedding as embedding_vss\n      from ml_training_snippets ts\n      where ts.embedding is not null and\n         type = @type and\n         not exists (select rowid from vss_ml_training_snippets as vss where ts.id = vss.rowid) limit 500"
+   data.connect:[generic|magic]
+      data.execute:x:@.sql
+         type:x:@.arguments/*/type
+      if
+         lt:x:@data.execute
+            .:int:500
+         .lambda
+            set-value:x:@.more
+               .:bool:false

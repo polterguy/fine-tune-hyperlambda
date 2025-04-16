@@ -1,0 +1,105 @@
+
+/*
+ * This Hyperlambda code processes a file upload, saves it, and interacts with the OpenAI API for text completion. It first checks if a condition is true, then constructs a file path and saves the file stream. It loads the file content, constructs a URI, and sends a request to OpenAI if a massage prompt is provided. The response is checked for success, and errors are logged if any. Finally, it adds the URI and file data to the signal and file-data nodes.
+ * 
+ * 1. [if] - Checks if a condition is true to proceed with the file processing.
+ * 2. [set-value] - Sets the filename and filepath by concatenating strings.
+ * 3. [io.stream.save-file] - Saves the file stream to the constructed filepath.
+ * 4. [io.file.load] - Loads the saved file content.
+ * 5. [set-value] - Constructs and sets a URI for accessing the file.
+ * 6. [signal] - Sends a signal to process the file with OpenAI.
+ * 7. [if] - Checks if a massage prompt is provided to interact with OpenAI.
+ * 8. [http.post] - Sends a request to OpenAI's API for text completion.
+ * 9. [if] - Checks the HTTP response status for success.
+ * 10. [log.error] - Logs an error if the OpenAI request fails.
+ * 11. [set-value] - Sets the prompt value from the OpenAI response.
+ * 12. [add] - Adds URI and file data to the signal and file-data nodes.
+ */
+if
+   eq:x:@.text
+      .:bool:true
+   .lambda
+      .filename
+      set-value:x:@.filename
+         get-value:x:@.arguments/*/file/*/name
+      .filepath
+      set-value:x:@.filepath
+         strings.concat
+            .:/etc/system/openai/pdf/
+            get-value:x:@.filename
+      io.stream.save-file:x:@.filepath
+         get-value:x:@.arguments/*/file/*/stream
+      io.file.load:x:@.filepath
+      .uri
+      set-value:x:@.uri
+         strings.concat
+            request.scheme
+            .:"://"
+            request.host
+            .:/magic/system/openai/download-txt?file=
+            strings.url-encode:x:@.filename
+      unwrap:x:+/*
+      signal:magic.ai.massage
+         content:x:@io.file.load
+         prompt:x:@.arguments/*/file/*/name
+         type:x:@.arguments/*/type
+      .uri
+      set-value:x:@.uri
+         strings.concat
+            request.scheme
+            .:"://"
+            request.host
+            .:/magic/system/openai/download-txt?file=
+            strings.url-encode:x:@.filename
+      if
+         and
+            not-null:x:@.arguments/*/massagePrompt
+            neq:x:@.arguments/*/massagePrompt
+               .:
+         .lambda
+            .token
+            set-value:x:@.token
+               strings.concat
+                  .:"Bearer "
+                  config.get:"magic:openai:key"
+            for-each:x:@signal/*
+               http.post:"https://api.openai.com/v1/chat/completions"
+                  convert:bool:true
+                  headers
+                     Authorization:x:@.token
+                     Content-Type:application/json
+                     Accept:text/event-stream
+                  payload
+                     model:gpt-3.5-turbo
+                     max_tokens:int:1000
+                     temperature:decimal:0.3
+                     messages
+                        .
+                           role:system
+                           content:x:@.arguments/*/massagePrompt
+                        .
+                           role:user
+                           content:x:@.dp/#/*/completion
+               if
+                  not
+                     and
+                        mte:x:@http.post
+                           .:int:200
+                        lt:x:@http.post
+                           .:int:300
+                  .lambda
+                     lambda2hyper:x:@http.post
+                     log.error:Something went wrong while invoking OpenAI
+                        message:x:@http.post/*/content/*/error/*/message
+                        status:x:@http.post
+                        error:x:@lambda2hyper
+               else
+                  set-value:x:@.dp/#/*/prompt
+                     get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+      unwrap:x:+/*/*
+      add:x:@signal/*
+         .
+            uri:x:@.uri
+            filename:x:@.filepath
+      add:x:@.file-data
+         get-nodes:x:@signal/*

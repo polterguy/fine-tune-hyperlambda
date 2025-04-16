@@ -1,0 +1,25 @@
+
+/*
+ * The code lists all files in the "/etc/system/openai/temp/" directory and deletes each file except "README.md". It then lists all folders in the same directory and deletes each one. The [else] block ensures this cleanup process occurs only if previous conditions in the conditional branching were not met. 
+ * 
+ * 1. [else] - Executes the following nodes if none of its elder siblings' conditions are true.
+ * 2. [io.file.list] - Lists all files in the specified directory.
+ * 3. [for-each] - Iterates over each file listed.
+ * 4. [if] - Checks if the current file is not "README.md".
+ * 5. [neq] - Compares the current file path to "README.md".
+ * 6. [io.file.delete] - Deletes the current file if it is not "README.md".
+ * 7. [io.folder.list] - Lists all folders in the specified directory.
+ * 8. [for-each] - Iterates over each folder listed.
+ * 9. [io.folder.delete] - Deletes the current folder.
+ */
+else
+   io.file.list:/etc/system/openai/temp/
+   for-each:x:@io.file.list/*
+      if
+         neq:x:@.dp/#
+            .:/etc/system/openai/temp/README.md
+         .lambda
+            io.file.delete:x:@.dp/#
+   io.folder.list:/etc/system/openai/temp/
+   for-each:x:@io.folder.list/*
+      io.folder.delete:x:@.dp/#

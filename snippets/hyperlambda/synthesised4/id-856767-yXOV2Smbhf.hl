@@ -1,0 +1,22 @@
+
+// This Hyperlambda code checks if a session argument exists and is not null, then constructs a cache key by concatenating the session value with ".IDs". It attempts to retrieve a cached value using this key. If a cached value is found, it appends a SQL condition to exclude certain IDs and sets a next value to the cached result. The code uses slots like [if], [and], [exists], [not-null], [set-value], [strings.concat], and [cache.get] to perform these operations.
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      set-value:x:@.cache-key
+         strings.concat
+            get-value:x:@.arguments/*/session
+            .:.IDs
+      cache.get:x:@.cache-key
+      if
+         not-null:x:@cache.get
+         .lambda
+            set-value:x:@.tail
+               strings.concat
+                  .:" and id not in("
+                  get-value:x:@cache.get
+                  .:)
+            set-value:x:@.next
+               get-value:x:@cache.get

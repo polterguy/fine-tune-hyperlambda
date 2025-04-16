@@ -1,0 +1,42 @@
+
+// This Hyperlambda code iteratively processes snippets from a signal node, appending their prompt and completion values to a temporary node [.tmp], while ensuring the total token count remains below 5000. It uses a [while] loop to check conditions with [and], [exists], and [lt] slots, and employs [if] conditions to concatenate strings using [strings.concat]. The processed snippet is then removed with [remove-nodes].
+while
+   and
+      exists:x:@signal/*/snippets/0
+      lt
+         openai.tokenize:x:@.tmp
+         .:int:5000
+   .lambda
+      set-value:x:@.context
+         get-value:x:@.tmp
+      if
+         and
+            exists:x:@signal/*/snippets/0/*/prompt
+            not-null:x:@signal/*/snippets/0/*/prompt
+            neq:x:@signal/*/snippets/0/*/prompt
+               .:
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.tmp
+                  .:@"
+"
+                  .:@"
+"
+                  get-value:x:@signal/*/snippets/0/*/prompt
+      if
+         and
+            exists:x:@signal/*/snippets/0/*/completion
+            not-null:x:@signal/*/snippets/0/*/completion
+            neq:x:@signal/*/snippets/0/*/completion
+               .:
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.tmp
+                  .:@"
+"
+                  .:@"
+"
+                  get-value:x:@signal/*/snippets/0/*/completion
+      remove-nodes:x:@signal/*/snippets/0

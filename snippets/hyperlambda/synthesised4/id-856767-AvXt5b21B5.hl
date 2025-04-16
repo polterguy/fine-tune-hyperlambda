@@ -1,0 +1,17 @@
+
+// This Hyperlambda code connects to a database and performs a vector similarity search using SQL. It converts a float array to bytes, calculates a threshold for the search, constructs a SQL query to find similar embeddings in a table, executes the query, and adds the results to a node. Key slots include [data.connect] for database connection, [floatArray2bytes] for conversion, [math.subtract] for threshold calculation, [strings.concat] for query construction, [data.select] for executing the query, and [add] for appending results.
+data.connect:[generic|magic]
+   floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+   math.subtract
+      .:float:1
+      get-value:x:@.arguments/*/threshold
+   strings.concat
+      .:"\nselect vss.distance, vss.rowid as id, ts.prompt, ts.completion, ts.uri, ts.cached\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and\n      vss_search(vss.embedding_vss, @embedding) and\n      vss.distance < @threshold"
+      get-value:x:@.tail
+      .:" limit 20"
+   data.select:x:@strings.concat
+      embedding:x:@floatArray2bytes
+      type:x:@.arguments/*/type
+      threshold:x:@math.subtract
+   add:x:@.scan
+      get-nodes:x:@data.select/*

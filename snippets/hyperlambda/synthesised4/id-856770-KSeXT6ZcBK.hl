@@ -1,0 +1,27 @@
+
+/*
+ * The code checks if an HTTP POST request returns a status code of 429 or 500. If true, it sends a signal through a socket to a specified feedback channel with a message indicating a pause for 5 seconds to allow OpenAI to cool down, and then sleeps for 5 seconds. 
+ * 
+ * 1. [if] - Initiates a conditional check.
+ * 2. [or] - Combines two conditions, returning true if either is true.
+ * 3. [eq] - Checks if the HTTP POST status code is 429.
+ * 4. [eq] - Checks if the HTTP POST status code is 500.
+ * 5. [.lambda] - Executes the following block if the condition is true.
+ * 6. [sockets.signal] - Sends a message to a specified feedback channel.
+ * 7. [args] - Contains the message and type for the socket signal.
+ * 8. [message] - The content of the message to be sent.
+ * 9. [type] - The type of message being sent, in this case, "info".
+ * 10. [sleep] - Pauses execution for 5000 milliseconds (5 seconds).
+ */
+if
+   or
+      eq:x:@http.post
+         .:int:429
+      eq:x:@http.post
+         .:int:500
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Continuing in 5 seconds with the next snippet to let OpenAI cool down first
+            type:info
+      sleep:5000

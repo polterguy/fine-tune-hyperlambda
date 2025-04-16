@@ -1,0 +1,19 @@
+
+// This Hyperlambda code updates the "embedding" field of a database record in the "ml_training_snippets" table. It concatenates the embedding values from an HTTP POST response, formats them as a string, and then updates the database record where the ID matches. It also increments a "success" counter. The main slots used are [set-value], [strings.concat], [strings.join], [data.connect], [data.update], and [math.increment].
+else
+   .embedding
+   set-value:x:@.embedding
+      strings.concat
+         .:[
+         strings.join:x:@http.post/*/content/*/data/0/*/embedding/*
+            .:,
+         .:]
+   data.connect:[generic|magic]
+      data.update
+         table:ml_training_snippets
+         values
+            embedding:x:@.embedding
+         where
+            and
+               id.eq:x:@.dp/#/*/id
+   math.increment:x:@.success
