@@ -1,0 +1,37 @@
+
+// This Hyperlambda code iterates over input nodes to dynamically build a JSON schema for a request body. It checks if properties already exist in the schema, and if not, it creates them with their respective types and descriptions. If properties are added, they are appended to the main body node. The code uses slots like [for-each], [if], [not-exists], [exists], [set-value], [set-name], [add], and [unwrap] to perform these operations.
+else
+   .body
+      requestBody
+         content
+            application/json
+               schema
+                  type:object
+                  properties
+   for-each:x:@.dp/#/*/input/*
+      if
+         not-exists:x:"@.body/*/requestBody/*/content/*/*/schema/*/properties/*/\"{@.dp/#/*/name}\""
+         .lambda
+            .prop
+               name
+                  type
+            set-value:x:@.prop/*/*/type
+               get-value:x:@.dp/#/*/type
+            set-name:x:@.prop/*
+               get-value:x:@.dp/#/*/name
+            if
+               exists:x:@.dp/#/*/description
+               .lambda
+                  unwrap:x:+/*/*
+                  add:x:@.prop/*
+                     .
+                        description:x:@.dp/#/*/description
+            add:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+               get-nodes:x:@.prop/*
+   if
+      exists:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+      .lambda
+         add:x:+/*
+            get-nodes:x:@.body/*
+         add:x:@.buffer/*/*
+            .

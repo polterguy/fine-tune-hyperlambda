@@ -1,0 +1,91 @@
+
+/*
+ * This Hyperlambda code creates a task that checks the status of an OpenAI model training session every 30 seconds. It uses the [http.get] slot to retrieve the training status from OpenAI's API, using a Bearer token for authorization. If the HTTP response status code is between 200 and 300, it checks if the training status is "succeeded" or "failed". On success, it updates the database with the new model information and deletes the task. On failure, it logs an error and deletes the task. It also sends a WebSocket signal with the training result message. If the HTTP request fails, it logs an error with the response details.
+ * 
+ * 1. [tasks.create] - Creates a task that repeats every 30 seconds.
+ * 2. [.task-id] - Retrieves the task ID.
+ * 3. [.model-id] - Retrieves the model ID from the HTTP POST response.
+ * 4. [.type] - Retrieves the type from the arguments.
+ * 5. [.token] - Initializes a token for authorization.
+ * 6. [set-value] - Sets the token value by concatenating strings.
+ * 7. [strings.concat] - Concatenates strings to form the API URL.
+ * 8. [http.get] - Sends a GET request to OpenAI's API.
+ * 9. [if] - Checks if the HTTP status code is between 200 and 300.
+ * 10. [and] - Combines multiple conditions.
+ * 11. [mte] - Checks if the status code is more than or equal to 200.
+ * 12. [lt] - Checks if the status code is less than 300.
+ * 13. [eq] - Checks if the training status is "succeeded" or "failed".
+ * 14. [log.info] - Logs a success message.
+ * 15. [data.connect] - Connects to the database.
+ * 16. [data.update] - Updates the database with new model information.
+ * 17. [tasks.delete] - Deletes the task.
+ * 18. [sockets.signal] - Sends a WebSocket signal with a success or error message.
+ * 19. [log.error] - Logs an error message.
+ * 20. [lambda2hyper] - Converts the HTTP response to a Hyperlambda format for logging.
+ */
+tasks.create:x:@.task-id
+   repeats:30.seconds
+   .lambda
+      .task-id:x:@.lambda/@.task-id
+      .model-id:x:@http.post/*/content/*/id
+      .type:x:@.arguments/*/type
+      .token
+      set-value:x:@.token
+         strings.concat
+            .:"Bearer "
+            config.get:"magic:openai:key"
+      strings.concat
+         .:"https://api.openai.com/v1/fine-tunes/"
+         get-value:x:@.model-id
+      http.get:x:@strings.concat
+         headers
+            Authorization:x:@.token
+         convert:true
+      if
+         and
+            mte:x:@http.get
+               .:int:200
+            lt:x:@http.get
+               .:int:300
+         .lambda
+            if
+               eq:x:@http.get/*/content/*/status
+                  .:succeeded
+               .lambda
+                  log.info:Training of OpenAI model completed successfully
+                  data.connect:[generic|magic]
+                     data.update
+                        table:ml_types
+                        values
+                           model:x:@http.get/*/content/*/fine_tuned_model
+                        where
+                           and
+                              type.eq:x:@.type
+                     data.update
+                        table:ml_training_snippets
+                        values
+                           pushed:int:1
+                        where
+                           and
+                              type.eq:x:@.type
+                  tasks.delete:x:@.task-id
+                  sockets.signal:magic.backend.message
+                     roles:root
+                     args
+                        message:Training of your OpenAI model succeeded!
+                        type:success
+            else-if
+               eq:x:@http.get/*/content/*/status
+                  .:failed
+               .lambda
+                  log.error:Training of OpenAI model FAILED!!
+                  tasks.delete:x:@.task-id
+                  sockets.signal:magic.backend.message
+                     roles:root
+                     args
+                        message:Training of your OpenAI model FAILED!
+                        type:error
+      else
+         lambda2hyper:x:@http.get
+         log.error:Retrieving training session status from OpenAI failed
+            result:x:@lambda2hyper

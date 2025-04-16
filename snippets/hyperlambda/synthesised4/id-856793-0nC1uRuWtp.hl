@@ -1,0 +1,59 @@
+
+// This Hyperlambda code creates a table and its columns in a database. It starts by setting a primary key name using [strings.concat] and then executes a file to create the table with [execute-file]. It logs the table creation using [log.info]. It iterates over a CSV structure to determine the column type, setting it to "numeric" if no non-numeric characters are found. It then creates columns using another [execute-file] and logs the column creation with [log.info]. Key slots include [try], [set-value], [for-each], and [if].
+try
+   .pk
+   set-value:x:@.pk
+      strings.concat
+         get-value:x:@.table
+         .:_id
+   execute-file:/system/sql/ddl/table.post.hl
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+      pkName:x:@.pk
+      pkType:auto_increment
+      pkLength:int:10
+      pkDefault:
+   set-value:x:@.changes
+      .:bool:true
+   log.info:Table created
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+   for-each:x:@csv2lambda/0/*
+      .type:text
+      get-name:x:@.dp/#
+      .found:bool:false
+      for-each:x:@csv2lambda/*/*/{@get-name}
+         if
+            not
+               eq
+                  strings.replace-not-of:x:@.dp/#
+                     .:0123456789.
+                     .:
+                  get-value:x:@.dp/#
+            .lambda
+               set-value:x:@.found
+                  .:bool:true
+      if
+         eq:x:@.found
+            .:bool:false
+         .lambda
+            set-value:x:@.type
+               .:numeric
+      execute-file:/system/sql/ddl/column.post.hl
+         databaseType:x:@.arguments/*/databaseType
+         connectionString:x:@.arguments/*/connectionString
+         databaseName:x:@.arguments/*/databaseName
+         tableName:x:@.table
+         columnName:x:@get-name
+         columnType:x:@.type
+   get-count:x:@csv2lambda/0/*
+   log.info:Columns created
+      column_count:x:@get-count
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table

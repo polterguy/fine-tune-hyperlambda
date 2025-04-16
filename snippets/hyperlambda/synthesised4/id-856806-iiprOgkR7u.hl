@@ -1,0 +1,63 @@
+
+// This Hyperlambda code constructs a SQL string for table creation, iterating over primary key columns. It uses [for-each] to loop through columns, appending column definitions to a SQL string with [strings.concat]. It conditionally appends length and foreign key references based on database type using [if], [exists], and [not-null]. The code builds primary key and foreign key constraints, adjusting syntax for different databases. Key slots include [for-each], [if], [strings.concat], [exists], and [not-null].
+for-each:x:@.arguments/*/args/*/table1pk/*
+   if:x:@.first
+      set-value:x:@.first
+         .:bool:false
+      set-value:x:@.sql
+         strings.concat
+            get-value:x:@.sql
+            .:@"
+  "
+   else
+      set-value:x:@.sql
+         strings.concat
+            get-value:x:@.sql
+            .:@",
+  "
+   set-value:x:@.sql
+      strings.concat
+         get-value:x:@.sql
+         get-value:x:@.dp/#/*/name
+         .:" "
+         get-value:x:@.dp/#/*/type
+   if
+      and
+         exists:x:@.dp/#/*/length
+         not-null:x:@.dp/#/*/length
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:(
+               get-value:x:@.dp/#/*/length
+               .:)
+   if
+      neq:x:@.arguments/*/databaseType
+         .:mysql
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" references "
+               get-value:x:@.arguments/*/args/*/table1
+               .:" ("
+               get-value:x:@.dp/#/*/name
+               .:)
+   else
+      set-value:x:@.fk
+         strings.concat
+            get-value:x:@.fk
+            .:@",
+ foreign key ("
+            get-value:x:@.dp/#/*/name
+            .:") references "
+            get-value:x:@.arguments/*/args/*/table1
+            .:" ("
+            get-value:x:@.dp/#/*/name
+            .:)
+   set-value:x:@.pk
+      strings.concat
+         get-value:x:@.pk
+         get-value:x:@.dp/#/*/name
+         .:,

@@ -1,0 +1,105 @@
+
+// This Hyperlambda code defines a dynamic slot named "magic.ai.send-lead-email" that sends an email using SMTP settings if valid. It validates mandatory arguments, constructs an email body from database records, and sends the email to specified lead emails. If SMTP settings are invalid, it logs an error and returns false. Key slots include [validators.mandatory] for argument validation, [strings.split] and [strings.concat] for string manipulation, [data.connect] and [data.read] for database interaction, and [mail.smtp.send] for sending the email.
+slots.create:magic.ai.send-lead-email
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/prompt
+   validators.mandatory:x:@.arguments/*/session
+   validators.mandatory:x:@.arguments/*/user_id
+   validators.mandatory:x:@.arguments/*/lead_email
+   validators.mandatory:x:@.arguments/*/contact_us
+   try
+      config.get:"magic:smtp:host"
+      if
+         and
+            not-null:x:@config.get
+            neq:x:@config.get
+               .:
+         .lambda
+            .email
+            strings.split:x:@.arguments/*/prompt
+               .:@
+            strings.split:x:@strings.split/0
+               .:" "
+            strings.split:x:@strings.split/@strings.split/1
+               .:" "
+            set-value:x:@.email
+               strings.concat
+                  get-value:x:@strings.split/@strings.split/0/-
+                  .:@
+                  get-value:x:@strings.split/0
+            set-value:x:@.email
+               strings.trim:x:@.email
+                  .:.,-
+            validators.email:x:@.email
+            .body:
+            data.connect:[generic|magic]
+               data.read
+                  table:ml_requests
+                  columns
+                     prompt
+                     completion
+                  where
+                     and
+                        session.eq:x:@.arguments/*/session
+               for-each:x:@data.read/*
+                  set-value:x:@.body
+                     strings.concat
+                        get-value:x:@.body
+                        .:<strong>
+                        get-value:x:@.dp/#/*/prompt
+                        .:</strong>
+                        .:<br>
+                        .:<div>
+                        get-value:x:@.dp/#/*/completion
+                        .:</div>
+                        .:<br>
+               set-value:x:@.body
+                  strings.concat
+                     get-value:x:@.body
+                     .:<strong>
+                     get-value:x:@.arguments/*/prompt
+                     .:</strong>
+                     .:<br>
+                     .:<div>
+                     get-value:x:@.arguments/*/contact_us
+                     .:</div>
+               strings.split:x:@.arguments/*/lead_email
+                  .:,
+               for-each:x:@strings.split/*
+                  strings.trim:x:@.dp/#
+                     .:" "
+                  unwrap:x:+/*/*/*
+                  add:x:../**/mail.smtp.send/*/message/*/to
+                     .
+                        .
+                           name:AINIRO Lead Inbox
+                           email:x:@strings.trim
+               data.create
+                  table:ml_requests
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@.arguments/*/prompt
+                     completion:x:@.arguments/*/contact_us
+                     finish_reason:lead
+                     session:x:@.arguments/*/session
+                     user_id:x:@.arguments/*/user_id
+            unwrap:x:+/**/content
+            mail.smtp.send
+               message
+                  to
+                  reply-to
+                     .
+                        name:Lead
+                        email:x:@.email
+                  subject:Chatbot lead
+                  entity:text/html
+                     content:x:@.body
+            log.info:Lead was generated
+            return:bool:true
+      else
+         return:bool:false
+   .catch
+      log.error:SMTP settings not valid
+         message:x:@.arguments/*/message
+         extra:To use lead generation with AINIRO, please apply a valid SMTP configuration.
+      return:bool:false

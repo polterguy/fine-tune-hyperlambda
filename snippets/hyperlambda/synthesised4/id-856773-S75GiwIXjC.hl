@@ -1,0 +1,53 @@
+
+// This Hyperlambda code connects to a database, retrieves records from the "ml_requests" table based on a session argument, and constructs an HTML formatted body from the retrieved prompts and completions. It then processes a list of lead emails, trimming spaces and adding them to an SMTP message's "to" field. Finally, it creates a new record in the "ml_requests" table with specified values from the arguments. Key slots include [data.connect], [data.read], [for-each], [set-value], [strings.concat], [strings.split], [strings.trim], [unwrap], [add], and [data.create].
+data.connect:[generic|magic]
+   data.read
+      table:ml_requests
+      columns
+         prompt
+         completion
+      where
+         and
+            session.eq:x:@.arguments/*/session
+   for-each:x:@data.read/*
+      set-value:x:@.body
+         strings.concat
+            get-value:x:@.body
+            .:<strong>
+            get-value:x:@.dp/#/*/prompt
+            .:</strong>
+            .:<br>
+            .:<div>
+            get-value:x:@.dp/#/*/completion
+            .:</div>
+            .:<br>
+   set-value:x:@.body
+      strings.concat
+         get-value:x:@.body
+         .:<strong>
+         get-value:x:@.arguments/*/prompt
+         .:</strong>
+         .:<br>
+         .:<div>
+         get-value:x:@.arguments/*/contact_us
+         .:</div>
+   strings.split:x:@.arguments/*/lead_email
+      .:,
+   for-each:x:@strings.split/*
+      strings.trim:x:@.dp/#
+         .:" "
+      unwrap:x:+/*/*/*
+      add:x:../**/mail.smtp.send/*/message/*/to
+         .
+            .
+               name:AINIRO Lead Inbox
+               email:x:@strings.trim
+   data.create
+      table:ml_requests
+      values
+         type:x:@.arguments/*/type
+         prompt:x:@.arguments/*/prompt
+         completion:x:@.arguments/*/contact_us
+         finish_reason:lead
+         session:x:@.arguments/*/session
+         user_id:x:@.arguments/*/user_id

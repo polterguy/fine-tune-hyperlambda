@@ -1,0 +1,28 @@
+
+// This code checks if the user is authenticated using [auth.ticket.get] and iterates over data nodes with [for-each]. It adds nodes to [.models] if the user has the "root" role, or if the [auth] node is null or empty. Otherwise, it splits the [auth] node's value by commas, trims spaces, and checks if the user's roles match any of the split values, adding nodes to [.models] if conditions are met. The code uses [not-null], [or], [exists], [null], [eq], [strings.split], [strings.trim], and [and] for conditional logic.
+if
+   not-null:x:@auth.ticket.get
+   .lambda
+      for-each:x:@data.read/*
+         if
+            or
+               exists:x:@auth.ticket.get/*/roles/*/=root
+               null:x:@.dp/#/*/auth
+               eq:x:@.dp/#/*/auth
+                  .:
+            .lambda
+               add:x:@.models
+                  get-nodes:x:@.dp/#
+         else
+            strings.split:x:@.dp/#/*/auth
+               .:,
+            for-each:x:@strings.split/*
+               strings.trim:x:@.dp/#
+                  .:" \t"
+               if
+                  and
+                     exists:x:@auth.ticket.get/*/roles/*/={@strings.trim}
+                     not-exists:x:"@.models/*/*/type/\"={@for-each/@.dp/#/*/type}\""
+                  .lambda
+                     add:x:@.models
+                        get-nodes:x:@for-each/@.dp/#

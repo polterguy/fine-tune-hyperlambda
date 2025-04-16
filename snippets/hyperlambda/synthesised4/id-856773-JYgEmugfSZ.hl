@@ -1,0 +1,115 @@
+
+/*
+ * This Hyperlambda code attempts to send an email with lead information if the SMTP host configuration is available and valid. It extracts the email from the prompt, validates it, and constructs the email body by reading data from a database. The email is sent to multiple recipients, and the lead information is logged and stored in the database. If the SMTP host is not configured, it returns false. 
+ * 
+ * 1. [try] - Attempts to execute the following nodes, catching any exceptions.
+ * 2. [config.get] - Retrieves the SMTP host configuration.
+ * 3. [if] - Checks if the SMTP host is not null and not empty.
+ * 4. [.email] - Initializes an email variable.
+ * 5. [strings.split] - Splits the prompt to extract the email.
+ * 6. [set-value] - Sets the extracted email to the [.email] node.
+ * 7. [validators.email] - Validates the extracted email.
+ * 8. [.body] - Initializes the email body.
+ * 9. [data.connect] - Connects to a database.
+ * 10. [data.read] - Reads data from the "ml_requests" table.
+ * 11. [for-each] - Iterates over the retrieved data to construct the email body.
+ * 12. [strings.split] - Splits the lead email addresses.
+ * 13. [for-each] - Iterates over the split email addresses.
+ * 14. [add] - Adds recipients to the email.
+ * 15. [data.create] - Inserts a new record into the "ml_requests" table.
+ * 16. [unwrap] - Unwraps the content for the email.
+ * 17. [mail.smtp.send] - Sends the constructed email.
+ * 18. [log.info] - Logs that a lead was generated.
+ * 19. [return] - Returns true if the email was sent, else false.
+ */
+try
+   config.get:"magic:smtp:host"
+   if
+      and
+         not-null:x:@config.get
+         neq:x:@config.get
+            .:
+      .lambda
+         .email
+         strings.split:x:@.arguments/*/prompt
+            .:@
+         strings.split:x:@strings.split/0
+            .:" "
+         strings.split:x:@strings.split/@strings.split/1
+            .:" "
+         set-value:x:@.email
+            strings.concat
+               get-value:x:@strings.split/@strings.split/0/-
+               .:@
+               get-value:x:@strings.split/0
+         set-value:x:@.email
+            strings.trim:x:@.email
+               .:.,-
+         validators.email:x:@.email
+         .body:
+         data.connect:[generic|magic]
+            data.read
+               table:ml_requests
+               columns
+                  prompt
+                  completion
+               where
+                  and
+                     session.eq:x:@.arguments/*/session
+            for-each:x:@data.read/*
+               set-value:x:@.body
+                  strings.concat
+                     get-value:x:@.body
+                     .:<strong>
+                     get-value:x:@.dp/#/*/prompt
+                     .:</strong>
+                     .:<br>
+                     .:<div>
+                     get-value:x:@.dp/#/*/completion
+                     .:</div>
+                     .:<br>
+            set-value:x:@.body
+               strings.concat
+                  get-value:x:@.body
+                  .:<strong>
+                  get-value:x:@.arguments/*/prompt
+                  .:</strong>
+                  .:<br>
+                  .:<div>
+                  get-value:x:@.arguments/*/contact_us
+                  .:</div>
+            strings.split:x:@.arguments/*/lead_email
+               .:,
+            for-each:x:@strings.split/*
+               strings.trim:x:@.dp/#
+                  .:" "
+               unwrap:x:+/*/*/*
+               add:x:../**/mail.smtp.send/*/message/*/to
+                  .
+                     .
+                        name:AINIRO Lead Inbox
+                        email:x:@strings.trim
+            data.create
+               table:ml_requests
+               values
+                  type:x:@.arguments/*/type
+                  prompt:x:@.arguments/*/prompt
+                  completion:x:@.arguments/*/contact_us
+                  finish_reason:lead
+                  session:x:@.arguments/*/session
+                  user_id:x:@.arguments/*/user_id
+         unwrap:x:+/**/content
+         mail.smtp.send
+            message
+               to
+               reply-to
+                  .
+                     name:Lead
+                     email:x:@.email
+               subject:Chatbot lead
+               entity:text/html
+                  content:x:@.body
+         log.info:Lead was generated
+         return:bool:true
+   else
+      return:bool:false

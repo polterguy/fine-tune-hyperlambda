@@ -1,0 +1,134 @@
+
+// This Hyperlambda script initializes and manages a database connection based on the default database type from the configuration, handling both database creation and migration scripts execution. It checks for database corruption, especially for SQLite, and restores from a backup if necessary. Additionally, it sets up a daily backup task for SQLite databases and executes startup Hyperlambda files. The script uses slots like [set-value], [signal], [if], [else-if], [try], [catch], [for-each], and [tasks.create] to achieve these operations.
+hyper2lambda
+   .db-type
+   set-value:x:@.db-type
+      config.get:"magic:databases:default"
+   .corrupt:bool:false
+   .slot
+   set-value:x:@.slot
+      strings.concat
+         .:magic.db.
+         get-value:x:@.db-type
+         .:.databases
+   signal:x:@.slot
+   if
+      not
+         exists:x:@signal/*/*/=magic
+      .lambda
+         strings.concat
+            .:/misc/
+            get-value:x:@.db-type
+            .:/magic.sql
+         io.file.load:x:@strings.concat
+         console.log:Trying to create Magic database
+         switch:x:@.db-type
+            case:mssql
+               mssql.connect
+                  mssql.execute-batch:x:@io.file.load
+            case:pgsql
+               pgsql.connect:[generic|postgres]
+                  pgsql.execute:create database magic
+               pgsql.connect:[generic|magic]
+                  pgsql.execute:x:@io.file.load
+            case:mysql
+               mysql.connect
+                  mysql.execute:x:@io.file.load
+            case:sqlite
+               sqlite.connect:[generic|magic]
+                  sqlite.execute:x:@io.file.load
+         console.log:Magic databases was successfully created
+   else-if
+      eq:x:@.db-type
+         .:sqlite
+      .lambda
+         try
+            data.connect:[generic|magic]
+               data.select:select count(*) from log_entries
+            console.log:Successfully connected to magic database
+         .catch
+            console.log:Magic database is corrupted
+            if
+               io.file.exists:/data/magic.backup
+               .lambda
+                  sqlite.connections.flush
+                  io.file.delete:/data/magic.db
+                  io.file.copy:/data/magic.backup
+                     .:/data/magic.db
+                  console.log:Reverted to backup of magic database
+                  set-value:x:@.corrupt
+                     .:bool:true
+   strings.concat
+      .:/misc/
+      get-value:x:@.db-type
+      .:/migrations/
+   io.file.list:x:@strings.concat
+   data.connect:[generic|magic]
+      for-each:x:@io.file.list/*
+         if
+            strings.ends-with:x:@.dp/#
+               .:.sql
+            .lambda
+               io.file.load:x:@.dp/#
+               try
+                  if
+                     eq
+                        get-value:x:@.db-type
+                        .:mssql
+                     .lambda
+                        set-name:x:@if/./*/data.execute
+                           .:mssql.execute-batch
+                  data.execute:x:@io.file.load
+                  strings.concat
+                     .:"Script '"
+                     get-value:x:@.dp/#
+                     .:"' succeeded"
+                  console.log:x:@strings.concat
+               .catch
+                  strings.concat
+                     .:"Script '"
+                     get-value:x:@.dp/#
+                     .:"' failed"
+                  console.log:x:@strings.concat
+                  console.log:x:@.arguments/*/message
+   io.file.list-recursively:/misc/common-startup-files/
+   for-each:x:@io.file.list-recursively/*
+      if
+         strings.ends-with:x:@.dp/#
+            .:.hl
+         .lambda
+            io.file.execute:x:@.dp/#
+            strings.concat
+               .:"Hyperlambda file '"
+               get-value:x:@.dp/#
+               .:"' successfully executed"
+            console.log:x:@strings.concat
+   if
+      eq
+         config.get:"magic:databases:default"
+         .:sqlite
+      .lambda
+         tasks.list:sqlite.create-backup
+         if
+            exists:x:@tasks.list/*
+            .lambda
+               tasks.delete:sqlite.create-backup
+         tasks.create:sqlite.create-backup
+            description:Creates a backup of your magic database 1AM UTC time every day.
+            repeats:**.**.01.00.00
+            .lambda
+               data.connect:[generic|magic]
+                  if
+                     io.file.exists:/data/magic.backup
+                     .lambda
+                        io.file.delete:/data/magic.backup
+                  sqlite.backup:magic.backup
+                  sqlite.connections.flush
+                  log.info:Created backup of magic database
+         console.log:Successfully created database backup task that creates a backup of magic.db 1AM UTC every day
+         if
+            eq:x:@.corrupt
+               .:bool:false
+            .lambda
+               tasks.execute:sqlite.create-backup
+               console.log:Executed task that creates backup of magic database

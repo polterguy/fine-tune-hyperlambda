@@ -1,0 +1,42 @@
+
+/*
+ * The code iterates over nodes returned by a lambda expression and checks if they contain complex objects. If complex objects are found, it sets a warning message. It then constructs an expression string for each node and checks if this expression already exists in a list of candidates. If not, it adds the expression to the candidates list, marking it as complete. 
+ * 
+ * 1. [else] - Default case executed if previous conditions are false.
+ * 2. [for-each] - Iterates over nodes returned by a lambda expression.
+ * 3. [if] - Checks if the current node contains complex objects.
+ * 4. [exists] - Determines if complex objects exist in the current node.
+ * 5. [set-value] - Sets a warning message if complex objects are found.
+ * 6. [.x] - Temporary node for constructing an expression string.
+ * 7. [strings.concat] - Concatenates parts of an expression string.
+ * 8. [get-value] - Retrieves the name of a node for the expression.
+ * 9. [get-name] - Gets the name of the current node.
+ * 10. [if] - Checks if the constructed expression already exists in candidates.
+ * 11. [not-exists] - Ensures the expression is not already in candidates.
+ * 12. [unwrap] - Evaluates expressions in the current context.
+ * 13. [add] - Adds the new expression to the candidates list if not present.
+ */
+else
+   for-each:x:@hyper2lambda/**/[yield|return|return-nodes]/*
+      if
+         exists:x:@.dp/#/*
+         .lambda
+            set-value:x:@.warning
+               .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+      .x
+      set-value:x:@.x
+         strings.concat
+            .:--/execute/=
+            get-value:x:@.dp/@.dp/#/*/name
+            .:/*/
+            get-name:x:@.dp/#
+      if
+         not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:../*/return/*/candidates
+               .
+                  .
+                     name:x:@.x
+                     expression:x:@.x
+                     complete:bool:true

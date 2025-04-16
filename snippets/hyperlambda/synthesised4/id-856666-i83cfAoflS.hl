@@ -1,0 +1,120 @@
+
+/*
+ * This Hyperlambda code defines a data retrieval process with dynamic filtering and ordering for a table named "ml_training_snippets". It verifies authentication, connects to a database, and constructs a query based on provided arguments for filtering and ordering. The code processes the "embedding_vss" field to set boolean values based on its presence and calculates token counts for "prompt" and "completion" fields using OpenAI's tokenization. The final result is returned as nodes. 
+ * 
+ * 1. [.arguments] - Defines the arguments for filtering and ordering the data query.
+ * 2. [auth.ticket.verify] - Verifies the authentication ticket for root access.
+ * 3. [data.connect] - Connects to the "magic" database.
+ * 4. [if] - Checks conditions for modifying the "order" argument.
+ * 5. [add] - Adds nodes to the data query for ordering and filtering.
+ * 6. [remove-nodes] - Removes nodes from arguments after processing.
+ * 7. [data.read] - Specifies the table and columns to be retrieved.
+ * 8. [for-each] - Iterates over the data read results.
+ * 9. [not-null] - Checks if "embedding_vss" is not null.
+ * 10. [set-value] - Sets boolean values for "embedding_vss".
+ * 11. [strings.concat] - Concatenates "prompt" and "completion" fields.
+ * 12. [openai.tokenize] - Tokenizes the concatenated string.
+ * 13. [unwrap] - Unwraps the tokenization result.
+ * 14. [return-nodes] - Returns the final data read results.
+ */
+hyper2lambda
+   .arguments
+      limit:long
+      offset:long
+      order:string
+      direction:string
+      ml_training_snippets.id.eq:long
+      ml_training_snippets.id.mt:long
+      ml_training_snippets.id.lt:long
+      ml_training_snippets.type.like:string
+      ml_training_snippets.type.eq:string
+      ml_training_snippets.pushed.eq:long
+      ml_training_snippets.uri.like:string
+      ml_training_snippets.uri.eq:string
+      ml_training_snippets.prompt.like:string
+      ml_training_snippets.prompt.eq:string
+      ml_training_snippets.completion.like:string
+      ml_training_snippets.completion.eq:string
+   auth.ticket.verify:root
+   data.connect:[generic|magic]
+      if
+         and
+            exists:x:@.arguments/*/order
+            eq:x:@.arguments/*/order
+               .:tokens
+         .lambda
+            set-value:x:@.arguments/*/order
+               .:length(prompt || completion)
+      add:x:./*/data.read
+         get-nodes:x:@.arguments/*/order
+         get-nodes:x:@.arguments/*/direction
+      remove-nodes:x:@.arguments/*/order
+      remove-nodes:x:@.arguments/*/direction
+      add:x:./*/data.read
+         get-nodes:x:@.arguments/*/limit
+         get-nodes:x:@.arguments/*/offset
+      remove-nodes:x:@.arguments/*/limit
+      remove-nodes:x:@.arguments/*/offset
+      add:x:./*/data.read/*/where/*/*/or
+         get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+         get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+         get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+         get-nodes:x:@.arguments/*/ml_training_snippets.completion.eq
+         get-nodes:x:@.arguments/*/ml_training_snippets.prompt.eq
+         get-nodes:x:@.arguments/*/ml_training_snippets.uri.eq
+         get-nodes:x:@.arguments/*/ml_training_snippets.id.eq
+         get-nodes:x:@.arguments/*/ml_training_snippets.id.lt
+         get-nodes:x:@.arguments/*/ml_training_snippets.id.mt
+      remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+      remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+      remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+      remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.eq
+      remove-nodes:x:@.arguments/*/ml_training_snippets.completion.eq
+      remove-nodes:x:@.arguments/*/ml_training_snippets.uri.eq
+      remove-nodes:x:@.arguments/*/ml_training_snippets.id.eq
+      remove-nodes:x:@.arguments/*/ml_training_snippets.id.lt
+      remove-nodes:x:@.arguments/*/ml_training_snippets.id.mt
+      add:x:./*/data.read/*/where/*
+         get-nodes:x:@.arguments/*
+      if
+         not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
+         .lambda
+            remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
+      data.read
+         table:ml_training_snippets
+         columns
+            ml_training_snippets.id
+            ml_training_snippets.created
+            ml_training_snippets.type
+            ml_training_snippets.pushed
+            ml_training_snippets.uri
+            ml_training_snippets.prompt
+            ml_training_snippets.completion
+            ml_training_snippets.embedding
+               as:embedding_vss
+            ml_training_snippets.cached
+            ml_training_snippets.meta
+         where
+            and
+               or
+      for-each:x:@data.read/*
+         if
+            not-null:x:@.dp/#/*/embedding_vss
+            .lambda
+               set-value:x:@.dp/#/*/embedding_vss
+                  .:bool:true
+         else
+            set-value:x:@.dp/#/*/embedding_vss
+               .:bool:false
+         strings.concat
+            get-value:x:@.dp/#/*/prompt
+            .:@"
+
+"
+            get-value:x:@.dp/#/*/completion
+         openai.tokenize:x:@strings.concat
+         unwrap:x:+/*/*
+         add:x:@.dp/#
+            .
+               tokens:x:@openai.tokenize
+      return-nodes:x:@data.read/*

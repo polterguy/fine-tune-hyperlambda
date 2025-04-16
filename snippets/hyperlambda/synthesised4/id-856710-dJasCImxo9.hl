@@ -1,0 +1,42 @@
+
+/*
+ * The code iterates through folders and files, splitting folder paths and recursively loading files. It checks if files end with ".hl" and converts them to a lambda structure, counting lines of code and files. The results are then structured into a new node hierarchy with metrics for each folder.
+ * 
+ * 1. [for-each] - Iterates through each folder listed by [io.folder.list].
+ * 2. [strings.split] - Splits each folder path by '/'.
+ * 3. [unwrap] - Evaluates the split paths.
+ * 4. [signal] - Loads files recursively within each folder.
+ * 5. [.loc] - Initializes the line of code counter.
+ * 6. [.files] - Initializes the file counter.
+ * 7. [for-each] - Iterates through each file loaded.
+ * 8. [if] - Checks if the file ends with ".hl".
+ * 9. [hyper2lambda] - Converts the file content to a lambda structure.
+ * 10. [math.increment] - Increments the line of code and file counters.
+ * 11. [set-name] - Sets the name of the node to the last part of the folder path.
+ * 12. [add] - Adds the metrics to a new node hierarchy.
+ */
+for-each:x:@io.folder.list/*
+   strings.split:x:@.dp/#
+      .:/
+   unwrap:x:+/*
+   signal:magic.io.file.load-recursively
+      .:x:@.dp/#
+   .loc:int:0
+   .files:int:0
+   for-each:x:@signal/*
+      if
+         strings.ends-with:x:@.dp/#
+            .:.hl
+         .lambda
+            hyper2lambda:x:@.dp/#/0
+            math.increment:x:@.loc
+               get-count:x:@hyper2lambda/**
+            math.increment:x:@.files
+   unwrap:x:+/+/*/*/*
+   set-name:x:+/*/*
+      get-value:x:@strings.split/0/-
+   add:x:@.lambda/*/lambda2hyper/*/modules
+      .
+         foo
+            loc:x:@.loc
+            files:x:@.files

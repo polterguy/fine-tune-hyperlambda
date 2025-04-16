@@ -1,0 +1,40 @@
+
+/*
+ * This Hyperlambda code checks if there are any nodes under [data.read], and if so, it executes an authentication process without password verification using the [magic.auth.authenticate] slot. It then connects to a "magic" database to read from the "users_extra" table, filtering by email or name type. For each result, it sets the name and value based on the type and value fields, and appends these to an [extra] node. Finally, it yields a ticket and the extra data. 
+ * 1. [if] - Checks if there are any nodes under [data.read].
+ * 2. [exists] - Verifies the existence of nodes under [data.read].
+ * 3. [execute] - Authenticates a user without password verification.
+ * 4. [data.connect] - Connects to the "magic" database.
+ * 5. [data.read] - Reads from the "users_extra" table with specific conditions.
+ * 6. [for-each] - Iterates over each result from [data.read].
+ * 7. [set-name] - Sets the name based on the type field.
+ * 8. [set-value] - Sets the value based on the value field.
+ * 9. [add] - Appends the processed data to the [extra] node.
+ * 10. [yield] - Returns the authentication ticket and extra data.
+ */
+if
+   exists:x:@data.read/*
+   .lambda
+      execute:magic.auth.authenticate
+         password-check:bool:false
+         username:x:@auth.token.verify/*/email
+      data.connect:magic
+         data.read
+            table:users_extra
+            where
+               and
+                  user.eq:x:@auth.token.verify/*/email
+                  or
+                     type.eq:name
+                     type.eq:email
+         for-each:x:@data.read/*
+            set-name:x:./*/add/*/*
+               get-value:x:@.dp/#/*/type
+            set-value:x:./*/add/*/*
+               get-value:x:@.dp/#/*/value
+            add:x:@.extra
+               .
+                  .
+      yield
+         ticket:x:@execute/*/ticket
+         extra:x:@.extra/*

@@ -1,0 +1,28 @@
+
+// This Hyperlambda code checks if a specific signal does not exist and, if so, attempts to create a "Magic" database. It concatenates a file path based on the database type and loads a SQL file. Depending on the database type (mssql, pgsql, mysql, sqlite), it connects to the respective database and executes the SQL commands from the loaded file. It logs messages before and after attempting to create the database to indicate the process's progress.
+if
+   not
+      exists:x:@signal/*/*/=magic
+   .lambda
+      strings.concat
+         .:/misc/
+         get-value:x:@.db-type
+         .:/magic.sql
+      io.file.load:x:@strings.concat
+      console.log:Trying to create Magic database
+      switch:x:@.db-type
+         case:mssql
+            mssql.connect
+               mssql.execute-batch:x:@io.file.load
+         case:pgsql
+            pgsql.connect:[generic|postgres]
+               pgsql.execute:create database magic
+            pgsql.connect:[generic|magic]
+               pgsql.execute:x:@io.file.load
+         case:mysql
+            mysql.connect
+               mysql.execute:x:@io.file.load
+         case:sqlite
+            sqlite.connect:[generic|magic]
+               sqlite.execute:x:@io.file.load
+      console.log:Magic databases was successfully created

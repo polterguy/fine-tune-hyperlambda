@@ -1,0 +1,44 @@
+
+// This Hyperlambda code iterates over nodes and checks for the existence of complex objects, setting a warning if found. It constructs expressions for node references and adds them to a list of candidates if they don't already exist. The code uses [for-each] to iterate nodes, [if] to check conditions, [set-value] to set node values, [strings.concat] to build expressions, [not-exists] to ensure uniqueness, and [add] to append new candidates.
+else
+   for-each:x:@.dp/#/*
+      if
+         exists:x:@.dp/#/*
+         .lambda
+            set-value:x:@.warning
+               .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+      .x
+      set-value:x:@.x
+         strings.concat
+            .:@
+            get-value:x:@.node-name
+            .:/*/
+            get-name:x:@.dp/#
+      if
+         not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:../*/return/*/candidates
+               .
+                  .
+                     name:x:@.x
+                     expression:x:@.x
+                     complete:bool:true
+   if
+      not-null:x:@.dp/#
+      .lambda
+         .x
+         set-value:x:@.x
+            strings.concat
+               .:@
+               get-value:x:@.node-name
+         if
+            not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+            .lambda
+               unwrap:x:+/*/*/*
+               add:x:../*/return/*/candidates
+                  .
+                     .
+                        name:x:@.x
+                        expression:x:@.x
+                        complete:bool:true
