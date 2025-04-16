@@ -1,0 +1,62 @@
+
+// This Hyperlambda code checks the HTTP status code from a [http.get] request. If the status is not between 200 and 299, it handles HTTP 301 or 302 redirects by attempting to switch from HTTP to HTTPS, signaling a feedback channel, and retrying the request. If the URL starts with "http://", it replaces it with "https://", adds headers, and executes a new request. For other redirects, it constructs a message with the new location, signals the feedback channel, and retries. If the status code is not handled, it logs an error and throws an exception with the status code.
+if
+   not
+      and
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+   .lambda
+      if
+         or
+            eq:x:@http.get
+               .:int:301
+            eq:x:@http.get
+               .:int:302
+         .lambda
+            if
+               strings.starts-with:x:@.arguments/*/url
+                  .:"http://"
+               .lambda
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:Page moved to, trying SSL equivalent
+                        type:info
+                  sleep:100
+                  strings.replace:x:@.arguments/*/url
+                     .:"http://"
+                     .:"https://"
+                  add:x:+/*/headers
+                     get-nodes:x:@.arguments/*/headers/*
+                  execute:magic.ai.url.get
+                     url:x:@strings.replace
+                     headers
+                  return:x:-
+            else
+               strings.concat
+                  .:"Page moved to '"
+                  get-value:x:@http.get/*/headers/*/Location
+                  .:"', trying alternative location"
+               unwrap:x:+/**
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:x:@strings.concat
+                     type:info
+               sleep:100
+               add:x:+/+/*/headers
+                  get-nodes:x:@.arguments/*/headers/*
+               add:x:+
+                  get-nodes:x:@.arguments/*/feedback-channel
+               execute:magic.ai.url.get
+                  url:x:@http.get/*/headers/*/Location
+                  headers
+               return:x:-
+      else
+         log.error:Something went wrong while trying to get URL
+            url:x:@.arguments/*/url
+            status:x:@http.get
+         strings.concat
+            .:"HTTP invocation returned status code "
+            get-value:x:@http.get
+         throw:x:-

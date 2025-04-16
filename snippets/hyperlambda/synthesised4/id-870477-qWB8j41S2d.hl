@@ -1,0 +1,43 @@
+
+/*
+ * This Hyperlambda code iterates through all files in a directory recursively, checking if they end with ".hl". If so, it loads the file, converts it to a lambda structure, and processes each node. It checks if the node's name exists in a vocabulary, and if it doesn't exist in the result, it adds it with a count of one. If it does exist, it increments the count. The code effectively counts occurrences of node names from the vocabulary in Hyperlambda files. 
+ * 
+ * 1. [for-each] - Iterates through each file in the directory.
+ * 2. [if] - Checks if the file ends with ".hl".
+ * 3. [io.file.load] - Loads the content of the file.
+ * 4. [hyper2lambda] - Converts the file content to a lambda structure.
+ * 5. [for-each] - Iterates through each node in the lambda structure.
+ * 6. [get-name] - Retrieves the name of the current node.
+ * 7. [if] - Checks if the node's name exists in the vocabulary.
+ * 8. [if] - Checks if the node's name doesn't exist in the result.
+ * 9. [set-name] - Sets the name of the node in the result.
+ * 10. [add] - Adds a new node with a count of one to the result.
+ * 11. [else] - Executes if the node's name exists in the result.
+ * 12. [set-value] - Increments the count of the node's name in the result.
+ */
+for-each:x:@io.file.list-recursively/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+         io.file.load:x:@.dp/#
+         hyper2lambda:x:@io.file.load
+            comments:true
+         for-each:x:@hyper2lambda/*/**
+            get-name:x:@.dp/#
+            if
+               exists:x:@vocabulary/*/={@get-name}
+               .lambda
+                  if
+                     not-exists:x:@.result/*/{@get-name}
+                     .lambda
+                        set-name:x:+/*/*
+                           get-value:x:@get-name
+                        add:x:@.result
+                           .
+                              .:int:1
+                  else
+                     set-value:x:@.result/*/{@get-name}
+                        math.add
+                           get-value:x:@.result/*/{@get-name}
+                           .:int:1

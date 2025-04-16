@@ -1,0 +1,46 @@
+
+// This code handles HTTP redirection responses, specifically status codes 301 and 302. If the original URL starts with "http://", it attempts an SSL connection by replacing "http://" with "https://". If the URL does not start with "http://", it tries the location provided in the redirection headers. Feedback is sent through a socket signal, and the process includes a brief pause before retrying the connection. The headers from the original request are preserved and reused in the subsequent requests.
+if
+   or
+      eq:x:@http.get
+         .:int:301
+      eq:x:@http.get
+         .:int:302
+   .lambda
+      if
+         strings.starts-with:x:@.arguments/*/url
+            .:"http://"
+         .lambda
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Page moved to, trying SSL equivalent
+                  type:info
+            sleep:100
+            strings.replace:x:@.arguments/*/url
+               .:"http://"
+               .:"https://"
+            add:x:+/*/headers
+               get-nodes:x:@.arguments/*/headers/*
+            execute:magic.ai.url.get
+               url:x:@strings.replace
+               headers
+            return:x:-
+      else
+         strings.concat
+            .:"Page moved to '"
+            get-value:x:@http.get/*/headers/*/Location
+            .:"', trying alternative location"
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         sleep:100
+         add:x:+/+/*/headers
+            get-nodes:x:@.arguments/*/headers/*
+         add:x:+
+            get-nodes:x:@.arguments/*/feedback-channel
+         execute:magic.ai.url.get
+            url:x:@http.get/*/headers/*/Location
+            headers
+         return:x:-

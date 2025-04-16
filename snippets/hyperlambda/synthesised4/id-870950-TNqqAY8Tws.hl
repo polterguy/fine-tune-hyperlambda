@@ -1,0 +1,26 @@
+
+// The code iterates over a list of files, checking if each file ends with ".sql". If true, it loads the file and attempts to execute it as a database migration script. It checks if the database type is "mssql" to use "mssql.execute-batch" for execution. Successful execution logs an info message, while errors are caught and logged as errors, setting a result flag to false.
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         io.file.load:x:@.dp/#
+         try
+            data.connect:x:@.arguments/*/database
+               if
+                  eq
+                     get-value:x:@.database-type
+                     .:mssql
+                  .lambda
+                     set-name:x:@data.connect/*/data.execute
+                        .:mssql.execute-batch
+               data.execute:x:@io.file.load
+               log.info:Database migration script successfully executed
+                  script:x:@.dp/#
+         .catch
+            log.error:Something went wrong as we tried to execute plugin database migration script
+               script:x:@.dp/#
+               error:x:@.arguments/*/message
+            set-value:x:@.result
+               .:bool:false

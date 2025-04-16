@@ -1,0 +1,41 @@
+
+// This Hyperlambda code iterates over a set of nodes, converting and processing Hyperlambda code with OpenAI's GPT-4o model, and finally saving the results. It uses [for-each] to iterate through nodes, [hyper2lambda] to transform code, and [lambda2hyper] to convert it back. It logs the process with [log.info], executes workflows with [execute], and saves results using [io.file.save]. The code also includes a [sleep] to pause execution.
+for-each:x:@data.select/*
+   hyper2lambda:x:@.dp/#/*/code
+      comments:true
+   unwrap:x:+/*/*
+   insert-before:x:@hyper2lambda/0
+      .
+         ..:x:@.dp/#/*/prompt
+   .hl
+   set-value:x:@.hl
+      lambda2hyper:x:@hyper2lambda/*
+         comments:true
+   log.info:Invoking OpenAI
+      prompt:x:@.hl
+   execute:magic.workflows.actions.execute
+      name:openai-context-from-database
+      filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+      arguments
+         type:magic-documentation
+         query:x:@.hl
+         threshold:decimal:0.3
+         max_tokens:int:3000
+   execute:magic.workflows.actions.execute
+      name:openai-query
+      filename:/modules/openai/workflows/actions/openai-query.hl
+      arguments
+         model:gpt-4o
+         max_tokens:int:1500
+         instruction:x:@.system-message
+         context:x:@execute/@execute/*/context
+         query:x:@.hl
+   .filename
+   set-value:x:@.filename
+      strings.concat
+         .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised/
+         get-value:x:@.dp/#/*/hyperlambda_id
+         .:.hl
+   io.file.save:x:@.filename
+      get-value:x:@execute/*/answer
+   sleep:5000

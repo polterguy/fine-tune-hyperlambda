@@ -1,0 +1,27 @@
+
+// This Hyperlambda code snippet uses a [switch] statement to determine the type of database connection to establish based on the [.database-type] node. It handles connections for MySQL, PostgreSQL, SQL Server, and SQLite databases. Each [case] node specifies the connection and execution process for its respective database type, utilizing slots like [mysql.connect], [pgsql.connect], [mssql.connect], and [sqlite.connect] to establish connections and execute SQL commands. The [strings.concat] and [io.file.save] slots are used for constructing file paths and saving files, respectively.
+switch:x:@.database-type
+   case:mysql
+      mysql.connect:sys
+         mysql.execute:x:@io.file.load
+   case:pgsql
+      pgsql.connect:postgres
+         strings.concat
+            .:"create database "
+            get-value:x:@.arguments/*/database
+         pgsql.execute:x:-
+            database:x:@.arguments/*/database
+      pgsql.connect:x:@.arguments/*/database
+         pgsql.execute:x:@io.file.load
+   case:mssql
+      mssql.connect:master
+         mssql.execute-batch:x:@io.file.load
+   case:sqlite
+      strings.concat
+         .:/data/
+         get-value:x:@.arguments/*/database
+         .:.db
+      io.file.save:x:-
+         .:
+      sqlite.connect:x:@.arguments/*/database
+         sqlite.execute:x:@io.file.load

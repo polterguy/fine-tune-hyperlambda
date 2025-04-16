@@ -1,0 +1,24 @@
+
+/*
+ * This Hyperlambda code opens a database connection using a dynamic database name, checks if the database type is "mssql", and if so, renames the [data.execute] slot to [mssql.execute-batch] for batch execution. It then executes a script loaded from a file and logs a success message indicating the script was executed. 
+ * 
+ * 1. [data.connect] - Opens a database connection using a dynamic database name.
+ * 2. [if] - Checks if the database type is "mssql".
+ * 3. [eq] - Compares the database type to "mssql".
+ * 4. [get-value] - Retrieves the database type.
+ * 5. [set-name] - Renames the [data.execute] slot to [mssql.execute-batch] for MSSQL batch execution.
+ * 6. [data.execute] - Executes a script loaded from a file.
+ * 7. [log.info] - Logs a success message indicating the script was executed.
+ * 8. [script] - Contains the script that was executed, used in the log message.
+ */
+data.connect:x:@.arguments/*/database
+   if
+      eq
+         get-value:x:@.database-type
+         .:mssql
+      .lambda
+         set-name:x:@data.connect/*/data.execute
+            .:mssql.execute-batch
+   data.execute:x:@io.file.load
+   log.info:Database migration script successfully executed
+      script:x:@.dp/#

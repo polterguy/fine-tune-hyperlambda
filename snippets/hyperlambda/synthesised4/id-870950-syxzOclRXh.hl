@@ -1,0 +1,25 @@
+
+// The code checks if the value of the [.dp] node ends with ".sql" and, if true, loads a file and attempts to execute it as a database migration script. It opens a database connection using the [data.connect] slot with a specified database, and if the database type is "mssql", it renames the [data.execute] slot to [mssql.execute-batch]. The script is executed, and a success message is logged. If an error occurs, it logs an error message and sets the [.result] node to false.
+if
+   strings.ends-with:x:@.dp/#
+      .:.sql
+   .lambda
+      io.file.load:x:@.dp/#
+      try
+         data.connect:x:@.arguments/*/database
+            if
+               eq
+                  get-value:x:@.database-type
+                  .:mssql
+               .lambda
+                  set-name:x:@data.connect/*/data.execute
+                     .:mssql.execute-batch
+            data.execute:x:@io.file.load
+            log.info:Database migration script successfully executed
+               script:x:@.dp/#
+      .catch
+         log.error:Something went wrong as we tried to execute plugin database migration script
+            script:x:@.dp/#
+            error:x:@.arguments/*/message
+         set-value:x:@.result
+            .:bool:false

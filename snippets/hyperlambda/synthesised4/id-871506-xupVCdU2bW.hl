@@ -1,0 +1,39 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "hospital" and reads distinct records from the "Patients" table. It constructs a distinct SQL function using a specified column, removes unnecessary arguments, and adds limit, offset, order, and direction nodes to the query. The code then executes the query and returns the results. 
+ * 
+ * 1. [data.connect] - Connects to the "hospital" database with SQLite as the database type.
+ * 2. [set-name] - Constructs a distinct SQL function using the specified column.
+ * 3. [remove-nodes] - Removes unnecessary nodes like distinct_column, order, direction, limit, and offset from the arguments.
+ * 4. [add] - Adds limit, offset, order, and direction nodes to the data.read query.
+ * 5. [data.read] - Executes the query on the "Patients" table, selecting distinct records.
+ * 6. [return-nodes] - Returns the results of the query execution.
+ */
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Patients
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

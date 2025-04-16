@@ -1,0 +1,29 @@
+
+/*
+ * This Hyperlambda code checks if an HTTP GET request's response does not contain a "Content-Type" header or if it does not start with "text/html". If either condition is true, it logs an error message and throws an exception. The error log includes the URL and the actual "Content-Type" received, and a concatenated error message is created to describe the issue. 
+ * 
+ * 1. [if] - Begins a conditional block to evaluate the following conditions.
+ * 2. [or] - Logical OR to check if either of the conditions is true.
+ * 3. [not-exists] - Checks if the "Content-Type" header does not exist in the HTTP response.
+ * 4. [not] - Negates the following condition.
+ * 5. [strings.starts-with] - Checks if the "Content-Type" does not start with "text/html".
+ * 6. [.lambda] - Executes the following code block if the condition is true.
+ * 7. [log.error] - Logs an error message with the URL and "Content-Type".
+ * 8. [strings.concat] - Concatenates strings to create a detailed error message.
+ * 9. [throw] - Throws an exception with the concatenated error message.
+ */
+if
+   or
+      not-exists:x:@http.get/*/headers/*/Content-Type
+      not
+         strings.starts-with:x:@http.get/*/headers/*/Content-Type
+            .:text/html
+   .lambda
+      log.error:URL did not return HTML content
+         url:x:@.arguments/*/url
+         content-type:x:@http.get/*/headers/*/Content-Type
+      strings.concat
+         .:"URL did not return HTML content but '"
+         get-value:x:@http.get/*/headers/*/Content-Type
+         .:"' content"
+      throw:x:-

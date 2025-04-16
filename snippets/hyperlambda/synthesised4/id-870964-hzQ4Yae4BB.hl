@@ -1,0 +1,28 @@
+
+// This Hyperlambda code checks if the model name in the arguments starts with "gpt", "o1-", or "o3-", or if the slot is not "magic.ai.chat". If any of these conditions are true, it unwraps and modifies the signal node, adds a referrer, removes the referrer from arguments, and adds the remaining arguments to the signal. If tokens are not null, it sets the model size in the signal. Finally, it signals the completion slot and returns the signal nodes.
+if
+   or
+      strings.starts-with:x:@.arguments/*/model
+         .:gpt
+      strings.starts-with:x:@.arguments/*/model
+         .:o1-
+      strings.starts-with:x:@.arguments/*/model
+         .:o3-
+      neq:x:@.slot
+         .:magic.ai.chat
+   .lambda
+      unwrap:x:+/*/*
+      add:x:./*/signal
+         .
+            referrer:x:@.referrer
+      remove-nodes:x:@.arguments/*/referrer
+      add:x:./*/signal
+         get-nodes:x:@.arguments/*
+      if
+         not-null:x:@.tokens
+         .lambda
+            set-value:x:@.lambda/@.lambda/*/signal/*/model_size
+               convert:x:@.tokens
+                  type:int
+      signal:x:@.arguments/*/completion_slot
+      return-nodes:x:@signal/*

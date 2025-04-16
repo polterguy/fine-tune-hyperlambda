@@ -1,0 +1,30 @@
+
+// This Hyperlambda code constructs an SQL statement to add a foreign key constraint to a table. The [else] block concatenates strings to form the base SQL command using table and column names from arguments. If a cascading delete is specified and true, an additional clause is appended to handle cascading deletes. Finally, the SQL command is terminated with a semicolon. The code uses [set-value] and [strings.concat] to build the SQL command dynamically.
+else
+   set-value:x:@.tail
+      strings.concat
+         .:"alter table "
+         get-value:x:@.arguments/*/tableName
+         .:" add foreign key ("
+         get-value:x:@.arguments/*/columnName
+         .:") references "
+         get-value:x:@.arguments/*/foreignTable
+         .:(
+         get-value:x:@.arguments/*/foreignField
+         .:)
+   if
+      and
+         exists:x:@.arguments/*/cascading
+         not-null:x:@.arguments/*/cascading
+         eq
+            get-value:x:@.arguments/*/cascading
+            .:bool:true
+      .lambda
+         set-value:x:@.tail
+            strings.concat
+               get-value:x:@.tail
+               .:" on delete cascade"
+   set-value:x:@.tail
+      strings.concat
+         get-value:x:@.tail
+         .:"; "

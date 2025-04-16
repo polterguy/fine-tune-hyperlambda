@@ -1,0 +1,21 @@
+
+// The code handles an HTTP response by concatenating a message indicating a page move, using the [strings.concat] slot to form a message with the new location from the HTTP headers. It signals this message to a feedback channel using [sockets.signal], then pauses execution with [sleep]. It adds headers and feedback channel nodes using [add], executes a URL retrieval with [execute], and returns the result with [return].
+else
+   strings.concat
+      .:"Page moved to '"
+      get-value:x:@http.get/*/headers/*/Location
+      .:"', trying alternative location"
+   unwrap:x:+/**
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:x:@strings.concat
+         type:info
+   sleep:100
+   add:x:+/+/*/headers
+      get-nodes:x:@.arguments/*/headers/*
+   add:x:+
+      get-nodes:x:@.arguments/*/feedback-channel
+   execute:magic.ai.url.get
+      url:x:@http.get/*/headers/*/Location
+      headers
+   return:x:-

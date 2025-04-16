@@ -1,0 +1,66 @@
+
+/*
+ * This Hyperlambda code attempts to create a database if it doesn't already exist. It uses a [try] block to attempt loading a database creation script and executes it based on the [switch] statement for different database types like MySQL, PostgreSQL, MSSQL, and SQLite. If successful, it logs a success message; if an error occurs, it catches the exception and logs an error message with details. 
+ * 
+ * 1. [if] - Checks if the database does not exist.
+ * 2. [not] - Negates the condition to check for non-existence.
+ * 3. [exists] - Placeholder for checking the existence of the database.
+ * 4. [try] - Begins a block to attempt database creation.
+ * 5. [io.file.load] - Loads the database creation script.
+ * 6. [switch] - Determines the database type and executes the appropriate block.
+ * 7. [case:mysql] - Handles MySQL database creation.
+ * 8. [mysql.connect] - Connects to the MySQL server.
+ * 9. [mysql.execute] - Executes the loaded script on MySQL.
+ * 10. [case:pgsql] - Handles PostgreSQL database creation.
+ * 11. [pgsql.connect] - Connects to PostgreSQL server.
+ * 12. [strings.concat] - Constructs the SQL command to create a database.
+ * 13. [pgsql.execute] - Executes the SQL command on PostgreSQL.
+ * 14. [case:mssql] - Handles MSSQL database creation.
+ * 15. [mssql.connect] - Connects to the MSSQL server.
+ * 16. [mssql.execute-batch] - Executes the script on MSSQL.
+ * 17. [case:sqlite] - Handles SQLite database creation.
+ * 18. [io.file.save] - Saves the SQLite database file.
+ * 19. [sqlite.connect] - Connects to the SQLite database.
+ * 20. [sqlite.execute] - Executes the script on SQLite.
+ * 21. [log.info] - Logs a success message if the database is created.
+ * 22. [.catch] - Catches exceptions during the database creation process.
+ * 23. [log.error] - Logs an error message with details if an exception occurs.
+ */
+if
+   not
+      exists
+   .lambda
+      try
+         io.file.load:x:@.create-database-script
+         switch:x:@.database-type
+            case:mysql
+               mysql.connect:sys
+                  mysql.execute:x:@io.file.load
+            case:pgsql
+               pgsql.connect:postgres
+                  strings.concat
+                     .:"create database "
+                     get-value:x:@.arguments/*/database
+                  pgsql.execute:x:-
+                     database:x:@.arguments/*/database
+               pgsql.connect:x:@.arguments/*/database
+                  pgsql.execute:x:@io.file.load
+            case:mssql
+               mssql.connect:master
+                  mssql.execute-batch:x:@io.file.load
+            case:sqlite
+               strings.concat
+                  .:/data/
+                  get-value:x:@.arguments/*/database
+                  .:.db
+               io.file.save:x:-
+                  .:
+               sqlite.connect:x:@.arguments/*/database
+                  sqlite.execute:x:@io.file.load
+         log.info:Successfully created database
+            database_name:x:@.arguments/*/database
+      .catch
+         log.error:Something went wrong when creating database
+            database:x:@.arguments/@.arguments/*/database
+            script:x:@.create-database-script
+            error:x:@.arguments/*/message
