@@ -1,0 +1,141 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and constructs a dynamic SQL query to calculate keyword density and count for a set of words in a "tasks" table. It iterates over the provided words, constructs SQL expressions to calculate keyword density and count, and orders the results by these metrics. The final SQL query is executed, and the results are returned after removing the keyword density and count fields. 
+ * 
+ * 1. [data.connect] - Connects to the SQLite database.
+ * 2. [.sql] - Initializes the SQL query string.
+ * 3. [.fields] - Constructs a string of fields for the SQL query.
+ * 4. [for-each] - Iterates over the columns and words to build SQL expressions.
+ * 5. [strings.concat] - Concatenates strings to form SQL expressions.
+ * 6. [unwrap] - Evaluates expressions for SQL construction.
+ * 7. [add] - Adds nodes to the SQL query.
+ * 8. [if] - Conditional logic for SQL string construction.
+ * 9. [math.increment] - Increments the counter for word processing.
+ * 10. [set-value] - Sets the value of nodes, constructing the SQL query.
+ * 11. [data.select] - Executes the constructed SQL query.
+ * 12. [remove-nodes] - Removes specific nodes from the result.
+ * 13. [return-nodes] - Returns the final result set.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   .sql:select *, (
+   .fields
+   for-each:x:@.columns/*
+      strings.concat
+         .:coalesce(
+         get-value:x:@.dp/#
+         .:", '')"
+      unwrap:x:+/*/*
+      add:x:@.fields
+         .
+            .:x:@strings.concat
+   set-value:x:@.fields
+      strings.join:x:@.fields/*
+         .:" || "
+   remove-nodes:x:@.fields/*
+   .no:int:0
+   for-each:x:@.words/*
+      set-name:x:+/+/*/*
+         strings.concat
+            .:@p
+            get-value:x:@.no
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/data.select
+         .
+            .:x:@.dp/#
+      if
+         eq:x:@.no
+            .:int:0
+         .lambda
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" (length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:), @p
+                  get-value:x:@.no
+                  .:", ''))) / length(@p"
+                  get-value:x:@.no
+                  .:)
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + (length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)
+      math.increment:x:@.no
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) * 1.0 / length(
+         get-value:x:@.fields
+         .:) as keyword_density, (
+   .no:int:0
+   for-each:x:@.words/*
+      if
+         eq:x:@.no
+            .:int:0
+         .lambda
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" CASE WHEN ((length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:), @p
+                  get-value:x:@.no
+                  .:", ''))) / length(@p"
+                  get-value:x:@.no
+                  .:)) > 0 THEN 1 ELSE 0 END
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + CASE WHEN ((length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)) > 0 THEN 1 ELSE 0 END
+      math.increment:x:@.no
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) as keyword_count
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" from "
+         .:tasks
+         .:" where keyword_count > 0"
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" order by keyword_count desc, keyword_density desc limit "
+         get-value:x:@.arguments/*/limit
+   if
+      exists:x:@.arguments/*/offset
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" offset "
+               get-value:x:@.arguments/*/offset
+   data.select:x:@.sql
+      database-type:sqlite
+   remove-nodes:x:@data.select/*/*/keyword_density
+   remove-nodes:x:@data.select/*/*/keyword_count
+   return-nodes:x:@data.select/*

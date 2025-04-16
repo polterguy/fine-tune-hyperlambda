@@ -1,0 +1,26 @@
+
+// This Hyperlambda code checks if the [databaseType] argument is not "mysql" and appends a foreign key reference to the [sql] node. If the [cascading] argument exists, is not null, and is true, it further appends "on delete cascade" to the [sql] node. The code uses [neq] to compare values, [set-value] to update the [sql] node, and [strings.concat] to concatenate strings.
+if
+   neq:x:@.arguments/*/databaseType
+      .:mysql
+   .lambda
+      set-value:x:@.sql
+         strings.concat
+            get-value:x:@.sql
+            .:" references "
+            get-value:x:@.arguments/*/foreignTable
+            .:(
+            get-value:x:@.arguments/*/foreignField
+            .:)
+      if
+         and
+            exists:x:@.arguments/*/cascading
+            not-null:x:@.arguments/*/cascading
+            eq
+               get-value:x:@.arguments/*/cascading
+               .:bool:true
+         .lambda
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" on delete cascade"
