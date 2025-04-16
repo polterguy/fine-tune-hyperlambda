@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code checks if a specific folder exists, and if it does, it lists all files in that folder. It then iterates over each file, checking if the file name ends with "css". If it does, it splits the file path and name, and checks if a certain condition is not met in a result node. If the condition is not met, it adds a new node to the result with a specific value. The code involves several operations like file listing, string manipulation, and conditional checks.
+ * 
+ * 1. [if] - Checks if the specified folder exists.
+ * 2. [io.folder.exists] - Evaluates to true if the folder exists.
+ * 3. [io.file.list] - Lists all files in the specified folder.
+ * 4. [for-each] - Iterates over each file in the list.
+ * 5. [if] - Checks if the file name ends with "css".
+ * 6. [strings.ends-with] - Evaluates if the file name ends with "css".
+ * 7. [strings.split] - Splits the file path and name.
+ * 8. [if] - Checks if a certain condition is not met in the result node.
+ * 9. [not-exists] - Evaluates if a specific node does not exist.
+ * 10. [unwrap] - Unwraps and evaluates expressions.
+ * 11. [add] - Adds a new node to the result with a specific value.
+ */
+if
+   io.folder.exists:/system/openai/front.files/search/
+   .lambda
+      io.file.list:/system/openai/front.files/search/
+      for-each:x:@io.file.list/*
+         if
+            strings.ends-with:x:@.dp/#
+               .:css
+            .lambda
+               strings.split:x:@.dp/#
+                  .:/
+               strings.split:x:@strings.split/0/-
+                  .:.
+               if
+                  not-exists:x:"@.result/*/\"={@strings.split/0}\""
+                  .lambda
+                     unwrap:x:+/*/*
+                     add:x:@.result
+                        .
+                           .:x:@strings.split/0

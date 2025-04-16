@@ -1,0 +1,22 @@
+
+// This Hyperlambda code iterates through nodes resulting from splitting a string and checks if each node contains a specific substring pattern indicating a function invocation, while excluding certain paths. If the conditions are met, it further processes the node by splitting, trimming, and unwrapping its content, then adds the processed result to a system functions list. The code effectively filters and processes function invocation strings, excluding specific paths, and organizes them into a structured list.
+for-each:x:@strings.split/*
+   if
+      and
+         strings.contains:x:@.dp/#
+            .:FUNCTION_INVOCATION[/
+         not
+            strings.contains:x:@.dp/#
+               .:"FUNCTION_INVOCATION[/FOLDER/FILENAME.hl]:"
+         not
+            strings.contains:x:@.dp/#
+               .:"FUNCTION_INVOCATION[/system/misc/workflows/list-functions.hl]:"
+      .lambda
+         strings.split:x:@.dp/#
+            .:"\n"
+         strings.trim:x:@strings.split/0
+            .:"# \n"
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/yield/*/system_functions
+            .
+               .:x:@strings.trim

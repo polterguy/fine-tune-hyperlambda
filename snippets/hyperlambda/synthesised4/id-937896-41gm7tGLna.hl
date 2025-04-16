@@ -1,0 +1,18 @@
+
+// This code connects to a database and selects conversation starters from the "ml_types" table where the type matches a given argument. If conversation starters are found and are not null or empty, it converts them from Markdown to HTML, then to a lambda structure. It iterates over list item text nodes in the HTML, unwraps them, and adds them to a "questions" node in the return structure.
+data.connect:[generic|magic]
+   data.select:"\nselect conversation_starters\n\tfrom ml_types\n\twhere type = @type"
+      type:x:@.arguments/*/type
+   if
+      and
+         not-null:x:@data.select/*/*/conversation_starters
+         neq:x:@data.select/*/*/conversation_starters
+            .:
+      .lambda
+         markdown2html:x:@data.select/*/*/conversation_starters
+         html2lambda:x:@markdown2html
+         for-each:x:"@html2lambda/**/li/**/\\#text"
+            unwrap:x:+/*/*
+            add:x:../*/return/*/questions
+               .
+                  .:x:@.dp/#

@@ -1,0 +1,17 @@
+
+// This Hyperlambda code checks if a file named "server.log" exists in the "/var/logs/" directory. If it does, it loads the file and extracts all URLs using a regular expression. The extracted URLs are then iterated over, added to a list, and converted to a Hyperlambda string format. Finally, the extracted URLs are logged as an informational message. The code uses slots like [io.file.exists], [io.file.load], [strings.matches], and [lambda2hyper] to perform these operations.
+if
+   io.file.exists:/var/logs/server.log
+   .lambda
+      io.file.load:/var/logs/server.log
+      .urls
+      strings.matches:x:@io.file.load
+         .:"https?://[\\w\\.-]+(?:\\.[\\w\\.-]+)+(?:[/\\w\\._~:?#[\\]@!$&'()*+,;=-]*)?"
+      for-each:x:@strings.matches/*/match
+         unwrap:x:+/*/*
+         add:x:@.urls
+            .
+               .:x:@.dp/#
+      lambda2hyper:x:@.urls/*
+      log.info:Extracted URLs from file
+         emails:x:@lambda2hyper

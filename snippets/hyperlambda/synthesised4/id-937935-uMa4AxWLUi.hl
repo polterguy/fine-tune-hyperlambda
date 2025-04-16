@@ -1,0 +1,28 @@
+
+// This Hyperlambda code connects to a database to read data from the "ml_requests" table, converts the retrieved data into a CSV format, and sends it via email. The [data.connect] slot establishes a connection to the database, [data.read] specifies the table and columns to retrieve, [lambda2csv] converts the data to CSV, and [mail.smtp.send] sends an email with the CSV as an attachment.
+data.connect:[generic|magic]
+   data.read
+      table:ml_requests
+      columns
+         prompt
+         completion
+         created
+         type
+         finish_reason
+         user_id
+         session
+   lambda2csv:x:@data.read/*
+   mail.smtp.send
+      message
+         to
+            .
+               email:x:@.arguments/*/email
+               name:Chatbot Admin
+         subject:Chatbot history log
+         entity:multipart/mixed
+            entity:text/plain
+               content:Latest AINIRO.IO Chatbot requests
+            entity:text/csv
+               headers
+                  Content-Disposition:"attachment; filename=\"log.csv\""
+               content:x:@lambda2csv

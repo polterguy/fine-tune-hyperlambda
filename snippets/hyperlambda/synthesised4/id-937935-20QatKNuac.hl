@@ -1,0 +1,48 @@
+
+/*
+ * This Hyperlambda code creates a dynamic slot named "utilities.history.send-email" that sends an email with chatbot logs. It validates the email argument, logs the action, retrieves data from a database, converts it to CSV, and sends it as an email attachment.
+ * 
+ * 1. [slots.create] - Defines a new dynamic slot named "utilities.history.send-email".
+ * 2. [validators.mandatory] - Ensures the "email" argument is provided.
+ * 3. [validators.email] - Validates the "email" argument as a proper email address.
+ * 4. [log.info] - Logs the action of sending a chatbot log.
+ * 5. [data.connect] - Connects to a database using a specified connection string.
+ * 6. [data.read] - Reads data from the "ml_requests" table with specified columns.
+ * 7. [lambda2csv] - Converts the retrieved data into a CSV format.
+ * 8. [mail.smtp.send] - Sends an email with the CSV data as an attachment.
+ * 9. [message] - Defines the email message details including recipient and subject.
+ * 10. [entity:multipart/mixed] - Specifies the email content type and includes attachments.
+ * 11. [entity:text/plain] - Adds plain text content to the email.
+ * 12. [entity:text/csv] - Attaches the CSV data to the email with appropriate headers.
+ */
+slots.create:utilities.history.send-email
+   validators.mandatory:x:@.arguments/*/email
+   validators.email:x:@.arguments/*/email
+   log.info:Sending chatbot log to cloudlet owner
+      email:x:@.arguments/*/email
+   data.connect:[generic|magic]
+      data.read
+         table:ml_requests
+         columns
+            prompt
+            completion
+            created
+            type
+            finish_reason
+            user_id
+            session
+      lambda2csv:x:@data.read/*
+      mail.smtp.send
+         message
+            to
+               .
+                  email:x:@.arguments/*/email
+                  name:Chatbot Admin
+            subject:Chatbot history log
+            entity:multipart/mixed
+               entity:text/plain
+                  content:Latest AINIRO.IO Chatbot requests
+               entity:text/csv
+                  headers
+                     Content-Disposition:"attachment; filename=\"log.csv\""
+                  content:x:@lambda2csv

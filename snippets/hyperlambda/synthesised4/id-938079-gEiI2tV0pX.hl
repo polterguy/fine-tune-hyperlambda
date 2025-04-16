@@ -1,0 +1,39 @@
+
+/*
+ * This Hyperlambda code defines a dynamic slot [magic.auth.change-password] to change a user's password. It first validates that a [password] argument is provided, retrieves the current user's authentication ticket, and checks if the user is authenticated. If not, it throws an "Access denied" exception. It then hashes the new password using [crypto.password.hash] and updates the user's password in a SQLite database using [data.update]. The [where] clause ensures the update is applied to the authenticated user's record.
+ * 
+ * 1. [slots.create] - Creates a dynamic slot named "magic.auth.change-password".
+ * 2. [validators.mandatory] - Ensures the "password" argument is provided.
+ * 3. [auth.ticket.get] - Retrieves the current user's authentication ticket.
+ * 4. [if] - Checks if the user is authenticated.
+ * 5. [null] - Evaluates if the authentication ticket is null.
+ * 6. [throw] - Throws an "Access denied" exception if the user is not authenticated.
+ * 7. [set-value] - Sets the hashed password value.
+ * 8. [crypto.password.hash] - Hashes the provided password.
+ * 9. [data.connect] - Connects to the "magic" SQLite database.
+ * 10. [data.update] - Updates the user's password in the "users" table.
+ * 11. [values] - Specifies the new hashed password to update.
+ * 12. [where] - Specifies the condition to update the correct user's record.
+ * 13. [username.eq] - Ensures the update applies to the authenticated user.
+ */
+slots.create:magic.auth.change-password
+   validators.mandatory:x:@.arguments/*/password
+   auth.ticket.get
+   if
+      null:x:@auth.ticket.get
+      .lambda
+         throw:Access denied
+            status:int:401
+            public:bool:true
+   .password
+   set-value:x:@.password
+      crypto.password.hash:x:@.arguments/*/password
+   data.connect:magic
+      database-type:sqlite
+      data.update
+         table:users
+         values
+            password:x:@.password
+         where
+            and
+               username.eq:x:@auth.ticket.get
