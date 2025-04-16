@@ -1,0 +1,23 @@
+
+// This Hyperlambda code connects to a database and executes a SQL query to retrieve machine learning training snippets based on specified criteria. It concatenates a SQL query string, executes it with parameters for embedding, type, and filter, and iterates through the results. The loop continues until the token count of the converted results is less than a specified maximum, at which point it stops and returns the selected data nodes.
+data.connect:[generic|magic]
+   strings.concat
+      .:"\nselect vss.rowid as id, ts.prompt, ts.completion, ts.uri\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and\n      (ts.completion like @filter or ts.prompt like @filter) and\n      vss_search(vss.embedding_vss, @embedding)"
+   data.select:x:@strings.concat
+      embedding:x:@floatArray2bytes
+      type:x:@.arguments/*/_type
+      filter:x:@.filter
+   .cont:bool:true
+   while:x:@.cont
+      lambda2hyper:x:@data.select/*
+      if
+         lt
+            openai.tokenize:x:@lambda2hyper
+            convert:x:@.arguments/*/max_tokens
+               type:int
+         .lambda
+            set-value:x:@.cont
+               .:bool:false
+      else
+         remove-nodes:x:@data.select/0/-
+   return-nodes:x:@data.select/*

@@ -1,0 +1,44 @@
+
+// This Hyperlambda code establishes a connection to a SQLite database named "northwind" and performs a read operation on the "Order Details" table. It joins the "Orders" and "Products" tables using left joins, retrieving specific columns from each table. The code also manipulates the arguments by adding and removing nodes related to ordering, direction, limit, and offset, and returns the resulting nodes from the data read operation.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Order Details
+         join:Orders
+            as:OrderID
+            type:left
+            on
+               and
+                  Order Details.OrderID:OrderID.OrderID
+         join:Products
+            as:ProductID
+            type:left
+            on
+               and
+                  Order Details.ProductID:ProductID.ProductID
+      columns
+         Order Details.OrderID
+         Order Details.ProductID
+         Order Details.UnitPrice
+         Order Details.Quantity
+         Order Details.Discount
+         OrderID.CustomerID
+            as:OrderID.CustomerID
+         ProductID.ProductName
+            as:ProductID.ProductName
+      where
+         and
+   return-nodes:x:@data.read/*

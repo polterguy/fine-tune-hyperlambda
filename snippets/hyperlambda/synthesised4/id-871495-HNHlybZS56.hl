@@ -1,0 +1,27 @@
+
+// This Hyperlambda code connects to a SQLite database named "hospital" and performs a SQL query to count distinct values from a specified column in the "Medications" table, joined with the "Patients" table on the "PatientID" field. It dynamically constructs a SQL function for counting distinct values using the [strings.concat] slot, removes the original distinct column argument, and adds additional where conditions from the arguments. The query uses a left join and returns the results of the SQL read operation. The code is structured to allow flexible querying by modifying the distinct column and where conditions.
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Medications
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Medications.PatientID:PatientID.PatientID
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*
