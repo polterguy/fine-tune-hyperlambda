@@ -1,0 +1,40 @@
+
+/*
+ * This Hyperlambda code evaluates a set of conditions to send a lead email. It checks if the prompt contains "@" and verifies that both contact_us and lead_email are not null or empty. If all conditions are met, it sends a lead email using the magic.ai.send-lead-email signal. If the signal is successful, it returns a cached result with a db_time of -1 and the contact_us value. 
+ * 
+ * 1. [if] - Evaluates the conditions to determine if the email should be sent.
+ * 2. [and] - Ensures all specified conditions are true.
+ * 3. [strings.contains] - Checks if the prompt contains the "@" character.
+ * 4. [not-null] - Verifies that contact_us and lead_email are not null.
+ * 5. [neq] - Ensures contact_us and lead_email are not empty.
+ * 6. [.lambda] - Executes the email sending logic if conditions are met.
+ * 7. [unwrap] - Evaluates the children nodes of the current node.
+ * 8. [signal] - Sends the lead email using the specified parameters.
+ * 9. [if] - Checks if the email signal was successful.
+ * 10. [return] - Returns a cached result with specific values if the email was sent successfully.
+ */
+if
+   and
+      strings.contains:x:@.arguments/*/prompt
+         .:@
+      not-null:x:@.arguments/*/contact_us
+      neq:x:@.arguments/*/contact_us
+         .:
+      not-null:x:@.arguments/*/lead_email
+      neq:x:@.arguments/*/lead_email
+         .:
+   .lambda
+      unwrap:x:+/*
+      signal:magic.ai.send-lead-email
+         type:x:@.arguments/*/type
+         prompt:x:@.arguments/*/prompt
+         session:x:@.arguments/*/session
+         user_id:x:@.arguments/*/user_id
+         lead_email:x:@.arguments/*/lead_email
+         contact_us:x:@.arguments/*/contact_us
+      if:x:@signal
+         unwrap:x:+/*
+         return
+            db_time:decimal:-1
+            finish_reason:cached
+            result:x:@.arguments/*/contact_us

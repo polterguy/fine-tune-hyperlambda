@@ -1,0 +1,50 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "hospital" and performs a complex SQL query on the "Medications" table. It dynamically constructs a distinct function for a specified column, manages query parameters like limit and order, and performs a left join with the "Patients" table. The results are returned as nodes, allowing for flexible data manipulation and retrieval. 
+ * 
+ * 1. [data.connect] - Connects to the specified database.
+ * 2. [database-type] - Specifies the type of the database as SQLite.
+ * 3. [set-name] - Constructs a distinct function for a specified column.
+ * 4. [remove-nodes] - Removes specified nodes from the arguments.
+ * 5. [add] - Adds nodes to the data.read structure.
+ * 6. [get-nodes] - Retrieves nodes from the arguments.
+ * 7. [data.read] - Executes the SQL query on the "Medications" table.
+ * 8. [join] - Performs a left join with the "Patients" table.
+ * 9. [columns] - Specifies the columns to be selected.
+ * 10. [where] - Defines the WHERE clause for the SQL query.
+ * 11. [return-nodes] - Returns the resulting nodes from the query.
+ */
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Medications
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Medications.PatientID:PatientID.PatientID
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

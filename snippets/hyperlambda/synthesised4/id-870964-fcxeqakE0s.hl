@@ -1,0 +1,28 @@
+
+// This Hyperlambda code evaluates a set of conditions using the [if] slot to determine whether to execute a series of operations. It checks if the [model] argument starts with specific prefixes or if the [slot] is not equal to "magic.ai.chat". If true, it processes the [signal] node by adding and removing nodes, and conditionally sets a [model_size] based on the presence of [tokens]. Finally, it signals a completion slot and returns the signal nodes.
+if
+   or
+      strings.starts-with:x:@.arguments/*/model
+         .:gpt
+      strings.starts-with:x:@.arguments/*/model
+         .:o1-
+      strings.starts-with:x:@.arguments/*/model
+         .:o3-
+      neq:x:@.slot
+         .:magic.ai.chat
+   .lambda
+      unwrap:x:+/*/*
+      add:x:./*/signal
+         .
+            referrer:x:@.referrer
+      remove-nodes:x:@.arguments/*/referrer
+      add:x:./*/signal
+         get-nodes:x:@.arguments/*
+      if
+         not-null:x:@.tokens
+         .lambda
+            set-value:x:@.lambda/@.lambda/*/signal/*/model_size
+               convert:x:@.tokens
+                  type:int
+      signal:x:@.arguments/*/completion_slot
+      return-nodes:x:@signal/*

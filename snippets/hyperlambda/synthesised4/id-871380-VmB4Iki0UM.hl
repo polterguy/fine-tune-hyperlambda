@@ -1,0 +1,33 @@
+
+// This Hyperlambda code connects to a SQLite database named "northwind" and performs a SQL query on the "Products" table. It constructs a "count(distinct ...)" SQL function using a specified column, removes the distinct column argument, and adds any additional arguments to the "where" clause. The query joins the "Categories" and "Suppliers" tables using left joins and selects the distinct count of a specified column, returning the results. The code demonstrates dynamic SQL generation and manipulation using Hyperlambda slots.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Products
+         join:Categories
+            as:ProductID
+            type:left
+            on
+               and
+                  Products.ProductID:ProductID.CategoryID
+         join:Suppliers
+            as:SupplierID
+            type:left
+            on
+               and
+                  Products.SupplierID:SupplierID.SupplierID
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

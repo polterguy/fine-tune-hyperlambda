@@ -1,0 +1,54 @@
+
+/*
+ * This Hyperlambda code iterates over nodes selected from [data.select], converting Hyperlambda code to a lambda structure with preserved comments using [hyper2lambda]. It modifies the lambda by inserting a prompt, serializes it back to Hyperlambda using [lambda2hyper], and logs the process. It then executes two workflows: [openai-context-from-database] and [openai-query], passing the serialized Hyperlambda as a query. Finally, it saves the OpenAI response to a file, identified by a unique [hyperlambda_id], and pauses execution for 5 seconds. 
+ * 
+ * 1. [for-each] - Iterates over nodes selected from [data.select].
+ * 2. [hyper2lambda] - Converts Hyperlambda code to a lambda structure with comments preserved.
+ * 3. [unwrap] - Evaluates expressions within the lambda structure.
+ * 4. [insert-before] - Inserts a prompt before the first node of [hyper2lambda].
+ * 5. [set-value] - Serializes the modified lambda back to Hyperlambda.
+ * 6. [log.info] - Logs the process of invoking OpenAI.
+ * 7. [execute] - Executes workflows [openai-context-from-database] and [openai-query].
+ * 8. [strings.concat] - Constructs a filename for saving the OpenAI response.
+ * 9. [io.file.save] - Saves the OpenAI response to a file.
+ * 10. [sleep] - Pauses execution for 5 seconds.
+ */
+for-each:x:@data.select/*
+   hyper2lambda:x:@.dp/#/*/code
+      comments:true
+   unwrap:x:+/*/*
+   insert-before:x:@hyper2lambda/0
+      .
+         ..:x:@.dp/#/*/prompt
+   .hl
+   set-value:x:@.hl
+      lambda2hyper:x:@hyper2lambda/*
+         comments:true
+   log.info:Invoking OpenAI
+      prompt:x:@.hl
+   execute:magic.workflows.actions.execute
+      name:openai-context-from-database
+      filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+      arguments
+         type:magic-documentation
+         query:x:@.hl
+         threshold:decimal:0.3
+         max_tokens:int:3000
+   execute:magic.workflows.actions.execute
+      name:openai-query
+      filename:/modules/openai/workflows/actions/openai-query.hl
+      arguments
+         model:gpt-4o
+         max_tokens:int:1500
+         instruction:x:@.system-message
+         context:x:@execute/@execute/*/context
+         query:x:@.hl
+   .filename
+   set-value:x:@.filename
+      strings.concat
+         .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised/
+         get-value:x:@.dp/#/*/hyperlambda_id
+         .:.hl
+   io.file.save:x:@.filename
+      get-value:x:@execute/*/answer
+   sleep:5000

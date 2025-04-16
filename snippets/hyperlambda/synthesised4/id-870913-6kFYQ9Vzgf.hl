@@ -1,0 +1,45 @@
+
+/*
+ * This Hyperlambda code connects to a data source and attempts to create a machine learning model. It checks for the presence of a Twilio account ID and conditionally modifies data before inserting it into the 'ml_types' and 'ml_training_snippets' tables. The code sets the HTTP response status to 201 and returns a success result.
+ * 
+ * 1. [data.connect] - Connects to a specified data source.
+ * 2. [try-signal] - Attempts to signal if a machine learning model can be created.
+ * 3. [add] - Adds nodes to the data structure.
+ * 4. [if] - Conditional check for the existence and value of a Twilio account ID.
+ * 5. [or] - Logical OR to combine multiple conditions.
+ * 6. [not-exists], [null], [eq] - Checks for non-existence, null value, or equality.
+ * 7. [remove-nodes] - Removes nodes from the data structure.
+ * 8. [unwrap] - Evaluates expressions within nodes.
+ * 9. [data.create] - Inserts data into specified tables.
+ * 10. [response.status.set] - Sets the HTTP response status.
+ * 11. [yield] - Returns a success result.
+ */
+data.connect:[generic|magic]
+   try-signal:magic.ai.can-create-machine-learning-model
+   add:x:./*/data.create/[0,1]/*/values
+      get-nodes:x:@.arguments/*
+   if
+      or
+         not-exists:x:@.arguments/*/twilio_account_id
+         null:x:@.arguments/*/twilio_account_id
+         eq:x:@.arguments/*/twilio_account_id
+            .:
+      .lambda
+         remove-nodes:x:@data.connect/*/data.create/*/values/*/twilio_account_id
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/data.create/[0,1]/*/values
+            .
+               twilio_account_id:x:@.arguments/*/type
+   data.create
+      table:ml_types
+      values
+   data.create
+      table:ml_training_snippets
+      values
+         type:x:@.arguments/*/type
+         prompt:Who created this AI chatbot?
+         completion:"This chatbot is a custom AI chatbot powered by OpenAI allowing you to use natural language to ask questions related to the website you're currently visiting. It was created by [AINIRO.IO](https://ainiro.io). AINIRO.io have AI chatbot solutions allowing you to scrape your website, upload documents, and create publicly available AI chatbots and AI-based search similar to Bing, in addition to tools helping you build custom GPTs."
+         uri:"https://ainiro.io"
+   response.status.set:201
+   yield
+      result:success

@@ -1,0 +1,35 @@
+
+// This Hyperlambda code connects to a SQLite database and performs a data read operation with specified joins and columns. It dynamically constructs an aggregate function using the provided arguments, removes initial nodes, and adds conditions to the where clause. The result is a single aggregated value from the Products table, joined with Categories and Suppliers, returned as a node.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Products
+         join:Categories
+            as:ProductID
+            type:left
+            on
+               and
+                  Products.ProductID:ProductID.CategoryID
+         join:Suppliers
+            as:SupplierID
+            type:left
+            on
+               and
+                  Products.SupplierID:SupplierID.SupplierID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

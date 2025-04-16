@@ -1,0 +1,44 @@
+
+/*
+ * This Hyperlambda code snippet demonstrates a loop that continues as long as two conditions are met: an [execute] node exists and the token count of [.context] is less than 4000. Within the loop, it concatenates strings from [.context], [prompt], and [completion] into a temporary node [.tmp]. If the token count of [.tmp] is less than 4000, it updates [.context] with [.tmp]. It then removes the first snippet node from [execute], and if no snippets remain, it removes the [execute] node entirely. 
+ * 
+ * 1. [while] - Initiates a loop that continues while its condition is true.
+ * 2. [and] - Combines two conditions that must both be true for the loop to continue.
+ * 3. [exists] - Checks if the [execute] node exists.
+ * 4. [lt] - Compares the token count of [.context] to ensure it is less than 4000.
+ * 5. [.lambda] - Contains the loop's body, executed if the conditions are met.
+ * 6. [.tmp] - A temporary node used to store concatenated strings.
+ * 7. [set-value] - Sets the value of [.tmp] with concatenated strings.
+ * 8. [strings.concat] - Concatenates [.context], [prompt], and [completion] strings.
+ * 9. [get-value] - Retrieves values from specified nodes.
+ * 10. [if] - Checks if the token count of [.tmp] is less than 4000.
+ * 11. [remove-nodes] - Removes the first snippet node and potentially the [execute] node if no snippets remain.
+ * 12. [not-exists] - Checks if no snippets remain in the [execute] node.
+ */
+while
+   and
+      exists:x:@execute/0
+      lt
+         openai.tokenize:x:@.context
+         .:int:4000
+   .lambda
+      .tmp
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@.context
+            .:"\n\n"
+            get-value:x:@execute/0/*/prompt
+            .:"\n\n"
+            get-value:x:@execute/0/*/completion
+      if
+         lt
+            openai.tokenize:x:@.tmp
+            .:int:4000
+         .lambda
+            set-value:x:@.context
+               get-value:x:@.tmp
+      remove-nodes:x:@execute/0/*/snippets/0
+      if
+         not-exists:x:@execute/0/*/snippets/0
+         .lambda
+            remove-nodes:x:@execute/0

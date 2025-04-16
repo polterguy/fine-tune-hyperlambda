@@ -1,0 +1,45 @@
+
+// This Hyperlambda code connects to a database and retrieves Hyperlambda code snippets with specific conditions using [data.connect] and [data.select]. It processes each snippet, converting it from Hyperlambda to lambda using [hyper2lambda], and then back to Hyperlambda with [lambda2hyper], while preserving comments. The code logs the process and invokes OpenAI models using [execute] to generate context and query responses. It saves the AI-generated responses to files with [io.file.save], pausing execution with [sleep] between iterations. The slots used are: [data.connect], [data.select], [for-each], [hyper2lambda], [unwrap], [insert-before], [.hl], [set-value], [lambda2hyper], [log.info], [execute], [.filename], [strings.concat], [get-value], [io.file.save], and [sleep].
+data.connect:fine-tune
+   data.select:"select * from hyperlambda where code like '%.arguments%' and is_static = 0 and synthesised = 0 limit @limit offset @offset"
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+   for-each:x:@data.select/*
+      hyper2lambda:x:@.dp/#/*/code
+         comments:true
+      unwrap:x:+/*/*
+      insert-before:x:@hyper2lambda/0
+         .
+            ..:x:@.dp/#/*/prompt
+      .hl
+      set-value:x:@.hl
+         lambda2hyper:x:@hyper2lambda/*
+            comments:true
+      log.info:Invoking OpenAI
+         prompt:x:@.hl
+      execute:magic.workflows.actions.execute
+         name:openai-context-from-database
+         filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+         arguments
+            type:magic-documentation
+            query:x:@.hl
+            threshold:decimal:0.3
+            max_tokens:int:3000
+      execute:magic.workflows.actions.execute
+         name:openai-query
+         filename:/modules/openai/workflows/actions/openai-query.hl
+         arguments
+            model:gpt-4o
+            max_tokens:int:1500
+            instruction:x:@.system-message
+            context:x:@execute/@execute/*/context
+            query:x:@.hl
+      .filename
+      set-value:x:@.filename
+         strings.concat
+            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised/
+            get-value:x:@.dp/#/*/hyperlambda_id
+            .:.hl
+      io.file.save:x:@.filename
+         get-value:x:@execute/*/answer
+      sleep:5000

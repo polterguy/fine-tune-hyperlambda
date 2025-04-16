@@ -1,0 +1,134 @@
+
+/*
+ * This Hyperlambda code creates a dynamic slot named "magic.ai.create-system-message" that generates a system message using OpenAI's API. It requires three mandatory arguments: URL, template, and instruction. The code scrapes the specified URL, processes the response to ensure it doesn't exceed token limits, and constructs a context. It then sends a POST request to OpenAI's API with the constructed context and template, handling errors and logging them if the API call fails. The final response from OpenAI is formatted and returned.
+ * 
+ * 1. [slots.create] - Creates a dynamic slot named "magic.ai.create-system-message".
+ * 2. [validators.mandatory] - Ensures the presence of mandatory arguments: URL, template, and instruction.
+ * 3. [validators.url] - Validates the URL format.
+ * 4. [execute] - Invokes "magic.http.scrape-url" to scrape the specified URL.
+ * 5. [if] - Checks if the scraping result is not null.
+ * 6. [throw] - Throws an error if the URL could not be scraped.
+ * 7. [.context] - Initializes an empty context.
+ * 8. [while] - Iterates while conditions are met to build the context.
+ * 9. [and] - Combines conditions for the while loop.
+ * 10. [exists] - Checks if the first element in the execute result exists.
+ * 11. [lt] - Compares token count to a limit.
+ * 12. [openai.tokenize] - Calculates the token count of the context.
+ * 13. [.tmp] - Temporary storage for concatenated strings.
+ * 14. [set-value] - Sets the value of a node.
+ * 15. [strings.concat] - Concatenates strings to build the context.
+ * 16. [get-value] - Retrieves node values.
+ * 17. [remove-nodes] - Removes nodes from the execute result.
+ * 18. [not-exists] - Checks if a node does not exist.
+ * 19. [strings.trim] - Trims whitespace from the context.
+ * 20. [.token] - Initializes a token for authorization.
+ * 21. [config.get] - Retrieves the OpenAI API key from configuration.
+ * 22. [http.post] - Sends a POST request to OpenAI's API.
+ * 23. [convert] - Converts the response to a specific type.
+ * 24. [headers] - Sets HTTP headers for the request.
+ * 25. [payload] - Constructs the payload for the API request.
+ * 26. [model] - Specifies the OpenAI model to use.
+ * 27. [max_tokens] - Sets the maximum tokens for the response.
+ * 28. [temperature] - Sets the randomness of the response.
+ * 29. [messages] - Constructs the message payload for the API.
+ * 30. [role] - Specifies the role of the message sender.
+ * 31. [content] - Sets the content of the message.
+ * 32. [mte] - Checks if the status code is more than or equal to 200.
+ * 33. [lt] - Checks if the status code is less than 300.
+ * 34. [lambda2hyper] - Converts the response to Hyperlambda format.
+ * 35. [log.error] - Logs an error message.
+ * 36. [strings.replace] - Replaces characters in the response.
+ * 37. [return] - Returns the final formatted response.
+ */
+slots.create:magic.ai.create-system-message
+   validators.mandatory:x:@.arguments/*/url
+   validators.mandatory:x:@.arguments/*/template
+   validators.mandatory:x:@.arguments/*/instruction
+   validators.url:x:@.arguments/*/url
+   execute:magic.http.scrape-url
+      url:x:@.arguments/*/url
+   if
+      not-null:x:@execute
+      .lambda
+         throw:Could not scrape URL
+            public:bool:true
+            status:x:@execute
+   .context:
+   while
+      and
+         exists:x:@execute/0
+         lt
+            openai.tokenize:x:@.context
+            .:int:4000
+      .lambda
+         .tmp
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.context
+               .:"\n\n"
+               get-value:x:@execute/0/*/prompt
+               .:"\n\n"
+               get-value:x:@execute/0/*/completion
+         if
+            lt
+               openai.tokenize:x:@.tmp
+               .:int:4000
+            .lambda
+               set-value:x:@.context
+                  get-value:x:@.tmp
+         remove-nodes:x:@execute/0/*/snippets/0
+         if
+            not-exists:x:@execute/0/*/snippets/0
+            .lambda
+               remove-nodes:x:@execute/0
+   set-value:x:@.context
+      strings.trim:x:@.context
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:gpt-4o
+         max_tokens:int:3600
+         temperature:decimal:0.3
+         messages
+            .
+               role:system
+               content:x:@.arguments/*/instruction
+            .
+               role:user
+               content:x:@.arguments/*/template
+            .
+               role:user
+               content:x:@.context
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+         throw:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   strings.replace:x:@http.post/*/content/*/choices/0/*/message/*/content
+      .:"\r"
+      .:
+   strings.replace:x:-
+      .:"\n"
+      .:@"
+"
+   return:x:-

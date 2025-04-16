@@ -1,0 +1,60 @@
+
+// This Hyperlambda code defines a dynamic slot named [magic.openai.chat-interceptor.avoid-abuse] to prevent abuse of an AI chatbot by blocking users based on their IP address. It retrieves the client's IP using [request.headers.get], checks if the IP is in a blocked list using [data.read], and blocks the request if the IP is found. It also checks the number of daily requests made by a user and blocks them if they exceed a configured limit using [data.scalar]. If a block is necessary, it logs the event and throws an exception with a message and status code 401.
+slots.create:magic.openai.chat-interceptor.avoid-abuse
+   request.headers.get:cf-connecting-ip
+   if
+      and
+         not-null:x:@request.headers.get
+         neq:x:@request.headers.get
+            .:
+      .lambda
+         data.connect:magic
+            data.read
+               table:ml_blocked_ips
+               where
+                  and
+                     ip_address.eq:x:@request.headers.get
+            if
+               exists:x:@data.read/*
+               .lambda
+                  request.headers.list
+                  add:x:./*/log.info
+                     get-nodes:x:@request.headers.list/*
+                  log.info:Potential abuse, user has been permanently blocked
+                  throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
+                     public:bool:true
+                     status:int:401
+            .block:bool:false
+            config.get:"magic:openai:max-daily-requests"
+            if
+               and
+                  not-null:x:@config.get
+                  neq:x:@config.get
+                     .:
+               .lambda
+                  .no
+                  set-value:x:@.no
+                     convert:x:@config.get
+                        type:int
+                  data.scalar:"select count(*) from ml_requests where user_id = @user and created >= date('now', '-1 day')"
+                     @user:x:@.arguments/*/user_id
+                  if
+                     mt
+                        convert:x:@data.scalar
+                           type:int
+                        get-value:x:@.no
+                     .lambda
+                        set-value:x:@.block
+                           .:bool:true
+            if:x:@.block
+               data.create
+                  table:ml_blocked_ips
+                  values
+                     ip_address:x:@request.headers.get
+                     user_id:x:@.arguments/*/user_id
+               add:x:./*/log.info
+                  request.headers.list
+               log.info:IP address was permanently blocked
+               throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
+                  public:bool:true
+                  status:int:401
