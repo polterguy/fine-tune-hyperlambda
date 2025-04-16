@@ -1,0 +1,43 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and performs a SQL query on the "EmployeeTerritories" table, joining it with the "Employees" table. It constructs a distinct count SQL function dynamically using a specified column, removes the column from the arguments, and adds additional conditions to the where clause. The query retrieves a count of distinct values and returns the result nodes. 
+ * 
+ * 1. [data.connect] - Connects to the database using a specified connection string.
+ * 2. [database-type] - Specifies the type of database being used, SQLite in this case.
+ * 3. [set-name] - Dynamically constructs a SQL function for counting distinct values.
+ * 4. [strings.concat] - Concatenates strings to form the SQL function.
+ * 5. [get-value] - Retrieves the value of the distinct column from the arguments.
+ * 6. [remove-nodes] - Removes the distinct column node from the arguments.
+ * 7. [add] - Adds additional nodes to the where clause.
+ * 8. [get-nodes] - Retrieves nodes from the arguments to be added to the where clause.
+ * 9. [data.read] - Reads data from the database, specifying the table and join conditions.
+ * 10. [join] - Specifies a left join between "EmployeeTerritories" and "Employees".
+ * 11. [columns] - Specifies the columns to be selected, including the distinct count.
+ * 12. [where] - Specifies the where clause for filtering results.
+ * 13. [return-nodes] - Returns the result nodes from the data read operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:EmployeeTerritories
+         join:Employees
+            as:EmployeeID
+            type:left
+            on
+               and
+                  EmployeeTerritories.EmployeeID:EmployeeID.EmployeeID
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

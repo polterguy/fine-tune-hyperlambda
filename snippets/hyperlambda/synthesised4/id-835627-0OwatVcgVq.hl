@@ -1,0 +1,42 @@
+
+// This Hyperlambda code connects to a SQLite database and performs a read operation on the "Products" table, joining it with "Categories" and "Suppliers" tables using left joins. It constructs a distinct SQL function using a specified column, removes certain nodes, and appends limit, offset, order, and direction nodes to the read operation. The code returns the results of the data read operation. Key slots include [data.connect] for database connection, [strings.concat] for constructing SQL functions, [remove-nodes] and [add] for modifying the node structure, and [return-nodes] for returning the query results.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Products
+         join:Categories
+            as:ProductID
+            type:left
+            on
+               and
+                  Products.ProductID:ProductID.CategoryID
+         join:Suppliers
+            as:SupplierID
+            type:left
+            on
+               and
+                  Products.SupplierID:SupplierID.SupplierID
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

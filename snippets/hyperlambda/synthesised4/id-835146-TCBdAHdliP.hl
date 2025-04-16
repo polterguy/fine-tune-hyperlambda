@@ -1,0 +1,22 @@
+
+// This Hyperlambda code iterates through each node in the [@data.select/*] set, checking if the [embedding_vss] node is not null. If it is not null, it sets its value to true, otherwise to false. It then concatenates the [prompt] and [completion] values of the current node, tokenizes the result using OpenAI's tokenizer, and adds the token count as a child node named [tokens] to the current node. The key slots used are [for-each], [if], [else], [strings.concat], [openai.tokenize], and [add].
+for-each:x:@data.select/*
+   if
+      not-null:x:@.dp/#/*/embedding_vss
+      .lambda
+         set-value:x:@.dp/#/*/embedding_vss
+            .:bool:true
+   else
+      set-value:x:@.dp/#/*/embedding_vss
+         .:bool:false
+   strings.concat
+      get-value:x:@.dp/#/*/prompt
+      .:@"
+
+"
+      get-value:x:@.dp/#/*/completion
+   openai.tokenize:x:@strings.concat
+   unwrap:x:+/*/*
+   add:x:@.dp/#
+      .
+         tokens:x:@openai.tokenize

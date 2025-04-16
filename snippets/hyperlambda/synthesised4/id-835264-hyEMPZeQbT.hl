@@ -1,0 +1,27 @@
+
+// The code iterates over a collection of sitemap URLs, loading and processing each sitemap until a maximum of 10,000 URLs are reached. It uses [for-each] to iterate, [if] to check conditions, and [unwrap] to evaluate expressions. It signals [magic.ai.load-sitemap] to load sitemaps, adds URLs to a collection, and sets a flag if no sitemap is found. Key slots include [for-each], [if], [unwrap], [signal], and [add].
+for-each:x:"@xml2lambda/*/sitemapindex/*/sitemap/*/[0,25]/loc/*/\\#text"
+   if
+      lt
+         get-count:x:@.urls/*
+         .:int:10000
+      .lambda
+         unwrap:x:+/**
+         signal:magic.ai.load-sitemap
+            max:int:10000
+            feedback-channel:x:@.arguments/*/feedback-channel
+            filter-on-url:x:@.arguments/*/filter-on-url
+            sitemap
+               .:x:@.dp/#
+         add:x:@.urls
+            get-nodes:x:@signal/*/urls/*
+         if
+            and
+               eq:x:@signal/*/has-sitemap
+                  .:bool:false
+               eq
+                  get-count:x:@.urls/*
+                  .:int:0
+            .lambda
+               set-value:x:@.has-sitemap
+                  .:bool:false

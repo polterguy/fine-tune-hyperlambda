@@ -1,0 +1,30 @@
+
+// This Hyperlambda code checks if a [client-id] is not null, and if true, it generates a nonce using [crypto.random] with a range between 20 and 30. It then stores this nonce in cache with a 3600-second expiration. If [createNonce] is true, it adds OAuth2 parameters to a URL for Google's authentication, and finally, it unwraps and adds the result to a return node. The key slots are: [if], [not-null], [eq], [set-value], [crypto.random], [cache.set], [add], and [unwrap].
+if
+   not-null:x:@.client-id
+   .lambda
+      .nonce
+      if
+         eq:x:@.arguments/*/createNonce
+            .:bool:true
+         .lambda
+            set-value:x:@.nonce
+               crypto.random
+                  min:20
+                  max:30
+            cache.set:x:@.nonce
+               value:"https://accounts.google.com"
+               expiration:3600
+            add:x:@.lambda/@.lambda/*/add/*/*
+               .
+                  nonce:x:@.nonce
+                  url:"https://accounts.google.com/o/oauth2/v2/auth"
+                  client_id:x:@.client-id
+                  response_type:id_token
+                  scope:openid email profile
+      unwrap:x:+/*/*/*
+      add:x:../*/return
+         .
+            .
+               name:Google
+               issuer:"https://accounts.google.com"

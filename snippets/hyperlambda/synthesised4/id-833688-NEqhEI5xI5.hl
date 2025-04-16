@@ -1,0 +1,35 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and reads data from the "crawl_urls" table. It dynamically adds and removes nodes related to ordering, direction, limit, and offset from the arguments, and constructs a "where" clause with additional conditions. The selected columns are "crawl_url_id", "url", and "type", and the results are returned as nodes. 
+ * 
+ * 1. [data.connect] - Establishes a connection to a SQLite database.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [add] - Adds nodes from the arguments to the "data.read" node.
+ * 4. [get-nodes] - Retrieves nodes from the arguments for ordering, direction, limit, and offset.
+ * 5. [remove-nodes] - Removes nodes related to ordering, direction, limit, and offset from the arguments.
+ * 6. [data.read] - Reads data from the "crawl_urls" table with specified columns and conditions.
+ * 7. [return-nodes] - Returns the nodes from the "data.read" operation.
+ */
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:crawl_urls
+      columns
+         crawl_urls.crawl_url_id
+         crawl_urls.url
+         crawl_urls.type
+      where
+         and
+   return-nodes:x:@data.read/*

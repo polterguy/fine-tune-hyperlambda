@@ -1,0 +1,60 @@
+
+/*
+ * This Hyperlambda code iterates over nodes in [.arguments] to process snippets, checking for a [prompt] node. If a [prompt] exists, it adds a type node and signals [magic.ai.can-create-snippet]. It sets a [uri] and determines the [type] based on conditions, defaulting to "default" if none are met. If a [filename] exists, it adds it to [data.create]. Finally, it creates a data entry in [ml_training_snippets] with specified values.
+ * 
+ * 1. [for-each] - Iterates over snippet nodes in [.arguments].
+ * 2. [if] - Checks for the existence of a [prompt] node.
+ * 3. [add] - Adds a type node from [.arguments].
+ * 4. [try-signal] - Signals [magic.ai.can-create-snippet].
+ * 5. [.uri] - Sets the [uri] value.
+ * 6. [set-value] - Sets [uri] and [type] values based on conditions.
+ * 7. [and] - Logical AND for checking conditions.
+ * 8. [exists] - Checks if a node exists.
+ * 9. [not-null] - Checks if a node is not null.
+ * 10. [neq] - Checks if a node value is not equal to a given value.
+ * 11. [else-if] - Alternative condition for setting [type].
+ * 12. [else] - Default action for setting [type].
+ * 13. [data.create] - Creates a data entry in [ml_training_snippets].
+ * 14. [values] - Specifies values for the data entry.
+ */
+for-each:x:@.arguments/*/snippets/*
+   if:x:@.dp/#/*/prompt
+      add:x:+
+         get-nodes:x:@.arguments/*/type
+      try-signal:magic.ai.can-create-snippet
+      .uri
+      set-value:x:@.uri
+         get-first-value
+            get-value:x:@.dp/#/*/uri
+            .:
+      .type
+      if
+         and
+            exists:x:@.arguments/*/type
+            not-null:x:@.arguments/*/type
+            neq:x:@.arguments/*/type
+               .:
+         .lambda
+            set-value:x:@.type
+               get-value:x:@.arguments/*/type
+      else-if
+         exists:x:@.dp/#/*/type
+         .lambda
+            set-value:x:@.type
+               get-value:x:@.dp/#/*/type
+      else
+         set-value:x:@.type
+            .:default
+      if
+         exists:x:@.dp/#/*/filename
+         .lambda
+            add:x:@for-each/*/data.create/*/values
+               get-nodes:x:@.dp/#/*/filename
+      data.create
+         table:ml_training_snippets
+         values
+            type:x:@.type
+            uri:x:@.uri
+            prompt:x:@.dp/#/*/prompt
+            completion:x:@.dp/#/*/completion
+            meta:imported

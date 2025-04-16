@@ -1,0 +1,29 @@
+
+// Iterates through a list of files, checking if each file ends with ".sql". If true, loads the file and attempts to execute it as a SQL batch based on the database type. Logs success or failure messages to the console, including error details if an exception occurs.
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         io.file.load:x:@.dp/#
+         try
+            if
+               eq
+                  get-value:x:@.db-type
+                  .:mssql
+               .lambda
+                  set-name:x:@if/./*/data.execute
+                     .:mssql.execute-batch
+            data.execute:x:@io.file.load
+            strings.concat
+               .:"Script '"
+               get-value:x:@.dp/#
+               .:"' succeeded"
+            console.log:x:@strings.concat
+         .catch
+            strings.concat
+               .:"Script '"
+               get-value:x:@.dp/#
+               .:"' failed"
+            console.log:x:@strings.concat
+            console.log:x:@.arguments/*/message

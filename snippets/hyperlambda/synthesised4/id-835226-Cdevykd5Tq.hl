@@ -1,0 +1,106 @@
+
+// This Hyperlambda code connects to a database to check if a specific message exists, and if not, it generates an SEO-optimized title and description using OpenAI's API. It then stores these in the database. Key slots include [data.connect] for database connection, [http.post] for API requests, [set-value] for setting values, and [data.create] for inserting data into the database. Error handling is done using [log.error] if the API call fails.
+data.connect:[generic|magic]
+   data.select:select id from ml_permalinks where messages = @messages limit 1
+      @messages:x:@cache.get
+   if
+      exists:x:@data.select/*
+      .lambda
+         yield
+            url:x:@data.select/*/*/id
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         get-first-value
+            get-value:x:@.arguments/*/api_key
+            config.get:"magic:openai:key"
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:o3-mini
+         max_completion_tokens:int:1000
+         messages
+            .
+               role:system
+               content:Create an SEO optimised summary of the following content intended to serve as a title
+            .
+               role:user
+               content:x:@cache.get
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   .title2
+   set-value:x:@.title2
+      get-first-value
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+         .:
+   set-value:x:@.title2
+      strings.trim:x:@.title2
+         .:@"""
+	 "
+   set-value:x:@.title2
+      strings.replace:x:@.title2
+         .:"\""
+         .:"'"
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:o3-mini
+         max_completion_tokens:int:1000
+         messages
+            .
+               role:system
+               content:Create a short and SEO optimised one sentence description of the following content intended to serve as a description for an HTML page with its content
+            .
+               role:user
+               content:x:@cache.get
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   .description2
+   set-value:x:@.description2
+      get-first-value
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+         .:
+   set-value:x:@.description2
+      strings.trim:x:@.description2
+         .:@"""
+	 "
+   set-value:x:@.description2
+      strings.replace:x:@.description2
+         .:"\""
+         .:"'"
+   data.create
+      table:ml_permalinks
+      values
+         id:x:@crypto.random
+         messages:x:@cache.get
+         title:x:@.title2
+         description:x:@.description2

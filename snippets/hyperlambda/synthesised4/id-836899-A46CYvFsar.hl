@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and performs a query on the "tasks" table, joining with the "users" table using a left join. It dynamically constructs a distinct count function based on a provided column, removes the original distinct column argument, and adds any additional conditions from the arguments to the where clause. Finally, it returns the results of the query. 
+ * 
+ * 1. [data.connect] - Connects to a database with a specified type.
+ * 2. [database-type] - Specifies the type of the database as SQLite.
+ * 3. [set-name] - Constructs a distinct count function for a specified column.
+ * 4. [strings.concat] - Concatenates strings to form the distinct function.
+ * 5. [get-value] - Retrieves the value of the distinct column argument.
+ * 6. [remove-nodes] - Removes the distinct column argument from the arguments.
+ * 7. [add] - Adds additional conditions from the arguments to the where clause.
+ * 8. [data.read] - Reads data from the "tasks" table, performing a left join with the "users" table.
+ * 9. [columns] - Specifies the columns to be selected, including the distinct function.
+ * 10. [where] - Specifies the where clause for the query.
+ * 11. [return-nodes] - Returns the results of the query.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:tasks
+         join:users
+            as:user_id
+            type:left
+            on
+               and
+                  tasks.user_id:user_id.user_id
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

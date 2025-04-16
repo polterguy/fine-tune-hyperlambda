@@ -1,0 +1,60 @@
+
+/*
+ * This Hyperlambda code snippet dynamically constructs an argument node based on the type of a given node. It first checks if the node's type is not a wildcard, then creates an argument structure with name and schema. It uses a switch-case to set the schema type based on the node's type, defaulting to string. If a description exists, it adds it to the argument. Finally, it appends the constructed argument to a buffer's parameters. 
+ * 
+ * 1. [if] - Checks if the type of the current node is not a wildcard.
+ * 2. [.arg] - Creates a new argument structure with name and schema.
+ * 3. [set-value] - Sets the name of the argument to the current node's name.
+ * 4. [switch] - Determines the schema type based on the node's type.
+ * 5. [case] - Handles integer types, setting schema type to integer.
+ * 6. [case] - Handles number types, setting schema type to number.
+ * 7. [case] - Handles boolean type, setting schema type to boolean.
+ * 8. [default] - Sets schema type to string for other types.
+ * 9. [if] - Checks if a description exists for the current node.
+ * 10. [unwrap] - Unwraps and processes the description.
+ * 11. [insert-after] - Inserts the description into the argument.
+ * 12. [add] - Adds the constructed argument to the buffer's parameters.
+ */
+if
+   neq:x:@.dp/#/*/type
+      .:*
+   .lambda
+      .arg
+         name
+         in:query
+         schema
+            type
+      set-value:x:@.arg/*/name
+         get-value:x:@.dp/#/*/name
+      switch:x:@.dp/#/*/type
+         case:short
+         case:ushort
+         case:int
+         case:uint
+         case:long
+         case:ulong
+            set-value:x:@.arg/*/schema/*/type
+               .:integer
+         case:float
+         case:double
+         case:decimal
+            set-value:x:@.arg/*/schema/*/type
+               .:number
+         case:bool
+            set-value:x:@.arg/*/schema/*/type
+               .:boolean
+         default
+            set-value:x:@.arg/*/schema/*/type
+               .:string
+      if
+         exists:x:@.dp/#/*/description
+         .lambda
+            unwrap:x:+/*/*
+            insert-after:x:@.arg/*/name
+               .
+                  description:x:@.dp/#/*/description
+      add:x:+/*/*
+         get-nodes:x:@.arg/*
+      add:x:@.buffer/*/*/*/parameters
+         .
+            .

@@ -1,0 +1,27 @@
+
+/*
+ * The code checks if a stream argument does not exist or is explicitly set to false. If either condition is true, it executes a lambda object that sets the values of [.result], [.finish_reason], and [.iterations] nodes. The [.result] node is set to the content of the first choice message from an HTTP POST response, [.finish_reason] is set to the first finish reason or "unknown" if not present, and [.iterations] is set to 0.
+ * 
+ * 1. [if] - Evaluates a condition and executes its lambda if true.
+ * 2. [or] - Logical OR to combine conditions.
+ * 3. [not-exists] - Checks if a node does not exist.
+ * 4. [eq] - Compares a node's value for equality.
+ * 5. [.lambda] - Contains the code executed if the condition is true.
+ * 6. [set-value] - Sets a node's value.
+ * 7. [get-value] - Retrieves a node's value.
+ * 8. [get-first-value] - Retrieves the first value from a node set.
+ */
+if
+   or
+      not-exists:x:@.arguments/*/stream
+      eq:x:@.arguments/*/stream
+         .:bool:false
+   .lambda
+      set-value:x:@.result
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+      set-value:x:@.finish_reason
+         get-first-value
+            get-value:x:@http.post/*/content/*/choices/0/*/finish_reason
+            .:unknown
+      set-value:x:@.iterations
+         .:int:0

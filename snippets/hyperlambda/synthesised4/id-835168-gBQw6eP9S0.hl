@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code connects to a database named "magic" and reads data from the "users_extra" table. It filters the data where the user's email matches a verified token and the type is either "name" or "email". For each record retrieved, it sets the name and value of nodes based on the "type" and "value" fields, and appends these to an "extra" node. 
+ * 
+ * 1. [data.connect] - Connects to the "magic" database.
+ * 2. [data.read] - Reads data from the specified table.
+ * 3. [table] - Specifies the "users_extra" table to read from.
+ * 4. [where] - Applies filtering conditions to the data retrieval.
+ * 5. [and] - Combines multiple conditions that must all be true.
+ * 6. [user.eq] - Checks if the user's email matches a verified token.
+ * 7. [or] - Combines conditions where at least one must be true.
+ * 8. [type.eq] - Checks if the type is "name".
+ * 9. [type.eq] - Checks if the type is "email".
+ * 10. [for-each] - Iterates over each record retrieved.
+ * 11. [set-name] - Sets the name of a node based on the "type" field.
+ * 12. [get-value] - Retrieves the value of a specified node.
+ * 13. [set-value] - Sets the value of a node based on the "value" field.
+ * 14. [add] - Appends nodes to the "extra" node.
+ */
+data.connect:magic
+   data.read
+      table:users_extra
+      where
+         and
+            user.eq:x:@auth.token.verify/*/email
+            or
+               type.eq:name
+               type.eq:email
+   for-each:x:@data.read/*
+      set-name:x:./*/add/*/*
+         get-value:x:@.dp/#/*/type
+      set-value:x:./*/add/*/*
+         get-value:x:@.dp/#/*/value
+      add:x:@.extra
+         .
+            .

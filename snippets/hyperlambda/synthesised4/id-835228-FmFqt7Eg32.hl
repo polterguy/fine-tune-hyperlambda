@@ -1,0 +1,70 @@
+
+// This Hyperlambda code checks if a query string starts with "http://" or "https://". If true, it concatenates a message and signals a session with the message. It then signals two processes: fetching a URL and extracting HTML content with specific options. The code enters a loop, appending prompts and completions from snippets to a temporary context until conditions are met, removing processed snippets.
+if
+   or
+      strings.starts-with:x:@.arguments/*/query
+         .:"http://"
+      strings.starts-with:x:@.arguments/*/query
+         .:"https://"
+   .lambda
+      strings.concat
+         .:"Scraping URL: "
+         get-value:x:@.arguments/*/query
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/session
+         args
+            message:x:@strings.concat
+            type:system
+      sleep:100
+      unwrap:x:+/*
+      signal:magic.ai.url.get
+         url:x:@.arguments/*/query
+      unwrap:x:+/*
+      signal:magic.ai.html.extract
+         url:x:@.arguments/*/query
+         images:bool:true
+         code:bool:true
+         lists:bool:true
+         main:bool:true
+         html:x:@signal/@signal
+      .tmp:
+      while
+         and
+            exists:x:@signal/*/snippets/0
+            lt
+               openai.tokenize:x:@.tmp
+               .:int:5000
+         .lambda
+            set-value:x:@.context
+               get-value:x:@.tmp
+            if
+               and
+                  exists:x:@signal/*/snippets/0/*/prompt
+                  not-null:x:@signal/*/snippets/0/*/prompt
+                  neq:x:@signal/*/snippets/0/*/prompt
+                     .:
+               .lambda
+                  set-value:x:@.tmp
+                     strings.concat
+                        get-value:x:@.tmp
+                        .:@"
+"
+                        .:@"
+"
+                        get-value:x:@signal/*/snippets/0/*/prompt
+            if
+               and
+                  exists:x:@signal/*/snippets/0/*/completion
+                  not-null:x:@signal/*/snippets/0/*/completion
+                  neq:x:@signal/*/snippets/0/*/completion
+                     .:
+               .lambda
+                  set-value:x:@.tmp
+                     strings.concat
+                        get-value:x:@.tmp
+                        .:@"
+"
+                        .:@"
+"
+                        get-value:x:@signal/*/snippets/0/*/completion
+            remove-nodes:x:@signal/*/snippets/0

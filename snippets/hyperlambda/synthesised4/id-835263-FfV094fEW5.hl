@@ -1,0 +1,37 @@
+
+/*
+ * This Hyperlambda code checks if a node named [relevant] is true. If so, it further checks if the [value] node starts with "http://" or "https://". If it does, it adds the [value] to a [disallow] node. If not, it concatenates [domain] and [value], then adds the result to [disallow]. 
+ * 
+ * 1. [if] - Checks if [relevant] is true.
+ * 2. [eq] - Compares [relevant] to true.
+ * 3. [or] - Checks if [value] starts with "http://" or "https://".
+ * 4. [strings.starts-with] - Checks if [value] starts with a specific string.
+ * 5. [unwrap] - Evaluates expressions in the context of the current node.
+ * 6. [add] - Adds a value to the [disallow] node.
+ * 7. [else] - Executes if the [or] condition is false.
+ * 8. [strings.concat] - Concatenates [domain] and [value].
+ * 9. [get-value] - Retrieves the value of a node.
+ */
+if
+   eq:x:@.relevant
+      .:bool:true
+   .lambda
+      if
+         or
+            strings.starts-with:x:@.value
+               .:"http://"
+            strings.starts-with:x:@.value
+               .:"https://"
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.disallow
+               .
+                  .:x:@.value
+      else
+         strings.concat
+            get-value:x:@.domain
+            get-value:x:@.value
+         unwrap:x:+/*/*
+         add:x:@.disallow
+            .
+               .:x:@strings.concat

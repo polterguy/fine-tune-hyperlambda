@@ -1,0 +1,45 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "hospital" and attempts to update records in the "Doctors" table. It uses [data.update] to specify the table and conditions for the update operation. If no records are updated, it sets the response status to 404 and returns "Record not found". If records are updated, it sets the response status to 202, signals a socket event "hospital.Doctors.put" with arguments and roles, and returns the number of affected records.
+ * 
+ * 1. [data.connect] - Opens a connection to the "hospital" SQLite database.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [add] - Adds nodes to the update values and where conditions.
+ * 4. [data.update] - Updates the "Doctors" table with specified values and conditions.
+ * 5. [if] - Checks if no records were updated.
+ * 6. [eq] - Compares the update result to zero.
+ * 7. [response.status.set] - Sets the HTTP response status.
+ * 8. [return] - Returns a result message or affected records count.
+ * 9. [sockets.signal] - Signals a socket event with arguments and roles.
+ * 10. [unwrap] - Evaluates expressions in the next node.
+ * 
+ */
+data.connect:[generic|hospital]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Doctors
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Doctors.put
+      args
+      roles:admin,root
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

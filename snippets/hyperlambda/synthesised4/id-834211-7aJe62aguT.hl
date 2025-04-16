@@ -1,0 +1,33 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and performs a distinct count on a specified column within the "Categories" table. It dynamically constructs a SQL function to count distinct values, removes the original distinct column argument, adds additional conditions to the query, and executes a data read operation. The final result is returned as nodes. 
+ * 
+ * 1. [data.connect] - Connects to the "northwind" database using SQLite.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs a SQL function for counting distinct values.
+ * 4. [remove-nodes] - Removes the distinct column argument from the arguments.
+ * 5. [add] - Adds additional conditions to the query from the arguments.
+ * 6. [data.read] - Reads data from the "Categories" table with the constructed query.
+ * 7. [columns] - Specifies the columns to select, including the distinct count.
+ * 8. [where] - Initializes a where clause for additional conditions.
+ * 9. [return-nodes] - Returns the result nodes from the data read operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Categories
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

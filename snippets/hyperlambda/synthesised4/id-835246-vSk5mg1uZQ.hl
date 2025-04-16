@@ -1,0 +1,40 @@
+
+// This Hyperlambda code checks if a cached item exists and is valid, or if certain conditions on references are met, before querying a database for a completion. The [if] slot evaluates multiple conditions using [and] and [or], checking for the existence and validity of cached data and references. If conditions are met, it connects to a database, reads from the "ml_requests" table, and checks if the retrieved data is cached. If so, it returns the completion and a finish reason of "cached".
+if
+   and
+      exists:x:@.arguments/*/cached
+      not-null:x:@.arguments/*/cached
+      eq
+         convert:x:@.arguments/*/cached
+            type:int
+         .:int:1
+      or
+         not-exists:x:@.arguments/*/references
+         not
+            get-value:x:@.arguments/*/references
+   .lambda
+      data.connect:[generic|magic]
+         data.read
+            table:ml_requests
+            columns
+               completion
+               cached
+            where
+               and
+                  prompt.eq:x:@.arguments/*/prompt
+                  type.eq:x:@.arguments/*/type
+            limit:1
+            order:created
+            direction:desc
+         if
+            and
+               exists:x:@data.read/*/*
+               eq
+                  convert:x:@data.read/*/*/cached
+                     type:int
+                  .:int:1
+            .lambda
+               unwrap:x:+/*
+               return
+                  result:x:@data.read/*/*/completion
+                  finish_reason:cached

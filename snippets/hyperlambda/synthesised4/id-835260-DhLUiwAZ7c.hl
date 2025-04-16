@@ -1,0 +1,38 @@
+
+// This Hyperlambda code checks if a signal indicates the presence of a "robots.txt" file. If found, it sends a message through a socket and calculates the number of sitemaps, sending this information as well. It further checks for a "crawl-delay" value, updates the delay argument, and sends a message with the delay time in seconds. Key slots include [if] for conditional logic, [sockets.signal] for sending messages, [strings.concat] for string concatenation, [unwrap] to evaluate expressions, and [exists] to check for node existence.
+if
+   eq:x:@signal/*/found
+      .:bool:true
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Site has robots.txt
+            type:info
+      sleep:100
+      strings.concat
+         .:"Found "
+         get-count:x:@signal/*/sitemap/*
+         .:" sitemaps in robots.txt file"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      sleep:100
+      if
+         exists:x:@signal/*/crawl-delay
+         .lambda
+            remove-nodes:x:@.arguments/*/delay
+            unwrap:x:+/*
+            validators.default:x:@.arguments
+               delay:x:@signal/*/crawl-delay
+            strings.concat
+               .:"Robots.txt file contains a Crawl-Delay value of "
+               math.divide:x:@signal/*/crawl-delay
+                  .:int:1000
+               .:" seconds"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info

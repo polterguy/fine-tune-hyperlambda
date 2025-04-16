@@ -1,0 +1,54 @@
+
+/*
+ * This Hyperlambda code performs a series of checks and validations related to reCAPTCHA and JWT tokens. It first checks if a JWT token exists and if the reCAPTCHA score is greater than zero and not null. If these conditions are met, it further checks if a reCAPTCHA response is missing or null, setting an error status if true. It retrieves the reCAPTCHA site key and secret from configuration, converts the reCAPTCHA score, and validates the reCAPTCHA response using these values. 
+ * 
+ * 1. [if] - Checks if the JWT token exists and the reCAPTCHA score is valid.
+ * 2. [and] - Combines multiple conditions to be true for the [if] statement.
+ * 3. [eq] - Checks if a JWT token exists.
+ * 4. [mt] - Checks if the reCAPTCHA score is greater than zero.
+ * 5. [not-null] - Ensures the reCAPTCHA score is not null.
+ * 6. [.lambda] - Executes the nested logic if the conditions are met.
+ * 7. [if] - Checks if the reCAPTCHA response is missing or null.
+ * 8. [or] - Combines conditions for the nested [if] statement.
+ * 9. [not-exists] - Checks if the reCAPTCHA response does not exist.
+ * 10. [null] - Checks if the reCAPTCHA response is null.
+ * 11. [.lambda] - Executes the logic to set an error status if conditions are met.
+ * 12. [response.status.set] - Sets the HTTP response status to 499.
+ * 13. [return] - Returns an error message if no reCAPTCHA is supplied.
+ * 14. [.key] - Retrieves the reCAPTCHA site key from configuration.
+ * 15. [set-value] - Sets the site key and secret values.
+ * 16. [.secret] - Retrieves the reCAPTCHA secret from configuration.
+ * 17. [convert] - Converts the reCAPTCHA score to a decimal type.
+ * 18. [validators.recaptcha] - Validates the reCAPTCHA response using the site key, secret, and minimum score.
+ */
+if
+   and
+      eq
+         auth.ticket.get
+         .
+      mt
+         convert:x:@.model/*/recaptcha
+            type:decimal
+         .:decimal:0
+      not-null:x:@.model/*/recaptcha
+   .lambda
+      if
+         or
+            not-exists:x:@.arguments/*/recaptcha_response
+            null:x:@.arguments/*/recaptcha_response
+         .lambda
+            response.status.set:499
+            return
+               error:No reCAPTCHA supplied
+      .key
+      set-value:x:@.key
+         config.get:"magic:auth:recaptcha:key"
+      .secret
+      set-value:x:@.secret
+         config.get:"magic:auth:recaptcha:secret"
+      convert:x:@.model/*/recaptcha
+         type:decimal
+      validators.recaptcha:x:@.arguments/*/recaptcha_response
+         min:x:@convert
+         site-key:x:@.key
+         secret:x:@.secret

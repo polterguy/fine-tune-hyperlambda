@@ -1,0 +1,55 @@
+
+/*
+ * This Hyperlambda code iterates over each child node of [.tmp-snippets] and sends an HTTP POST request to the OpenAI API for chat completions. It sets headers and payload for the request, including model, max tokens, and temperature. If the response status code is not between 200 and 299, it logs an error with details. Otherwise, it updates the [.dp] node's prompt with the response content from OpenAI.
+ * 
+ * 1. [for-each] - Iterates over each child node of [.tmp-snippets].
+ * 2. [http.post] - Sends a POST request to the OpenAI API for chat completions.
+ * 3. [convert] - Converts the response to the appropriate type.
+ * 4. [headers] - Sets HTTP headers for the request.
+ * 5. [payload] - Defines the request payload, including model and message details.
+ * 6. [if] - Checks if the response status code indicates an error.
+ * 7. [not] - Inverts the condition to check for non-success status codes.
+ * 8. [and] - Combines conditions for status code checking.
+ * 9. [mte] - Checks if the status code is greater than or equal to 200.
+ * 10. [lt] - Checks if the status code is less than 300.
+ * 11. [.lambda] - Executes error handling if the status code is not successful.
+ * 12. [lambda2hyper] - Converts the response to a Hyperlambda format.
+ * 13. [log.error] - Logs an error message with details if the request fails.
+ * 14. [else] - Executes if the response status code indicates success.
+ * 15. [set-value] - Updates the [.dp] node's prompt with the response content.
+ * 16. [get-value] - Retrieves the response content from the OpenAI API.
+ */
+for-each:x:@.tmp-snippets/*
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+         Accept:text/event-stream
+      payload
+         model:gpt-3.5-turbo
+         max_tokens:int:1000
+         temperature:decimal:0.3
+         messages
+            .
+               role:system
+               content:x:@.arguments/*/massagePrompt
+            .
+               role:user
+               content:x:@.dp/#/*/completion
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   else
+      set-value:x:@.dp/#/*/prompt
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content

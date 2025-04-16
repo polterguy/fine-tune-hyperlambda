@@ -1,0 +1,35 @@
+
+/*
+ * The code checks if a file path ends with ".hl" and, if true, loads the file, transforms it into a lambda object, and checks if the root node's name is "..". If so, it prepends a copyright notice to the content, converts it back to Hyperlambda, and saves the file with comments preserved.
+ * 
+ * 1. [if] - Checks if the file path ends with ".hl".
+ * 2. [strings.ends-with] - Determines if the file path ends with ".hl".
+ * 3. [io.file.load] - Loads the file content if the condition is true.
+ * 4. [hyper2lambda] - Converts the file content to a lambda object with comments.
+ * 5. [if] - Checks if the root node's name is "..".
+ * 6. [eq] - Compares the root node's name to "..".
+ * 7. [set-value] - Prepends a copyright notice to the lambda content.
+ * 8. [strings.concat] - Concatenates the copyright notice with the original content.
+ * 9. [lambda2hyper] - Converts the modified lambda object back to Hyperlambda with comments.
+ * 10. [io.file.save] - Saves the modified content back to the original file path.
+ */
+if
+   strings.ends-with:x:@.dp/#
+      .:.hl
+   .lambda
+      io.file.load:x:@.dp/#
+      hyper2lambda:x:@io.file.load
+         comments:true
+      if
+         eq
+            get-name:x:@hyper2lambda/0
+            .:..
+         .lambda
+            set-value:x:@hyper2lambda/0
+               strings.concat
+                  .:"Copyright Thomas Hansen 2025\n"
+                  get-value:x:@hyper2lambda/0
+            lambda2hyper:x:@hyper2lambda/*
+               comments:true
+            io.file.save:x:@.dp/#
+               get-value:x:@lambda2hyper

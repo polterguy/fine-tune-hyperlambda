@@ -1,0 +1,167 @@
+
+/*
+ * This Hyperlambda code uses a [switch] statement to handle different file types by converting them into lambda objects or processing them accordingly. It processes ZIP, CSV, XML, JSON, YAML, PDF, and text files differently, using slots like [csv2lambda], [xml2lambda], [json2lambda], and [yaml2lambda] to convert file content into lambda objects. For PDFs, it saves the file, extracts text, and optionally massages the content using OpenAI's API. The code also handles file overwriting and constructs a URI for PDF downloads.
+ * 
+ * 1. [switch] - Determines the file type to process.
+ * 2. [case:zip] - Processes ZIP files by importing them.
+ * 3. [case:csv] - Converts CSV files to lambda objects.
+ * 4. [case:xml] - Converts XML files to lambda objects and processes prompts and completions.
+ * 5. [case:json] - Converts JSON files to lambda objects.
+ * 6. [case:yaml] - Converts YAML files to lambda objects.
+ * 7. [case:pdf] - Saves PDF files, extracts text, and optionally massages content using OpenAI.
+ * 8. [case:md] and [case:txt] - Sets a flag for text files.
+ */
+switch:x:@strings.to-lower
+   case:zip
+      add:x:./*/signal
+         get-nodes:x:@.arguments/*
+      signal:magic.ai.import-zip-file
+      return:x:-/*
+   case:csv
+      if
+         eq:x:@.arguments/*/forceAsText
+            .:bool:true
+         .lambda
+            set-value:x:@.text
+               .:bool:true
+      else
+         io.stream.read:x:@.arguments/*/file/*/stream
+         add:x:@.file-data
+            csv2lambda:x:@io.stream.read
+   case:xml
+      io.stream.read:x:@.arguments/*/file/*/stream
+      xml2lambda:x:@io.stream.read
+      for-each:x:@xml2lambda/*/*
+         unwrap:x:./*/add/*/*/*
+         set-name:x:./*/add/*/*/*/prompt
+            get-value:x:@.arguments/*/prompt
+         set-name:x:./*/add/*/*/*/completion
+            get-value:x:@.arguments/*/completion
+         add:x:@.file-data
+            .
+               .
+                  prompt:x:"@.dp/#/*/\"{@.arguments/*/prompt}\"/*/\\#text"
+                  completion:x:"@.dp/#/*/\"{@.arguments/*/completion}\"/*/\\#text"
+   case:json
+      io.stream.read:x:@.arguments/*/file/*/stream
+      add:x:@.file-data
+         json2lambda:x:@io.stream.read
+   case:yaml
+      io.stream.read:x:@.arguments/*/file/*/stream
+      add:x:@.file-data
+         yaml2lambda:x:@io.stream.read
+   case:pdf
+      .filename
+      set-value:x:@.filename
+         get-value:x:@.arguments/*/file/*/name
+      .filepath
+      set-value:x:@.filepath
+         strings.concat
+            .:/etc/system/openai/pdf/
+            get-value:x:@.filename
+      if
+         and
+            eq:x:@.arguments/*/overwrite
+               .:bool:false
+            io.file.exists:x:@.filepath
+         .lambda
+            throw:File already exists
+               status:int:400
+               public:bool:true
+      io.stream.save-file:x:@.filepath
+         get-value:x:@.arguments/*/file/*/stream
+      .tmp-snippets
+      pdf2text:x:@.filepath
+         preserve-pages:x:@.arguments/*/preservePages
+      if
+         eq:x:@.arguments/*/preservePages
+            .:bool:true
+         .lambda
+            .no:int:1
+            for-each:x:@pdf2text/*
+               .prompt
+               set-value:x:@.prompt
+                  strings.concat
+                     get-value:x:@.arguments/*/file/*/name
+                     .:" - Page "
+                     get-value:x:@.no
+               unwrap:x:+/*/*/*
+               add:x:@.tmp-snippets
+                  .
+                     .
+                        prompt:x:@.prompt
+                        completion:x:@.dp/#
+               math.increment:x:@.no
+      else
+         unwrap:x:+/*
+         signal:magic.ai.massage
+            content:x:@pdf2text
+            massage:x:@.arguments/*/massage
+            prompt:x:@.arguments/*/file/*/name
+            type:x:@.arguments/*/type
+         add:x:@.tmp-snippets
+            get-nodes:x:@signal/*
+      .uri
+      set-value:x:@.uri
+         strings.concat
+            request.scheme
+            .:"://"
+            request.host
+            .:/magic/system/openai/download-pdf?file=
+            strings.url-encode:x:@.filename
+      if
+         and
+            not-null:x:@.arguments/*/massagePrompt
+            neq:x:@.arguments/*/massagePrompt
+               .:
+         .lambda
+            .token
+            set-value:x:@.token
+               strings.concat
+                  .:"Bearer "
+                  config.get:"magic:openai:key"
+            for-each:x:@.tmp-snippets/*
+               http.post:"https://api.openai.com/v1/chat/completions"
+                  convert:bool:true
+                  headers
+                     Authorization:x:@.token
+                     Content-Type:application/json
+                     Accept:text/event-stream
+                  payload
+                     model:gpt-3.5-turbo
+                     max_tokens:int:1000
+                     temperature:decimal:0.3
+                     messages
+                        .
+                           role:system
+                           content:x:@.arguments/*/massagePrompt
+                        .
+                           role:user
+                           content:x:@.dp/#/*/completion
+               if
+                  not
+                     and
+                        mte:x:@http.post
+                           .:int:200
+                        lt:x:@http.post
+                           .:int:300
+                  .lambda
+                     lambda2hyper:x:@http.post
+                     log.error:Something went wrong while invoking OpenAI
+                        message:x:@http.post/*/content/*/error/*/message
+                        status:x:@http.post
+                        error:x:@lambda2hyper
+               else
+                  set-value:x:@.dp/#/*/prompt
+                     get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+      unwrap:x:+/*/*
+      add:x:@.tmp-snippets/*
+         .
+            uri:x:@.uri
+            filename:x:@.filepath
+      add:x:@.file-data
+         get-nodes:x:@.tmp-snippets/*
+   case:md
+   case:txt
+      set-value:x:@.text
+         .:bool:true

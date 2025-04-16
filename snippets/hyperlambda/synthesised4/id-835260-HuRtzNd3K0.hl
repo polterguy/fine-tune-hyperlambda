@@ -1,0 +1,19 @@
+
+// This Hyperlambda code checks if a [crawl-delay] node exists within the [signal] node. If it exists, it removes any existing [delay] node from [.arguments], calculates the delay in seconds by dividing the [crawl-delay] value by 1000, and constructs a message indicating the delay in seconds. This message is then sent to a feedback channel using [sockets.signal]. The code uses [unwrap] to evaluate expressions and [validators.default] to ensure the [delay] value is set in [.arguments].
+if
+   exists:x:@signal/*/crawl-delay
+   .lambda
+      remove-nodes:x:@.arguments/*/delay
+      unwrap:x:+/*
+      validators.default:x:@.arguments
+         delay:x:@signal/*/crawl-delay
+      strings.concat
+         .:"Robots.txt file contains a Crawl-Delay value of "
+         math.divide:x:@signal/*/crawl-delay
+            .:int:1000
+         .:" seconds"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info

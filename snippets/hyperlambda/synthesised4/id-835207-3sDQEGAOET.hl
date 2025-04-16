@@ -1,0 +1,40 @@
+
+// This Hyperlambda code creates a scheduled task that deletes a chatbot 7 days after its creation. It starts by sending a signal with a message to a feedback channel, then calculates the future date by adding 7 days to the current date. It constructs a task name using string concatenation and creates a task with a description and due date. The task's lambda deletes specific records from a database and a file, logs the deletion, and finally deletes the task itself. Key slots used include [if], [sockets.signal], [sleep], [math.add], [strings.concat], [unwrap], [tasks.create], [data.connect], [data.execute], [data.delete], [io.file.delete], and [log.info].
+if:x:@.auto_destruct
+   sockets.signal:x:@.feedback-channel
+      args
+         message:Creating scheduled task that deletes chatbot 7 days from now
+         type:info
+   sleep:100
+   math.add
+      date.now
+      time
+         days:7
+   strings.concat
+      .:delete-chatbot-
+      get-value:x:@.type
+   unwrap:x:+/+/*/.lambda/*/.task
+   unwrap:x:+/*/.lambda/*/.type
+   tasks.create:x:@strings.concat
+      description:Deletes demo chatbot 7 days after creating it
+      due:x:@math.add
+      .lambda
+         .type:x:@.type
+         data.connect:[generic|magic]
+            data.execute:"\ndelete from vss_ml_training_snippets\n   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+               type:x:@.type
+         .task:x:@strings.concat
+         data.connect:[generic|magic]
+            data.delete
+               table:ml_types
+               where
+                  and
+                     type.eq:x:@.type
+         strings.concat
+            .:/etc/www/
+            get-value:x:@.type
+            .:.html
+         io.file.delete:x:@strings.concat
+         log.info:Demo chatbot was deleted
+            type:x:@.type
+         tasks.delete:x:@.task

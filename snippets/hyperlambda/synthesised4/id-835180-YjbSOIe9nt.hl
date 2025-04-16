@@ -1,0 +1,47 @@
+
+/*
+ * This Hyperlambda code iterates over nodes in [.result], checks if their values end with ".hl", and processes them as Hyperlambda files. It loads the file, converts it to a lambda object while preserving comments, and if the first node's name is "..", it unwraps and adds a description and content. It also splits the filename by "/" and ".", removes nodes, joins the parts, and adds a return node with the name and filename. 
+ * 
+ * 1. [for-each] - Iterates over nodes in [.result].
+ * 2. [if] - Checks if the current node's value ends with ".hl".
+ * 3. [load-file] - Loads the file specified by the current node's value.
+ * 4. [hyper2lambda] - Converts the loaded file to a lambda object, preserving comments.
+ * 5. [if] - Checks if the first node's name in the lambda object is "..".
+ * 6. [unwrap] - Unwraps and processes the lambda object.
+ * 7. [add] - Adds description and content nodes.
+ * 8. [strings.split] - Splits the filename by "/" and ".".
+ * 9. [remove-nodes] - Removes nodes from the split result.
+ * 10. [strings.join] - Joins the split parts.
+ * 11. [add] - Adds a return node with name and filename.
+ */
+for-each:x:@.result/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+         load-file:x:@.dp/#
+         hyper2lambda:x:-
+            comments:true
+         if
+            eq
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.lambda/@.lambda/0/-/*/*
+                  .
+                     description:x:@hyper2lambda/0
+                     content:x:@load-file
+         strings.split:x:@.dp/#
+            .:/
+         strings.split:x:-/0/-
+            .:.
+         remove-nodes:x:@strings.split/0/-
+         strings.join:x:@strings.split/0
+            .:.
+         unwrap:x:+/*/*/*
+         add:x:../*/return
+            .
+               .
+                  name:x:@strings.join
+                  filename:x:@.dp/#

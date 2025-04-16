@@ -1,0 +1,21 @@
+
+// Iterates over files in a directory recursively using [for-each], checking if each file ends with ".hl" using [strings.ends-with]. If true, the file is loaded with [io.file.load] and converted to a lambda structure with [hyper2lambda], preserving comments. For each node in the lambda, it checks if the node's name does not exist in [.result] but exists in [vocabulary] using [if], [and], [not-exists], and [exists]. If conditions are met, it unwraps the node and adds it to [.result] using [add].
+for-each:x:@io.file.list-recursively/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+         io.file.load:x:@.dp/#
+         hyper2lambda:x:@io.file.load
+            comments:true
+         for-each:x:@hyper2lambda/*/**
+            get-name:x:@.dp/#
+            if
+               and
+                  not-exists:x:@.result/*/={@get-name}
+                  exists:x:@vocabulary/*/={@get-name}
+               .lambda
+                  unwrap:x:+/*/*
+                  add:x:@.result
+                     .
+                        .:x:@get-name

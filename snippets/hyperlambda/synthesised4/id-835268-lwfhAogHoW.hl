@@ -1,0 +1,32 @@
+
+/*
+ * This Hyperlambda code checks if the [model] argument starts with "gpt". If true, it adds nodes from [.arguments] to a signal, invokes the [magic.ai.chat] signal, unwraps the result, and sends a message using [magic.twilio.send-message], swapping the [from] and [to] arguments. The Twilio account credentials are retrieved from the context. 
+ * 
+ * 1. [if] - Checks if the [model] argument starts with "gpt".
+ * 2. [strings.starts-with] - Determines if the [model] argument begins with "gpt".
+ * 3. [.lambda] - Executes the following nodes if the condition is true.
+ * 4. [add] - Adds nodes from [.arguments] to the signal.
+ * 5. [get-nodes] - Retrieves nodes from [.arguments].
+ * 6. [signal] - Invokes the [magic.ai.chat] signal.
+ * 7. [unwrap] - Unwraps the result of the signal invocation.
+ * 8. [signal] - Sends a message using [magic.twilio.send-message].
+ * 9. [body] - Sets the message body from the signal result.
+ * 10. [to] - Sets the recipient of the message.
+ * 11. [from] - Sets the sender of the message.
+ * 12. [twilio_account_id] - Retrieves the Twilio account ID.
+ * 13. [twilio_account_sid] - Retrieves the Twilio account SID.
+ */
+if
+   strings.starts-with:x:@.arguments/*/model
+      .:gpt
+   .lambda
+      add:x:./*/signal/[0,1]
+         get-nodes:x:@.arguments/*
+      signal:magic.ai.chat
+      unwrap:x:+/*
+      signal:magic.twilio.send-message
+         body:x:@signal/@signal/*/result
+         to:x:@.arguments/*/from
+         from:x:@.arguments/*/to
+         twilio_account_id:x:@.twilio_account_id
+         twilio_account_sid:x:@.twilio_account_sid

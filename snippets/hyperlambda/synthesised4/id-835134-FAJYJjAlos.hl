@@ -1,0 +1,46 @@
+
+// This Hyperlambda code iterates over input nodes, checks their types, and constructs argument nodes with appropriate schema types. It uses [for-each] to iterate through input nodes, [if] and [neq] to filter nodes based on type, and [switch] to map types to schema types. The code also checks for descriptions using [exists], and adds this information to the argument nodes. Finally, it appends the constructed nodes to a buffer using [add].
+for-each:x:@.dp/#/*/input/*
+   if
+      neq:x:@.dp/#/*/type
+         .:*
+      .lambda
+         .arg
+            name
+            in:query
+            schema
+               type
+         set-value:x:@.arg/*/name
+            get-value:x:@.dp/#/*/name
+         switch:x:@.dp/#/*/type
+            case:short
+            case:ushort
+            case:int
+            case:uint
+            case:long
+            case:ulong
+               set-value:x:@.arg/*/schema/*/type
+                  .:integer
+            case:float
+            case:double
+            case:decimal
+               set-value:x:@.arg/*/schema/*/type
+                  .:number
+            case:bool
+               set-value:x:@.arg/*/schema/*/type
+                  .:boolean
+            default
+               set-value:x:@.arg/*/schema/*/type
+                  .:string
+         if
+            exists:x:@.dp/#/*/description
+            .lambda
+               unwrap:x:+/*/*
+               insert-after:x:@.arg/*/name
+                  .
+                     description:x:@.dp/#/*/description
+         add:x:+/*/*
+            get-nodes:x:@.arg/*
+         add:x:@.buffer/*/*/*/parameters
+            .
+               .

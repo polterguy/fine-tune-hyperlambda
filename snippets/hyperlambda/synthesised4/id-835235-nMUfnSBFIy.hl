@@ -1,0 +1,37 @@
+
+/*
+ * This Hyperlambda code checks if the status of an HTTP GET request is "succeeded" and logs a success message if true. It updates the "ml_types" table with the fine-tuned model and marks training snippets as pushed in the "ml_training_snippets" table. It then deletes a task and sends a success signal to the backend. 
+ * 1. [if] - Checks if the status of the HTTP GET request is "succeeded".
+ * 2. [log.info] - Logs a message indicating successful training of the OpenAI model.
+ * 3. [data.connect] - Connects to a data source for database operations.
+ * 4. [data.update] - Updates the "ml_types" table with the fine-tuned model.
+ * 5. [data.update] - Marks training snippets as pushed in the "ml_training_snippets" table.
+ * 6. [tasks.delete] - Deletes a task using its ID.
+ * 7. [sockets.signal] - Sends a success message to the backend.
+ */
+if
+   eq:x:@http.get/*/content/*/status
+      .:succeeded
+   .lambda
+      log.info:Training of OpenAI model completed successfully
+      data.connect:[generic|magic]
+         data.update
+            table:ml_types
+            values
+               model:x:@http.get/*/content/*/fine_tuned_model
+            where
+               and
+                  type.eq:x:@.type
+         data.update
+            table:ml_training_snippets
+            values
+               pushed:int:1
+            where
+               and
+                  type.eq:x:@.type
+      tasks.delete:x:@.task-id
+      sockets.signal:magic.backend.message
+         roles:root
+         args
+            message:Training of your OpenAI model succeeded!
+            type:success

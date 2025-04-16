@@ -1,0 +1,65 @@
+
+/*
+ * This Hyperlambda code checks if a machine learning model type already exists in a database and throws an error if it does. It then attempts to signal the creation of a new machine learning model and sets various parameters for it, including token limits and model type. If the model type does not start with "gpt-4", it adjusts the token limits. Finally, it creates a new entry in the "ml_types" table with the specified parameters.
+ * 
+ * 1. [data.connect] - Opens a database connection using a specified connection string.
+ * 2. [data.read] - Reads data from the "ml_types" table, filtering by type.
+ * 3. [if] - Checks if the type already exists in the database.
+ * 4. [throw] - Throws an error if the model already exists.
+ * 5. [try-signal] - Attempts to signal the creation of a new machine learning model.
+ * 6. [if] - Checks if the "autocrawl" argument is true.
+ * 7. [unwrap] - Unwraps and evaluates expressions.
+ * 8. [add] - Adds a base URL to the data to be created.
+ * 9. [.max-tokens] - Sets the maximum tokens for the model.
+ * 10. [.max-context-tokens] - Sets the maximum context tokens for the model.
+ * 11. [if] - Checks if the model name does not start with "gpt-4".
+ * 12. [set-value] - Adjusts token limits if the model is not "gpt-4".
+ * 13. [data.create] - Creates a new entry in the "ml_types" table with specified values.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         type
+      where
+         and
+            type.eq:x:@.type
+   if
+      exists:x:@data.read/*
+      .lambda
+         throw:Model already exists!
+   try-signal:magic.ai.can-create-machine-learning-model
+   if:x:@.arguments/*/autocrawl
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/data.create/[0,1]/*/values
+         .
+            base_url:x:@.arguments/*/url
+   .max-tokens:int:4000
+   .max-context-tokens:int:4000
+   if
+      not
+         strings.starts-with:x:@.arguments/*/model
+            .:gpt-4
+      .lambda
+         set-value:x:@.max-context-tokens
+            .:int:1000
+         set-value:x:@.max-tokens
+            .:int:1000
+   data.create
+      table:ml_types
+      values
+         type:x:@.type
+         model:x:@.arguments/*/model
+         max_tokens:x:@.max-tokens
+         max_context_tokens:x:@.max-context-tokens
+         max_request_tokens:int:1000
+         temperature:decimal:0.3
+         recaptcha:decimal:0.0
+         supervised:int:1
+         cached:int:0
+         use_embeddings:int:1
+         threshold:decimal:0.3
+         vector_model:text-embedding-ada-002
+         system_message:x:@.arguments/*/flavor
+         greeting:Hi there, how can I help you?
+         conversation_starters:"* What can I ask you about?\n* How do I contact you?\n* Who created this chatbot?"

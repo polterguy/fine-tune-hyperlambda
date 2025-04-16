@@ -1,0 +1,31 @@
+
+// This Hyperlambda code iterates over each list item in the HTML converted to a lambda object, splits the text by "=>" to separate questions from answers, and processes them. It trims and sets the question text, checks if there are multiple parts, and if so, further splits by commas to handle multiple answers. It then trims and assigns names to these answers, adding them to a data structure for questions. The code uses slots like [for-each], [strings.split], [set-value], [if], and [data.create] to manipulate and organize the data into a table format.
+for-each:x:@html2lambda/**/li
+   strings.split:x:"@.dp/#/*/\\#text"
+      .:=>
+   .question
+   set-value:x:@.question
+      strings.trim:x:@strings.split/0
+   if
+      mt
+         get-count:x:@strings.split/*
+         .:int:1
+      .lambda
+         strings.trim:x:@strings.split/1
+         strings.split:x:-
+            .:,
+         for-each:x:@strings.split/*
+            strings.split:x:@.dp/#
+               .:=
+            set-value:x:./*/add/*/*/name
+               strings.trim:x:@strings.split/1
+            set-name:x:./*/add/*/*/name
+               strings.trim:x:@strings.split/0
+            add:x:@for-each/@for-each/*/data.create/*/values
+               .
+                  name:value
+   data.create
+      table:questions
+      values
+         questionnaire:x:@.arguments/*/name
+         question:x:@.question

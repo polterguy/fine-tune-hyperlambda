@@ -1,0 +1,14 @@
+
+// This Hyperlambda code creates a scheduled task named "sqlite.create-backup" that runs every day at 1 AM UTC. The task connects to a database, checks if a backup file exists, deletes it if it does, creates a new backup of the database, flushes cached connections, and logs the backup creation. The [tasks.create] slot is used to define the task, [data.connect] establishes the database connection, [if] checks for the file's existence, [io.file.delete] removes the existing backup, [sqlite.backup] creates a new backup, [sqlite.connections.flush] clears cached connections, and [log.info] logs the operation.
+tasks.create:sqlite.create-backup
+   description:Creates a backup of your magic database 1AM UTC time every day.
+   repeats:**.**.01.00.00
+   .lambda
+      data.connect:[generic|magic]
+         if
+            io.file.exists:/data/magic.backup
+            .lambda
+               io.file.delete:/data/magic.backup
+         sqlite.backup:magic.backup
+         sqlite.connections.flush
+         log.info:Created backup of magic database

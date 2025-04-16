@@ -1,0 +1,49 @@
+
+// The provided Hyperlambda code iterates through nodes under [scan], checking if their [completion] node contains a specific substring. If not, it concatenates [prompt] and [completion] into a temporary string [tmp]. It then checks if the token count of [tmp] is less than [max_tokens]. If true, it updates [context] with [tmp], adds the node's [id] to [ids], and conditionally appends data to [result] if certain conditions are met. If the token count exceeds [max_tokens], [tmp] is reset to [context]. Key slots include [for-each], [if], [not], [strings.contains], [set-value], [strings.concat], [openai.tokenize], [unwrap], [add], [not-null], and [not-exists].
+for-each:x:@.scan/*
+   if
+      not
+         strings.contains:x:@.dp/#/*/completion
+            .:{{
+      .lambda
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.tmp
+               .:@"
+"
+               get-value:x:@.dp/#/*/prompt
+               .:@"
+"
+               .:@"
+"
+               get-value:x:@.dp/#/*/completion
+               .:@"
+
+---
+"
+         if
+            lt
+               openai.tokenize:x:@.tmp
+               get-value:x:@.arguments/*/max_tokens
+            .lambda
+               set-value:x:@.context
+                  get-value:x:@.tmp
+               unwrap:x:+/*/*
+               add:x:@.ids
+                  .
+                     .:x:@.dp/#/*/id
+               if
+                  and
+                     not-null:x:@.dp/#/*/uri
+                     not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+                  .lambda
+                     unwrap:x:+/*/*/*
+                     add:x:@.result
+                        .
+                           .
+                              prompt:x:@.dp/#/*/prompt
+                              uri:x:@.dp/#/*/uri
+                              distance:x:@.dp/#/*/distance
+         else
+            set-value:x:@.tmp
+               get-value:x:@.context

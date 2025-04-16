@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code iterates over all files in a directory recursively and checks if the file ends with ".hl". If true, it loads the file and converts it to a lambda structure while preserving comments. It then checks if the root node's name is ".." and, if so, prepends a copyright notice to the content. Finally, it converts the lambda back to Hyperlambda format and saves the modified content back to the original file. 
+ * 
+ * 1. [for-each] - Iterates over each file in the directory recursively.
+ * 2. [if] - Checks if the current file ends with ".hl".
+ * 3. [strings.ends-with] - Determines if the file name ends with ".hl".
+ * 4. [io.file.load] - Loads the content of the current file.
+ * 5. [hyper2lambda] - Converts the file content into a lambda structure, preserving comments.
+ * 6. [eq] - Checks if the root node's name is "..".
+ * 7. [set-value] - Sets the value of the root node by prepending a copyright notice.
+ * 8. [strings.concat] - Concatenates the copyright notice with the original content.
+ * 9. [lambda2hyper] - Converts the lambda structure back to Hyperlambda format, preserving comments.
+ * 10. [io.file.save] - Saves the modified content back to the original file.
+ */
+for-each:x:@io.file.list-recursively/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+         io.file.load:x:@.dp/#
+         hyper2lambda:x:@io.file.load
+            comments:true
+         if
+            eq
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+               set-value:x:@hyper2lambda/0
+                  strings.concat
+                     .:"Copyright Thomas Hansen 2025\n"
+                     get-value:x:@hyper2lambda/0
+               lambda2hyper:x:@hyper2lambda/*
+                  comments:true
+               io.file.save:x:@.dp/#
+                  get-value:x:@lambda2hyper

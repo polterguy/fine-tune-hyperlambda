@@ -1,0 +1,55 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "northwind" and performs a data read operation on the "Orders" table. It dynamically constructs an aggregate function using [strings.concat] and removes specific nodes from the arguments. The code includes left joins with "Employees" and "Shippers" tables and selects a column with an aggregate function as "result". The [where] clause is initially empty, and the query is limited to one result. Finally, it returns the nodes from the data read operation. 
+ * 
+ * 1. [data.connect] - Connects to the specified database.
+ * 2. [database-type] - Specifies the type of database being used.
+ * 3. [set-name] - Constructs an aggregate function dynamically.
+ * 4. [strings.concat] - Concatenates strings to form the aggregate function.
+ * 5. [get-value] - Retrieves values from specified nodes.
+ * 6. [remove-nodes] - Removes specific nodes from the arguments.
+ * 7. [add] - Adds nodes to the where clause.
+ * 8. [data.read] - Reads data from the specified table.
+ * 9. [table] - Specifies the table to read from.
+ * 10. [join] - Joins additional tables to the main table.
+ * 11. [type] - Specifies the type of join.
+ * 12. [on] - Specifies the join condition.
+ * 13. [columns] - Specifies the columns to select.
+ * 14. [as] - Aliases the selected column.
+ * 15. [where] - Specifies the where clause.
+ * 16. [limit] - Limits the number of results returned.
+ * 17. [return-nodes] - Returns the nodes from the data read operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Orders
+         join:Employees
+            as:EmployeeID
+            type:left
+            on
+               and
+                  Orders.EmployeeID:EmployeeID.EmployeeID
+         join:Shippers
+            as:ShipVia
+            type:left
+            on
+               and
+                  Orders.ShipVia:ShipVia.ShipperID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

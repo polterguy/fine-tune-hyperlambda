@@ -1,0 +1,63 @@
+
+// This code iterates through a set of nodes to construct an SQL string for table column definitions and foreign key constraints. It uses [for-each] to loop through nodes, [if] to handle conditional logic, and [strings.concat] to build the SQL string. It checks for the existence and non-null status of a length attribute using [exists] and [not-null], and adjusts the SQL string based on the database type, appending foreign key constraints differently for MySQL and other databases.
+for-each:x:@.arguments/*/args/*/table2pk/*
+   if:x:@.first
+      set-value:x:@.first
+         .:bool:false
+      set-value:x:@.sql
+         strings.concat
+            get-value:x:@.sql
+            .:@"
+  "
+   else
+      set-value:x:@.sql
+         strings.concat
+            get-value:x:@.sql
+            .:@",
+  "
+   set-value:x:@.sql
+      strings.concat
+         get-value:x:@.sql
+         get-value:x:@.dp/#/*/name
+         .:" "
+         get-value:x:@.dp/#/*/type
+   if
+      and
+         exists:x:@.dp/#/*/length
+         not-null:x:@.dp/#/*/length
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:(
+               get-value:x:@.dp/#/*/length
+               .:)
+   if
+      neq:x:@.arguments/*/databaseType
+         .:mysql
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" references "
+               get-value:x:@.arguments/*/args/*/table2
+               .:" ("
+               get-value:x:@.dp/#/*/name
+               .:)
+   else
+      set-value:x:@.fk
+         strings.concat
+            get-value:x:@.fk
+            .:@",
+ foreign key ("
+            get-value:x:@.dp/#/*/name
+            .:") references "
+            get-value:x:@.arguments/*/args/*/table2
+            .:" ("
+            get-value:x:@.dp/#/*/name
+            .:)
+   set-value:x:@.pk
+      strings.concat
+         get-value:x:@.pk
+         get-value:x:@.dp/#/*/name
+         .:,

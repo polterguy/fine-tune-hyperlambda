@@ -1,0 +1,43 @@
+
+// This Hyperlambda code checks if a specific node exists and has a non-null value that doesn't start with "http://" or "https://". If true, it processes the URL, ensuring it is correctly formatted by trimming and concatenating with a base URL. Finally, it adds the processed URL to a list if it doesn't already exist. The code uses slots like [exists], [not-null], [neq], [not], [strings.starts-with], [strings.split], [strings.trim-end], [strings.concat], [add], and [unwrap] to achieve this.
+if
+   and
+      exists:x:"@.dp/#/*/\\@href/[0,1]"
+      not-null:x:"@.dp/#/*/\\@href/[0,1]"
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"http://"
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"https://"
+   .lambda
+      strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      strings.trim-end:x:@strings.split/0
+         .:/
+      .tmp
+      if
+         strings.starts-with:x:@strings.trim-end
+            .:/
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:@strings.trim-end
+      else
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.base
+               .:/
+               get-value:x:@strings.trim-end
+      if
+         not-exists:x:@.url/*/{@strings.concat}
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.urls
+               .
+                  .:x:@.tmp

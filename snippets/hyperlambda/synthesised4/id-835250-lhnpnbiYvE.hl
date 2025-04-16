@@ -1,0 +1,48 @@
+
+// This Hyperlambda code checks if a specific substring exists within a node's completion text. If not, it concatenates prompt and completion texts, checks token count, and updates context and result nodes based on conditions. The code ensures that the context doesn't exceed a specified token limit and handles unique URIs. Key slots include [if], [not], [strings.contains], [set-value], [strings.concat], [lt], [openai.tokenize], [unwrap], [add], [not-null], and [not-exists].
+if
+   not
+      strings.contains:x:@.dp/#/*/completion
+         .:{{
+   .lambda
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@.tmp
+            .:@"
+"
+            get-value:x:@.dp/#/*/prompt
+            .:@"
+"
+            .:@"
+"
+            get-value:x:@.dp/#/*/completion
+            .:@"
+
+---
+"
+      if
+         lt
+            openai.tokenize:x:@.tmp
+            get-value:x:@.arguments/*/max_tokens
+         .lambda
+            set-value:x:@.context
+               get-value:x:@.tmp
+            unwrap:x:+/*/*
+            add:x:@.ids
+               .
+                  .:x:@.dp/#/*/id
+            if
+               and
+                  not-null:x:@.dp/#/*/uri
+                  not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+               .lambda
+                  unwrap:x:+/*/*/*
+                  add:x:@.result
+                     .
+                        .
+                           prompt:x:@.dp/#/*/prompt
+                           uri:x:@.dp/#/*/uri
+                           distance:x:@.dp/#/*/distance
+      else
+         set-value:x:@.tmp
+            get-value:x:@.context

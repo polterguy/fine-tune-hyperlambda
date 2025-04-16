@@ -1,0 +1,42 @@
+
+/*
+ * This Hyperlambda code iterates over dynamically created slots, setting their execution values and invoking them. It checks for the existence of "issuer" and "name" in the executed slots, throwing an exception if they are missing. If no matching issuer is found in the return nodes, it adds the current node to the return list. The code ensures only valid OpenID providers are processed, with error handling for missing data.
+ * 
+ * 1. [for-each] - Iterates over dynamically created slots.
+ * 2. [set-value] - Sets the execution value for each slot.
+ * 3. [execute] - Invokes the slot with a nonce argument.
+ * 4. [if] - Checks for missing "issuer" or "name" nodes.
+ * 5. [throw] - Throws an exception if required nodes are missing.
+ * 6. [.exists] - Initializes a boolean to track issuer existence.
+ * 7. [for-each] - Iterates over return nodes to check for issuer matches.
+ * 8. [if] - Sets the existence flag if a match is found.
+ * 9. [add] - Adds the current node to the return list if no match is found.
+ */
+for-each:x:@slots.vocabulary/*
+   set-value:x:./*/execute
+      get-value:x:@.dp/#
+   execute
+      createNonce:x:@.arguments/*/createNonce
+   for-each:x:@execute/*
+      if
+         or
+            not-exists:x:@.dp/#/*/issuer
+            not-exists:x:@.dp/#/*/name
+         .lambda
+            throw:Bogus OpenID provider
+               status:int:500
+               public:bool:true
+      .exists:bool:false
+      for-each:x:../*/return/*
+         if
+            eq:x:@.dp/#/*/issuer
+               get-value:x:@for-each/@.dp/#/*/issuer
+            .lambda
+               set-value:x:@.exists
+                  .:bool:true
+      if
+         eq:x:@.exists
+            .:bool:false
+         .lambda
+            add:x:../*/return
+               get-nodes:x:@.dp/#

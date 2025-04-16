@@ -1,0 +1,72 @@
+
+// This Hyperlambda code verifies a request's integrity and prevents replay attacks by checking if the request ID has been previously executed. It processes a request, ensuring it's whitelisted, and persists the invocation details. The response is signed with the server's private key before being returned. Key slots include [crypto.verify] for verification, [whitelist] for access control, and [crypto.sign] for signing the response.
+context:fingerprint
+   value:x:@crypto.get-key
+   .lambda
+      hyper2lambda:x:@crypto.verify
+      add:x:./*/whitelist/*/.lambda
+         get-nodes:x:@hyper2lambda/*
+      .request
+      .request-id
+      .request-raw
+      set-value:x:@.request
+         get-value:x:@crypto.verify
+      set-value:x:@.request-id
+         get-value:x:@hyper2lambda/*/.request-id
+      set-value:x:@.request-raw
+         convert:x:@io.stream.read
+            type:base64
+      if
+         or
+            eq
+               get-value:x:@.request-id
+               .
+            eq
+               get-value:x:@.request-id
+               .:
+         .lambda
+            throw:No [.request-id] found in the Hyperlambda payload
+      unwrap:x:+/*/signal/*
+      if
+         signal:magic.crypto.http.has-invoked
+            request-id:x:@.request-id
+         .lambda
+            strings.concat
+               .:"Request with the id of '"
+               get-value:x:@.request-id
+               .:"' has been previously executed implying a replay attack, hence execution was aborted"
+            throw:x:@strings.concat
+      add:x:./*/whitelist/*/vocabulary
+         get-nodes:x:@signal/*/vocabulary/*
+      whitelist
+         vocabulary
+         .lambda
+      .result:success
+      if
+         not
+            eq
+               get-value:x:@whitelist
+               .
+         .lambda
+            set-value:x:@.result
+               get-value:x:@whitelist
+      else-if
+         exists:x:@whitelist/*
+         .lambda
+            set-value:x:@.result
+               lambda2hyper:x:@whitelist/*
+      unwrap:x:+/*
+      signal:magic.crypto.http.persist-invocation
+         crypto-key:x:@try/*/signal/[0,1]/*/id
+         request-id:x:@.request-id
+         request:x:@.request
+         request-raw:x:@.request-raw
+         response:x:@.result
+      response.headers.set
+         Content-Type:application/octet-stream
+      signal:magic.crypto.get-server-private-key
+      crypto.sign:x:@.result
+         raw:true
+         signing-key:x:@signal/*/private-key
+         signing-key-fingerprint:x:@signal/*/fingerprint
+      return:x:@crypto.sign

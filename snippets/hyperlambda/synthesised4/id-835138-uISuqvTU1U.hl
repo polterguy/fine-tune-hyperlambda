@@ -1,0 +1,16 @@
+
+// This code checks if a [filter] argument exists, and if so, it constructs a pattern for a SQL-like query using [strings.concat]. It then appends a condition to the [where] clause of a database query using [add], checking if either [ml_requests.prompt] is like the pattern or [ml_requests.user_id] equals the filter. Finally, it removes the [filter] argument using [remove-nodes].
+if
+   exists:x:@.arguments/*/filter
+   .lambda
+      strings.concat
+         .:%
+         get-value:x:@.arguments/*/filter
+         .:%
+      unwrap:x:+/*/*/*
+      add:x:@data.connect/*/data.read/*/where/*/and
+         .
+            or
+               ml_requests.prompt.like:x:@strings.concat
+               ml_requests.user_id.eq:x:@.arguments/*/filter
+      remove-nodes:x:@.arguments/*/filter

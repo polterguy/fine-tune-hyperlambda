@@ -1,0 +1,27 @@
+
+/*
+ * This Hyperlambda code checks if the [databaseType] argument is "sqlite" and if the [generate] argument is true, it returns a result indicating that SQLite does not support the drop database syntax. If not, it constructs a file path using [strings.concat] to form the database file path and deletes it using [io.file.delete]. Finally, it flushes the SQLite connections with [sqlite.connections.flush]. 
+ * 
+ * 1. [if] - Checks if the [databaseType] argument is "sqlite".
+ * 2. [eq] - Compares the [databaseType] argument to "sqlite".
+ * 3. [.lambda] - Contains the code to execute if the condition is true.
+ * 4. [if:x:@.arguments/*/generate] - Checks if the [generate] argument is true.
+ * 5. [return] - Returns a result message if SQLite does not support the operation.
+ * 6. [strings.concat] - Concatenates strings to form the database file path.
+ * 7. [get-value] - Retrieves the value of [databaseName].
+ * 8. [io.file.delete] - Deletes the specified database file.
+ * 9. [sqlite.connections.flush] - Flushes cached SQLite connections.
+ */
+if
+   eq:x:@.arguments/*/databaseType
+      .:sqlite
+   .lambda
+      if:x:@.arguments/*/generate
+         return
+            result:/* SQLite does not support drop database syntax */
+      strings.concat
+         .:/data/
+         get-value:x:@.arguments/*/databaseName
+         .:.db
+      io.file.delete:x:-
+      sqlite.connections.flush

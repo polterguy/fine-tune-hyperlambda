@@ -1,0 +1,33 @@
+
+// This Hyperlambda code processes JSON data to update a result node and send signals based on conditions. It checks if specific JSON content is not null or empty, concatenates it to a result, and signals a session if certain strings are not present. If a specific function invocation string is found and a waiting signal hasn't been sent, it sends a waiting signal and updates a flag.
+if
+   and
+      not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+      neq:x:@json2lambda/*/choices/0/*/delta/*/content
+         .:
+   .lambda
+      set-value:x:@.result
+         strings.concat
+            get-value:x:@.result
+            get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+      if
+         not
+            strings.contains:x:@.result
+               .:___
+         .lambda
+            unwrap:x:+/*/*
+            sockets.signal:x:@.session
+               args
+                  message:x:@json2lambda/*/choices/0/*/delta/*/content
+      else-if
+         and
+            strings.contains:x:@.result
+               .:FUNCTION_INVOCATION[
+            neq:x:@.has-sent-waiting
+               .:bool:true
+         .lambda
+            sockets.signal:x:@.session
+               args
+                  function_waiting:bool:true
+            set-value:x:@.has-sent-waiting
+               .:bool:true

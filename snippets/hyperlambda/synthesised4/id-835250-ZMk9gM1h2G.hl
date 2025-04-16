@@ -1,0 +1,25 @@
+
+// The code checks if the number of tokens in a temporary node is less than a maximum token limit. If true, it sets a context node's value, adds an ID to a list, and conditionally adds a node to a result list if a URI exists and is not already present in the result. The [if] slot evaluates a condition, and if true, executes its [.lambda] child. The inner [if] uses [and] to combine conditions, and [not-null] and [not-exists] to ensure a URI is present and unique before adding it to the result.
+if
+   lt
+      openai.tokenize:x:@.tmp
+      get-value:x:@.arguments/*/max_tokens
+   .lambda
+      set-value:x:@.context
+         get-value:x:@.tmp
+      unwrap:x:+/*/*
+      add:x:@.ids
+         .
+            .:x:@.dp/#/*/id
+      if
+         and
+            not-null:x:@.dp/#/*/uri
+            not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:@.result
+               .
+                  .
+                     prompt:x:@.dp/#/*/prompt
+                     uri:x:@.dp/#/*/uri
+                     distance:x:@.dp/#/*/distance

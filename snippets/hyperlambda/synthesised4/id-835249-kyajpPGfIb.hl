@@ -1,0 +1,28 @@
+
+/*
+ * This Hyperlambda code checks if the scalar value from a database query equals zero. If true, it performs another query to count entries in the "ml_types" table with specific conditions. If this second query also results in zero, it throws an exception with a custom error message and HTTP status code 400. The code uses [if] for conditional logic, [eq] for equality checks, and [throw] to generate an error response.
+ * 
+ * 1. [if] - Checks if the scalar value from the database query equals zero.
+ * 2. [eq] - Compares the scalar value to zero.
+ * 3. [.lambda] - Contains the code to execute if the condition is true.
+ * 4. [data.scalar] - Executes a SQL query to count entries in the "ml_types" table.
+ * 5. [@type] - References the "type" argument from the input.
+ * 6. [@func] - References a concatenated string from another slot.
+ * 7. [throw] - Throws an exception if the second query also results in zero.
+ * 8. [public] - Sets the exception as public.
+ * 9. [status] - Sets the HTTP status code for the exception.
+ */
+if
+   eq:x:@data.scalar
+      .:long:0
+   .lambda
+      data.scalar:select count(*) from ml_types where type = @type and system_message like @func
+         @type:x:@.arguments/*/type
+         @func:x:@strings.concat/@strings.concat
+      if
+         eq:x:@data.scalar
+            .:long:0
+         .lambda
+            throw:"That function doesn't exist on type"
+               public:bool:true
+               status:int:400

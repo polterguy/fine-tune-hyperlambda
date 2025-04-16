@@ -1,0 +1,37 @@
+
+/*
+ * This Hyperlambda code connects to a data source and performs a series of SQL queries to verify the existence of specific function invocations and types. It constructs SQL queries using string concatenation to check if a function invocation or type exists in the database, and throws an exception if the function does not exist. The code uses conditional logic to determine the existence of records and handles errors by throwing exceptions with specific status codes.
+ * 
+ * 1. [data.connect] - Connects to a data source using specified parameters.
+ * 2. [strings.concat] - Concatenates strings to form SQL query parts and function invocation strings.
+ * 3. [data.scalar] - Executes a SQL query to count records matching specific criteria in the database.
+ * 4. [if] - Checks if the result of the SQL query is zero, indicating no matching records.
+ * 5. [eq] - Compares the result of the SQL query to zero.
+ * 6. [throw] - Throws an exception if the function does not exist, with a public message and status code.
+ */
+data.connect:[generic|magic]
+   strings.concat
+      :%FUNCTION_INVOCATION[
+      get-value:x:@.file
+      .:]%
+   strings.concat
+      :"FUNCTION_INVOCATION ==> "
+      get-value:x:@.file
+   data.scalar:select count(*) from ml_training_snippets where type = @type and (meta = @meta or completion like @completion)
+      @type:x:@.arguments/*/type
+      @meta:x:@strings.concat
+      @completion:x:@strings.concat/@strings.concat
+   if
+      eq:x:@data.scalar
+         .:long:0
+      .lambda
+         data.scalar:select count(*) from ml_types where type = @type and system_message like @func
+            @type:x:@.arguments/*/type
+            @func:x:@strings.concat/@strings.concat
+         if
+            eq:x:@data.scalar
+               .:long:0
+            .lambda
+               throw:"That function doesn't exist on type"
+                  public:bool:true
+                  status:int:400

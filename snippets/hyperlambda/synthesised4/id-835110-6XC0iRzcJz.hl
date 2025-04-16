@@ -1,0 +1,30 @@
+
+// This Hyperlambda code connects to a database using a specified connection string and iterates over a list of files. For each file ending with ".sql", it loads the file and attempts to execute its SQL script. If the database type is "mssql", it uses a specific execution slot. Success or failure messages are logged to the console. Key slots include [data.connect] for database connection, [for-each] for file iteration, [if] for condition checking, [io.file.load] for loading files, [try] and [.catch] for error handling, and [console.log] for logging messages.
+data.connect:[generic|magic]
+   for-each:x:@io.file.list/*
+      if
+         strings.ends-with:x:@.dp/#
+            .:.sql
+         .lambda
+            io.file.load:x:@.dp/#
+            try
+               if
+                  eq
+                     get-value:x:@.db-type
+                     .:mssql
+                  .lambda
+                     set-name:x:@if/./*/data.execute
+                        .:mssql.execute-batch
+               data.execute:x:@io.file.load
+               strings.concat
+                  .:"Script '"
+                  get-value:x:@.dp/#
+                  .:"' succeeded"
+               console.log:x:@strings.concat
+            .catch
+               strings.concat
+                  .:"Script '"
+                  get-value:x:@.dp/#
+                  .:"' failed"
+               console.log:x:@strings.concat
+               console.log:x:@.arguments/*/message

@@ -1,0 +1,48 @@
+
+/*
+ * This Hyperlambda code connects to a database and performs an update operation on the "ml_training_snippets" table. It constructs a dynamic SQL update statement by adding conditions and values from the [.arguments] node, and removes specific filter conditions after use. If no records are updated, it sets the response status to 404 and returns "Record not found". Otherwise, it sets the response status to 202 and returns the number of affected records. The code ensures that the SQL statement is correctly structured by checking for the existence of logical operators and conditions.
+ * 
+ * 1. [data.connect] - Establishes a connection to the database.
+ * 2. [add] - Adds nodes to the SQL update statement's "where" clause.
+ * 3. [get-nodes] - Retrieves nodes from the [.arguments] for filtering.
+ * 4. [remove-nodes] - Removes specific nodes from the [.arguments].
+ * 5. [if] - Checks conditions to modify the SQL statement structure.
+ * 6. [not-exists] - Verifies the absence of certain nodes.
+ * 7. [data.update] - Executes the SQL update operation.
+ * 8. [eq] - Compares the update result to determine if records were affected.
+ * 9. [response.status.set] - Sets the HTTP response status code.
+ * 10. [return] - Returns the result of the operation.
+ * 11. [unwrap] - Evaluates and returns additional nodes or values.
+ */
+data.connect:[generic|magic]
+   add:x:./*/data.update/*/where/*/*/or
+      get-nodes:x:@.arguments/*/filter/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/filter/*/ml_training_snippets.uri.like
+   remove-nodes:x:@.arguments/*/filter/*/ml_training_snippets.prompt.like
+   remove-nodes:x:@.arguments/*/filter/*/ml_training_snippets.uri.like
+   add:x:./*/data.update/*/where/*
+      get-nodes:x:@.arguments/*/filter/*
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/values/*
+   if
+      not-exists:x:@data.connect/*/data.update/*/where/*/and/*/or/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.update/*/where/*/and/*/or
+   data.update
+      table:ml_training_snippets
+      values
+      where
+         and
+            or
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

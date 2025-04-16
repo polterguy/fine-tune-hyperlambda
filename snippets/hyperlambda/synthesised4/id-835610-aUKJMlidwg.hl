@@ -1,0 +1,69 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and performs a complex SQL query on the "Order Details" table, joining it with "Orders" and "Products" tables. It dynamically constructs the SQL query by manipulating nodes based on provided arguments, such as group columns, aggregate functions, limits, offsets, and ordering. The query aggregates data using a specified function and groups results by a given column, returning the processed nodes from the data read operation.
+ * 
+ * 1. [data.connect] - Establishes a connection to the SQLite database.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Sets the name of the group column in the query.
+ * 4. [insert-before] - Inserts the group column before the first column in the query.
+ * 5. [set-value] - Sets the alias for the aggregate function result.
+ * 6. [remove-nodes] - Removes specific argument nodes after processing.
+ * 7. [add] - Adds limit and offset nodes to the data read operation.
+ * 8. [set-name] - Concatenates aggregate function and column to form a functor.
+ * 9. [data.read] - Executes the SQL read operation with specified joins and columns.
+ * 10. [return-nodes] - Returns the result nodes from the data read operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Order Details
+         join:Orders
+            as:OrderID
+            type:left
+            on
+               and
+                  Order Details.OrderID:OrderID.OrderID
+         join:Products
+            as:ProductID
+            type:left
+            on
+               and
+                  Order Details.ProductID:ProductID.ProductID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

@@ -1,0 +1,18 @@
+
+// This Hyperlambda code connects to a database and selects the most recent completion for each prompt for a specific user. It iterates over the results, unwrapping and adding each prompt and its corresponding completion to a session node, alternating roles between assistant and user. The [data.connect] slot establishes the database connection, [data.select] retrieves the data, and [for-each] iterates through the results to build a structured session log.
+data.connect:[generic|magic]
+   data.select:"\nselect prompt, max(completion) as completion\n   from ml_requests\n   where user_id = @user_id and questionnaire = 1 and context = 1\n   group by prompt"
+      user_id:x:@.arguments/*/user_id
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:assistant
+               content:x:@.dp/#/*/prompt
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:user
+               content:x:@.dp/#/*/completion

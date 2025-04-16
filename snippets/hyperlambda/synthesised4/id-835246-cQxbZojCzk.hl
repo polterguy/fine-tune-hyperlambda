@@ -1,0 +1,20 @@
+
+// This Hyperlambda code checks if an HTTP POST request's status code is not between 200 and 299. If the condition is true, it logs an error message with details from the HTTP response, sets the response status, unwraps the response content, and returns an error message. The slots used are: [if] for conditional branching, [not] and [and] for logical operations, [mte] and [lt] for comparison, [lambda2hyper] to convert the response, [log.error] to log the error, [response.status.set] to set the status, [unwrap] to process the response, and [return] to send the error result.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      response.status.set:x:@http.post
+      unwrap:x:+/*
+      return
+         error:bool:true
+         result:x:@http.post/*/content/*/error/*/message

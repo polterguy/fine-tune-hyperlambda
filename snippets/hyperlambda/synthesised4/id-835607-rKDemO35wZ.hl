@@ -1,0 +1,33 @@
+
+// This Hyperlambda code connects to a SQLite database using the Northwind connection, dynamically constructs a SQL query to count distinct values of a specified column, and then reads data from the "Order Details" table with left joins on "Orders" and "Products" tables. It uses [strings.concat] to create a distinct count function, removes the distinct column argument, adds conditions to the where clause, and returns the query results. The slots used include [data.connect], [strings.concat], [remove-nodes], [add], [data.read], and [return-nodes].
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Order Details
+         join:Orders
+            as:OrderID
+            type:left
+            on
+               and
+                  Order Details.OrderID:OrderID.OrderID
+         join:Products
+            as:ProductID
+            type:left
+            on
+               and
+                  Order Details.ProductID:ProductID.ProductID
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

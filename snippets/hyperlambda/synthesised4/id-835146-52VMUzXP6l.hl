@@ -1,0 +1,75 @@
+
+/*
+ * This Hyperlambda code connects to a database and constructs a dynamic SQL query to retrieve records from the "vss_ml_training_snippets" table, with optional filtering based on "type", "limit", and "offset" arguments. It executes the query and processes the results, checking if the "embedding_vss" field is not null and setting its value accordingly. It also concatenates "prompt" and "completion" fields, tokenizes them using OpenAI's tokenizer, and appends the token count to each record. Finally, it returns the processed records. 
+ * 
+ * 1. [data.connect] - Connects to the specified database.
+ * 2. [.sql] - Initializes the SQL query string.
+ * 3. [if] - Checks if the "type" argument exists and appends a condition to the SQL query.
+ * 4. [set-value] - Updates the SQL query string.
+ * 5. [strings.concat] - Concatenates strings to build the SQL query.
+ * 6. [unwrap] - Evaluates expressions within the node.
+ * 7. [add] - Adds a node to the data.select node.
+ * 8. [if] - Checks if the "limit" argument exists and appends a limit clause to the SQL query.
+ * 9. [if] - Checks if the "offset" argument exists and appends an offset clause to the SQL query.
+ * 10. [data.select] - Executes the SQL query and retrieves the records.
+ * 11. [for-each] - Iterates over each record in the result set.
+ * 12. [if] - Checks if the "embedding_vss" field is not null.
+ * 13. [set-value] - Sets the "embedding_vss" field to true or false.
+ * 14. [strings.concat] - Concatenates "prompt" and "completion" fields.
+ * 15. [openai.tokenize] - Tokenizes the concatenated string.
+ * 16. [unwrap] - Evaluates expressions within the node.
+ * 17. [add] - Adds the token count to the current record.
+ * 18. [return-nodes] - Returns the processed records.
+ */
+data.connect:[generic|magic]
+   .sql:"\nselect vss.distance, id, created, type, pushed, uri, prompt, completion, filename, cached, meta, embedding as embedding_vss\n   from vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      vss_search(vss.embedding_vss, @embedding)"
+   if
+      exists:x:@.arguments/*/type
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" and type = @type"
+         unwrap:x:+/*/*
+         add:x:@if/./*/data.select
+            .
+               @type:x:@.arguments/*/type
+   if
+      exists:x:@.arguments/*/limit
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" limit "
+               get-value:x:@.arguments/*/limit
+   if
+      exists:x:@.arguments/*/offset
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" offset "
+               get-value:x:@.arguments/*/offset
+   data.select:x:@.sql
+      @embedding:x:@floatArray2bytes
+   for-each:x:@data.select/*
+      if
+         not-null:x:@.dp/#/*/embedding_vss
+         .lambda
+            set-value:x:@.dp/#/*/embedding_vss
+               .:bool:true
+      else
+         set-value:x:@.dp/#/*/embedding_vss
+            .:bool:false
+      strings.concat
+         get-value:x:@.dp/#/*/prompt
+         .:@"
+
+"
+         get-value:x:@.dp/#/*/completion
+      openai.tokenize:x:@strings.concat
+      unwrap:x:+/*/*
+      add:x:@.dp/#
+         .
+            tokens:x:@openai.tokenize
+   return-nodes:x:@data.select/*

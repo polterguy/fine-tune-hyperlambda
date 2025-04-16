@@ -1,0 +1,107 @@
+
+/*
+ * This Hyperlambda code handles the installation of modules or frontends based on the provided type argument. It uses a [switch] statement to determine the type, either "module" or "frontend". For modules, it checks for an uninstall script, downloads and unzips the module, and installs it. For frontends, it downloads, unzips, and installs the frontend in the specified directory. Success messages are sent using [sockets.signal].
+ * 
+ * 1. [try] - Begins a try block to handle potential exceptions.
+ * 2. [switch] - Determines the action based on the type argument.
+ * 3. [case] - Specifies actions for "module" and "frontend" types.
+ * 4. [strings.concat] - Constructs file paths and URLs.
+ * 5. [io.file.exists] - Checks if a file exists.
+ * 6. [log.info] - Logs information about the uninstallation process.
+ * 7. [io.file.execute] - Executes the uninstall script if it exists.
+ * 8. [http.get] - Fetches content from a URL.
+ * 9. [strings.split] - Splits strings to extract file names.
+ * 10. [strings.trim] - Trims characters from strings.
+ * 11. [io.file.save.binary] - Saves binary content to a file.
+ * 12. [io.folder.exists] - Checks if a folder exists.
+ * 13. [io.folder.delete] - Deletes a folder if it exists.
+ * 14. [io.folder.create] - Creates a new folder.
+ * 15. [io.file.unzip] - Unzips a file to a specified folder.
+ * 16. [io.file.delete] - Deletes a file.
+ * 17. [io.folder.move] - Moves a folder to a new location.
+ * 18. [execute] - Executes the module installation.
+ * 19. [sockets.signal] - Sends a success message after installation.
+ */
+try
+   switch:x:@.arguments/*/type
+      case:module
+         strings.concat
+            .:/modules/
+            get-value:x:@.arguments/*/name
+            .:/uninstall.hl
+         if
+            io.file.exists:x:@strings.concat
+            .lambda
+               log.info:Uninstalling module
+                  module:x:@strings.concat
+               io.file.execute:x:@strings.concat
+         http.get:x:@.arguments/*/url
+         strings.split:x:@http.get/*/headers/*/Content-Disposition
+            .:=
+         strings.trim:x:@strings.split/1
+            .:"\""
+         strings.concat
+            .:/modules/
+            get-value:x:@strings.trim
+         io.file.save.binary:x:@strings.concat
+            get-value:x:@http.get/*/content
+         .folder
+         set-value:x:@.folder
+            strings.concat
+               .:/modules/
+               get-value:x:@.arguments/*/name
+               .:/
+         if
+            io.folder.exists:x:@.folder
+            .lambda
+               io.folder.delete:x:@.folder
+         io.folder.create:x:@.folder
+         io.file.unzip:x:@strings.concat
+            folder:x:@.folder
+         io.file.delete:x:@strings.concat
+         .module-folder
+         set-value:x:@.module-folder
+            strings.concat
+               .:/modules/
+               get-value:x:@.arguments/*/name
+               .:/
+         if
+            not
+               io.folder.exists:x:@.module-folder
+            .lambda
+               strings.split:x:@strings.concat
+                  .:.zip
+               io.folder.move:x:@strings.split/0
+                  get-value:x:@.module-folder
+         strings.split:x:@.module-folder
+            .:/
+         execute:magic.modules.install-module
+            module:x:@strings.split/0/-
+         sockets.signal:magic.backend.message
+            roles:root
+            args
+               message:Plugin was successfully installed
+               type:success
+      case:frontend
+         strings.concat
+            get-value:x:@.arguments/*/url
+            .:&type=frontend
+         http.get:x:@strings.concat
+         strings.split:x:@http.get/*/headers/*/Content-Disposition
+            .:=
+         strings.trim:x:@strings.split/1
+            .:"\""
+         strings.concat
+            .:/modules/
+            get-value:x:@strings.trim
+         io.file.save.binary:x:@strings.concat
+            get-value:x:@http.get/*/content
+         io.file.unzip:x:@strings.concat
+            folder:/etc/www/
+            overwrite:true
+         io.file.delete:x:@strings.concat
+         sockets.signal:magic.backend.message
+            roles:root
+            args
+               message:Frontend was successfully installed
+               type:success

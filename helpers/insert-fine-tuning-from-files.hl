@@ -85,7 +85,7 @@ for-each:x:@execute/*
                   .synthesised:int:0
                   if
                      strings.contains:x:@.dp/#
-                        .:/synthesised/
+                        .:/synthesised
                      .lambda
                         set-value:x:@.synthesised
                            .:int:1
@@ -93,17 +93,29 @@ for-each:x:@execute/*
                   // Saving above code snippet.
                   data.connect:fine-tune
 
-                     // Making sure we avoid double inserts.
-                     data.create
+                     // Verifying that code doesn't already exist in file.
+                     .exists:bool:false
+                     data.read
                         table:hyperlambda
-                        values
-                           code:x:@lambda2hyper
-                           prompt:x:@.prompt
-                           validation:x:@.validation
-                           synthesised:x:@.synthesised
+                        where
+                           and
+                              code.eq:x:@lambda2hyper
+                        limit:1
+                     if
+                        not-exists:x:@data.read/*
+                        .lambda
 
-                     // Counting how many training snippets we're inserting
-                     math.increment:x:@.no
+                           // Making sure we avoid double inserts.
+                           data.create
+                              table:hyperlambda
+                              values
+                                 code:x:@lambda2hyper
+                                 prompt:x:@.prompt
+                                 validation:x:@.validation
+                                 synthesised:x:@.synthesised
+
+                           // Counting how many training snippets we're inserting
+                           math.increment:x:@.no
             else
                throw:x:@.dp/#
 

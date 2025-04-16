@@ -1,0 +1,29 @@
+
+/*
+ * The code iterates over each URL in the [.urls] node using [for-each], attempting to scrape data from each URL with [execute:magic.ai.url.scrape]. It sends a success signal with a message to a feedback channel using [sockets.signal] if successful, or catches errors with [.catch] and sends a warning message to the same feedback channel. 
+ * 
+ * 1. [for-each] - Iterates over each URL node in [.urls].
+ * 2. [try] - Attempts to execute the URL scraping and signaling process.
+ * 3. [execute:magic.ai.url.scrape] - Scrapes data from the current URL.
+ * 4. [sockets.signal] - Sends a success message to the feedback channel.
+ * 5. [.catch] - Catches any exceptions during the scraping process.
+ * 6. [sockets.signal] - Sends a warning message to the feedback channel if an error occurs.
+ */
+for-each:x:@.urls/*/*
+   try
+      execute:magic.ai.url.scrape
+         url:x:@.dp/#
+         type:x:@.arguments/*/type
+         feedback-channel:x:@.arguments/*/feedback-channel
+         lists:bool:false
+         images:bool:false
+         code:bool:false
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:------------------------------------------------------------------------------------------------------------------------
+            type:info
+   .catch
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@.arguments/*/message
+            type:warning

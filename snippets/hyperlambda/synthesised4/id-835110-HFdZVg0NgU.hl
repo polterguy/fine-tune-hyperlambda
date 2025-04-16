@@ -1,0 +1,31 @@
+
+// This Hyperlambda code checks if the default database is SQLite and, if so, manages a scheduled task to back up the database daily at 1AM UTC. It first lists existing tasks and deletes any existing backup task. Then, it creates a new backup task with a description and schedule. The task connects to the database, deletes any existing backup file, creates a new backup, flushes connections, and logs the action. It also logs the successful creation of the task and executes it if a specific condition is met.
+if
+   eq
+      config.get:"magic:databases:default"
+      .:sqlite
+   .lambda
+      tasks.list:sqlite.create-backup
+      if
+         exists:x:@tasks.list/*
+         .lambda
+            tasks.delete:sqlite.create-backup
+      tasks.create:sqlite.create-backup
+         description:Creates a backup of your magic database 1AM UTC time every day.
+         repeats:**.**.01.00.00
+         .lambda
+            data.connect:[generic|magic]
+               if
+                  io.file.exists:/data/magic.backup
+                  .lambda
+                     io.file.delete:/data/magic.backup
+               sqlite.backup:magic.backup
+               sqlite.connections.flush
+               log.info:Created backup of magic database
+      console.log:Successfully created database backup task that creates a backup of magic.db 1AM UTC every day
+      if
+         eq:x:@.corrupt
+            .:bool:false
+         .lambda
+            tasks.execute:sqlite.create-backup
+            console.log:Executed task that creates backup of magic database

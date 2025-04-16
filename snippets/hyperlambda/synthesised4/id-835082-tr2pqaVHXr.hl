@@ -1,0 +1,39 @@
+
+// This Hyperlambda code connects to a "magic" database and selects specific columns from the "crypto_keys" table where the fingerprint matches the provided argument. It checks if the public key exists and if it is enabled. If the key doesn't exist or is disabled, it throws an error with a descriptive message. If successful, it adds the selected data to the return node, converting the "vocabulary" column using "hyper2lambda" before returning it.
+data.connect:magic
+   data.select:select id, content as public_key, domain, email, vocabulary, enabled from crypto_keys where fingerprint = @fingerprint
+      @fingerprint:x:@.arguments/*/fingerprint
+   if
+      not
+         exists:x:./././0/0
+      .lambda
+         strings.concat
+            .:"Public key with fingerprint of '"
+            get-value:x:@.arguments/*/fingerprint
+            .:"' does not exist"
+         throw:x:@strings.concat
+   if
+      not
+         or
+            eq
+               get-value:x:@data.select/*/*/enabled
+               .:bool:true
+            eq
+               get-value:x:@data.select/*/*/enabled
+               .:long:1
+      .lambda
+         strings.concat
+            .:"Public key with fingerprint of '"
+            get-value:x:@.arguments/*/fingerprint
+            .:"' is disabled"
+         throw:x:@strings.concat
+   add:x:./*/return
+      get-nodes:x:@data.select/*/*/id
+      get-nodes:x:@data.select/*/*/public_key
+      get-nodes:x:@data.select/*/*/domain
+      get-nodes:x:@data.select/*/*/email
+      get-nodes:x:@data.select/*/*/enabled
+   add:x:./*/return/*/vocabulary
+      hyper2lambda:x:@data.select/*/*/vocabulary
+   return
+      vocabulary

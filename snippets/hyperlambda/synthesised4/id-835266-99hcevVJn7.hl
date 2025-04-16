@@ -1,0 +1,102 @@
+
+/*
+ * The Hyperlambda code checks if a completion node exists and is not null, then evaluates its length against a threshold. If the length is greater, it attempts to add a type node, signals an AI snippet creation, and reads data from a table. If no matching data is found, it optionally appends a URL to the completion and creates a new record. If a match exists with a "Common" prompt, it increments a counter; otherwise, it updates the prompt to "Common". If the length is below the threshold, it increments a different counter.
+ * 
+ * 1. [if] - Checks if both conditions are true: the existence and non-null status of a completion node.
+ * 2. [and] - Combines two conditions: existence and non-null check for the completion node.
+ * 3. [exists] - Checks if the completion node exists.
+ * 4. [not-null] - Checks if the completion node is not null.
+ * 5. [mt] - Compares the length of the completion string with a threshold.
+ * 6. [strings.length] - Gets the length of the completion string.
+ * 7. [get-value] - Retrieves the threshold value from arguments.
+ * 8. [add] - Adds a type node to the arguments.
+ * 9. [try-signal] - Attempts to signal an AI snippet creation.
+ * 10. [strings.concat] - Concatenates strings, including the completion and URL.
+ * 11. [data.read] - Reads data from the ml_training_snippets table.
+ * 12. [if] - Checks if no data was read from the table.
+ * 13. [not-exists] - Checks if no data was found.
+ * 14. [set-value] - Optionally appends a URL to the completion.
+ * 15. [data.create] - Creates a new record in the ml_training_snippets table.
+ * 16. [else-if] - Checks if the prompt is "Common".
+ * 17. [eq] - Compares the prompt with "Common".
+ * 18. [math.increment] - Increments a counter.
+ * 19. [not] - Negates the condition.
+ * 20. [data.update] - Updates the prompt to "Common" in the table.
+ * 21. [else] - Increments a counter if the length is below the threshold.
+ */
+if
+   and
+      exists:x:@.dp/#/*/completion
+      not-null:x:@.dp/#/*/completion
+   .lambda
+      if
+         mt
+            strings.length:x:@.dp/#/*/completion
+            get-value:x:@.arguments/*/threshold
+         .lambda
+            add:x:+
+               get-nodes:x:@.arguments/*/type
+            try-signal:magic.ai.can-create-snippet
+            strings.concat
+               get-value:x:@.dp/#/*/completion
+               .:@"
+"
+               .:@"
+"
+               .:This information was taken from [this URL](
+               .:%
+            data.read
+               table:ml_training_snippets
+               columns
+                  id
+                  prompt
+                  completion
+                  uri
+               where
+                  and
+                     type.eq:x:@.arguments/*/type
+                     or
+                        completion.eq:x:@.dp/#/*/completion
+                        completion.like:x:@strings.concat
+            if
+               not-exists:x:@data.read/*
+               .lambda
+                  if:x:@.arguments/*/insert_url
+                     set-value:x:@.dp/#/*/completion
+                        strings.concat
+                           get-value:x:@.dp/#/*/completion
+                           .:@"
+"
+                           .:@"
+"
+                           .:This information was taken from [this URL](
+                           get-value:x:@.arguments/*/url
+                           .:)
+                  data.create
+                     table:ml_training_snippets
+                     values
+                        type:x:@.arguments/*/type
+                        uri:x:@.arguments/*/url
+                        prompt:x:@.dp/#/*/prompt
+                        completion:x:@.dp/#/*/completion
+                        meta:AINIRO-Website-Crawler
+            else-if
+               eq:x:@data.read/0/*/prompt
+                  .:Common
+               .lambda
+                  math.increment:x:@.already-exists
+            else-if
+               not
+                  eq:x:@data.read/*/*/prompt
+                     get-value:x:@.dp/#/*/prompt
+               .lambda
+                  math.increment:x:@.similar
+                  data.update
+                     table:ml_training_snippets
+                     values
+                        prompt:Common
+                     where
+                        and
+                           id.eq:x:@data.read/0/*/id
+      else
+         math.increment:x:@.below-threshold

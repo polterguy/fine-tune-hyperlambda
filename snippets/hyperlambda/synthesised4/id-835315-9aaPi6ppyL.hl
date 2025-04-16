@@ -1,0 +1,75 @@
+
+/*
+ * This Hyperlambda code iterates over HTTP GET content nodes, checking for in-stock items with non-empty descriptions. It creates a prompt and completion text using markdown conversion and string concatenation, including price, URL, and optionally short descriptions and images. Finally, it stores the generated data in a database table for machine learning training snippets.
+ * 
+ * 1. [for-each] - Iterates over each content node from HTTP GET response.
+ * 2. [if] - Checks conditions for stock status and description presence.
+ * 3. [set-value] - Sets values for prompt and completion using markdown conversion and string concatenation.
+ * 4. [data.create] - Inserts the generated prompt and completion into a database table.
+ */
+for-each:x:@http.get/*/content/*
+   if
+      and
+         eq:x:@.dp/#/*/stock_status
+            .:instock
+         not-null:x:@.dp/#/*/description
+         neq:x:@.dp/#/*/description
+            .:
+      .lambda
+         .prompt
+         .completion
+         set-value:x:@.prompt
+            strings.concat
+               html2markdown:x:@.dp/#/*/description
+         set-value:x:@.completion
+            strings.concat
+               .:"Price: "
+               get-value:x:@.dp/#/*/price
+               .:@"
+
+"
+               .:"URL: "
+               get-value:x:@.dp/#/*/permalink
+         if
+            and
+               not-null:x:@.dp/#/*/short_description
+               neq:x:@.dp/#/*/short_description
+                  .:
+            .lambda
+               set-value:x:@.completion
+                  strings.concat
+                     get-value:x:@.completion
+                     .:@"
+
+"
+                     .:"Short description: "
+                     html2markdown:x:@.dp/#/*/short_description
+         if
+            exists:x:@.dp/#/*/images/*
+            .lambda
+               set-value:x:@.completion
+                  strings.concat
+                     get-value:x:@.completion
+                     .:@"
+
+Images of product:"
+               for-each:x:@.dp/#/*/images/*
+                  set-value:x:@.completion
+                     strings.concat
+                        get-value:x:@.completion
+                        .:@"
+
+"
+                        .:![
+                        get-value:x:@.dp/#/*/name
+                        .:](
+                        get-value:x:@.dp/#/*/src
+                        .:)
+         data.create
+            table:ml_training_snippets
+            values
+               type:x:@.arguments/*/type
+               prompt:x:@.prompt
+               completion:x:@.completion
+               uri:x:@.uri
+               meta:woocommerce-import

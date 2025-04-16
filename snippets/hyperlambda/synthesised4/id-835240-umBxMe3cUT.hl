@@ -1,0 +1,36 @@
+
+// This Hyperlambda code iterates over each child node of [signal], sending a POST request to OpenAI's chat completions API for each, using the [http.post] slot. It sets headers for authorization and content type, and constructs a JSON payload with model and message details. If the response status code is not between 200 and 299, it logs an error with details from the response. Otherwise, it updates the [prompt] node with the content from the API's response.
+for-each:x:@signal/*
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+         Accept:text/event-stream
+      payload
+         model:gpt-3.5-turbo
+         max_tokens:int:1000
+         temperature:decimal:0.3
+         messages
+            .
+               role:system
+               content:x:@.arguments/*/massagePrompt
+            .
+               role:user
+               content:x:@.dp/#/*/completion
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   else
+      set-value:x:@.dp/#/*/prompt
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content

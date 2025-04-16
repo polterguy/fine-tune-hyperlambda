@@ -1,0 +1,34 @@
+
+// This Hyperlambda code connects to a SQLite database and updates records in the "Orders" table using values and conditions from arguments. If no records are updated, it sets a 404 response status; otherwise, it sets a 202 status. It signals a socket event with updated arguments and returns the number of affected records. The code includes slots for database connection ([data.connect]), updating records ([data.update]), setting response status ([response.status.set]), signaling sockets ([sockets.signal]), and returning results ([return]).
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Orders
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Orders.put
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

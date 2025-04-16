@@ -1,0 +1,58 @@
+
+// This Hyperlambda code performs a series of conditional checks and string manipulations. It first checks if an [anchor] exists and is not null, and if a [url] does not contain a hash. If a [query] argument exists, it splits the [url] on "?" and further processes the query string to check for specific parameters, updating the [url] if a match is found. If the [url] is not null, it decrements a [max] argument and appends a formatted Markdown link to a [markdown] node. Key slots include [if], [and], [not-null], [neq], [strings.contains], [strings.split], [strings.starts-with], [strings.concat], and [math.decrement].
+if
+   and
+      not-null:x:@.anchor
+      neq:x:@.anchor
+         .:
+      not
+         strings.contains:x:@.url
+            .:#
+   .lambda
+      if
+         exists:x:@.arguments/*/query
+         .lambda
+            strings.split:x:@.url
+               .:?
+            if
+               mt
+                  get-count:x:@strings.split/*
+                  .:int:1
+               .lambda
+                  strings.split:x:@strings.split/1
+                     .:&
+                  .found:bool:false
+                  for-each:x:@strings.split/*
+                     if
+                        strings.starts-with:x:@.dp/#
+                           strings.concat
+                              get-value:x:@.arguments/*/query
+                              .:=
+                        .lambda
+                           set-value:x:@.found
+                              .:bool:true
+                           strings.split:x:@.dp/#
+                              .:=
+                           set-value:x:@.url
+                              strings.url-decode:x:@strings.split/1
+                  if
+                     not
+                        get-value:x:@.found
+                     .lambda
+                        set-value:x:@.url
+            else
+               set-value:x:@.url
+      if
+         not-null:x:@.url
+         .lambda
+            math.decrement:x:@.arguments/*/max
+            set-value:x:@.markdown
+               strings.concat
+                  get-value:x:@.markdown
+                  .:* [
+                  get-value:x:@.anchor
+                  .:](
+                  get-value:x:@.url
+                  .:)
+                  .:@"
+"

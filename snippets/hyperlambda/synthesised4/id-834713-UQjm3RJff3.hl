@@ -1,0 +1,30 @@
+
+/*
+ * This Hyperlambda code connects to the "chinook" database and reads data from the "Artist" table. It includes optional offset, limit, order, and direction parameters from the arguments. It then reads related "Album" records for each artist using a nested [data.read] with a where condition on "ArtistId". The results are yielded as "contacts" and "albums". 
+ * 
+ * 1. [data.connect] - Connects to the "chinook" database.
+ * 2. [add] - Adds optional parameters (offset, limit, order, direction) to the data read operation.
+ * 3. [get-nodes] - Retrieves specific argument nodes for offset, limit, order, and direction.
+ * 4. [data.read] - Reads data from the "Artist" table.
+ * 5. [include] - Includes related data from the nested [data.read] operation.
+ * 6. [where] - Specifies a condition to filter "Album" records by "ArtistId".
+ * 7. [yield] - Returns the results as "contacts" and "albums".
+ */
+data.connect:chinook
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   data.read
+      table:Artist
+   include:x:@data.read/*
+      data.read
+         table:Album
+         where
+            and
+               ArtistId.eq:x:@.dp/#/*/ArtistId
+      yield
+         albums:x:@data.read/*
+   yield
+      contacts:x:@data.read/*

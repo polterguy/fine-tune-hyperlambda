@@ -1,0 +1,92 @@
+
+/*
+ * This Hyperlambda code communicates with the OpenAI API to generate a summary of provided content. It sends a POST request to OpenAI's chat completions endpoint, processes the response, and handles different HTTP status codes to signal success or failure. If the request fails, it logs the error and retries after a delay. The code utilizes slots for HTTP communication, string manipulation, and conditional logic to manage the flow.
+ * 
+ * 1. [try] - Initiates a try block to handle potential exceptions.
+ * 2. [unwrap] - Evaluates the expression to retrieve the content for summarization.
+ * 3. [http.post] - Sends a POST request to OpenAI's API for chat completions.
+ * 4. [headers] - Sets the authorization and content type headers for the request.
+ * 5. [payload] - Specifies the model, max tokens, temperature, and messages for the API request.
+ * 6. [convert] - Converts the response to the appropriate type.
+ * 7. [if] - Checks if the HTTP status code is 400, indicating a client error.
+ * 8. [sockets.signal] - Sends a warning message to the feedback channel.
+ * 9. [sleep] - Pauses execution for a specified duration.
+ * 10. [lambda2hyper] - Converts the lambda response to a Hyperlambda format.
+ * 11. [log.error] - Logs an error message with details from the API response.
+ * 12. [set-value] - Sets the value of a node to indicate failure.
+ * 13. [else-if] - Checks if the status code indicates a successful response (200-299).
+ * 14. [strings.trim] - Trims whitespace from the API response content.
+ * 15. [strings.concat] - Concatenates strings to form a summary.
+ * 16. [else] - Handles other status codes, indicating a need to retry.
+ * 17. [math.decrement] - Decreases the retry counter.
+ */
+try
+   unwrap:x:+/**
+   http.post:"https://api.openai.com/v1/chat/completions"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:x:@.model
+         max_tokens:x:@.max-size
+         temperature:decimal:0.3
+         messages
+            .
+               role:system
+               content:Create a summary of the following information
+            .
+               role:user
+               content:x:@.dp/#/*/completion
+      convert:true
+   if
+      eq:x:@http.post
+         .:int:400
+      .lambda
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Could not summarize snippet, check your log for details
+               type:warning
+         sleep:100
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+         set-value:x:@.no
+            .:int:0
+   else-if
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+      .lambda
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Successfully created summary of snippet
+               type:info
+         sleep:100
+         set-value:x:@.dp/#/*/completion
+            strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+               .:@"
+	 "
+         set-value:x:@.dp/#/*/prompt
+            strings.concat
+               .:"Summary; "
+               strings.substring:x:@.dp/#/*/prompt
+                  .:int:0
+                  .:int:150
+         set-value:x:@.no
+            .:int:0
+   else
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+            type:warning
+      sleep:3000
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      math.decrement:x:@.no

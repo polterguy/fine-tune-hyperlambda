@@ -1,0 +1,39 @@
+
+// This Hyperlambda code connects to a database and reads records from the "ml_training_snippets" table, applying filters based on provided arguments. It dynamically constructs a WHERE clause using OR conditions for "completion", "prompt", and "uri" fields, and removes these nodes from arguments after use. If no records are found, it sets a 404 response status. The retrieved data is converted to CSV format using [lambda2csv], and the response headers are set to facilitate CSV download. Finally, the CSV data is returned as the response.
+data.connect:[generic|magic]
+   add:x:./*/data.read/*/where/*/*/or
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   if
+      not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
+   data.read
+      table:ml_training_snippets
+      columns
+         type
+         uri
+         prompt
+         completion
+      where
+         and
+            or
+      limit:-1
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         response.status.set:404
+         return
+            result:No records found
+   lambda2csv:x:@data.read/*
+   response.headers.set
+      Content-Type:text/csv
+      Access-Control-Expose-Headers:Content-Disposition
+      Content-Disposition:"attachment; filename=\"training-snippets.csv\""
+   return:x:@lambda2csv

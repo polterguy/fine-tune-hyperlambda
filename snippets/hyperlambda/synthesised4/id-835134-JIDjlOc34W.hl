@@ -1,0 +1,21 @@
+
+// This Hyperlambda code checks if a specific schema property does not exist in a request body. If it doesn't, it creates a new property node with a name and type, copying these from an existing node. If a description exists, it adds this to the new property. Finally, it adds the new property to the schema properties node. The code uses slots like [if], [not-exists], [set-value], [set-name], [exists], [unwrap], and [add] to perform these operations.
+if
+   not-exists:x:"@.body/*/requestBody/*/content/*/*/schema/*/properties/*/\"{@.dp/#/*/name}\""
+   .lambda
+      .prop
+         name
+            type
+      set-value:x:@.prop/*/*/type
+         get-value:x:@.dp/#/*/type
+      set-name:x:@.prop/*
+         get-value:x:@.dp/#/*/name
+      if
+         exists:x:@.dp/#/*/description
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.prop/*
+               .
+                  description:x:@.dp/#/*/description
+      add:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+         get-nodes:x:@.prop/*

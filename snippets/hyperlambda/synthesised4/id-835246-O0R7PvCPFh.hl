@@ -1,0 +1,27 @@
+
+// This Hyperlambda code connects to a database and reads from the "ml_requests" table, selecting specific columns based on conditions. It checks if a record exists where the "prompt" and "type" match given arguments, and if the "cached" value is 1. If such a record exists, it returns the "completion" value and indicates the result was cached.
+data.connect:[generic|magic]
+   data.read
+      table:ml_requests
+      columns
+         completion
+         cached
+      where
+         and
+            prompt.eq:x:@.arguments/*/prompt
+            type.eq:x:@.arguments/*/type
+      limit:1
+      order:created
+      direction:desc
+   if
+      and
+         exists:x:@data.read/*/*
+         eq
+            convert:x:@data.read/*/*/cached
+               type:int
+            .:int:1
+      .lambda
+         unwrap:x:+/*
+         return
+            result:x:@data.read/*/*/completion
+            finish_reason:cached

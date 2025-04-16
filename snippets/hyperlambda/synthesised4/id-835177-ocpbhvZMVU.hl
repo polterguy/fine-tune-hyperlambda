@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code checks for the existence of specific nodes within a structure and performs operations based on their presence. It uses [if] and [and] to evaluate conditions, checking for the existence of [yield], [return], or [return-nodes] nodes. If conditions are met, it concatenates strings and checks for non-existence of certain expressions, adding nodes if necessary. The use of [unwrap], [add], and [set-value] facilitates dynamic node manipulation and string operations.
+ * 
+ * 1. [if] - Initiates a conditional check based on subsequent conditions.
+ * 2. [and] - Combines multiple conditions that must all be true.
+ * 3. [exists] - Checks if certain nodes exist within the specified path.
+ * 4. [not-exists] - Checks if certain nodes do not exist within the specified path.
+ * 5. [.lambda] - Contains the operations to execute if conditions are true.
+ * 6. [.x] - A node used to store intermediate results.
+ * 7. [set-value] - Assigns a concatenated string to [.x].
+ * 8. [strings.concat] - Concatenates multiple strings.
+ * 9. [get-value] - Retrieves the value of a node.
+ * 10. [if] - Nested conditional check for non-existence of expressions.
+ * 11. [not-exists] - Checks for non-existence of specific expressions.
+ * 12. [.lambda] - Contains operations to execute if nested conditions are true.
+ * 13. [unwrap] - Evaluates expressions within nodes.
+ * 14. [add] - Adds new nodes to a specified location.
+ * 15. [name], [expression], [complete] - Nodes added to store specific information.
+ */
+if
+   and
+      exists:x:@hyper2lambda/**/[yield|return|return-nodes]
+      not-exists:x:@hyper2lambda/**/[yield|return|return-nodes]/*
+   .lambda
+      .x
+      set-value:x:@.x
+         strings.concat
+            .:--/execute/=
+            get-value:x:@.dp/#/*/name
+            .:/*
+      if
+         not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:../*/return/*/candidates
+               .
+                  .
+                     name:x:@.x
+                     expression:x:@.x
+                     complete:bool:false

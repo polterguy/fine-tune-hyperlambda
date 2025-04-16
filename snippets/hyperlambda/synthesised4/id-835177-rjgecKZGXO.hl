@@ -1,0 +1,36 @@
+
+/*
+ * The code iterates through each node in a specified set, checking if complex objects exist and issuing a warning if so. It constructs a string expression for each node and checks if this expression already exists in a list of candidates. If not, it adds the expression to the candidates list, marking it as complete. 
+ * 
+ * 1. [for-each] - Iterates through each node in the specified set.
+ * 2. [if] - Checks if complex objects exist in the current node.
+ * 3. [set-value] - Sets a warning message if complex objects are found.
+ * 4. [strings.concat] - Constructs a string expression for the current node.
+ * 5. [get-name] - Retrieves the name of the current node.
+ * 6. [if] - Checks if the constructed expression already exists in the candidates list.
+ * 7. [unwrap] - Evaluates expressions before adding to the candidates list.
+ * 8. [add] - Adds the new expression to the candidates list if it doesn't already exist.
+ */
+for-each:x:@.dp/#/*
+   if
+      exists:x:@.dp/#/*
+      .lambda
+         set-value:x:@.warning
+            .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+   .x
+   set-value:x:@.x
+      strings.concat
+         .:@
+         get-value:x:@.node-name
+         .:/*/
+         get-name:x:@.dp/#
+   if
+      not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+      .lambda
+         unwrap:x:+/*/*/*
+         add:x:../*/return/*/candidates
+            .
+               .
+                  name:x:@.x
+                  expression:x:@.x
+                  complete:bool:true

@@ -1,0 +1,29 @@
+
+// This code establishes a connection to a SQLite database and reads data from the "activities" table, joining it with the "clients" table using a left join. It dynamically constructs an aggregate function using provided arguments and adds additional conditions to the query. The result is limited to one record and returned. The slots used include [data.connect] for establishing a connection, [set-name] for creating the aggregate function, [remove-nodes] and [add] for modifying the query, [data.read] for reading data, and [return-nodes] for returning the result.
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:activities
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  activities.client_id:client_id.client_id
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

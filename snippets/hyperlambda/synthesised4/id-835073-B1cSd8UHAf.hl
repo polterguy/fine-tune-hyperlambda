@@ -1,0 +1,39 @@
+
+// This Hyperlambda code connects to a database to read cryptographic keys and verifies a challenge using a public key. It checks a cache for a valid verification result, throwing an "Access denied" exception if not valid. It then retrieves the associated username, signals authentication without password checking, caches the verification result, and returns an authentication ticket. Key slots include [data.connect], [crypto.verify], [cache.get], [if], [data.read], [signal], [cache.set], and [return].
+data.connect:magic
+   data.read
+      table:crypto_keys
+      columns
+         content
+         id
+      where
+         and
+            fingerprint.eq:x:@crypto.get-key
+            enabled:bool:true
+   crypto.verify:x:@.arguments/*/challenge
+      public-key:x:@data.read/*/*/content
+   cache.get:x:@crypto.verify
+   if
+      not
+         eq
+            get-value:x:@cache.get
+            .:VALID
+      .lambda
+         throw:Access denied
+            public:true
+            status:401
+   data.read
+      table:users_crypto_keys
+      columns
+         username
+      where
+         and
+            key_id.eq:x:@data.read/@data.read/*/*/id
+   unwrap:x:+/*/username
+   signal:magic.auth.authenticate
+      check-password:bool:false
+      username:x:@data.read/*/*/username
+   cache.set:x:@crypto.verify
+   unwrap:x:+/*
+   return
+      result:x:@signal/*/ticket

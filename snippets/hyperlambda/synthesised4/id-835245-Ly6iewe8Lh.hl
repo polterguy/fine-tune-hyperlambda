@@ -1,0 +1,61 @@
+
+/*
+ * This code checks the HTTP response status from a [http.post] request to ensure it is not between 200 and 299. If the status is outside this range, it logs an error and checks if a stream argument exists. If no stream exists or it is false, it throws an error with a public status. Otherwise, it unwraps the response, signals an error through sockets, and resets an iteration counter to zero. 
+ * 
+ * 1. [if] - Initiates a conditional check.
+ * 2. [not] - Negates the condition within.
+ * 3. [and] - Combines multiple conditions.
+ * 4. [mte] - Checks if the HTTP status is more than or equal to 200.
+ * 5. [lt] - Checks if the HTTP status is less than 300.
+ * 6. [.lambda] - Executes if the condition is true.
+ * 7. [lambda2hyper] - Converts the HTTP response to a Hyperlambda object.
+ * 8. [log.error] - Logs an error message.
+ * 9. [message] - Retrieves the error message from the HTTP response.
+ * 10. [status] - Retrieves the HTTP status code.
+ * 11. [error] - Retrieves the converted Hyperlambda error.
+ * 12. [if] - Initiates another conditional check.
+ * 13. [or] - Combines multiple conditions.
+ * 14. [not-exists] - Checks if a stream argument does not exist.
+ * 15. [eq] - Checks if the stream argument is false.
+ * 16. [.lambda] - Executes if the condition is true.
+ * 17. [throw] - Throws an error with a public status.
+ * 18. [else] - Executes if the previous condition is false.
+ * 19. [unwrap] - Unwraps the HTTP response.
+ * 20. [sockets.signal] - Sends a signal through sockets.
+ * 21. [args] - Specifies arguments for the signal.
+ * 22. [error] - Indicates an error in the signal.
+ * 23. [status] - Retrieves the HTTP status code for the signal.
+ * 24. [message] - Retrieves the error message for the signal.
+ * 25. [set-value] - Resets the iteration counter to zero.
+ */
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      if
+         or
+            not-exists:x:@.arguments/*/stream
+            eq:x:@.arguments/*/stream
+               .:bool:false
+         .lambda
+            throw:x:@http.post/*/content/*/error/*/message
+               public:bool:true
+               status:x:@http.post
+      else
+         unwrap:x:+/*/*
+         sockets.signal:x:@.arguments/*/session
+            args
+               error:bool:true
+               status:x:@http.post
+               message:x:@http.post/*/content/*/error/*/message
+         set-value:x:@.iterations
+            .:int:0

@@ -1,0 +1,42 @@
+
+// This Hyperlambda code connects to a SQLite database and performs a read operation on the "Orders" table, joining it with "Employees" and "Shippers" tables using left joins. It dynamically constructs a distinct column selection based on an argument, removes certain nodes from the arguments, and adds others to the data read operation. Finally, it returns the results of the data read operation. The code is structured to allow for dynamic SQL query construction and execution.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Orders
+         join:Employees
+            as:EmployeeID
+            type:left
+            on
+               and
+                  Orders.EmployeeID:EmployeeID.EmployeeID
+         join:Shippers
+            as:ShipVia
+            type:left
+            on
+               and
+                  Orders.ShipVia:ShipVia.ShipperID
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

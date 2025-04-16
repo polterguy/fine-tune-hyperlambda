@@ -1,0 +1,38 @@
+
+// This Hyperlambda code processes a string, checking if it's not empty, and then performs further actions based on its content. If the string equals "[DONE]", it signals a session as finished. Otherwise, it converts the string from JSON to lambda and checks for a "finish_reason" in the data, signaling the session if found. Additionally, it appends content from the JSON to a result node and signals the session with this content if it's not empty. The code uses slots like [if], [neq], [eq], [json2lambda], [sockets.signal], [exists], [not-null], [unwrap], and [strings.concat] to achieve its logic.
+if
+   neq:x:@strings.trim
+      .:
+   .lambda
+      if
+         eq:x:@strings.trim
+            .:[DONE]
+         .lambda
+            sockets.signal:x:@.session
+               args
+                  finished:bool:true
+      else
+         json2lambda:x:@strings.trim
+         if
+            and
+               exists:x:@json2lambda/*/choices/0/*/finish_reason
+               not-null:x:@json2lambda/*/choices/0/*/finish_reason
+            .lambda
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     finish_reason:x:@json2lambda/*/choices/0/*/finish_reason
+         if
+            and
+               not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+               neq:x:@json2lambda/*/choices/0/*/delta/*/content
+                  .:
+            .lambda
+               set-value:x:@.result
+                  strings.concat
+                     get-value:x:@.result
+                     get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     message:x:@json2lambda/*/choices/0/*/delta/*/content

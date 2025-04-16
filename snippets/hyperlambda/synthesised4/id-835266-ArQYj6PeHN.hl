@@ -1,0 +1,122 @@
+
+/*
+ * This Hyperlambda code iterates over a set of snippets to process and potentially summarize them if they exceed a specified token size. It uses the OpenAI API to create summaries, signaling feedback through a channel and handling errors with retries. Key slots include [for-each] for iteration, [set-value] for setting node values, [if] for conditional logic, [http.post] for API requests, and [sockets.signal] for feedback.
+ * 
+ * 1. [for-each] - Iterates over each snippet in the collection.
+ * 2. [set-value] - Sets the value of the [.tmp] node with concatenated prompt and completion.
+ * 3. [strings.concat] - Concatenates strings, including prompts and completions.
+ * 4. [openai.tokenize] - Calculates token size of the [.tmp] node.
+ * 5. [if] - Checks if the token size exceeds a threshold.
+ * 6. [sockets.signal] - Sends feedback messages through a specified channel.
+ * 7. [http.post] - Sends a POST request to the OpenAI API for summarization.
+ * 8. [while] - Retries the API call if needed, based on conditions.
+ * 9. [try] - Attempts the API call and handles exceptions.
+ * 10. [unwrap] - Evaluates expressions in the current context.
+ * 11. [lambda2hyper] - Converts lambda expressions to Hyperlambda for logging.
+ * 12. [log.error] - Logs errors when API calls fail.
+ * 13. [math.decrement] - Decreases the retry counter in case of failure.
+ */
+for-each:x:@.snippets/*
+   .tmp
+   set-value:x:@.tmp
+      strings.concat
+         get-value:x:@.dp/#/*/prompt
+         .:@"
+"
+         .:@"
+"
+         get-value:x:@.dp/#/*/completion
+   if
+      mt
+         openai.tokenize:x:@.tmp
+         get-value:x:@.max-size
+      .lambda
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Summarizing snippet since it is larger than 80% of maximum context size for type
+               type:info
+         sleep:100
+         .token
+         set-value:x:@.token
+            strings.concat
+               .:"Bearer "
+               get-first-value
+                  get-value:x:@.api-key
+                  config.get:"magic:openai:key"
+         .no:int:3
+         while
+            mt:x:@.no
+               .:int:0
+            .lambda
+               try
+                  unwrap:x:+/**
+                  http.post:"https://api.openai.com/v1/chat/completions"
+                     headers
+                        Authorization:x:@.token
+                        Content-Type:application/json
+                     payload
+                        model:x:@.model
+                        max_tokens:x:@.max-size
+                        temperature:decimal:0.3
+                        messages
+                           .
+                              role:system
+                              content:Create a summary of the following information
+                           .
+                              role:user
+                              content:x:@.dp/#/*/completion
+                     convert:true
+                  if
+                     eq:x:@http.post
+                        .:int:400
+                     .lambda
+                        sockets.signal:x:@.arguments/*/feedback-channel
+                           args
+                              message:Could not summarize snippet, check your log for details
+                              type:warning
+                        sleep:100
+                        lambda2hyper:x:@http.post
+                        log.error:Something went wrong while invoking OpenAI
+                           message:x:@http.post/*/content/*/error/*/message
+                           status:x:@http.post
+                           error:x:@lambda2hyper
+                        set-value:x:@.no
+                           .:int:0
+                  else-if
+                     and
+                        mte:x:@http.post
+                           .:int:200
+                        lt:x:@http.post
+                           .:int:300
+                     .lambda
+                        sockets.signal:x:@.arguments/*/feedback-channel
+                           args
+                              message:Successfully created summary of snippet
+                              type:info
+                        sleep:100
+                        set-value:x:@.dp/#/*/completion
+                           strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+                              .:@"
+	 "
+                        set-value:x:@.dp/#/*/prompt
+                           strings.concat
+                              .:"Summary; "
+                              strings.substring:x:@.dp/#/*/prompt
+                                 .:int:0
+                                 .:int:150
+                        set-value:x:@.no
+                           .:int:0
+                  else
+                     sockets.signal:x:@.arguments/*/feedback-channel
+                        args
+                           message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+                           type:warning
+                     sleep:3000
+                     lambda2hyper:x:@http.post
+                     log.error:Something went wrong while invoking OpenAI
+                        message:x:@http.post/*/content/*/error/*/message
+                        status:x:@http.post
+                        error:x:@lambda2hyper
+                     math.decrement:x:@.no
+               .catch
+                  math.decrement:x:@.no

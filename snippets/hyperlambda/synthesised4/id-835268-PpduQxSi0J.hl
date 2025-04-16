@@ -1,0 +1,85 @@
+
+/*
+ * This Hyperlambda code connects to a database to retrieve Twilio account credentials based on a specified type, and then performs actions based on the input arguments. It checks if the prompt contains "@" and if "contact_us" is not null or empty, sending a lead email and a Twilio message if true. If the model argument starts with "gpt", it initiates a chat signal; otherwise, it performs a completion signal. The results are sent as Twilio messages using the retrieved credentials. 
+ * 
+ * 1. [data.connect] - Opens a connection to the specified database.
+ * 2. [.twilio_account_id] - Initializes a node for storing Twilio account ID.
+ * 3. [.twilio_account_sid] - Initializes a node for storing Twilio account SID.
+ * 4. [data.read] - Reads data from the "ml_types" table based on the specified type.
+ * 5. [set-value] - Sets the Twilio account ID and SID from the database read results.
+ * 6. [if] - Checks conditions on the prompt and contact_us arguments.
+ * 7. [strings.contains] - Checks if the prompt contains "@".
+ * 8. [not-null] - Checks if contact_us is not null.
+ * 9. [neq] - Checks if contact_us is not empty.
+ * 10. [unwrap] - Evaluates expressions in the current context.
+ * 11. [signal:magic.ai.send-lead-email] - Sends a lead email if conditions are met.
+ * 12. [signal:magic.twilio.send-message] - Sends a Twilio message with specified details.
+ * 13. [strings.starts-with] - Checks if the model argument starts with "gpt".
+ * 14. [add] - Adds nodes to the signal.
+ * 15. [signal:magic.ai.chat] - Initiates a chat signal.
+ * 16. [signal:magic.ai.completion] - Initiates a completion signal.
+ * 17. [else] - Executes if the model does not start with "gpt".
+ */
+data.connect:[generic|magic]
+   .twilio_account_id
+   .twilio_account_sid
+   data.read
+      table:ml_types
+      columns
+         twilio_account_id
+         twilio_account_sid
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   set-value:x:@.twilio_account_id
+      get-value:x:@data.read/*/*/twilio_account_id
+   set-value:x:@.twilio_account_sid
+      get-value:x:@data.read/*/*/twilio_account_sid
+   if
+      and
+         strings.contains:x:@.arguments/*/prompt
+            .:@
+         not-null:x:@.arguments/*/contact_us
+         neq:x:@.arguments/*/contact_us
+            .:
+      .lambda
+         unwrap:x:+/*
+         signal:magic.ai.send-lead-email
+            type:x:@.arguments/*/type
+            prompt:x:@.arguments/*/prompt
+            session:x:@.arguments/*/session
+            lead_email:x:@.arguments/*/lead_email
+            contact_us:x:@.arguments/*/contact_us
+         if:x:@signal
+            unwrap:x:+/*
+            signal:magic.twilio.send-message
+               body:x:@.arguments/*/contact_us
+               to:x:@.arguments/*/from
+               from:x:@.arguments/*/to
+               twilio_account_id:x:@.twilio_account_id
+               twilio_account_sid:x:@.twilio_account_sid
+   if
+      strings.starts-with:x:@.arguments/*/model
+         .:gpt
+      .lambda
+         add:x:./*/signal/[0,1]
+            get-nodes:x:@.arguments/*
+         signal:magic.ai.chat
+         unwrap:x:+/*
+         signal:magic.twilio.send-message
+            body:x:@signal/@signal/*/result
+            to:x:@.arguments/*/from
+            from:x:@.arguments/*/to
+            twilio_account_id:x:@.twilio_account_id
+            twilio_account_sid:x:@.twilio_account_sid
+   else
+      add:x:./*/signal/[0,1]
+         get-nodes:x:@.arguments/*
+      signal:magic.ai.completion
+      unwrap:x:+/*
+      signal:magic.twilio.send-message
+         body:x:@signal/@signal/*/result
+         to:x:@.arguments/*/from
+         from:x:@.arguments/*/to
+         twilio_account_id:x:@.twilio_account_id
+         twilio_account_sid:x:@.twilio_account_sid

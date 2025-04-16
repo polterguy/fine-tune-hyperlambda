@@ -1,0 +1,26 @@
+
+// This Hyperlambda code checks if a user is authenticated by verifying a password or a password-check flag. If authenticated, it logs the event, retrieves user roles from a database, and creates a JWT token with these roles. The token is then returned as a result. Key slots include [if], [or], [eq], [crypto.password.verify], [log.info], [data.read], [add], [auth.ticket.create], and [yield].
+if
+   or
+      eq:x:@.arguments/*/password-check
+         .:bool:false
+      crypto.password.verify:x:@.arguments/*/password
+         hash:x:@data.read/*/*/password
+   .lambda
+      log.info:User successfully authenticated
+         username:x:@.arguments/*/username
+      data.read
+         table:users_roles
+         columns
+            role
+         where
+            and
+               user.eq:x:@.arguments/*/username
+      add:x:./*/auth.ticket.create/*/roles
+         get-nodes:x:@data.read/*/*
+      auth.ticket.create
+         username:x:@.arguments/*/username
+         expires:x:@.arguments/*/expires
+         roles
+      yield
+         ticket:x:@auth.ticket.create

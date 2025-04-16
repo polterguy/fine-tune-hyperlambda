@@ -1,0 +1,43 @@
+
+/*
+ * This Hyperlambda code connects to a database and checks if a cryptographic key with a specific fingerprint already exists. If it does, it throws an exception. If not, it creates a new entry in the "crypto_keys" table with various attributes. If a username is provided, it also associates the key with a user in the "users_crypto_keys" table. The code ensures that duplicate keys are not imported and associates keys with users when applicable.
+ * 
+ * 1. [data.connect] - Connects to the "magic" database.
+ * 2. [data.read] - Reads from the "crypto_keys" table to check for existing keys with the same fingerprint.
+ * 3. [if] - Checks if the key already exists.
+ * 4. [throw] - Throws an exception if the key is already imported.
+ * 5. [data.create] - Inserts a new key into the "crypto_keys" table if it doesn't exist.
+ * 6. [if] - Checks if a username argument is provided.
+ * 7. [data.create] - Associates the key with a user in the "users_crypto_keys" table if a username is provided.
+ */
+data.connect:magic
+   data.read
+      table:crypto_keys
+      where
+         and
+            fingerprint.eq:x:@crypto.fingerprint
+   if
+      exists:x:@data.read/*/*
+      .lambda
+         throw:Key has already been imported
+            public:true
+            status:400
+   data.create
+      table:crypto_keys
+      values
+         subject:x:@.arguments/*/subject
+         email:x:@.arguments/*/email
+         domain:x:@.arguments/*/domain
+         type:RSA
+         fingerprint:x:@crypto.fingerprint
+         content:x:@.arguments/*/content
+         enabled:x:@.enabled
+         vocabulary:"add\nreturn\nget-nodes\nvocabulary\nslots.vocabulary\n"
+   if
+      exists:x:@.arguments/*/username
+      .lambda
+         data.create
+            table:users_crypto_keys
+            values
+               username:x:@.arguments/*/username
+               key_id:x:@data.create/@data.create

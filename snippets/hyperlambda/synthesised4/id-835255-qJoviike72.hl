@@ -1,0 +1,57 @@
+
+/*
+ * This Hyperlambda code is designed to create a machine learning training snippet in a database. It checks for the existence and validity of a type argument, setting it from various sources or defaulting if necessary. It also processes a filename if present, adding it to the data to be inserted. The final step is using [data.create] to insert the snippet details into the "ml_training_snippets" table, including type, URI, prompt, completion, and meta information.
+ * 
+ * 1. [if] - Checks if the prompt node exists in the input data.
+ * 2. [add] - Adds nodes from the type argument to the current node.
+ * 3. [try-signal] - Attempts to signal the ability to create a snippet.
+ * 4. [.uri] - Placeholder for URI value setting.
+ * 5. [set-value] - Sets the URI value from the input data.
+ * 6. [.type] - Placeholder for type value setting.
+ * 7. [if] - Checks conditions to set the type value from arguments.
+ * 8. [else-if] - Sets the type from input data if not set by arguments.
+ * 9. [else] - Defaults the type to "default" if not set by other means.
+ * 10. [if] - Checks for the existence of a filename in the input data.
+ * 11. [add] - Adds filename nodes to the data creation values.
+ * 12. [data.create] - Inserts a new training snippet into the database.
+ */
+if:x:@.dp/#/*/prompt
+   add:x:+
+      get-nodes:x:@.arguments/*/type
+   try-signal:magic.ai.can-create-snippet
+   .uri
+   set-value:x:@.uri
+      get-first-value
+         get-value:x:@.dp/#/*/uri
+         .:
+   .type
+   if
+      and
+         exists:x:@.arguments/*/type
+         not-null:x:@.arguments/*/type
+         neq:x:@.arguments/*/type
+            .:
+      .lambda
+         set-value:x:@.type
+            get-value:x:@.arguments/*/type
+   else-if
+      exists:x:@.dp/#/*/type
+      .lambda
+         set-value:x:@.type
+            get-value:x:@.dp/#/*/type
+   else
+      set-value:x:@.type
+         .:default
+   if
+      exists:x:@.dp/#/*/filename
+      .lambda
+         add:x:@for-each/*/data.create/*/values
+            get-nodes:x:@.dp/#/*/filename
+   data.create
+      table:ml_training_snippets
+      values
+         type:x:@.type
+         uri:x:@.uri
+         prompt:x:@.dp/#/*/prompt
+         completion:x:@.dp/#/*/completion
+         meta:imported

@@ -1,0 +1,80 @@
+
+/*
+ * This Hyperlambda code checks if a [supervised] argument exists and is not null, and if its integer value is 1. If true, it constructs a [prompt] string based on the presence of [no-invocation]. It then checks if [function-result] is not null to append additional information to [tmp-completion]. Finally, it creates a record in the [ml_requests] table with various values derived from arguments and computed nodes.
+ * 
+ * 1. [if] - Checks if the conditions for supervised mode are met.
+ * 2. [and] - Combines multiple conditions to determine supervised mode.
+ * 3. [exists] - Checks if the [supervised] argument exists.
+ * 4. [not-null] - Ensures the [supervised] argument is not null.
+ * 5. [eq] - Compares the converted [supervised] value to 1.
+ * 6. [convert] - Converts the [supervised] argument to an integer.
+ * 7. [.lambda] - Executes if the above conditions are true.
+ * 8. [data.connect] - Connects to a data source.
+ * 9. [if] - Checks if [no-invocation] is greater than 0.
+ * 10. [mt] - Compares [no-invocation] to 0.
+ * 11. [set-value] - Sets the value of [prompt] or [tmp-completion].
+ * 12. [strings.concat] - Concatenates strings to form [prompt] or [tmp-completion].
+ * 13. [else] - Executes if the [if] condition is false.
+ * 14. [not-null] - Checks if [function-result] is not null.
+ * 15. [data.create] - Inserts a new record into the [ml_requests] table with specified values.
+ */
+if
+   and
+      exists:x:@.arguments/*/supervised
+      not-null:x:@.arguments/*/supervised
+      eq
+         convert:x:@.arguments/*/supervised
+            type:int
+         .:int:1
+   .lambda
+      data.connect:[generic|magic]
+         .prompt
+         if
+            mt:x:@.no-invocation
+               .:int:0
+            .lambda
+               set-value:x:@.prompt
+                  strings.concat
+                     .:[
+                     get-value:x:@.no-invocation
+                     .:"] - "
+                     get-value:x:@.only-prompt
+         else
+            set-value:x:@.prompt
+               get-value:x:@.only-prompt
+         .tmp-completion
+         if
+            not-null:x:@.function-result
+            .lambda
+               set-value:x:@.tmp-completion
+                  strings.concat
+                     get-value:x:@.result
+                     .:@"
+"
+                     .:@"
+"
+                     .:@"Result of function invocation:
+"
+                     .:@"
+"
+                     .:```json
+                     .:@"
+"
+                     get-value:x:@.function-result
+                     .:@"
+"
+                     .:```
+               set-value:x:@.function-result
+         else
+            set-value:x:@.tmp-completion
+               get-value:x:@.result
+         data.create
+            table:ml_requests
+            values
+               type:x:@.arguments/*/type
+               prompt:x:@.prompt
+               completion:x:@.tmp-completion
+               finish_reason:x:@.finish_reason
+               session:x:@.arguments/*/session
+               user_id:x:@.arguments/*/user_id
+               referrer:x:@.arguments/*/referrer

@@ -1,0 +1,42 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "hospital" and performs a data read operation on the "Treatments" table with a left join on the "Patients" table. It constructs a SQL query to count distinct values in a specified column, which is dynamically set using the [strings.concat] slot. The code removes the [distinct_column] argument after use and adds any additional conditions from the arguments to the [where] clause. The result of the query is returned using [return-nodes]. 
+ * 
+ * 1. [data.connect] - Connects to the "hospital" database using SQLite.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs a string to count distinct values in a specified column.
+ * 4. [strings.concat] - Concatenates parts of the SQL function for counting distinct values.
+ * 5. [get-value] - Retrieves the value of the distinct column from the arguments.
+ * 6. [remove-nodes] - Removes the [distinct_column] argument after use.
+ * 7. [add] - Adds additional conditions from arguments to the [where] clause.
+ * 8. [data.read] - Reads data from the "Treatments" table with a left join on "Patients".
+ * 9. [join] - Specifies a left join on the "Patients" table using "PatientID".
+ * 10. [columns] - Specifies the columns to select, including the distinct count.
+ * 11. [where] - Initializes the where clause for additional conditions.
+ * 12. [return-nodes] - Returns the result of the data read operation.
+ */
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Treatments
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Treatments.PatientID:PatientID.PatientID
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

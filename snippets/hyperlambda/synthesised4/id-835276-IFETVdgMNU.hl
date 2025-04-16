@@ -1,0 +1,30 @@
+
+// This Hyperlambda code iterates over each node in a CSV converted to a lambda object, determining the type of each column as either "text" or "numeric". It uses [for-each] to traverse nodes, [if] to check conditions, and [set-value] to assign types. Finally, it executes an SQL DDL file to update column metadata in a database using the determined types.
+for-each:x:@csv2lambda/0/*
+   .type:text
+   get-name:x:@.dp/#
+   .found:bool:false
+   for-each:x:@csv2lambda/*/*/{@get-name}
+      if
+         not
+            eq
+               strings.replace-not-of:x:@.dp/#
+                  .:0123456789.
+                  .:
+               get-value:x:@.dp/#
+         .lambda
+            set-value:x:@.found
+               .:bool:true
+   if
+      eq:x:@.found
+         .:bool:false
+      .lambda
+         set-value:x:@.type
+            .:numeric
+   execute-file:/system/sql/ddl/column.post.hl
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+      columnName:x:@get-name
+      columnType:x:@.type

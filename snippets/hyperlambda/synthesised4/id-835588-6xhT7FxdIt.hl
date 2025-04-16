@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database using a generic connection string and performs a SQL query on the "Employees" table. It constructs a "count(distinct ...)" SQL function dynamically based on a provided "distinct_column" argument, removes this argument from the input, and adds any remaining arguments as conditions in the "where" clause. The query includes a left join on the "Employees" table with an alias "ReportsTo" and returns the resulting nodes from the query execution. 
+ * 
+ * 1. [data.connect] - Connects to a database using a specified connection string.
+ * 2. [database-type] - Specifies the type of database, in this case, SQLite.
+ * 3. [set-name] - Constructs a SQL "count(distinct ...)" function dynamically.
+ * 4. [strings.concat] - Concatenates strings to form the SQL function.
+ * 5. [remove-nodes] - Removes the "distinct_column" argument from the input.
+ * 6. [add] - Adds remaining arguments as conditions in the "where" clause.
+ * 7. [data.read] - Executes a SQL query on the "Employees" table.
+ * 8. [join] - Performs a left join on the "Employees" table with an alias.
+ * 9. [columns] - Specifies the columns to be selected in the query.
+ * 10. [where] - Adds conditions to the SQL query.
+ * 11. [return-nodes] - Returns the resulting nodes from the query execution.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Employees
+         join:Employees
+            as:ReportsTo
+            type:left
+            on
+               and
+                  Employees.ReportsTo:ReportsTo.EmployeeID
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,30 @@
+
+/*
+ * This Hyperlambda code checks if the [createNonce] argument is true, and if so, generates a random nonce using [crypto.random] with a length between 20 and 30 characters. It then stores this nonce in a cache with a 1-hour expiration using [cache.set]. Finally, it adds a new node with the nonce, a Google OAuth2 URL, client ID, response type, and scope to the lambda object. 
+ * 
+ * 1. [if] - Checks if the [createNonce] argument is true.
+ * 2. [eq] - Compares the [createNonce] argument to true.
+ * 3. [.lambda] - Executes the following nodes if the condition is true.
+ * 4. [set-value] - Sets the value of the [nonce] node.
+ * 5. [crypto.random] - Generates a random string between 20 and 30 characters.
+ * 6. [cache.set] - Caches the nonce with a specific expiration time.
+ * 7. [add] - Adds a node with OAuth2 authentication details to the lambda object.
+ */
+if
+   eq:x:@.arguments/*/createNonce
+      .:bool:true
+   .lambda
+      set-value:x:@.nonce
+         crypto.random
+            min:20
+            max:30
+      cache.set:x:@.nonce
+         value:"https://accounts.google.com"
+         expiration:3600
+      add:x:@.lambda/@.lambda/*/add/*/*
+         .
+            nonce:x:@.nonce
+            url:"https://accounts.google.com/o/oauth2/v2/auth"
+            client_id:x:@.client-id
+            response_type:id_token
+            scope:openid email profile

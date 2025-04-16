@@ -1,0 +1,27 @@
+
+// This Hyperlambda code connects to a SQLite database and performs a data read operation on the "documents" table, joining it with the "clients" table on the "client_id" field using a left join. It constructs a distinct count SQL function for a specified column, removes the distinct column argument, and adds any additional conditions from the arguments to the where clause. The result of the data read operation is returned. Key slots include [data.connect] for establishing the connection, [set-name] for constructing the distinct count function, and [data.read] for executing the SQL query.
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:documents
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  documents.client_id:client_id.client_id
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,68 @@
+
+/*
+ * This Hyperlambda code processes a collection of training snippets, determining their type and URI, and then stores them in a database table. It iterates over each snippet, checks for the presence of a prompt, and sets the type and URI based on existing values or defaults. The code then creates a new entry in the "ml_training_snippets" table with the determined type, URI, prompt, and completion data.
+ * 
+ * 1. [data.connect] - Connects to a data source.
+ * 2. [for-each] - Iterates through each snippet in the arguments.
+ * 3. [if] - Checks if the current snippet has a prompt.
+ * 4. [add] - Adds the type to the current node.
+ * 5. [try-signal] - Attempts to create a snippet using a signal.
+ * 6. [.uri] - Declares a URI node.
+ * 7. [set-value] - Sets the value of the URI node.
+ * 8. [get-first-value] - Retrieves the first value from the URI.
+ * 9. [.type] - Declares a type node.
+ * 10. [if] - Checks conditions to set the type.
+ * 11. [and] - Combines multiple conditions.
+ * 12. [exists] - Checks if a node exists.
+ * 13. [not-null] - Checks if a node is not null.
+ * 14. [neq] - Checks if a node is not equal to a value.
+ * 15. [.lambda] - Executes a block of code if conditions are met.
+ * 16. [else-if] - Checks alternative conditions.
+ * 17. [else] - Executes if no conditions are met.
+ * 18. [add] - Adds filename data to the values.
+ * 19. [data.create] - Creates a new entry in the database.
+ * 20. [table] - Specifies the database table name.
+ * 21. [values] - Specifies the data to be inserted into the table.
+ */
+data.connect:[generic|magic]
+   for-each:x:@.arguments/*/snippets/*
+      if:x:@.dp/#/*/prompt
+         add:x:+
+            get-nodes:x:@.arguments/*/type
+         try-signal:magic.ai.can-create-snippet
+         .uri
+         set-value:x:@.uri
+            get-first-value
+               get-value:x:@.dp/#/*/uri
+               .:
+         .type
+         if
+            and
+               exists:x:@.arguments/*/type
+               not-null:x:@.arguments/*/type
+               neq:x:@.arguments/*/type
+                  .:
+            .lambda
+               set-value:x:@.type
+                  get-value:x:@.arguments/*/type
+         else-if
+            exists:x:@.dp/#/*/type
+            .lambda
+               set-value:x:@.type
+                  get-value:x:@.dp/#/*/type
+         else
+            set-value:x:@.type
+               .:default
+         if
+            exists:x:@.dp/#/*/filename
+            .lambda
+               add:x:@for-each/*/data.create/*/values
+                  get-nodes:x:@.dp/#/*/filename
+         data.create
+            table:ml_training_snippets
+            values
+               type:x:@.type
+               uri:x:@.uri
+               prompt:x:@.dp/#/*/prompt
+               completion:x:@.dp/#/*/completion
+               meta:imported

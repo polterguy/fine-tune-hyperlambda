@@ -1,0 +1,85 @@
+
+/*
+ * This Hyperlambda code processes URLs from a data structure, checking their validity and format. It uses [if], [else-if], and logical operators like [and], [not], and [neq] to evaluate conditions on URLs. The code checks if URLs exist, are not null, and do not start with "http://" or "https://". It then manipulates the URLs using [strings.split], [strings.trim-end], and [strings.concat] to ensure proper formatting, adding them to a list if they don't already exist. The [unwrap] and [add] slots are used to manage and append URLs to the [.urls] node.
+ * 
+ * 1. [case] - Defines a case block for conditional execution.
+ * 2. [if] - Evaluates conditions to process URLs.
+ * 3. [and] - Combines multiple conditions that must all be true.
+ * 4. [exists] - Checks if a node exists at a specified path.
+ * 5. [not-null] - Ensures the node is not null.
+ * 6. [neq] - Checks if the node's value is not equal to a specified value.
+ * 7. [not] - Negates the condition, used with [strings.starts-with].
+ * 8. [strings.starts-with] - Checks if a string starts with a specified prefix.
+ * 9. [.lambda] - Contains the code to execute if conditions are met.
+ * 10. [strings.split] - Splits a string into parts.
+ * 11. [strings.trim-end] - Trims characters from the end of a string.
+ * 12. [.tmp] - Temporary storage for processed URL.
+ * 13. [set-value] - Sets the value of a node.
+ * 14. [strings.concat] - Concatenates strings.
+ * 15. [else-if] - Provides an alternative condition to evaluate.
+ * 16. [not-exists] - Checks if a node does not exist at a specified path.
+ * 17. [unwrap] - Evaluates expressions before execution.
+ * 18. [add] - Adds a node to a list if conditions are met.
+ */
+case:a
+   if
+      and
+         exists:x:"@.dp/#/*/\\@href/[0,1]"
+         not-null:x:"@.dp/#/*/\\@href/[0,1]"
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:
+         not
+            strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+               .:"http://"
+         not
+            strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+               .:"https://"
+      .lambda
+         strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         strings.trim-end:x:@strings.split/0
+            .:/
+         .tmp
+         if
+            strings.starts-with:x:@strings.trim-end
+               .:/
+            .lambda
+               set-value:x:@.tmp
+                  strings.concat
+                     get-value:x:@.base
+                     get-value:x:@strings.trim-end
+         else
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.base
+                  .:/
+                  get-value:x:@strings.trim-end
+         if
+            not-exists:x:@.url/*/{@strings.concat}
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.urls
+                  .
+                     .:x:@.tmp
+   else-if
+      and
+         exists:x:"@.dp/#/*/\\@href/[0,1]"
+         not-null:x:"@.dp/#/*/\\@href/[0,1]"
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:
+      .lambda
+         strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         strings.trim-end:x:@strings.split/0
+            .:/
+         if
+            not-exists:x:"@.urls/*/\"{@strings.split/0}\""
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.urls
+                  .
+                     .:x:@strings.trim-end

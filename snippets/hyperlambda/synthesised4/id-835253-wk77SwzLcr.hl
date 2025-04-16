@@ -1,0 +1,68 @@
+
+/*
+ * This Hyperlambda code handles the response from an HTTP POST request to OpenAI, checking if the response status code is not between 200 and 299. If the condition is true, it logs an error and sends a warning message. If the status code is 429 or 500, it signals a message to wait 5 seconds before retrying. Otherwise, it aborts the process, sending an error message and setting a continuation flag to false.
+ * 
+ * 1. [if] - Checks if the HTTP POST response is not successful.
+ * 2. [not] - Inverts the condition to check for unsuccessful responses.
+ * 3. [and] - Combines conditions to check if the response code is between 200 and 299.
+ * 4. [mte] - Checks if the response code is 200 or more.
+ * 5. [lt] - Checks if the response code is less than 300.
+ * 6. [.lambda] - Executes if the response is unsuccessful.
+ * 7. [math.increment] - Increments the failed counter.
+ * 8. [lambda2hyper] - Converts the HTTP response to a Hyperlambda format.
+ * 9. [log.error] - Logs an error message with details from the response.
+ * 10. [strings.concat] - Concatenates a message about the failure.
+ * 11. [unwrap] - Unwraps the concatenated message for signaling.
+ * 12. [sockets.signal] - Sends a warning message to a feedback channel.
+ * 13. [if] - Checks if the response code is 429 or 500.
+ * 14. [or] - Combines conditions for specific error codes.
+ * 15. [eq] - Checks if the response code matches 429 or 500.
+ * 16. [.lambda] - Executes if the response code is 429 or 500.
+ * 17. [sockets.signal] - Sends an info message to wait before retrying.
+ * 18. [sleep] - Pauses execution for 5 seconds.
+ * 19. [else] - Executes if the response code is not 429 or 500.
+ * 20. [sockets.signal] - Sends an error message and aborts the process.
+ * 21. [set-value] - Sets a continuation flag to false.
+ */
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      math.increment:x:@.failed
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         error:x:@lambda2hyper
+      strings.concat
+         .:"OpenAI failed, could not create vectors for '"
+         get-value:x:@.dp/#/*/prompt
+         .:"'"
+      unwrap:x:+/*/args/*/message
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:warning
+      if
+         or
+            eq:x:@http.post
+               .:int:429
+            eq:x:@http.post
+               .:int:500
+         .lambda
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Continuing in 5 seconds with the next snippet to let OpenAI cool down first
+                  type:info
+            sleep:5000
+      else
+         sockets.signal:magic.backend.message
+            roles:root
+            args
+               message:Could not vectorize snippet and it was a non-transitional error, aborting vectorization for type
+               type:error
+         set-value:x:@.continue
+            .:bool:false

@@ -1,0 +1,60 @@
+
+/*
+ * This Hyperlambda code checks if data from a database table is already loaded. If not, it reads data from the "ml_types" table with specific columns and a condition where the type is "default". If the data still doesn't exist after the read attempt, it throws an error. If data is found, it adds the retrieved nodes to the model and sets the type argument to "default". The code ensures that necessary data is available or provides an error if it cannot be found.
+ * 
+ * 1. [if] - Checks if data has not been read yet.
+ * 2. [not-exists] - Verifies the absence of data in the current context.
+ * 3. [data.read] - Reads data from the "ml_types" table with specified columns.
+ * 4. [where] - Adds a condition to filter the data by type "default".
+ * 5. [throw] - Throws an error if no data is found.
+ * 6. [add] - Adds retrieved data nodes to the model.
+ * 7. [set-value] - Sets the type argument to "default".
+ */
+if
+   not-exists:x:@data.read/*
+   .lambda
+      data.read
+         table:ml_types
+         columns
+            model
+            max_tokens
+            max_context_tokens
+            max_request_tokens
+            temperature
+            recaptcha
+            auth
+            supervised
+            cached
+            prefix
+            use_embeddings
+            threshold
+            vector_model
+            contact_us
+            lead_email
+            api_key
+            webhook_incoming
+            webhook_outgoing
+            webhook_incoming_url
+            webhook_outgoing_url
+            system_message
+            initial_questionnaire
+            no_requests
+            max_requests
+            session_timeout
+            search_postfix
+            max_function_invocations
+            max_session_items
+            completion_slot
+         where
+            and
+               type.eq:default
+      if
+         not-exists:x:@data.read/*
+         .lambda
+            throw:No such type, and no default type was found
+               status:int:400
+               public:bool:true
+      add:x:@.model
+         get-nodes:x:@data.read/*/*
+      set-value:x:@.arguments/*/type
+         .:default

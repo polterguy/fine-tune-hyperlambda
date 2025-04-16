@@ -1,0 +1,122 @@
+
+// This Hyperlambda code retrieves and caches system information for 300 seconds using [cache.try-get]. It gathers various system metrics such as version, task count, slot vocabulary, and log capabilities. If timeshift capabilities are present, it logs specific events. It lists endpoints, counts them, and retrieves vocabulary and dynamic slots. It also fetches configuration settings like the default database and timezone. The code iterates over module directories, counting lines of code and files, and finally compiles all gathered data into a Hyperlambda structure using [lambda2hyper] before returning it.
+cache.try-get:system-information
+   expiration:300
+   .lambda
+      version
+      tasks.count
+      slots.vocabulary:magic.system-information.
+      for-each:x:-/*
+         signal:x:@.dp/#
+         add:x:+/*
+            get-nodes:x:@signal/*
+         add:x:././*/lambda2hyper
+            .
+      log.count
+      log.capabilities
+      if:x:@log.capabilities/*/can-timeshift
+         add:x:@.lambda/*/lambda2hyper
+            .
+               timeshifts
+                  logins
+                     name:Logins
+                     description:Successfully authenticated users
+                     items
+                  access_denied
+                     name:Access denied
+                     description:Access denied requests
+                     items
+                  openai_success
+                     name:OpenAI success
+                     description:Successful OpenAI API requests
+                     items
+                  openai_failure
+                     name:OpenAI failure
+                     description:Failed OpenAI API requests
+                     items
+                  lead_generated
+                     name:Lead
+                     description:Lead generated
+                     items
+         add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/logins/*/items
+            log.timeshift:User successfully authenticated
+         add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/access_denied/*/items
+            log.timeshift:Access denied
+         add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/openai_success/*/items
+            log.timeshift:Invoking OpenAI was a success
+         add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/openai_failure/*/items
+            log.timeshift:Something went wrong while invoking OpenAI
+         add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/lead_generated/*/items
+            log.timeshift:Lead was generated
+      endpoints.list
+      .no-endpoints
+      set-value:x:-
+         get-count:x:@endpoints.list/*
+      add:x:@.lambda/*/lambda2hyper/*/last_log_items
+         log.query
+            max:10
+      vocabulary
+      .no-slots
+      set-value:x:-
+         get-count:x:@vocabulary/*
+      slots.vocabulary
+      .no-dynamic-slots
+      set-value:x:-
+         get-count:x:@slots.vocabulary/*
+      .default-db
+      set-value:x:-
+         config.get:"magic:databases:default"
+      .default-timezone
+      set-value:x:-
+         config.get:"magic:culture:defaultTimeZone"
+      cache.count
+      .has-scheduler:bool:true
+      if
+         eq
+            config.get:"magic:tasks:scheduler"
+            .
+         .lambda
+            set-value:x:@.has-scheduler
+               .:bool:false
+      io.folder.list:/modules/
+      for-each:x:@io.folder.list/*
+         strings.split:x:@.dp/#
+            .:/
+         unwrap:x:+/*
+         signal:magic.io.file.load-recursively
+            .:x:@.dp/#
+         .loc:int:0
+         .files:int:0
+         for-each:x:@signal/*
+            if
+               strings.ends-with:x:@.dp/#
+                  .:.hl
+               .lambda
+                  hyper2lambda:x:@.dp/#/0
+                  math.increment:x:@.loc
+                     get-count:x:@hyper2lambda/**
+                  math.increment:x:@.files
+         unwrap:x:+/+/*/*/*
+         set-name:x:+/*/*
+            get-value:x:@strings.split/0/-
+         add:x:@.lambda/*/lambda2hyper/*/modules
+            .
+               foo
+                  loc:x:@.loc
+                  files:x:@.files
+      unwrap:x:+/*
+      lambda2hyper
+         version:x:@version
+         persisted_tasks:x:@tasks.count
+         has_sockets:x:@.has-sockets
+         has_scheduler:x:@.has-scheduler
+         log_items:x:@log.count
+         cache_items:x:@cache.count
+         endpoints:x:@.no-endpoints
+         slots:x:@.no-slots
+         dynamic_slots:x:@.no-dynamic-slots
+         default_db:x:@.default-db
+         default_timezone:x:@.default-timezone
+         last_log_items
+         modules
+      return:x:@lambda2hyper

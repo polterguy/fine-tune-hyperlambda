@@ -1,0 +1,33 @@
+
+// This code checks if a message content is not null and not empty, then appends it to a result string. If the result doesn't contain "___", it unwraps and signals a session with the message. If the result contains "FUNCTION_INVOCATION[" and a waiting flag hasn't been sent, it signals a session with a waiting flag and sets the waiting flag to true.
+if
+   and
+      not-null:x:@json2lambda/*/message/*/content
+      neq:x:@json2lambda/*/message/*/content
+         .:
+   .lambda
+      set-value:x:@.result
+         strings.concat
+            get-value:x:@.result
+            get-value:x:@json2lambda/*/message/*/content
+      if
+         not
+            strings.contains:x:@.result
+               .:___
+         .lambda
+            unwrap:x:+/*/*
+            sockets.signal:x:@.session
+               args
+                  message:x:@json2lambda/*/message/*/content
+      else-if
+         and
+            strings.contains:x:@.result
+               .:FUNCTION_INVOCATION[
+            neq:x:@.has-sent-waiting
+               .:bool:true
+         .lambda
+            sockets.signal:x:@.session
+               args
+                  function_waiting:bool:true
+            set-value:x:@.has-sent-waiting
+               .:bool:true

@@ -1,0 +1,77 @@
+
+/*
+ * This Hyperlambda code checks if a session exists and is not null, and then performs a series of operations based on the conditions of [.result] and [.new-prompt]. If [.result] is not null and not equal to an empty string, it adds an "assistant" role with the result content to the session. Similarly, if [.new-prompt] is not null and not equal to an empty string, it adds a "system" role with the new prompt content to the session. It then caches the session, removes nodes from the cache session while [.tmp] is greater than 0, converts the cache session to Hyperlambda format, and finally sets the session in the cache with a specified expiration time. 
+ * 
+ * 1. [if] - Checks if session exists and is not null.
+ * 2. [and] - Combines conditions for session existence and non-nullity.
+ * 3. [exists] - Verifies the existence of the session.
+ * 4. [not-null] - Ensures the session is not null.
+ * 5. [.lambda] - Executes the following operations if the condition is true.
+ * 6. [if] - Nested condition checking if [.result] is not null and not empty.
+ * 7. [neq] - Checks if [.result] is not equal to an empty string.
+ * 8. [unwrap] - Unwraps the content for further processing.
+ * 9. [add] - Adds a role and content to the session.
+ * 10. [role] - Specifies the role as "assistant".
+ * 11. [content] - Sets the content from [.result].
+ * 12. [if] - Another nested condition checking if [.new-prompt] is not null and not empty.
+ * 13. [add] - Adds a role and content to the session.
+ * 14. [role] - Specifies the role as "system".
+ * 15. [content] - Sets the content from [.new-prompt].
+ * 16. [.cache-session] - Prepares the session for caching.
+ * 17. [add] - Adds nodes to the cache session.
+ * 18. [get-nodes] - Retrieves nodes from the session.
+ * 19. [.tmp] - Temporary storage for operations.
+ * 20. [set-value] - Sets the value of [.tmp].
+ * 21. [get-value] - Retrieves the value from [.fixed].
+ * 22. [while] - Loops while [.tmp] is greater than 0.
+ * 23. [mt] - Checks if [.tmp] is greater than 0.
+ * 24. [remove-nodes] - Removes nodes from the cache session.
+ * 25. [math.decrement] - Decrements the value of [.tmp].
+ * 26. [lambda2hyper] - Converts the cache session to Hyperlambda format.
+ * 27. [cache.set] - Sets the session in the cache with expiration.
+ */
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      if
+         and
+            not-null:x:@.result
+            neq:x:@.result
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:assistant
+                     content:x:@.result
+      if
+         and
+            not-null:x:@.new-prompt
+            neq:x:@.new-prompt
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:system
+                     content:x:@.new-prompt
+      .cache-session
+      add:x:@.cache-session
+         get-nodes:x:@.session/*
+      .tmp
+      set-value:x:@.tmp
+         get-value:x:@.fixed
+      while
+         mt:x:@.tmp
+            .:int:0
+         .lambda
+            remove-nodes:x:@.cache-session/0
+            math.decrement:x:@.tmp
+      lambda2hyper:x:@.cache-session/*
+      cache.set:x:@.arguments/*/session
+         expiration:x:@.arguments/*/session_timeout
+         value:x:@lambda2hyper

@@ -13,6 +13,13 @@
 validators.mandatory:x:@.arguments/*/limit
 validators.mandatory:x:@.arguments/*/offset
 
+// Loading our system message file.
+.system-message
+set-value:x:@.system-message
+   io.file.load:/modules/fine-tune-hyperlambda/system-message-synthesiser.md
+
+vocabulary
+
 // Connecting to our fine-tune database.
 data.connect:fine-tune
 
@@ -26,26 +33,88 @@ data.connect:fine-tune
 
       // Converting code to lambda
       hyper2lambda:x:@.dp/#/*/code
+         comments:true
 
-      // Looping through all comments in lambda object.
-      for-each:x:@hyper2lambda/*/**/\..
+      // Looping through all nodes in lambda object.
+      for-each:x:@hyper2lambda/**
 
-         // Creating a lambda object exclusively containing the comment and its NEXT node.
-         .tmp
-         add:x:@.tmp
-            get-nodes:x:@.dp/#
-            get-nodes:x:@.dp/#/+
+         // Verifying currently iterated node's name is '..' and that the next node is a slot!
+         get-name:x:@.dp/#/+
+         if
+            and
+               eq
+                  get-name:x:@.dp/#
+                  .:..
+               exists:x:@vocabulary/*/={@get-name}
+            .lambda
 
-         // Converting lambda object to Hyperlambda
-         lambda2hyper:x:@.tmp/*
+               // Creating a lambda object exclusively containing its NEXT node.
+               .tmp
+               add:x:@.tmp
+                  get-nodes:x:@.dp/#/+
 
-         // Saving with a random filename in /synthesised4/ folder
-         .filename
-         set-value:x:@.filename
-            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
-            crypto.random
-               min:10
-               max:10
-            .:.hl
-         io.file.save:x:@.filename
-            get-value:x:@lambda2hyper
+               // Removing all comments
+               remove-nodes:x:@.tmp/**/\..
+
+               // Converting lambda object to Hyperlambda
+               lambda2hyper:x:@.tmp/*
+
+               /*
+                * Returns context for the specified [query] from the specified [type],
+                * and returns to caller.
+                *
+                * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
+                * tokens to return. [type] is a machine learning type from your ml_types database table in
+                * your magic database.
+                */
+               execute:magic.workflows.actions.execute
+                  name:openai-context-from-database
+                  filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+                  arguments
+                     type:magic-documentation
+                     query:x:@lambda2hyper
+                     threshold:decimal:0.3
+                     max_tokens:int:3000
+
+               /*
+                * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+                * [instruction] and [query].
+                *
+                * Will use the default API key found from configurations.
+                *
+                * [context] is additional data you can supply to OpenAI such that it responds using
+                * your data as its source for information. [instruction] is a system message allowing
+                * you to change how OpenAI responds.
+                */
+               execute:magic.workflows.actions.execute
+                  name:openai-query
+                  filename:/modules/openai/workflows/actions/openai-query.hl
+                  arguments
+                     model:gpt-4o
+                     max_tokens:int:1500
+                     instruction:x:@.system-message
+                     context:x:@execute/@execute/*/context
+                     query:x:@lambda2hyper
+
+               // Injecting comment into Hyperlambda.
+               unwrap:x:+/*/*
+               insert-before:x:@.tmp/0
+                  .
+                     ..:x:@execute/*/answer
+               lambda2hyper:x:@.tmp/*
+                  comments:true
+
+               // Saving with a random filename in /synthesised4/ folder
+               .filename
+               set-value:x:@.filename
+                  strings.concat
+                     .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
+                     .:id-
+                     get-value:x:@for-each/@.dp/#/*/hyperlambda_id
+                     .:-
+                     crypto.random
+                        min:10
+                        max:10
+                     .:.hl
+               io.file.save:x:@.filename
+                  get-value:x:@lambda2hyper

@@ -1,0 +1,28 @@
+
+// This Hyperlambda code checks if a file ends with ".sql" and attempts to execute it as a SQL script. If the database type is "mssql", it uses "mssql.execute-batch" for execution. It logs a success message if the execution is successful and logs an error message along with the exception message if it fails. Key slots used are [if], [strings.ends-with], [io.file.load], [try], [eq], [set-name], [data.execute], [strings.concat], [console.log], and [.catch].
+if
+   strings.ends-with:x:@.dp/#
+      .:.sql
+   .lambda
+      io.file.load:x:@.dp/#
+      try
+         if
+            eq
+               get-value:x:@.db-type
+               .:mssql
+            .lambda
+               set-name:x:@if/./*/data.execute
+                  .:mssql.execute-batch
+         data.execute:x:@io.file.load
+         strings.concat
+            .:"Script '"
+            get-value:x:@.dp/#
+            .:"' succeeded"
+         console.log:x:@strings.concat
+      .catch
+         strings.concat
+            .:"Script '"
+            get-value:x:@.dp/#
+            .:"' failed"
+         console.log:x:@strings.concat
+         console.log:x:@.arguments/*/message

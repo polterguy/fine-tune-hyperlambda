@@ -1,0 +1,32 @@
+
+// This Hyperlambda code connects to a database and retrieves distinct user IDs from the "ml_requests" table based on a specified type and a condition. For each user ID, it selects prompts and completions, concatenates them into a conversation string, and adds it to a data node. The data is then converted to a CSV format using [lambda2csv], and the response headers are set to facilitate downloading the CSV file. The CSV data is returned as the response.
+data.connect:[generic|magic]
+   data.select:select distinct(user_id) from ml_requests where type = @type and questionnaire != 1
+      @type:x:@.arguments/*/type
+   .data
+   for-each:x:@data.select/*
+      data.select:select prompt, completion from ml_requests where type = @type and user_id = @user_id and questionnaire != 1
+         @type:x:@.arguments/*/type
+         @user_id:x:@.dp/#/*/user_id
+      .tmp:
+      for-each:x:@data.select/*
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.tmp
+               get-value:x:@.dp/#/*/prompt
+               .:"\n"
+               .:"\n"
+               get-value:x:@.dp/#/*/completion
+               .:"\n"
+               .:"\n"
+      unwrap:x:+/*/*/*
+      add:x:@.data
+         .
+            .
+               conversation:x:@.tmp
+   lambda2csv:x:@.data/*
+   response.headers.set
+      Content-Type:text/csv
+      Access-Control-Expose-Headers:Content-Disposition
+      Content-Disposition:"attachment; filename=\"conversations.csv\""
+   return:x:@lambda2csv

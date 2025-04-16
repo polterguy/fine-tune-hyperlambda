@@ -1,0 +1,35 @@
+
+// This Hyperlambda code checks if a query parameter exists in the URL. If it does, it splits the URL by "?" and further splits the query string by "&" to find the specified query parameter. If found, it decodes the parameter's value and updates the URL. If the query parameter is not found, or if no query parameter is specified, it sets the URL to a default value. The code uses slots like [exists], [strings.split], [strings.starts-with], and [strings.url-decode] to manipulate and evaluate the URL and query parameters.
+if
+   exists:x:@.arguments/*/query
+   .lambda
+      strings.split:x:@.url
+         .:?
+      if
+         mt
+            get-count:x:@strings.split/*
+            .:int:1
+         .lambda
+            strings.split:x:@strings.split/1
+               .:&
+            .found:bool:false
+            for-each:x:@strings.split/*
+               if
+                  strings.starts-with:x:@.dp/#
+                     strings.concat
+                        get-value:x:@.arguments/*/query
+                        .:=
+                  .lambda
+                     set-value:x:@.found
+                        .:bool:true
+                     strings.split:x:@.dp/#
+                        .:=
+                     set-value:x:@.url
+                        strings.url-decode:x:@strings.split/1
+            if
+               not
+                  get-value:x:@.found
+               .lambda
+                  set-value:x:@.url
+      else
+         set-value:x:@.url

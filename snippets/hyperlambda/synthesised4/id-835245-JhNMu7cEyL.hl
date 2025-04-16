@@ -1,0 +1,64 @@
+
+/*
+ * This Hyperlambda code connects to a data source and conditionally constructs a prompt and completion message based on the presence of a function result. It then creates a new entry in the "ml_requests" table with various attributes including type, prompt, completion, finish_reason, session, user_id, and referrer. The code uses conditional logic to format the prompt and completion messages and handles the presence of a function result to append additional information.
+ * 
+ * 1. [data.connect] - Connects to a specified data source.
+ * 2. [if] - Checks if the number of invocations is greater than zero.
+ * 3. [set-value] - Sets the value of [.prompt] based on conditions.
+ * 4. [strings.concat] - Concatenates strings to form the prompt.
+ * 5. [else] - Sets the value of [.prompt] if the condition is false.
+ * 6. [not-null] - Checks if [.function-result] is not null.
+ * 7. [strings.concat] - Concatenates strings to form the completion message.
+ * 8. [data.create] - Creates a new entry in the "ml_requests" table with specified values.
+ */
+data.connect:[generic|magic]
+   .prompt
+   if
+      mt:x:@.no-invocation
+         .:int:0
+      .lambda
+         set-value:x:@.prompt
+            strings.concat
+               .:[
+               get-value:x:@.no-invocation
+               .:"] - "
+               get-value:x:@.only-prompt
+   else
+      set-value:x:@.prompt
+         get-value:x:@.only-prompt
+   .tmp-completion
+   if
+      not-null:x:@.function-result
+      .lambda
+         set-value:x:@.tmp-completion
+            strings.concat
+               get-value:x:@.result
+               .:@"
+"
+               .:@"
+"
+               .:@"Result of function invocation:
+"
+               .:@"
+"
+               .:```json
+               .:@"
+"
+               get-value:x:@.function-result
+               .:@"
+"
+               .:```
+         set-value:x:@.function-result
+   else
+      set-value:x:@.tmp-completion
+         get-value:x:@.result
+   data.create
+      table:ml_requests
+      values
+         type:x:@.arguments/*/type
+         prompt:x:@.prompt
+         completion:x:@.tmp-completion
+         finish_reason:x:@.finish_reason
+         session:x:@.arguments/*/session
+         user_id:x:@.arguments/*/user_id
+         referrer:x:@.arguments/*/referrer

@@ -1,0 +1,22 @@
+
+// This Hyperlambda code iterates over a set of nodes retrieved from a database query, concatenating prompt and completion pairs into a temporary string. It uses a nested [for-each] loop to process each record, appending formatted text to a temporary node. The final result is unwrapped and added to a [.data] node, creating a structured conversation log.
+for-each:x:@data.select/*
+   data.select:select prompt, completion from ml_requests where type = @type and user_id = @user_id and questionnaire != 1
+      @type:x:@.arguments/*/type
+      @user_id:x:@.dp/#/*/user_id
+   .tmp:
+   for-each:x:@data.select/*
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@.tmp
+            get-value:x:@.dp/#/*/prompt
+            .:"\n"
+            .:"\n"
+            get-value:x:@.dp/#/*/completion
+            .:"\n"
+            .:"\n"
+   unwrap:x:+/*/*/*
+   add:x:@.data
+      .
+         .
+            conversation:x:@.tmp

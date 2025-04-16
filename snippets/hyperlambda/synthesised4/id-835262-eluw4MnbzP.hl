@@ -1,0 +1,31 @@
+
+// This Hyperlambda code iterates over the children of the [html2lambda] node, using a [for-each] loop to process each node based on its name. It uses a [switch] statement to handle different HTML elements: for heading tags (h1 to h6), it concatenates their text content to a temporary prompt; for list and preformatted tags (ul, ol, pre), it converts them to Markdown and adds them to a snippets collection with the current prompt; for other elements, it adds them to a remaining collection. The code demonstrates dynamic processing and transformation of HTML elements into structured data.
+for-each:x:@html2lambda/*
+   get-name:x:@.dp/#
+   switch:x:@get-name
+      case:h1
+      case:h2
+      case:h3
+      case:h4
+      case:h5
+      case:h6
+         set-value:x:@.tmp-prompt
+            strings.concat
+               get-value:x:@.prompt
+               .:" | "
+               get-value:x:"@.dp/#/*/\\#text"
+      case:ul
+      case:ol
+      case:pre
+         lambda2html:x:@.dp/#
+         html2markdown:x:@lambda2html
+            url:x:@.arguments/*/url
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
+               .
+                  prompt:x:@.tmp-prompt
+                  completion:x:@html2markdown
+      default
+         add:x:@.remaining
+            get-nodes:x:@.dp/#

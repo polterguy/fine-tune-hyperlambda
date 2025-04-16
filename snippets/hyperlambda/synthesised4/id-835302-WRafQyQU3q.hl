@@ -1,0 +1,117 @@
+
+// This Hyperlambda code iterates over a set of PostgreSQL column metadata, transforming it into a structured format. It uses [for-each] to loop through the columns, creating a temporary node [.tmp] for each column's attributes like name, type, and nullability. It evaluates conditions to determine if columns are nullable, primary keys, or have default values, using [if] and [else] constructs. The [strings.regex-replace] and [strings.replace] slots clean up data types, and a [switch] statement maps SQL data types to Hyperlambda types. Finally, it adds the processed data to a result set using [add].
+for-each:x:@pgsql.select/*
+   unwrap:x:+/*/*
+   .tmp
+      ""
+         name:x:@.dp/#/*/column_name
+         db:x:@.dp/#/*/data_type
+   if
+      eq
+         get-value:x:@.dp/#/*/is_nullable
+         .:NO
+      .lambda
+         add:x:@.tmp/*
+            .
+               nullable:bool:false
+   else
+      add:x:@.tmp/*
+         .
+            nullable:bool:true
+   if
+      get-value:x:@.dp/#/*/is_pk
+      .lambda
+         add:x:@.tmp/*
+            .
+               primary:bool:true
+   else
+      add:x:@.tmp/*
+         .
+            primary:bool:false
+   if
+      and
+         not
+            eq
+               get-value:x:@.dp/#/*/column_default
+               .:
+         not
+            eq
+               get-value:x:@.dp/#/*/column_default
+               .
+      .lambda
+         add:x:@.tmp/*
+            .
+               automatic:bool:true
+   else
+      add:x:@.tmp/*
+         .
+            automatic:bool:false
+   .type
+   strings.regex-replace:x:@.dp/#/*/data_type
+      .:" \\([0-9,]+\\)"
+      .:
+   strings.regex-replace:x:@strings.regex-replace
+      .:" \\[[0-9,]+\\]"
+      .:
+   strings.replace:x:@strings.regex-replace
+      .:" unsigned"
+      .:
+   strings.replace:x:@strings.replace
+      .:" without time zone"
+      .:
+   strings.replace:x:@strings.replace
+      .:" with time zone"
+      .:
+   switch:x:@strings.replace
+      case:smallserial
+      case:serial
+      case:smallint
+         set-value:x:@.type
+            .:int
+      case:timestamp
+         set-value:x:@.type
+            .:date
+      case:numeric
+      case:decimal
+      case:real
+      case:money
+         set-value:x:@.type
+            .:decimal
+      case:double precision
+         set-value:x:@.type
+            .:double
+      case:integer
+      case:bigint
+      case:bigserial
+      case:interval
+         set-value:x:@.type
+            .:long
+      case:string
+      case:bit
+      case:bit varying
+      case:character
+      case:character varying
+      case:json
+      case:text
+      case:xml
+         set-value:x:@.type
+            .:string
+      case:boolean
+         set-value:x:@.type
+            .:bool
+      default
+         if
+            strings.starts-with:x:@strings.replace
+               .:enum
+            .lambda
+               set-value:x:@.type
+                  .:string
+         else
+            set-value:x:@.type
+               .:string
+   unwrap:x:+/*/*
+   add:x:@.tmp/*
+      .
+         hl:x:@.type
+   add:x:../*/pgsql.connect/*/return-nodes
+      get-nodes:x:@.tmp/*

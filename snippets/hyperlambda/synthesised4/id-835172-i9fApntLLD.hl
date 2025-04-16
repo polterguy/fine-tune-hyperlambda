@@ -1,0 +1,43 @@
+
+// This Hyperlambda code connects to a database to authenticate a user. It reads the user's password from the "users" table and verifies it against the provided password. If the user is authenticated, it logs the event, retrieves the user's roles from the "users_roles" table, and creates a JWT token with the user's roles. If authentication fails, it throws an "Access denied" exception. The slots used include [data.connect], [data.read], [if], [not-exists], [or], [crypto.password.verify], [log.info], [add], [auth.ticket.create], and [yield].
+data.connect:magic
+   data.read
+      table:users
+      columns
+         password
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Access denied
+            status:int:401
+            public:bool:true
+   if
+      or
+         eq:x:@.arguments/*/password-check
+            .:bool:false
+         crypto.password.verify:x:@.arguments/*/password
+            hash:x:@data.read/*/*/password
+      .lambda
+         log.info:User successfully authenticated
+            username:x:@.arguments/*/username
+         data.read
+            table:users_roles
+            columns
+               role
+            where
+               and
+                  user.eq:x:@.arguments/*/username
+         add:x:./*/auth.ticket.create/*/roles
+            get-nodes:x:@data.read/*/*
+         auth.ticket.create
+            username:x:@.arguments/*/username
+            expires:x:@.arguments/*/expires
+            roles
+         yield
+            ticket:x:@auth.ticket.create
+   throw:Access denied
+      status:int:401
+      public:bool:true

@@ -1,0 +1,65 @@
+
+// This Hyperlambda code checks if embeddings should be used by evaluating the [if] condition on the [use_embeddings] argument. If true, it retrieves AI context using [signal:magic.ai.get-context] and processes cached results if available. It constructs a prompt based on the presence of specific strings in the [prefix] argument using [strings.contains] and [strings.replace]. If references exist, it adds them to the result. The code uses [unwrap], [add], and [set-value] to manipulate nodes and values throughout the process.
+if
+   eq
+      convert:x:@.arguments/*/use_embeddings
+         type:int
+      .:int:1
+   .lambda
+      unwrap:x:+/*
+      signal:magic.ai.get-context
+         type:x:@.arguments/*/type
+         prompt:x:@.arguments/*/prompt
+         threshold:x:@.arguments/*/threshold
+         max_tokens:x:@.arguments/*/max_context_tokens
+         api_key:x:@.arguments/*/api_key
+      if
+         exists:x:@signal/*/cached
+         .lambda
+            unwrap:x:+/*
+            return
+               result:x:@signal/*/cached
+               finish_reason:cached
+      add:x:@.result
+         get-nodes:x:@signal/*/db_time
+      if
+         and
+            strings.contains:x:@.arguments/*/prefix
+               .:[CONTEXT]
+            strings.contains:x:@.arguments/*/prefix
+               .:[QUESTION]
+            strings.contains:x:@.arguments/*/prefix
+               .:"ANSWER:"
+         .lambda
+            set-value:x:@.prompt
+               strings.replace:x:@.arguments/*/prefix
+                  .:[QUESTION]
+                  get-value:x:@.arguments/*/prompt
+            set-value:x:@.prompt
+               strings.replace:x:@.prompt
+                  .:[CONTEXT]
+                  get-value:x:@signal/*/context
+      else
+         set-value:x:@.prompt
+            strings.concat
+               get-value:x:@.arguments/*/prefix
+               .:@"
+QUESTION: "
+               get-value:x:@.arguments/*/prompt
+               .:@"
+CONTEXT: 
+"
+               get-value:x:@signal/*/context
+               .:@"
+ANSWER: "
+      if
+         and
+            exists:x:@.arguments/*/references
+            not-null:x:@.arguments/*/references
+            get-value:x:@.arguments/*/references
+         .lambda
+            add:x:@.result
+               .
+                  references
+            add:x:@.result/*/references
+               get-nodes:x:@signal/*/snippets/*

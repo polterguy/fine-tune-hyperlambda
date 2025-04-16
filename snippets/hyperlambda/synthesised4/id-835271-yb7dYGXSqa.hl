@@ -1,0 +1,31 @@
+
+// This Hyperlambda code connects to a database and performs a series of operations to manage user data. It first deletes any existing user record with a matching username, then creates a new user in the "users" table with specified username and password. Additional user information such as email and name is inserted into the "users_extra" table. Finally, it iterates over roles obtained from an authentication ticket, creating entries in the "users_roles" table for each role associated with the user.
+data.connect:[generic|magic]
+   data.delete
+      table:users
+      where
+         and
+            username.eq:x:@.username
+   data.create
+      table:users
+      values
+         username:x:@.username
+         password:x:@.password
+   data.create
+      table:users_extra
+      values
+         user:x:@.username
+         type:email
+         value:x:@.email
+   data.create
+      table:users_extra
+      values
+         user:x:@.username
+         type:name
+         value:x:@.name
+   for-each:x:@auth.ticket.get/*/roles/*
+      data.create
+         table:users_roles
+         values
+            user:x:@.username
+            role:x:@.dp/#

@@ -1,0 +1,39 @@
+
+/*
+ * This Hyperlambda code iterates over nodes from [data.read] and checks user roles against node-specific authorization requirements. If the user has the "root" role or no specific authorization is required, the node is added to [models]. Otherwise, it splits the authorization string, trims it, and checks if the user has any of the required roles, adding the node to [models] if conditions are met. The code uses slots like [for-each], [exists], [add], and [strings.split] to manage node access based on user roles.
+ * 
+ * 1. [for-each] - Iterates over nodes from [data.read].
+ * 2. [or] - Checks if the user has the "root" role or if no specific authorization is required.
+ * 3. [exists] - Verifies if the "root" role exists in the user's roles.
+ * 4. [null] - Checks if the authorization node is null.
+ * 5. [eq] - Compares the authorization node to an empty string.
+ * 6. [add] - Adds the node to [models] if conditions are met.
+ * 7. [strings.split] - Splits the authorization string by commas.
+ * 8. [strings.trim] - Trims whitespace from split authorization strings.
+ * 9. [and] - Checks if the user has any required roles and if the node type doesn't already exist in [models].
+ * 10. [not-exists] - Ensures the node type isn't already in [models].
+ * 11. [get-nodes] - Retrieves nodes to add to [models].
+ */
+for-each:x:@data.read/*
+   if
+      or
+         exists:x:@auth.ticket.get/*/roles/*/=root
+         null:x:@.dp/#/*/auth
+         eq:x:@.dp/#/*/auth
+            .:
+      .lambda
+         add:x:@.models
+            get-nodes:x:@.dp/#
+   else
+      strings.split:x:@.dp/#/*/auth
+         .:,
+      for-each:x:@strings.split/*
+         strings.trim:x:@.dp/#
+            .:" \t"
+         if
+            and
+               exists:x:@auth.ticket.get/*/roles/*/={@strings.trim}
+               not-exists:x:"@.models/*/*/type/\"={@for-each/@.dp/#/*/type}\""
+            .lambda
+               add:x:@.models
+                  get-nodes:x:@for-each/@.dp/#

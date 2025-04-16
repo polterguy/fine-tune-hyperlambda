@@ -1,0 +1,171 @@
+
+/*
+ * This Hyperlambda code processes URLs and anchors based on certain conditions. It checks if the [max] argument is missing or greater than 0, then constructs a URL using base and href values. It adjusts the URL based on its prefix and checks if it starts with specific strings or contains certain classes. If the conditions are met, it concatenates text nodes into an anchor, trims and replaces spaces, and appends the result to a markdown string if the URL is valid and not null. The [max] argument is decremented for each valid URL processed.
+ * 
+ * 1. [if] - Checks if [max] is missing or greater than 0.
+ * 2. [.url] - Initializes a URL variable.
+ * 3. [set-value] - Sets the URL based on href value.
+ * 4. [if] - Checks if URL starts with "://".
+ * 5. [strings.split] - Splits base URL by "://".
+ * 6. [set-value] - Concatenates protocol with URL.
+ * 7. [else-if] - Checks if URL starts with "/".
+ * 8. [set-value] - Concatenates base with URL.
+ * 9. [else-if] - Checks if URL lacks "http://" or "https://".
+ * 10. [set-value] - Concatenates base and href.
+ * 11. [if] - Checks if URL starts with specified string or contains class.
+ * 12. [.anchor] - Initializes anchor text.
+ * 13. [for-each] - Iterates over text nodes.
+ * 14. [set-value] - Concatenates text nodes into anchor.
+ * 15. [set-value] - Trims spaces from anchor.
+ * 16. [set-value] - Replaces double spaces in anchor.
+ * 17. [set-value] - Replaces carriage returns in anchor.
+ * 18. [set-value] - Replaces newlines in anchor.
+ * 19. [if] - Checks if anchor is not null and URL lacks "#".
+ * 20. [if] - Checks if query argument exists.
+ * 21. [strings.split] - Splits URL by "?".
+ * 22. [if] - Checks if query part exists.
+ * 23. [strings.split] - Splits query by "&".
+ * 24. [.found] - Initializes found flag.
+ * 25. [for-each] - Iterates over query parts.
+ * 26. [if] - Checks if query starts with specified string.
+ * 27. [set-value] - Sets found flag to true.
+ * 28. [strings.split] - Splits query by "=".
+ * 29. [set-value] - Decodes URL part.
+ * 30. [if] - Checks if query not found.
+ * 31. [set-value] - Sets URL.
+ * 32. [if] - Checks if URL is not null.
+ * 33. [math.decrement] - Decrements max argument.
+ * 34. [set-value] - Appends markdown link with anchor and URL.
+ */
+if
+   or
+      not-exists:x:@.arguments/*/max
+      mt:x:@.arguments/*/max
+         .:int:0
+   .lambda
+      .url
+      set-value:x:@.url
+         get-value:x:"@.dp/#/*/\\@href"
+      if
+         strings.starts-with:x:@.url
+            .://
+         .lambda
+            strings.split:x:@.base
+               .:"://"
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@strings.split/0
+                  .:":"
+                  get-value:x:@.url
+      else-if
+         strings.starts-with:x:@.url
+            .:/
+         .lambda
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:@.url
+      else-if
+         and
+            not
+               strings.starts-with:x:@.url
+                  .:"https://"
+            not
+               strings.starts-with:x:@.url
+                  .:"http://"
+         .lambda
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@.base
+                  .:/
+                  get-value:x:"@.dp/#/*/\\@href"
+      if
+         and
+            or
+               not-exists:x:@.arguments/*/starts_with
+               strings.starts-with:x:@.url
+                  get-value:x:@.arguments/*/starts_with
+            or
+               not-exists:x:@.arguments/*/class
+               strings.contains:x:"@.dp/#/*/\\@class"
+                  get-value:x:@.arguments/*/class
+         .lambda
+            .anchor:
+            for-each:x:"@.dp/#/**/\\#text"
+               set-value:x:@.anchor
+                  strings.concat
+                     get-value:x:@.anchor
+                     .:" "
+                     get-value:x:@.dp/#
+            set-value:x:@.anchor
+               strings.trim:x:@.anchor
+                  .:@" 	
+"
+            set-value:x:@.anchor
+               strings.replace:x:@.anchor
+                  .:"  "
+                  .:" "
+            set-value:x:@.anchor
+               strings.replace:x:@.anchor
+                  .:"\r"
+                  .:" "
+            set-value:x:@.anchor
+               strings.replace:x:@.anchor
+                  .:"\n"
+                  .:" "
+            if
+               and
+                  not-null:x:@.anchor
+                  neq:x:@.anchor
+                     .:
+                  not
+                     strings.contains:x:@.url
+                        .:#
+               .lambda
+                  if
+                     exists:x:@.arguments/*/query
+                     .lambda
+                        strings.split:x:@.url
+                           .:?
+                        if
+                           mt
+                              get-count:x:@strings.split/*
+                              .:int:1
+                           .lambda
+                              strings.split:x:@strings.split/1
+                                 .:&
+                              .found:bool:false
+                              for-each:x:@strings.split/*
+                                 if
+                                    strings.starts-with:x:@.dp/#
+                                       strings.concat
+                                          get-value:x:@.arguments/*/query
+                                          .:=
+                                    .lambda
+                                       set-value:x:@.found
+                                          .:bool:true
+                                       strings.split:x:@.dp/#
+                                          .:=
+                                       set-value:x:@.url
+                                          strings.url-decode:x:@strings.split/1
+                              if
+                                 not
+                                    get-value:x:@.found
+                                 .lambda
+                                    set-value:x:@.url
+                        else
+                           set-value:x:@.url
+                  if
+                     not-null:x:@.url
+                     .lambda
+                        math.decrement:x:@.arguments/*/max
+                        set-value:x:@.markdown
+                           strings.concat
+                              get-value:x:@.markdown
+                              .:* [
+                              get-value:x:@.anchor
+                              .:](
+                              get-value:x:@.url
+                              .:)
+                              .:@"
+"

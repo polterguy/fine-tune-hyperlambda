@@ -1,0 +1,41 @@
+
+// This Hyperlambda code connects to a database and deletes records from the "questions" table where the "questionnaire" matches a provided argument. It then converts Markdown to HTML, parses it into a lambda structure, and iterates through list items to extract and process questions and their associated data. If additional data is present, it splits and processes this data, creating new records in the "questions" table. Finally, it returns a success result.
+data.connect:[generic|magic]
+   data.delete
+      table:questions
+      where
+         and
+            questionnaire.eq:x:@.arguments/*/name
+   markdown2html:x:@.arguments/*/questions
+   html2lambda:x:-
+   for-each:x:@html2lambda/**/li
+      strings.split:x:"@.dp/#/*/\\#text"
+         .:=>
+      .question
+      set-value:x:@.question
+         strings.trim:x:@strings.split/0
+      if
+         mt
+            get-count:x:@strings.split/*
+            .:int:1
+         .lambda
+            strings.trim:x:@strings.split/1
+            strings.split:x:-
+               .:,
+            for-each:x:@strings.split/*
+               strings.split:x:@.dp/#
+                  .:=
+               set-value:x:./*/add/*/*/name
+                  strings.trim:x:@strings.split/1
+               set-name:x:./*/add/*/*/name
+                  strings.trim:x:@strings.split/0
+               add:x:@for-each/@for-each/*/data.create/*/values
+                  .
+                     name:value
+      data.create
+         table:questions
+         values
+            questionnaire:x:@.arguments/*/name
+            question:x:@.question
+   return
+      result:success

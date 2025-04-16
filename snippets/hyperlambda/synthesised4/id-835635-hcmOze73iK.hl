@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "northwind" and performs a distinct count operation on a specified column from the "Regions" table. It constructs a SQL query by concatenating strings to form a "count(distinct ...)" expression, removes the distinct column argument, adds additional conditions from arguments to the "where" clause, and finally executes a data read operation. The results of the query are returned using the [return-nodes] slot.
+ * 
+ * 1. [data.connect] - Connects to the "northwind" SQLite database.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs a "count(distinct ...)" expression for the specified column.
+ * 4. [strings.concat] - Concatenates strings to form the distinct count SQL expression.
+ * 5. [get-value] - Retrieves the value of the distinct column argument.
+ * 6. [remove-nodes] - Removes the distinct column argument from the arguments list.
+ * 7. [add] - Adds additional conditions from arguments to the "where" clause.
+ * 8. [get-nodes] - Retrieves nodes from the arguments to be added to the "where" clause.
+ * 9. [data.read] - Executes a data read operation on the "Regions" table.
+ * 10. [columns] - Specifies the columns to be selected, including the distinct count expression.
+ * 11. [where] - Initializes the "where" clause with an "and" condition.
+ * 12. [return-nodes] - Returns the results of the data read operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Regions
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

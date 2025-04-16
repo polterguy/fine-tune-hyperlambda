@@ -1,0 +1,94 @@
+
+// This Hyperlambda code fetches product data from a WooCommerce API, processes it, and stores it in a database. It uses a [while] loop to paginate through API results, checking if there are more pages to fetch. The [http.get] slot retrieves product data, and [add] aggregates it. The [if] slot checks if fewer than 10 products were returned to stop pagination. The [for-each] loop processes each product, converting descriptions to Markdown with [html2markdown], and constructs a prompt and completion for machine learning training snippets, which are then stored using [data.create]. The code also handles product images and short descriptions if available.
+while:x:@.continue
+   .base-url:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10"
+   if
+      mt:x:@.page
+         .:int:0
+      .lambda
+         set-value:x:@.base-url
+            strings.concat
+               .:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10&page="
+               get-value:x:@.page
+   http.get:x:@.base-url
+      headers
+         Authorization:x:@.auth
+      convert:bool:true
+   add:x:@.products
+      get-nodes:x:@http.get/*/content/*
+   if
+      lt
+         get-count:x:@http.get/*/content/*
+         .:int:10
+      .lambda
+         set-value:x:@.continue
+            .:bool:false
+   math.increment:x:@.page
+      .:int:10
+   data.connect:[generic|magic]
+      for-each:x:@http.get/*/content/*
+         if
+            and
+               eq:x:@.dp/#/*/stock_status
+                  .:instock
+               not-null:x:@.dp/#/*/description
+               neq:x:@.dp/#/*/description
+                  .:
+            .lambda
+               .prompt
+               .completion
+               set-value:x:@.prompt
+                  strings.concat
+                     html2markdown:x:@.dp/#/*/description
+               set-value:x:@.completion
+                  strings.concat
+                     .:"Price: "
+                     get-value:x:@.dp/#/*/price
+                     .:@"
+
+"
+                     .:"URL: "
+                     get-value:x:@.dp/#/*/permalink
+               if
+                  and
+                     not-null:x:@.dp/#/*/short_description
+                     neq:x:@.dp/#/*/short_description
+                        .:
+                  .lambda
+                     set-value:x:@.completion
+                        strings.concat
+                           get-value:x:@.completion
+                           .:@"
+
+"
+                           .:"Short description: "
+                           html2markdown:x:@.dp/#/*/short_description
+               if
+                  exists:x:@.dp/#/*/images/*
+                  .lambda
+                     set-value:x:@.completion
+                        strings.concat
+                           get-value:x:@.completion
+                           .:@"
+
+Images of product:"
+                     for-each:x:@.dp/#/*/images/*
+                        set-value:x:@.completion
+                           strings.concat
+                              get-value:x:@.completion
+                              .:@"
+
+"
+                              .:![
+                              get-value:x:@.dp/#/*/name
+                              .:](
+                              get-value:x:@.dp/#/*/src
+                              .:)
+               data.create
+                  table:ml_training_snippets
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@.prompt
+                     completion:x:@.completion
+                     uri:x:@.uri
+                     meta:woocommerce-import

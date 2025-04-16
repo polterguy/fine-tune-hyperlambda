@@ -1,0 +1,42 @@
+
+/*
+ * This Hyperlambda code connects to a database and reads a greeting from the "ml_types" table based on a specified type. It retrieves the greeting, defaults to a message if none is found, and sanitizes it by replacing newline and carriage return characters, as well as single quotes, with their escaped versions. Finally, it replaces a placeholder in the result with the sanitized greeting. 
+ * 
+ * 1. [data.connect] - Opens a database connection using the specified connection string and database.
+ * 2. [data.read] - Reads data from the "ml_types" table, selecting the "greeting" column where the "type" matches the provided argument.
+ * 3. [.greeting] - Declares a node to store the greeting.
+ * 4. [set-value] - Sets the value of the [.greeting] node, using a default message if no greeting is found.
+ * 5. [strings.replace] - Replaces newline characters in the greeting with escaped versions.
+ * 6. [strings.replace] - Replaces carriage return characters in the greeting with escaped versions.
+ * 7. [strings.replace] - Replaces single quotes in the greeting with escaped versions.
+ * 8. [set-value] - Sets the value of the [.result] node by replacing a placeholder with the sanitized greeting.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         greeting
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   .greeting
+   set-value:x:@.greeting
+      get-first-value
+         get-value:x:@data.read/*/*/greeting
+         .:Hello there! How may I help you today?
+   set-value:x:@.greeting
+      strings.replace:x:@.greeting
+         .:"\n"
+         .:"\\n"
+   set-value:x:@.greeting
+      strings.replace:x:@.greeting
+         .:"\r"
+         .:"\\r"
+   set-value:x:@.greeting
+      strings.replace:x:@.greeting
+         .:"'"
+         .:"\\'"
+   set-value:x:@.result
+      strings.replace:x:@.result
+         .:[[greeting]]
+         get-value:x:@.greeting

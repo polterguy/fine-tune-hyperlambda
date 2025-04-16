@@ -1,0 +1,49 @@
+
+/*
+ * This Hyperlambda code checks if the "to" and "from" arguments exist, are not null, and contain a colon. If true, it splits these arguments by the colon, extracting and setting the channel, to, and from values. It then adds nodes to a signal, unwraps them, and adds more nodes with the extracted values. 
+ * 
+ * 1. [if] - Checks multiple conditions using [and].
+ * 2. [and] - Ensures all conditions are true.
+ * 3. [exists] - Verifies the presence of "to" and "from" arguments.
+ * 4. [not-null] - Ensures "to" and "from" arguments are not null.
+ * 5. [strings.contains] - Checks if "to" and "from" contain a colon.
+ * 6. [.lambda] - Executes if conditions are met.
+ * 7. [strings.split] - Splits "to" and "from" by colon.
+ * 8. [set-value] - Sets values for channel, to, and from.
+ * 9. [add] - Adds nodes to a signal.
+ * 10. [unwrap] - Evaluates expressions in nodes.
+ * 
+ */
+if
+   and
+      exists:x:@.arguments/*/to
+      exists:x:@.arguments/*/from
+      not-null:x:@.arguments/*/to
+      not-null:x:@.arguments/*/from
+      strings.contains:x:@.arguments/*/to
+         .:":"
+      strings.contains:x:@.arguments/*/from
+         .:":"
+   .lambda
+      .channel
+      .to
+      .from
+      strings.split:x:@.arguments/*/to
+         .:":"
+      set-value:x:@.channel
+         get-value:x:@strings.split/0
+      set-value:x:@.to
+         get-value:x:@strings.split/1
+      strings.split:x:@.arguments/*/from
+         .:":"
+      set-value:x:@.from
+         get-value:x:@strings.split/1
+      add:x:@.exe/*/signal
+         get-nodes:x:@.arguments/*/prompt
+         get-nodes:x:@.arguments/*/session
+      unwrap:x:+/*/*
+      add:x:@.exe/*/signal
+         .
+            to:x:@.to
+            from:x:@.from
+            channel:x:@.channel

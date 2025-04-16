@@ -1,0 +1,103 @@
+
+/*
+ * This Hyperlambda code connects to a database and reads data from the "ml_types" table, selecting various columns. It checks if a specific type exists using a [where] clause, and if not, attempts to retrieve a default type. If neither is found, it throws an error. The code then adds the retrieved model data to the current node structure and sets the type to "default" if necessary.
+ * 
+ * 1. [data.connect] - Connects to the database.
+ * 2. [data.read] - Reads data from the "ml_types" table.
+ * 3. [table] - Specifies the table to read from.
+ * 4. [columns] - Lists the columns to be retrieved.
+ * 5. [where] - Filters the data based on the type argument.
+ * 6. [if] - Checks if the data read was successful.
+ * 7. [not-exists] - Checks if no data was found.
+ * 8. [.lambda] - Executes a block of code if the condition is true.
+ * 9. [throw] - Throws an error if no type or default type is found.
+ * 10. [add] - Adds the retrieved model data to the node structure.
+ * 11. [set-value] - Sets the type to "default" if no specific type is found.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         model
+         max_tokens
+         max_context_tokens
+         max_request_tokens
+         temperature
+         recaptcha
+         auth
+         supervised
+         cached
+         prefix
+         use_embeddings
+         threshold
+         vector_model
+         contact_us
+         lead_email
+         api_key
+         webhook_incoming
+         webhook_outgoing
+         webhook_incoming_url
+         webhook_outgoing_url
+         system_message
+         initial_questionnaire
+         no_requests
+         max_requests
+         session_timeout
+         search_postfix
+         max_function_invocations
+         max_session_items
+         completion_slot
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         data.read
+            table:ml_types
+            columns
+               model
+               max_tokens
+               max_context_tokens
+               max_request_tokens
+               temperature
+               recaptcha
+               auth
+               supervised
+               cached
+               prefix
+               use_embeddings
+               threshold
+               vector_model
+               contact_us
+               lead_email
+               api_key
+               webhook_incoming
+               webhook_outgoing
+               webhook_incoming_url
+               webhook_outgoing_url
+               system_message
+               initial_questionnaire
+               no_requests
+               max_requests
+               session_timeout
+               search_postfix
+               max_function_invocations
+               max_session_items
+               completion_slot
+            where
+               and
+                  type.eq:default
+         if
+            not-exists:x:@data.read/*
+            .lambda
+               throw:No such type, and no default type was found
+                  status:int:400
+                  public:bool:true
+         add:x:@.model
+            get-nodes:x:@data.read/*/*
+         set-value:x:@.arguments/*/type
+            .:default
+   else
+      add:x:@.model
+         get-nodes:x:@data.read/*/*

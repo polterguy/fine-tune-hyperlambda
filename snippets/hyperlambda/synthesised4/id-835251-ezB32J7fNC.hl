@@ -1,0 +1,86 @@
+
+/*
+ * This Hyperlambda code checks if a massage argument exists and is not empty, and if the token count of content is less than 15000. If true, it sends a signal with a concatenated message and makes a POST request to OpenAI's API to generate a chat completion. If the response status code is between 200 and 299, it unwraps the response and adds it to snippets. Otherwise, it signals a warning and adds a fallback snippet. 
+ * 
+ * 1. [if] - Checks if multiple conditions are true.
+ * 2. [and] - Combines multiple conditions.
+ * 3. [exists] - Checks if the massage argument exists.
+ * 4. [neq] - Ensures the massage argument is not empty.
+ * 5. [lt] - Verifies the token count of content is less than 15000.
+ * 6. [strings.concat] - Concatenates strings for a message.
+ * 7. [unwrap] - Evaluates expressions.
+ * 8. [sockets.signal] - Sends a signal with a message.
+ * 9. [http.post] - Sends a POST request to OpenAI's API.
+ * 10. [if] - Checks the response status code.
+ * 11. [and] - Combines status code conditions.
+ * 12. [mte] - Checks if the response code is at least 200.
+ * 13. [lt] - Checks if the response code is less than 300.
+ * 14. [add] - Adds the response to snippets.
+ * 15. [else] - Handles unsuccessful API responses.
+ * 16. [strings.concat] - Concatenates a warning message.
+ * 17. [sockets.signal] - Sends a warning signal.
+ * 18. [add] - Adds a fallback snippet.
+ */
+if
+   and
+      exists:x:@.arguments/*/massage
+      neq:x:@.arguments/*/massage
+         .
+      neq:x:@.arguments/*/massage
+         .:
+      lt
+         openai.tokenize:x:@.content
+         .:int:15000
+   .lambda
+      strings.concat
+         .:"Creating summary for file: "
+         get-value:x:@.dp/#
+      unwrap:x:+/*/*/message
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      http.post:"https://api.openai.com/v1/chat/completions"
+         headers
+            Authorization:x:@.token
+            Content-Type:application/json
+         payload
+            model:gpt-3.5-turbo-1106
+            max_tokens:int:2000
+            temperature:decimal:0.5
+            messages
+               .
+                  role:system
+                  content:x:@.arguments/*/massage
+               .
+                  role:system
+                  content:x:@.content
+         convert:true
+      if
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:@.snippets
+               .
+                  .
+                     prompt:x:@http.post/*/content/*/choices/0/*/message/*/content
+                     completion:x:@.content
+      else
+         strings.concat
+            .:"Could not create summary for file: "
+            get-value:x:@.dp/#
+         unwrap:x:+/*/*/message
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:warning
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
+               .
+                  prompt:x:@.file-meta
+                  completion:x:@.content

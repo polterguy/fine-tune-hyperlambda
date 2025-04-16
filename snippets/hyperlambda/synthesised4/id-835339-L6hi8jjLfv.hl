@@ -1,0 +1,18 @@
+
+// This Hyperlambda code checks if an HTTP GET request did not return HTML content. It uses a series of conditions to verify if the content or headers are missing or if the Content-Type is not "text/html". If any condition is true, it logs an error with the URL and content details, and returns a 415 status code. The code uses slots like [not-exists], [null], [eq], [not], and [strings.starts-with] to perform these checks.
+if
+   or
+      not-exists:x:@http.get/*/content
+      null:x:@http.get/*/content
+      eq:x:@http.get/*/content
+         .:
+      not-exists:x:@http.get/*/headers/*/Content-Type
+      not
+         strings.starts-with:x:@http.get/*/headers/*/Content-Type
+            .:text/html
+   .lambda
+      lambda2hyper:x:@http.get
+      log.error:URL did not return HTML content when scraping
+         content:x:@lambda2hyper
+         url:x:@.arguments/*/url
+      return:int:415

@@ -1,0 +1,51 @@
+
+/*
+ * This Hyperlambda code checks if a session exists and is not null, then processes a list of IDs. It joins the IDs into a string, optionally appends a tail value, trims, and splits the string. If the resulting list has 20 or more items, it removes items from index 15 to 19. Finally, it caches the processed value with a specified expiration time. 
+ * 
+ * 1. [if] - Checks if the session exists and is not null.
+ * 2. [.lambda] - Executes if the condition is true.
+ * 3. [.value] - Placeholder for the processed value.
+ * 4. [set-value] - Joins IDs into a string.
+ * 5. [if] - Checks if a tail value exists.
+ * 6. [.lambda] - Appends the tail value if it exists.
+ * 7. [strings.trim] - Trims trailing commas.
+ * 8. [strings.split] - Splits the string into a list.
+ * 9. [if] - Checks if the list has 20 or more items.
+ * 10. [remove-nodes] - Removes items from index 15 to 19.
+ * 11. [set-value] - Joins the list back into a string.
+ * 12. [cache.set] - Caches the processed value with expiration.
+ */
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      .value
+      set-value:x:@.value
+         strings.join:x:@.ids/*
+            .:,
+      if
+         not-null:x:@.tail/+
+         .lambda
+            set-value:x:@.value
+               strings.concat
+                  get-value:x:@.value
+                  .:,
+                  get-value:x:@.tail/+
+            set-value:x:@.value
+               strings.trim:x:@.value
+                  .:,
+            strings.split:x:@.value
+               .:,
+            if
+               mte
+                  get-count:x:@strings.split/*
+                  .:int:20
+               .lambda
+                  remove-nodes:x:@strings.split/*/[15,20]
+                  set-value:x:@.value
+                     strings.join:x:@strings.split/*
+                        .:,
+      cache.set:x:@.cache-key
+         value:x:@.value
+         expiration:x:@.arguments/*/session_timeout

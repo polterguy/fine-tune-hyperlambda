@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and performs a read operation on the "clients" table. It constructs an aggregate function using the provided arguments, removes certain argument nodes, and appends additional nodes to the "where" clause. The result is a single record with an alias "result" for the aggregate function. The final output is returned from the data read operation. 
+ * 
+ * 1. [data.connect] - Connects to the specified database using SQLite.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs an aggregate function string using provided arguments.
+ * 4. [remove-nodes] - Removes specific argument nodes.
+ * 5. [add] - Appends nodes to the "where" clause.
+ * 6. [data.read] - Reads data from the "clients" table.
+ * 7. [columns] - Specifies the columns to be selected, including the aggregate function.
+ * 8. [where] - Defines the "where" clause for filtering data.
+ * 9. [limit] - Limits the result to one record.
+ * 10. [return-nodes] - Returns the result of the data read operation.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:clients
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

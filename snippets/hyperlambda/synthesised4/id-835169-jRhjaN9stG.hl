@@ -1,0 +1,40 @@
+
+/*
+ * This Hyperlambda code iterates over nodes under [execute] and checks for the existence of [issuer] and [name] nodes. If neither exists, it throws an exception. It then checks if any [return] node has an [issuer] matching the current node's [issuer]. If no match is found, it adds the current node to [return]. The code ensures only valid OpenID providers are processed and added to the [return] node. 
+ * 
+ * 1. [for-each] - Iterates over nodes under [execute].
+ * 2. [if] - Checks if either [issuer] or [name] is missing.
+ * 3. [or] - Logical OR to check for missing nodes.
+ * 4. [not-exists] - Checks if nodes do not exist.
+ * 5. [throw] - Throws an exception if conditions are met.
+ * 6. [for-each] - Iterates over [return] nodes.
+ * 7. [if] - Checks if [issuer] matches.
+ * 8. [eq] - Compares [issuer] values.
+ * 9. [set-value] - Sets [exists] to true if match is found.
+ * 10. [if] - Checks if [exists] is false.
+ * 11. [add] - Adds current node to [return] if no match is found.
+ * 12. [get-nodes] - Retrieves nodes to add to [return].
+ */
+for-each:x:@execute/*
+   if
+      or
+         not-exists:x:@.dp/#/*/issuer
+         not-exists:x:@.dp/#/*/name
+      .lambda
+         throw:Bogus OpenID provider
+            status:int:500
+            public:bool:true
+   .exists:bool:false
+   for-each:x:../*/return/*
+      if
+         eq:x:@.dp/#/*/issuer
+            get-value:x:@for-each/@.dp/#/*/issuer
+         .lambda
+            set-value:x:@.exists
+               .:bool:true
+   if
+      eq:x:@.exists
+         .:bool:false
+      .lambda
+         add:x:../*/return
+            get-nodes:x:@.dp/#

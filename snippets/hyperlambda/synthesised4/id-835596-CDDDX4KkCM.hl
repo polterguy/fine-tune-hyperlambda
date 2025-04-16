@@ -1,0 +1,50 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and updates records in the "Employees" table. It dynamically constructs the update query using arguments and checks if any records were updated. If no records are updated, it sets the response status to 404 and returns a "Record not found" message. If records are updated, it sets the response status to 202, signals a socket event with updated arguments, and returns the number of affected records.
+ * 
+ * 1. [data.connect] - Opens a connection to the SQLite database.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [add] - Adds nodes to the update query's values and where conditions.
+ * 4. [get-nodes] - Retrieves nodes from the arguments for update query construction.
+ * 5. [data.update] - Executes the update operation on the "Employees" table.
+ * 6. [if] - Checks if the update operation affected any records.
+ * 7. [eq] - Compares the result of the update operation to zero.
+ * 8. [response.status.set] - Sets the HTTP response status.
+ * 9. [return] - Returns a result or affected records.
+ * 10. [sockets.signal] - Signals a socket event with updated arguments.
+ * 11. [set-name] - Renames a node for socket signaling.
+ * 12. [unwrap] - Evaluates expressions in the socket signal.
+ * 13. [affected] - Returns the number of records affected by the update.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Employees
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Employees.put
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

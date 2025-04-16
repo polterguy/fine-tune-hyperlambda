@@ -1,0 +1,25 @@
+
+// The code iterates through nodes returned by a lambda expression and checks if they have children. If children exist, it sets a warning message. It constructs a string expression for each node and checks if this expression exists in a list of candidates. If not, it adds the expression to the candidates list, marking it as complete. The code ensures that complex objects are manually referenced and expressions are unique within the candidates.
+for-each:x:@hyper2lambda/**/[yield|return|return-nodes]/*
+   if
+      exists:x:@.dp/#/*
+      .lambda
+         set-value:x:@.warning
+            .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+   .x
+   set-value:x:@.x
+      strings.concat
+         .:--/execute/=
+         get-value:x:@.dp/@.dp/#/*/name
+         .:/*/
+         get-name:x:@.dp/#
+   if
+      not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+      .lambda
+         unwrap:x:+/*/*/*
+         add:x:../*/return/*/candidates
+            .
+               .
+                  name:x:@.x
+                  expression:x:@.x
+                  complete:bool:true

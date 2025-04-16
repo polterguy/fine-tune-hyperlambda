@@ -1,0 +1,29 @@
+
+// This Hyperlambda code connects to a database and performs a SQL query on the "Employees" table with a left join on itself to retrieve hierarchical data. It constructs an aggregate function dynamically, removes specific nodes, adds conditions to the "where" clause, and limits the result to one record. The final result is returned as nodes. Key slots include [data.connect] for database connection, [set-name] for constructing the aggregate function, [remove-nodes] and [add] for modifying the query structure, and [data.read] for executing the query.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Employees
+         join:Employees
+            as:ReportsTo
+            type:left
+            on
+               and
+                  Employees.ReportsTo:ReportsTo.EmployeeID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

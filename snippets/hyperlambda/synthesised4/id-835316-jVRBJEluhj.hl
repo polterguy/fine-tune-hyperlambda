@@ -1,0 +1,61 @@
+
+/*
+ * This Hyperlambda code handles the response of an HTTP POST request. It logs an error if the HTTP status code is not between 200 and 299, and converts the response to a lambda object. If a stream argument doesn't exist or is false, it throws an error with a public message and status. Otherwise, it sends a signal with error details and resets an iteration counter.
+ * 
+ * 1. [if] - Evaluates a condition to determine the flow of execution.
+ * 2. [not] - Inverts the result of the following condition.
+ * 3. [and] - Ensures both conditions are true for the block to execute.
+ * 4. [mte] - Checks if the HTTP status code is greater than or equal to 200.
+ * 5. [lt] - Checks if the HTTP status code is less than 300.
+ * 6. [.lambda] - Executes the block if the condition is true.
+ * 7. [lambda2hyper] - Converts the HTTP POST response to a lambda object.
+ * 8. [log.error] - Logs an error message with details from the HTTP response.
+ * 9. [message] - Retrieves the error message from the HTTP response.
+ * 10. [status] - Retrieves the HTTP status code.
+ * 11. [error] - Logs the converted lambda object.
+ * 12. [if] - Evaluates another condition based on stream existence.
+ * 13. [or] - Ensures at least one condition is true for the block to execute.
+ * 14. [not-exists] - Checks if the stream argument does not exist.
+ * 15. [eq] - Checks if the stream argument is false.
+ * 16. [.lambda] - Executes the block if the condition is true.
+ * 17. [throw] - Throws an error with a public message and status.
+ * 18. [else] - Executes if the previous condition is false.
+ * 19. [unwrap] - Evaluates expressions in the HTTP response.
+ * 20. [sockets.signal] - Sends a signal with error details.
+ * 21. [args] - Provides arguments for the signal.
+ * 22. [error] - Indicates an error occurred.
+ * 23. [status] - Retrieves the HTTP status code.
+ * 24. [message] - Retrieves the error message from the HTTP response.
+ * 25. [set-value] - Resets the iteration counter to 0.
+ */
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Ollama
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      if
+         or
+            not-exists:x:@.arguments/*/stream
+            eq:x:@.arguments/*/stream
+               .:bool:false
+         .lambda
+            throw:x:@http.post/*/content/*/error/*/message
+               public:bool:true
+               status:x:@http.post
+      else
+         unwrap:x:+/*/*
+         sockets.signal:x:@.arguments/*/session
+            args
+               error:bool:true
+               status:x:@http.post
+               message:x:@http.post/*/content/*/error/*/message
+         set-value:x:@.iterations
+            .:int:0

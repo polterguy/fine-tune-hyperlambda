@@ -1,0 +1,31 @@
+
+// The provided Hyperlambda code iterates over URL nodes within an XML structure, checking if each URL is unique and less than 10,000 in count. It adjusts URLs without "http://" or "https://" prefixes by prepending a domain value, and adds unique URLs to a list. The code uses [for-each] to iterate, [if] for conditional checks, [set-value] to modify node values, and [add] to include unique URLs in the [.urls] node.
+for-each:x:"@xml2lambda/*/urlset/*/url/*/loc/*/\\#cdata-section"
+   if
+      lt
+         get-count:x:@.urls/*
+         .:int:10000
+      .lambda
+         .url
+         set-value:x:@.url
+            get-value:x:@.dp/#
+         if
+            and
+               not
+                  strings.starts-with:x:@.dp/#
+                     .:"http://"
+               not
+                  strings.starts-with:x:@.dp/#
+                     .:"https://"
+            .lambda
+               set-value:x:@.url
+                  strings.concat
+                     get-value:x:@.domain
+                     get-value:x:@.dp/#
+         if
+            not-exists:x:@.urls/*/={@.url}
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.urls
+                  .
+                     .:x:@.url

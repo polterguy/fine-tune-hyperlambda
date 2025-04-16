@@ -1,0 +1,38 @@
+
+/*
+ * This Hyperlambda code checks if certain conditions are met before executing a series of actions. It first verifies if the [prompt] contains an "@" character, [contact_us] is not null, and [contact_us] is not an empty string. If true, it sends a lead email using [magic.ai.send-lead-email]. If the email is sent successfully, it proceeds to send a message using [magic.twilio.send-message]. The code uses [unwrap] to evaluate expressions and [signal] to trigger actions.
+ * 
+ * 1. [if] - Checks if all specified conditions are true.
+ * 2. [and] - Ensures all conditions within it are true.
+ * 3. [strings.contains] - Checks if [prompt] contains "@".
+ * 4. [not-null] - Verifies [contact_us] is not null.
+ * 5. [neq] - Ensures [contact_us] is not an empty string.
+ * 6. [.lambda] - Executes actions if conditions are true.
+ * 7. [unwrap] - Evaluates expressions in the next sibling node.
+ * 8. [signal:magic.ai.send-lead-email] - Sends a lead email with specified arguments.
+ * 9. [if:x:@signal] - Checks if the previous signal was successful.
+ * 10. [signal:magic.twilio.send-message] - Sends a message using Twilio if the email was sent successfully.
+ */
+if
+   and
+      strings.contains:x:@.arguments/*/prompt
+         .:@
+      not-null:x:@.arguments/*/contact_us
+      neq:x:@.arguments/*/contact_us
+         .:
+   .lambda
+      unwrap:x:+/*
+      signal:magic.ai.send-lead-email
+         type:x:@.arguments/*/type
+         prompt:x:@.arguments/*/prompt
+         session:x:@.arguments/*/session
+         lead_email:x:@.arguments/*/lead_email
+         contact_us:x:@.arguments/*/contact_us
+      if:x:@signal
+         unwrap:x:+/*
+         signal:magic.twilio.send-message
+            body:x:@.arguments/*/contact_us
+            to:x:@.arguments/*/from
+            from:x:@.arguments/*/to
+            twilio_account_id:x:@.twilio_account_id
+            twilio_account_sid:x:@.twilio_account_sid

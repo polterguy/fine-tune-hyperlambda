@@ -1,0 +1,35 @@
+
+/*
+ * The code iterates over each input node and checks if a corresponding schema property exists. If not, it creates a new property node with the same name and type as the input node, and adds a description if available. This property node is then added to the schema properties. 
+ * 
+ * 1. [for-each] - Iterates over each input node.
+ * 2. [if] - Checks if a schema property for the input node does not exist.
+ * 3. [.prop] - Creates a new node to hold property details.
+ * 4. [set-value] - Sets the type of the new property node.
+ * 5. [set-name] - Sets the name of the new property node.
+ * 6. [if] - Checks if a description exists for the input node.
+ * 7. [unwrap] - Evaluates expressions for the description.
+ * 8. [add] - Adds the description to the property node.
+ * 9. [add] - Adds the new property node to the schema properties.
+ * 10. [get-nodes] - Retrieves the newly created property node.
+ */
+for-each:x:@.dp/#/*/input/*
+   if
+      not-exists:x:"@.body/*/requestBody/*/content/*/*/schema/*/properties/*/\"{@.dp/#/*/name}\""
+      .lambda
+         .prop
+            name
+               type
+         set-value:x:@.prop/*/*/type
+            get-value:x:@.dp/#/*/type
+         set-name:x:@.prop/*
+            get-value:x:@.dp/#/*/name
+         if
+            exists:x:@.dp/#/*/description
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.prop/*
+                  .
+                     description:x:@.dp/#/*/description
+         add:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+            get-nodes:x:@.prop/*

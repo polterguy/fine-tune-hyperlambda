@@ -1,0 +1,33 @@
+
+// The Hyperlambda code checks if the [produces] node exists or if its value is "application/json". If true, it initializes [.content] and checks conditions on the [.foo] node's [content]. If conditions are met, it sets [.content] with [.foo]'s [content]. It then converts [.content] to a lambda object, formats it to JSON, and assigns it to [.response]. Finally, it processes the [response] node similarly and assigns it to [.assumption].
+if
+   or
+      not
+         exists:x:@hyper2lambda/*/produces
+      eq
+         get-value:x:@hyper2lambda/*/produces
+         .:application/json
+   .lambda
+      .content:{}
+      if
+         and
+            exists:x:@.foo/-/*/content
+            not
+               eq
+                  get-value:x:@.foo/-/*/content
+                  .:
+            not
+               eq
+                  get-value:x:@.foo/-/*/content
+                  .
+         .lambda
+            set-value:x:@.content
+               get-value:x:@.foo/-/*/content
+      json2lambda:x:@.content
+      set-value:x:@.response
+         lambda2json:x:@json2lambda/*
+            format:true
+      json2lambda:x:@hyper2lambda/*/response
+      set-value:x:@.assumption
+         lambda2json:x:@json2lambda/*
+            format:true

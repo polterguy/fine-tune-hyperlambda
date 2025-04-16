@@ -1,0 +1,33 @@
+
+/*
+ * The code iterates over each node in the [data.read] collection using [for-each]. For each node, it checks if the [embedding_vss] child node is not null, setting its value to true if it exists, otherwise setting it to false. It then concatenates the values of [prompt] and [completion] from the current node, tokenizes the concatenated string using [openai.tokenize], and adds the resulting tokens back to the current node under a [tokens] node. 
+ * 
+ * 1. [for-each] - Iterates over each node in [data.read].
+ * 2. [if] - Checks if the [embedding_vss] node is not null.
+ * 3. [not-null] - Evaluates the existence of [embedding_vss].
+ * 4. [set-value] - Sets the value of [embedding_vss] to true or false.
+ * 5. [strings.concat] - Concatenates [prompt] and [completion] values.
+ * 6. [openai.tokenize] - Tokenizes the concatenated string.
+ * 7. [unwrap] - Evaluates the tokenized result.
+ * 8. [add] - Adds the tokenized result to the current node as [tokens].
+ */
+for-each:x:@data.read/*
+   if
+      not-null:x:@.dp/#/*/embedding_vss
+      .lambda
+         set-value:x:@.dp/#/*/embedding_vss
+            .:bool:true
+   else
+      set-value:x:@.dp/#/*/embedding_vss
+         .:bool:false
+   strings.concat
+      get-value:x:@.dp/#/*/prompt
+      .:@"
+
+"
+      get-value:x:@.dp/#/*/completion
+   openai.tokenize:x:@strings.concat
+   unwrap:x:+/*/*
+   add:x:@.dp/#
+      .
+         tokens:x:@openai.tokenize

@@ -1,0 +1,59 @@
+
+/*
+ * This Hyperlambda code connects to a database to retrieve and process machine learning training snippets and system messages related to function invocations. It first queries the "ml_training_snippets" table for prompts of a specific type, then iterates over the results to extract and add these prompts to a list of "rag_functions". Next, it reads system messages from the "ml_types" table, splits them, and filters for specific function invocations, adding them to a list of "system_functions". Finally, it yields both "rag_functions" and "system_functions" as output. 
+ * 
+ * 1. [data.connect] - Establishes a connection to the database.
+ * 2. [data.select] - Executes a SQL query to select prompts from the "ml_training_snippets" table based on a given type.
+ * 3. [for-each] - Iterates over the results of the data selection.
+ * 4. [unwrap] - Evaluates and processes each node in the selection results.
+ * 5. [add] - Adds the processed prompt to the "rag_functions" list.
+ * 6. [data.read] - Reads system messages from the "ml_types" table.
+ * 7. [strings.split] - Splits the system messages into parts based on a delimiter.
+ * 8. [for-each] - Iterates over the split system message parts.
+ * 9. [if] - Checks conditions to filter specific function invocations.
+ * 10. [strings.contains] - Checks if a string contains a specific substring.
+ * 11. [not] - Ensures certain substrings are not present in the string.
+ * 12. [strings.trim] - Trims unwanted characters from the string.
+ * 13. [add] - Adds the processed system function to the "system_functions" list.
+ * 14. [yield] - Returns the "rag_functions" and "system_functions" lists as output.
+ */
+data.connect:[generic|magic]
+   data.select:"select prompt from ml_training_snippets where type = @type and meta like '%FUNCTION_INVOCATION ==> %'"
+      @type:x:@.arguments/*/_type
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/yield/*/rag_functions
+         .
+            .:x:@.dp/#/*/prompt
+   data.read
+      table:ml_types
+      columns
+         system_message
+      where
+         and
+            type.eq:x:@.arguments/*/_type
+   strings.split:x:@data.read/*/*/system_message
+      .:"# "
+   for-each:x:@strings.split/*
+      if
+         and
+            strings.contains:x:@.dp/#
+               .:FUNCTION_INVOCATION[/
+            not
+               strings.contains:x:@.dp/#
+                  .:"FUNCTION_INVOCATION[/FOLDER/FILENAME.hl]:"
+            not
+               strings.contains:x:@.dp/#
+                  .:"FUNCTION_INVOCATION[/system/misc/workflows/list-functions.hl]:"
+         .lambda
+            strings.split:x:@.dp/#
+               .:"\n"
+            strings.trim:x:@strings.split/0
+               .:"# \n"
+            unwrap:x:+/*/*
+            add:x:@data.connect/*/yield/*/system_functions
+               .
+                  .:x:@strings.trim
+   yield
+      rag_functions
+      system_functions
