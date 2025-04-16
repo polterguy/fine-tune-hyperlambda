@@ -1,0 +1,35 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "hospital" and performs a SQL query to count distinct values in a specified column of the "Doctors" table. It constructs a "count(distinct ...)" SQL function dynamically based on an input argument, removes the argument node after use, and adds any additional conditions from the input arguments to the query's WHERE clause. Finally, it returns the query results. 
+ * 
+ * 1. [data.connect] - Connects to the SQLite database named "hospital".
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs a "count(distinct ...)" SQL function dynamically.
+ * 4. [remove-nodes] - Removes the input argument node after constructing the SQL function.
+ * 5. [add] - Adds additional conditions from input arguments to the WHERE clause.
+ * 6. [data.read] - Performs the SQL query on the "Doctors" table.
+ * 7. [database-type] - Specifies the database type for the query.
+ * 8. [table] - Specifies the table name as "Doctors".
+ * 9. [columns] - Specifies the columns to select, including the dynamically constructed function.
+ * 10. [where] - Initializes the WHERE clause for additional conditions.
+ * 11. [return-nodes] - Returns the query results.
+ */
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Doctors
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

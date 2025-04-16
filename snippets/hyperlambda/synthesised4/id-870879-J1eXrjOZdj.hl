@@ -1,0 +1,43 @@
+
+// This Hyperlambda code connects to a database to retrieve and process machine learning training snippets and system messages. It uses [data.connect] and [data.select] to fetch prompts from a table based on a specified type, then iterates over the results to extract and add them to a list of RAG functions. It also reads system messages from another table, splits them, and filters for specific FUNCTION_INVOCATION patterns, excluding certain paths. The filtered results are added to a list of system functions. Finally, it yields two lists: [rag_functions] and [system_functions].
+data.connect:[generic|magic]
+   data.select:"select prompt from ml_training_snippets where type = @type and meta like '%FUNCTION_INVOCATION ==> %'"
+      @type:x:@.arguments/*/_type
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/yield/*/rag_functions
+         .
+            .:x:@.dp/#/*/prompt
+   data.read
+      table:ml_types
+      columns
+         system_message
+      where
+         and
+            type.eq:x:@.arguments/*/_type
+   strings.split:x:@data.read/*/*/system_message
+      .:"# "
+   for-each:x:@strings.split/*
+      if
+         and
+            strings.contains:x:@.dp/#
+               .:FUNCTION_INVOCATION[/
+            not
+               strings.contains:x:@.dp/#
+                  .:"FUNCTION_INVOCATION[/FOLDER/FILENAME.hl]:"
+            not
+               strings.contains:x:@.dp/#
+                  .:"FUNCTION_INVOCATION[/system/misc/workflows/list-functions.hl]:"
+         .lambda
+            strings.split:x:@.dp/#
+               .:"\n"
+            strings.trim:x:@strings.split/0
+               .:@"# 
+"
+            unwrap:x:+/*/*
+            add:x:@data.connect/*/yield/*/system_functions
+               .
+                  .:x:@strings.trim
+   yield
+      rag_functions
+      system_functions

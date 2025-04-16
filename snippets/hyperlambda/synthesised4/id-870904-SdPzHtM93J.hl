@@ -1,0 +1,49 @@
+
+/*
+ * This Hyperlambda code connects to a database and constructs a dynamic SQL query to count records in the "ml_training_snippets" table based on specified conditions. It checks for the presence of a "not_embedded" argument and modifies the query accordingly. The code dynamically adds conditions to the "where" clause based on various "like" and "eq" arguments, removes processed arguments, and ensures the query structure is valid before executing the read operation. Finally, it returns the count of matching records. 
+ * 
+ * 1. [data.connect] - Connects to a database, either generic or magic.
+ * 2. [if] - Checks conditions to modify the query based on the "not_embedded" argument.
+ * 3. [add] - Adds conditions to the "where" clause of the query.
+ * 4. [remove-nodes] - Removes processed argument nodes.
+ * 5. [data.read] - Executes a SQL read operation to count records in the "ml_training_snippets" table.
+ * 6. [return-nodes] - Returns the result of the SQL read operation.
+ */
+data.connect:[generic|magic]
+   if
+      and
+         exists:x:@.arguments/*/not_embedded
+         get-value:x:@.arguments/*/not_embedded
+      .lambda
+         add:x:@data.connect/*/data.read/*/where/*/and
+            .
+               embedding.eq
+         remove-nodes:x:@.arguments/*/not_embedded
+   add:x:./*/data.read/*/where/*/*/or
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.eq
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.eq
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.eq
+   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.eq
+   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.eq
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   if
+      not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
+   data.read
+      table:ml_training_snippets
+      columns
+         count(*)
+            as:count
+      where
+         and
+            or
+      limit:long:1
+   return-nodes:x:@data.read/*/*

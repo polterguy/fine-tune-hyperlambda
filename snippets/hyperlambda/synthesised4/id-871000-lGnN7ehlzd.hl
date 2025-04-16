@@ -1,0 +1,75 @@
+
+/*
+ * This Hyperlambda code connects to a database to retrieve training snippets and their associated vector models, concatenates the prompt and completion into an embedding, and sends it to OpenAI's API to create embeddings. If the API call is unsuccessful, it logs an error and throws an exception. It then deletes the existing embedding from the database and inserts the new embedding after converting it to bytes.
+ * 
+ * 1. [data.connect] - Connects to the database to access training snippets and types.
+ * 2. [data.read] - Reads data from the 'ml_training_snippets' table, joining with 'ml_types' on the type column.
+ * 3. [columns] - Specifies the columns to retrieve: prompt, completion, and vector_model.
+ * 4. [where] - Filters the query to match the specified ID from arguments.
+ * 5. [set-value] - Concatenates the prompt and completion into a single string for embedding.
+ * 6. [http.post] - Sends a POST request to OpenAI's API to create embeddings.
+ * 7. [headers] - Sets the authorization and content type headers for the API request.
+ * 8. [payload] - Specifies the model and input for the embedding request.
+ * 9. [convert] - Converts the response to a usable format.
+ * 10. [if] - Checks if the API response status code indicates success.
+ * 11. [not] - Inverts the condition to handle unsuccessful responses.
+ * 12. [log.error] - Logs an error message if the API call fails.
+ * 13. [throw] - Throws an exception if embeddings cannot be created.
+ * 14. [data.delete] - Deletes the existing embedding from the database.
+ * 15. [floatArray2bytes] - Converts the embedding data to bytes.
+ * 16. [data.create] - Inserts the new embedding into the database.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_training_snippets
+         join:ml_types
+            on
+               and
+                  ml_training_snippets.type.eq:ml_types.type
+      columns
+         prompt
+         completion
+         vector_model
+      where
+         and
+            id.eq:x:@.arguments/*/id
+   .embedding
+   set-value:x:@.embedding
+      strings.concat
+         get-value:x:@data.read/*/*/prompt
+         .:@"
+
+"
+         get-value:x:@data.read/*/*/completion
+   http.post:"https://api.openai.com/v1/embeddings"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:x:@data.read/*/*/vector_model
+         input:x:@.embedding
+      convert:true
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            error:x:@lambda2hyper
+         throw:Could not create embeddings for model
+   data.delete
+      table:vss_ml_training_snippets
+      where
+         and
+            rowid.eq:x:@.arguments/*/id
+   floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+   data.create
+      table:vss_ml_training_snippets
+      values
+         embedding_vss:x:@floatArray2bytes
+         rowid:x:@.arguments/*/id

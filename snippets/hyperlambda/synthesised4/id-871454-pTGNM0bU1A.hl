@@ -1,0 +1,36 @@
+
+// This Hyperlambda code establishes a connection to a SQLite database and performs a data read operation on the "documents" table, joining it with the "clients" table using a left join. It dynamically manipulates query parameters such as order, direction, limit, and offset by adding and removing nodes from the arguments. The code retrieves specific columns from both tables and returns the resulting nodes from the data read operation.
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:documents
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  documents.client_id:client_id.client_id
+      columns
+         documents.document_id
+         documents.client_id
+         documents.title
+         documents.file_path
+         documents.uploaded_date
+         client_id.name
+            as:client_id.name
+      where
+         and
+   return-nodes:x:@data.read/*

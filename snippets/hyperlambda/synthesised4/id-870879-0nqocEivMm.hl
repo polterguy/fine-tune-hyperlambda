@@ -1,0 +1,35 @@
+
+/*
+ * This Hyperlambda code checks if a string contains a specific pattern and does not contain two other specific patterns. If these conditions are met, it splits the string by newline, trims the first line, and adds the result to a node. The code uses [strings.contains] to check for patterns, [strings.split] and [strings.trim] to manipulate strings, and [add] to append data to a node.
+ * 
+ * 1. [if] - Starts a conditional block.
+ * 2. [and] - Combines multiple conditions that must all be true.
+ * 3. [strings.contains] - Checks if the string contains "FUNCTION_INVOCATION[/".
+ * 4. [not] - Ensures the string does not contain "FUNCTION_INVOCATION[/FOLDER/FILENAME.hl]:".
+ * 5. [not] - Ensures the string does not contain "FUNCTION_INVOCATION[/system/misc/workflows/list-functions.hl]:".
+ * 6. [.lambda] - Executes if all conditions are true.
+ * 7. [strings.split] - Splits the string by newline.
+ * 8. [strings.trim] - Trims the first line of the split string.
+ * 9. [unwrap] - Evaluates the node before execution.
+ * 10. [add] - Appends the trimmed result to a specified node.
+ */
+if
+   and
+      strings.contains:x:@.dp/#
+         .:FUNCTION_INVOCATION[/
+      not
+         strings.contains:x:@.dp/#
+            .:"FUNCTION_INVOCATION[/FOLDER/FILENAME.hl]:"
+      not
+         strings.contains:x:@.dp/#
+            .:"FUNCTION_INVOCATION[/system/misc/workflows/list-functions.hl]:"
+   .lambda
+      strings.split:x:@.dp/#
+         .:"\n"
+      strings.trim:x:@strings.split/0
+         .:@"# 
+"
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/yield/*/system_functions
+         .
+            .:x:@strings.trim
