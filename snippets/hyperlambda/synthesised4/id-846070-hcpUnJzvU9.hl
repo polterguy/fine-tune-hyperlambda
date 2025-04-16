@@ -1,0 +1,75 @@
+
+// This Hyperlambda code processes text nodes within a document, concatenating and trimming them to construct a prompt. It uses [for-each] to iterate through text nodes, [strings.concat] and [strings.trim] to build and clean the prompt, and [switch] to set values in a hierarchical structure based on header levels. Finally, it formats the prompt by replacing double spaces, trimming trailing characters, and adds the result to a snippets collection.
+case:h6
+   .prompt:
+   for-each:x:"@.dp/#/**/\\#text"
+      set-value:x:@.prompt
+         strings.concat
+            get-value:x:@.prompt
+            strings.trim:x:@.dp/#
+               .:@"  
+	"
+            .:" "
+   set-value:x:@.prompt
+      strings.trim:x:@.prompt
+         .:" "
+   switch:x:@get-name
+      case:h1
+         set-value:x:@.page-header/*/h1
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h2
+         set-value:x:@.page-header/*/h3
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h2
+         set-value:x:@.page-header/*/h2
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h3
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h3
+         set-value:x:@.page-header/*/h3
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h4
+         set-value:x:@.page-header/*/h4
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h5
+         set-value:x:@.page-header/*/h5
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h6
+      case:h6
+         set-value:x:@.page-header/*/h6
+            get-value:x:@.prompt
+   set-value:x:@.prompt
+      .:
+   for-each:x:@.page-header/*
+      if
+         and
+            not-null:x:@.dp/#
+            neq:x:@.dp/#
+               .:
+         .lambda
+            set-value:x:@.prompt
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:" - "
+                  get-value:x:@.prompt
+   set-value:x:@.prompt
+      strings.replace:x:@.prompt
+         .:"  "
+         .:" "
+   set-value:x:@.prompt
+      strings.trim-end:x:@.prompt
+         .:" -"
+   unwrap:x:+/*/*/*
+   add:x:@.snippets
+      .
+         .
+            prompt:x:@.prompt

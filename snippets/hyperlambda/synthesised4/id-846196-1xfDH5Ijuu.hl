@@ -1,0 +1,45 @@
+
+// This Hyperlambda code handles conditional logic based on the presence and content of nodes within a JSON-converted lambda object. It checks if a "done_reason" exists and is not null, setting a "finish_reason" and sending a signal if true. It also concatenates message content to a result, signaling if the result doesn't contain "___". If the result contains "FUNCTION_INVOCATION[" and a waiting signal hasn't been sent, it sends a waiting signal and updates the state.
+else
+   if
+      and
+         exists:x:@json2lambda/*/done_reason
+         not-null:x:@json2lambda/*/done_reason
+      .lambda
+         set-value:x:@.finish_reason
+            get-value:x:@json2lambda/*/done_reason
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               finish_reason:x:@.finish_reason
+   if
+      and
+         not-null:x:@json2lambda/*/message/*/content
+         neq:x:@json2lambda/*/message/*/content
+            .:
+      .lambda
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               get-value:x:@json2lambda/*/message/*/content
+         if
+            not
+               strings.contains:x:@.result
+                  .:___
+            .lambda
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     message:x:@json2lambda/*/message/*/content
+         else-if
+            and
+               strings.contains:x:@.result
+                  .:FUNCTION_INVOCATION[
+               neq:x:@.has-sent-waiting
+                  .:bool:true
+            .lambda
+               sockets.signal:x:@.session
+                  args
+                     function_waiting:bool:true
+               set-value:x:@.has-sent-waiting
+                  .:bool:true

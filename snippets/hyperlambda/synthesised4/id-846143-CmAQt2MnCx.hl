@@ -1,0 +1,39 @@
+
+/*
+ * This Hyperlambda code checks if a node named [relevant] is true, and if so, it evaluates whether the [value] node starts with "http://" or "https://". If it does, it adds the [value] to a [disallow] list. If not, it concatenates [domain] and [value], then adds the result to the [disallow] list. The [unwrap] slot is used to evaluate expressions before adding them to the list.
+ * 
+ * 1. [case:disallow] - Defines a case for disallowing certain values.
+ * 2. [if] - Checks if the [relevant] node is true.
+ * 3. [eq] - Compares the [relevant] node's value to true.
+ * 4. [or] - Logical OR to check if [value] starts with "http://" or "https://".
+ * 5. [strings.starts-with] - Checks if [value] starts with a specific string.
+ * 6. [unwrap] - Evaluates expressions before adding to the [disallow] list.
+ * 7. [add] - Adds a value to the [disallow] list.
+ * 8. [else] - Executes if the [value] does not start with "http://" or "https://".
+ * 9. [strings.concat] - Concatenates [domain] and [value].
+ * 10. [get-value] - Retrieves the value of [domain] and [value].
+ */
+case:disallow
+   if
+      eq:x:@.relevant
+         .:bool:true
+      .lambda
+         if
+            or
+               strings.starts-with:x:@.value
+                  .:"http://"
+               strings.starts-with:x:@.value
+                  .:"https://"
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.disallow
+                  .
+                     .:x:@.value
+         else
+            strings.concat
+               get-value:x:@.domain
+               get-value:x:@.value
+            unwrap:x:+/*/*
+            add:x:@.disallow
+               .
+                  .:x:@strings.concat

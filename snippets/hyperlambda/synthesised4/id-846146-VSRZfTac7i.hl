@@ -1,0 +1,98 @@
+
+/*
+ * This Hyperlambda code iterates through each snippet, checking if it has a non-null completion. If the completion's length exceeds a threshold, it attempts to create a new snippet entry in the database. It checks for existing entries and updates or creates new entries accordingly. It also increments counters based on conditions such as existing entries or below-threshold completions.
+ * 
+ * 1. [for-each] - Iterates over each snippet node.
+ * 2. [if] - Checks if the completion node exists and is not null.
+ * 3. [and] - Combines conditions for existence and non-null checks.
+ * 4. [mt] - Compares the length of the completion with a threshold.
+ * 5. [add] - Adds a type node to the current position.
+ * 6. [try-signal] - Attempts to create a snippet signal.
+ * 7. [strings.concat] - Concatenates strings for a query.
+ * 8. [data.read] - Reads data from the ml_training_snippets table.
+ * 9. [if] - Checks if no data was read.
+ * 10. [not-exists] - Checks for non-existence of data.
+ * 11. [set-value] - Sets the completion value with concatenated strings.
+ * 12. [data.create] - Creates a new entry in the database.
+ * 13. [else-if] - Checks if the prompt is "Common".
+ * 14. [math.increment] - Increments counters for existing or similar entries.
+ * 15. [data.update] - Updates the database with a "Common" prompt.
+ * 16. [else] - Increments the below-threshold counter.
+ */
+for-each:x:@.snippets/*
+   if
+      and
+         exists:x:@.dp/#/*/completion
+         not-null:x:@.dp/#/*/completion
+      .lambda
+         if
+            mt
+               strings.length:x:@.dp/#/*/completion
+               get-value:x:@.arguments/*/threshold
+            .lambda
+               add:x:+
+                  get-nodes:x:@.arguments/*/type
+               try-signal:magic.ai.can-create-snippet
+               strings.concat
+                  get-value:x:@.dp/#/*/completion
+                  .:@"
+"
+                  .:@"
+"
+                  .:This information was taken from [this URL](
+                  .:%
+               data.read
+                  table:ml_training_snippets
+                  columns
+                     id
+                     prompt
+                     completion
+                     uri
+                  where
+                     and
+                        type.eq:x:@.arguments/*/type
+                        or
+                           completion.eq:x:@.dp/#/*/completion
+                           completion.like:x:@strings.concat
+               if
+                  not-exists:x:@data.read/*
+                  .lambda
+                     if:x:@.arguments/*/insert_url
+                        set-value:x:@.dp/#/*/completion
+                           strings.concat
+                              get-value:x:@.dp/#/*/completion
+                              .:@"
+"
+                              .:@"
+"
+                              .:This information was taken from [this URL](
+                              get-value:x:@.arguments/*/url
+                              .:)
+                     data.create
+                        table:ml_training_snippets
+                        values
+                           type:x:@.arguments/*/type
+                           uri:x:@.arguments/*/url
+                           prompt:x:@.dp/#/*/prompt
+                           completion:x:@.dp/#/*/completion
+                           meta:AINIRO-Website-Crawler
+               else-if
+                  eq:x:@data.read/0/*/prompt
+                     .:Common
+                  .lambda
+                     math.increment:x:@.already-exists
+               else-if
+                  not
+                     eq:x:@data.read/*/*/prompt
+                        get-value:x:@.dp/#/*/prompt
+                  .lambda
+                     math.increment:x:@.similar
+                     data.update
+                        table:ml_training_snippets
+                        values
+                           prompt:Common
+                        where
+                           and
+                              id.eq:x:@data.read/0/*/id
+         else
+            math.increment:x:@.below-threshold

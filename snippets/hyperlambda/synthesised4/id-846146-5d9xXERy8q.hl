@@ -1,0 +1,24 @@
+
+// This code checks if data does not exist using [not-exists], and if so, it conditionally updates a completion node with a URL reference using [if] and [set-value]. It then creates a new entry in the "ml_training_snippets" table using [data.create], setting values for type, uri, prompt, completion, and meta. The [strings.concat] slot is used to append additional information to the completion node.
+if
+   not-exists:x:@data.read/*
+   .lambda
+      if:x:@.arguments/*/insert_url
+         set-value:x:@.dp/#/*/completion
+            strings.concat
+               get-value:x:@.dp/#/*/completion
+               .:@"
+"
+               .:@"
+"
+               .:This information was taken from [this URL](
+               get-value:x:@.arguments/*/url
+               .:)
+      data.create
+         table:ml_training_snippets
+         values
+            type:x:@.arguments/*/type
+            uri:x:@.arguments/*/url
+            prompt:x:@.dp/#/*/prompt
+            completion:x:@.dp/#/*/completion
+            meta:AINIRO-Website-Crawler

@@ -1,0 +1,38 @@
+
+/*
+ * This Hyperlambda code connects to a database and retrieves specific columns from the "ml_types" table based on a condition. It then calculates a maximum size by multiplying the "max_context_tokens" value by 0.8, converts the result to an integer, and sets it to a node. Additionally, it retrieves and sets the "api_key" and "model" values from the database query results. 
+ * 
+ * 1. [data.connect] - Connects to a database.
+ * 2. [data.read] - Reads data from the "ml_types" table.
+ * 3. [table] - Specifies the table to read from.
+ * 4. [columns] - Lists the columns to retrieve.
+ * 5. [where] - Applies a condition to filter the data.
+ * 6. [and] - Combines conditions for filtering.
+ * 7. [type.eq] - Compares the "type" argument with a database field.
+ * 8. [set-value] - Sets the value of a node.
+ * 9. [math.multiply] - Multiplies two numbers.
+ * 10. [convert] - Converts a value to a specified type.
+ * 11. [get-value] - Retrieves a value from a node.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         max_context_tokens
+         api_key
+         model
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   set-value:x:@.max-size
+      math.multiply
+         convert:x:@data.read/*/*/max_context_tokens
+            type:decimal
+         .:decimal:0.8
+   set-value:x:@.max-size
+      convert:x:@.max-size
+         type:int
+   set-value:x:@.api-key
+      get-value:x:@data.read/*/*/api_key
+   set-value:x:@.model
+      get-value:x:@data.read/*/*/model

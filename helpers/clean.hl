@@ -1,0 +1,52 @@
+/*
+ * Cleans up files that went wrong.
+ */
+
+.arguments
+
+// Loading all files recursively
+execute:magic.io.file.load-recursively
+   .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
+
+// Counting training data
+.no:int:0
+
+// Looping through all files.
+for-each:x:@execute/*
+
+   // Making sure we catch exceptions such that we can see which file fails.
+   try
+
+      // Verifying we're dealing with a Hyperlambda file.
+      if
+         strings.ends-with:x:@.dp/#
+            .:.hl
+         .lambda
+
+            // Transforming file to lambda object.
+            hyper2lambda:x:@.dp/#/0
+               comments:true
+            if
+               and
+                  eq
+                     get-name:x:@hyper2lambda/0
+                     .:..
+                  eq
+                     get-name:x:@hyper2lambda/1
+                     .:hyper2lambda
+                  null:x:@hyper2lambda/1
+               .lambda
+
+                  // Deleting file since it's syntactically wrong having pulled in one root node too many.
+                  io.file.delete:x:@.dp/#
+
+                  // Counting how many training snippets we're inserting
+                  math.increment:x:@.no
+
+   .catch
+   
+      // This throws an exception being the name of the currently processed filename
+      throw:x:@.dp/#
+
+yield
+   count:x:@.no

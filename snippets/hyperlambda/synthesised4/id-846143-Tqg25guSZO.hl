@@ -1,0 +1,57 @@
+
+/*
+ * This Hyperlambda code handles a "crawl-delay" setting by first removing non-numeric characters from a value, then checking if the value is relevant and not empty. If true, it attempts to convert the value to an integer, multiply it by 1000, and set it as the crawl delay. If the delay exceeds 60 seconds, it adjusts it to 60 seconds and sends a warning signal. If conversion fails, it defaults to a 10-second delay and sends a warning signal. 
+ * 
+ * 1. [case:crawl-delay] - Initiates the process for handling crawl-delay settings.
+ * 2. [set-value] - Removes non-numeric characters from the value.
+ * 3. [if] - Checks if the value is relevant and not empty.
+ * 4. [and] - Combines two conditions to be true.
+ * 5. [eq] - Checks if the relevant flag is true.
+ * 6. [neq] - Ensures the value is not empty.
+ * 7. [try] - Attempts to convert and set the crawl delay.
+ * 8. [set-value] - Converts the value to milliseconds and sets it as the crawl delay.
+ * 9. [math.multiply] - Multiplies the value by 1000 to convert seconds to milliseconds.
+ * 10. [convert] - Converts the string value to an integer.
+ * 11. [if] - Checks if the crawl delay exceeds 60 seconds.
+ * 12. [mt] - Compares if the crawl delay is more than 60 seconds.
+ * 13. [sockets.signal] - Sends a warning if the delay exceeds 60 seconds.
+ * 14. [set-value] - Adjusts the crawl delay to 60 seconds if exceeded.
+ * 15. [.catch] - Handles exceptions during conversion.
+ * 16. [sockets.signal] - Sends a warning if the value is not a valid integer.
+ * 17. [set-value] - Sets the crawl delay to a default of 10 seconds if conversion fails.
+ */
+case:crawl-delay
+   set-value:x:@.value
+      strings.replace-not-of:x:@.value
+         .:0123456789
+         .:
+   if
+      and
+         eq:x:@.relevant
+            .:bool:true
+         neq:x:@.value
+            .:
+      .lambda
+         try
+            set-value:x:@.crawl-delay
+               math.multiply
+                  .:int:1000
+                  convert:x:@.value
+                     type:int
+            if
+               mt:x:@.crawl-delay
+                  .:int:60000
+               .lambda
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:Crawl-Delay was more than 60 seconds, using 60 seconds as our value
+                        type:warning
+                  set-value:x:@.crawl-delay
+                     .:int:60000
+         .catch
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Crawl-Delay was not a valid integer value, using 10 seconds as our value
+                  type:warning
+            set-value:x:@.crawl-delay
+               .:int:10000
