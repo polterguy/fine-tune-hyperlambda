@@ -1,0 +1,32 @@
+
+// This Hyperlambda code connects to a CRM database and conditionally reads from either the "contacts" or "employees" table based on the "type" argument. If the type is "contacts," it retrieves records where the email or name matches specified patterns and yields the result. Otherwise, it reads from the "employees" table, sends an email alert about the access, and yields the employee records.
+data.connect:crm
+   if
+      eq:x:@.arguments/*/type
+         .:contacts
+      .lambda
+         data.read
+            table:contacts
+            where
+               or
+                  email.eq:x:@.arguments/*/email.eq
+                  name.like:x:@.arguments/*/name.like
+         yield
+            contacts:x:@data.read/*
+      else
+         data.read
+            table:employees
+            where
+               or
+                  email.eq:x:@.arguments/*/email.eq
+                  name.like:x:@.arguments/*/name.like
+         mail.smtp.send
+            message
+               to
+                  .
+                     name:Thomas Hansen
+                     email:thomas@ainiro.io
+               subject:Contact Access Alert
+               body:Somebody accessed the employees table.
+         yield
+            employees:x:@data.read/*

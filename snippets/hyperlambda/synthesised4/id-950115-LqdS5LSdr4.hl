@@ -1,0 +1,14 @@
+
+// This Hyperlambda code establishes a database connection using [data.connect] with a specified connection string and database name. It reads from the "cloudlets" table, applying a filter condition based on the authenticated user's ID obtained via [auth.ticket.get]. If any records exist, it throws an exception with a message indicating that all cloudlets must be deleted before account deletion, using the [throw] slot with public visibility and a status code of 400.
+data.connect:[generic|hub]
+   data.read
+      table:cloudlets
+      where
+         and
+            user.eq:x:@auth.ticket.get
+   if
+      exists:x:@data.read/*/*
+      .lambda
+         throw:You have to delete all cloudlets before you delete your account
+            public:true
+            status:400

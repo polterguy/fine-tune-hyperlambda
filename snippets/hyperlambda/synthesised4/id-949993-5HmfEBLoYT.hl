@@ -1,0 +1,10 @@
+
+// Creates a task to periodically delete machine learning requests older than 14 days. The task is scheduled to repeat every 72 hours and connects to a SQLite database to execute the deletion query. After execution, it logs the number of deleted requests.
+tasks.create:delete-old-machine-learning-requests
+   description:Periodically deletes all machine learning requests older than 14 days
+   repeats:72.hours
+   .lambda
+      sqlite.connect:magic
+         sqlite.execute:"delete from ml_requests where created < date('now', '-14 day') and (cached = 0 or cached is null) and (questionnaire = 0 or questionnaire is null)"
+      log.info:Task to cleanup old machine learning requests executed successfully
+         deleted:x:@sqlite.connect/*/sqlite.execute

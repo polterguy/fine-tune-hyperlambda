@@ -1,0 +1,23 @@
+
+// The code checks if the default database is SQLite and then attempts to list and delete an existing task named "delete-old-machine-learning-requests". If the task exists, it deletes it. It then creates a new task with the same name, scheduled to run every 72 hours, which connects to the SQLite database and deletes machine learning requests older than 14 days. If the task creation fails, it logs a message indicating the task already exists.
+if
+   eq
+      config.get:"magic:databases:default"
+      .:sqlite
+   .lambda
+      try
+         tasks.list:delete-old-machine-learning-requests
+         if
+            exists:x:@tasks.list/*
+            .lambda
+               tasks.delete:x:@tasks.list/0/*/id
+         tasks.create:delete-old-machine-learning-requests
+            description:Periodically deletes all machine learning requests older than 14 days
+            repeats:72.hours
+            .lambda
+               sqlite.connect:magic
+                  sqlite.execute:"delete from ml_requests where created < date('now', '-14 day') and (cached = 0 or cached is null) and (questionnaire = 0 or questionnaire is null)"
+               log.info:Task to cleanup old machine learning requests executed successfully
+                  deleted:x:@sqlite.connect/*/sqlite.execute
+      .catch
+         console.log:Task to periodically delete historical requests already exists

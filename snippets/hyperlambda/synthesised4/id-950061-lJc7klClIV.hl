@@ -1,0 +1,29 @@
+
+// This Hyperlambda code creates a fork to handle an HTTP POST request to OpenAI's API for converting text to speech. It retrieves an API key using [config.get] and constructs an authorization token with [strings.concat]. The [http.post] slot sends a request with JSON payload to the OpenAI endpoint, specifying model and voice parameters. The response content is converted to base64 using [convert], and the result is unwrapped. Finally, [sockets.signal] sends the audio result back to a specified session.
+fork
+   .token
+   config.get:"magic:openai:key"
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         get-first-value
+            get-value:x:@.arguments/*/api_key
+            config.get:"magic:openai:key"
+   http.post:"https://api.openai.com/v1/audio/speech"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+         Accept:text/event-stream
+      payload
+         model:tts-1
+         input:x:@.arguments/*/content
+         voice:alloy
+         response_format:mp3
+         speed:decimal:1.0
+   convert:x:@http.post/*/content
+      type:base64
+   unwrap:x:+/*/*
+   sockets.signal:x:@.arguments/*/session
+      args
+         audio:x:@http.post/*/content

@@ -1,0 +1,16 @@
+
+// This Hyperlambda code manages a periodic task to delete old machine learning requests from a SQLite database. It first checks if a task named "delete-old-machine-learning-requests" exists and deletes it if found. Then, it creates a new task with the same name, scheduled to run every 72 hours. The task connects to a SQLite database and executes a SQL query to delete requests older than 14 days, logging the number of deleted entries. The slots involved include [tasks.list], [if], [exists], [tasks.delete], [tasks.create], [sqlite.connect], [sqlite.execute], and [log.info].
+try
+   tasks.list:delete-old-machine-learning-requests
+   if
+      exists:x:@tasks.list/*
+      .lambda
+         tasks.delete:x:@tasks.list/0/*/id
+   tasks.create:delete-old-machine-learning-requests
+      description:Periodically deletes all machine learning requests older than 14 days
+      repeats:72.hours
+      .lambda
+         sqlite.connect:magic
+            sqlite.execute:"delete from ml_requests where created < date('now', '-14 day') and (cached = 0 or cached is null) and (questionnaire = 0 or questionnaire is null)"
+         log.info:Task to cleanup old machine learning requests executed successfully
+            deleted:x:@sqlite.connect/*/sqlite.execute

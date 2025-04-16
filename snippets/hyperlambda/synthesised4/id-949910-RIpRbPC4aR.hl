@@ -1,0 +1,31 @@
+
+// This Hyperlambda code conditionally reads data from either the "contacts" or "employees" table based on the [type] argument. If the [type] is "contacts", it retrieves records from the "contacts" table where the email or name matches specified arguments. Otherwise, it reads from the "employees" table with similar conditions and sends an email alert. The results are then yielded as either "contacts" or "employees".
+if
+   eq:x:@.arguments/*/type
+      .:contacts
+   .lambda
+      data.read
+         table:contacts
+         where
+            or
+               email.eq:x:@.arguments/*/email.eq
+               name.like:x:@.arguments/*/name.like
+      yield
+         contacts:x:@data.read/*
+   else
+      data.read
+         table:employees
+         where
+            or
+               email.eq:x:@.arguments/*/email.eq
+               name.like:x:@.arguments/*/name.like
+      mail.smtp.send
+         message
+            to
+               .
+                  name:Thomas Hansen
+                  email:thomas@ainiro.io
+            subject:Contact Access Alert
+            body:Somebody accessed the employees table.
+      yield
+         employees:x:@data.read/*

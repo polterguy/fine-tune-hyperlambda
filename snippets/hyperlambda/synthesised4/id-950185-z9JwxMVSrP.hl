@@ -1,0 +1,33 @@
+
+/*
+ * This Hyperlambda code connects to a database using a specified type and reads all records from a given table. It then converts the data to a CSV format using [lambda2csv], constructs a filename for the CSV, and sets HTTP response headers to facilitate downloading the CSV file. The resulting CSV data is returned as the HTTP response. 
+ * 
+ * 1. [data.connect] - Connects to the database using the specified type.
+ * 2. [type] - Retrieves the database type from the arguments.
+ * 3. [data.read] - Reads all records from the specified table.
+ * 4. [table] - Retrieves the table name from the arguments.
+ * 5. [limit] - Sets the limit for data retrieval to -1 (no limit).
+ * 6. [lambda2csv] - Converts the data to CSV format.
+ * 7. [strings.concat] - Constructs the filename for the CSV.
+ * 8. [get-value] - Retrieves the table name for the filename.
+ * 9. [response.headers.set] - Sets HTTP headers for the CSV response.
+ * 10. [Content-Type] - Sets the content type to application/csv.
+ * 11. [Content-Disposition] - Sets the content disposition for the CSV download.
+ * 12. [Access-Control-Expose-Headers] - Exposes the Content-Disposition header.
+ * 13. [return] - Returns the CSV data as the HTTP response.
+ */
+data.connect:x:@strings.concat
+   type:x:@.arguments/*/databaseType
+   data.read
+      table:x:@.arguments/*/tableName
+      limit:-1
+   lambda2csv:x:-/*
+   strings.concat
+      .:"attachment; filename=\""
+      get-value:x:@.arguments/*/tableName
+      .:".csv\""
+   response.headers.set
+      Content-Type:application/csv
+      Content-Disposition:x:@strings.concat
+      Access-Control-Expose-Headers:Content-Disposition
+   return:x:@lambda2csv

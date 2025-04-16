@@ -1,0 +1,35 @@
+
+/*
+ * This code connects to a database and reads from the "users" table to check if a user exists based on the provided username. If the user does not exist, it throws an exception. Then, it iterates over a list of roles and deletes entries from the "users_roles" table where the username and role match the provided arguments. 
+ * 
+ * 1. [data.connect] - Establishes a connection to the specified database.
+ * 2. [data.read] - Reads data from the "users" table, filtering by the provided username.
+ * 3. [columns] - Specifies the "username" column to be selected.
+ * 4. [where] - Defines the condition to filter the "users" table by username.
+ * 5. [if] - Checks if the user does not exist in the query result.
+ * 6. [not-exists] - Evaluates whether the user was found in the previous read operation.
+ * 7. [throw] - Throws an exception if the user does not exist, including the username in the message.
+ * 8. [for-each] - Iterates over the roles provided in the arguments.
+ * 9. [data.delete] - Deletes entries from the "users_roles" table where the username and role match the provided arguments.
+ * 10. [where] - Specifies conditions for deleting entries based on username and role.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:users
+      columns
+         username
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:No such user
+            username:x:@.arguments/*/username
+   for-each:x:@.arguments/*/roles/*
+      data.delete
+         table:users_roles
+         where
+            and
+               user.eq:x:@.arguments/*/username
+               role.eq:x:@.dp/#

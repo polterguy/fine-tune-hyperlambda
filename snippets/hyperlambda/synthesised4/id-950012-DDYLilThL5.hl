@@ -1,0 +1,41 @@
+
+/*
+ * This code handles folder creation and file extraction based on a condition. It checks if a folder should be created, calculates the folder path by manipulating the file path, and unzips a file into the folder. If the folder doesn't exist, it creates it; otherwise, it deletes and recreates it.
+ * 
+ * 1. [if] - Checks if the folder creation condition is true.
+ * 2. [strings.length] - Calculates the length of the file path.
+ * 3. [strings.substring] - Extracts a substring from the file path, excluding the last 4 characters.
+ * 4. [math.subtract] - Subtracts 4 from the length of the file path.
+ * 5. [strings.concat] - Concatenates the substring with a "/" to form a folder path.
+ * 6. [unwrap] - Evaluates expressions in the context of the current node.
+ * 7. [add] - Adds an unzip operation to a node list.
+ * 8. [io.file.unzip] - Unzips the file into the specified folder.
+ * 9. [if] - Checks if the folder does not exist.
+ * 10. [not] - Negates the condition of folder existence.
+ * 11. [io.folder.exists] - Checks if the folder exists.
+ * 12. [io.folder.create] - Creates the folder if it doesn't exist.
+ * 13. [else] - Executes if the folder exists.
+ * 14. [io.folder.delete] - Deletes the existing folder.
+ * 15. [io.folder.create] - Recreates the folder after deletion.
+ */
+if:x:@.arguments/*/create_folder
+   strings.length:x:@.arguments/*/file
+   strings.substring:x:@.arguments/*/file
+      .:int:0
+      math.subtract:x:@strings.length
+         .:int:4
+   strings.concat
+      get-value:x:@strings.substring
+      .:/
+   unwrap:x:+/*/*
+   add:x:../*/io.file.unzip
+      .
+         folder:x:@strings.concat
+   if
+      not
+         io.folder.exists:x:@strings.concat
+      .lambda
+         io.folder.create:x:@strings.concat
+   else
+      io.folder.delete:x:@strings.concat
+      io.folder.create:x:@strings.concat

@@ -1,0 +1,34 @@
+
+/*
+ * This Hyperlambda code connects to a PostgreSQL database and executes a SQL query to retrieve director information from the "directors" and "basic" tables. It uses parameters for director ID, limit, and offset to filter and paginate results. If the number of retrieved records matches the limit, it adds a notice suggesting potential additional associations. Finally, it yields the list of companies associated with the director.
+ * 
+ * 1. [data.connect] - Establishes a connection to the PostgreSQL database.
+ * 2. [database-type] - Specifies the database type as PostgreSQL.
+ * 3. [data.select] - Executes a SQL query to select director and company information.
+ * 4. [@id] - Binds the director ID parameter for the SQL query.
+ * 5. [@limit] - Binds the limit parameter for the SQL query.
+ * 6. [@offset] - Binds the offset parameter for the SQL query.
+ * 7. [if] - Checks if the number of retrieved records equals the limit.
+ * 8. [eq] - Compares the count of selected records with the limit.
+ * 9. [get-count] - Retrieves the count of records from the query result.
+ * 10. [get-value] - Retrieves the limit value from the arguments.
+ * 11. [add] - Adds a notice if the retrieved records match the limit.
+ * 12. [yield] - Returns the list of companies associated with the director.
+ */
+data.connect:[finovo|finovo]
+   database-type:pgsql
+   data.select:"\nselect d1.org_number, b.company_name, d1.role_name\n   from directors d1\n      inner join basic b on b.org_number = d1.org_number\n      inner join directors d2 on d1.director_nbr = d2.director_nbr\n   where d2.director_id = @id and d1.org_number != d2.org_number\n   limit @limit offset @offset"
+      database-type:pgsql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+   if
+      eq
+         get-count:x:@data.select/*
+         get-value:x:@.arguments/*/limit
+      .lambda
+         add:x:@data.connect/*/yield
+            .
+               notice:The director might be associated with more companies
+   yield
+      companies:x:@data.select/*

@@ -1,0 +1,37 @@
+
+/*
+ * This Hyperlambda code creates a dynamic slot named "magic.auth.ensure-role" that ensures a specified role exists in a database. It first validates the presence of "role" and "description" arguments using [validators.mandatory]. It then attempts to connect to a database and read from the "roles" table to check if the role already exists. If the role does not exist, it inserts a new record into the "roles" table with the provided role name and description. Any exceptions during this process are caught and silenced. 
+ * 
+ * 1. [slots.create] - Creates a new dynamic slot named "magic.auth.ensure-role".
+ * 2. [validators.mandatory] - Ensures the "role" and "description" arguments are provided.
+ * 3. [try] - Begins a block to attempt database operations.
+ * 4. [data.connect] - Connects to a database.
+ * 5. [data.read] - Reads from the "roles" table to check for the existence of the role.
+ * 6. [if] - Checks if the role does not exist in the database.
+ * 7. [not] - Negates the condition to check for non-existence.
+ * 8. [exists] - Determines if the role was found in the database read operation.
+ * 9. [data.create] - Inserts a new role into the "roles" table if it doesn't exist.
+ * 10. [.catch] - Catches any exceptions that occur during the try block.
+ * 11. [.silent] - Silences any exceptions caught, preventing them from propagating.
+ */
+slots.create:magic.auth.ensure-role
+   validators.mandatory:x:@.arguments/*/role
+   validators.mandatory:x:@.arguments/*/description
+   try
+      data.connect:[generic|magic]
+         data.read
+            table:roles
+            where
+               and
+                  name.eq:x:@.arguments/*/role
+         if
+            not
+               exists:x:@data.read/*/*
+            .lambda
+               data.create
+                  table:roles
+                  values
+                     name:x:@.arguments/*/role
+                     description:x:@.arguments/*/description
+   .catch
+      .silent
