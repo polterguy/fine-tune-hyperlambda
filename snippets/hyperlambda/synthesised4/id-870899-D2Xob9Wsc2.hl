@@ -1,0 +1,17 @@
+
+// The code checks if a [filter] argument exists, and if so, it concatenates "%" with the filter value and appends it to a query condition. The concatenated string is used to filter database records based on certain fields, and the [filter] argument is then removed. The [if] slot ensures the operations only execute if the filter exists, while [strings.concat] and [add] slots build and apply the query conditions.
+if
+   exists:x:@.arguments/*/filter
+   .lambda
+      strings.concat
+         .:%
+         get-value:x:@.arguments/*/filter
+         .:%
+      unwrap:x:+/*/*/*
+      add:x:@data.connect/*/data.read/*/where/*/and
+         .
+            or
+               ml_requests.prompt.like:x:@strings.concat
+               ml_requests.completion.like:x:@strings.concat
+               ml_requests.user_id.eq:x:@.arguments/*/filter
+      remove-nodes:x:@.arguments/*/filter

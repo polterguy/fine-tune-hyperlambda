@@ -1,0 +1,29 @@
+
+// This Hyperlambda code connects to a SQLite database and performs a SQL query on the "Medications" table, joining it with the "Patients" table using a left join. It dynamically constructs an aggregate function using provided arguments, removes certain nodes, and adds nodes to the "where" clause. The query limits the result to one record and returns the result nodes. Key slots include [data.connect] for establishing the connection, [strings.concat] for constructing the aggregate function, [remove-nodes] and [add] for modifying the node structure, and [data.read] for executing the query.
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Medications
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Medications.PatientID:PatientID.PatientID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,80 @@
+
+/*
+ * This Hyperlambda code connects to a database and reads the "recaptcha" column from the "ml_types" table based on a given type. If a non-null "recaptcha" value is found and is greater than zero, it retrieves reCAPTCHA keys from the configuration and validates a reCAPTCHA response. If the keys are not found or the "recaptcha" value is zero, it executes a captcha verification slot. The code then deletes specific records from the "ml_requests" table and creates a new record with provided arguments. 
+ * 
+ * 1. [data.connect] - Opens a connection to a specified database.
+ * 2. [data.read] - Reads the "recaptcha" column from "ml_types" table based on a type argument.
+ * 3. [if] - Checks if the "recaptcha" value is non-null and not empty.
+ * 4. [convert] - Converts the "recaptcha" value to a decimal.
+ * 5. [if] - Checks if the converted value is greater than zero.
+ * 6. [set-value] - Retrieves and sets reCAPTCHA keys from the configuration.
+ * 7. [if] - Validates the presence of reCAPTCHA keys.
+ * 8. [validators.mandatory] - Ensures the "recaptcha_response" argument is provided.
+ * 9. [validators.recaptcha] - Validates the reCAPTCHA response using the keys.
+ * 10. [else] - Executes a captcha verification slot if conditions are not met.
+ * 11. [data.delete] - Deletes records from "ml_requests" table based on multiple conditions.
+ * 12. [data.create] - Inserts a new record into the "ml_requests" table with specified values.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         recaptcha
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   if
+      and
+         not-null:x:@data.read/*/*/recaptcha
+         neq:x:@data.read/*/*/recaptcha
+            .:
+      .lambda
+         convert:x:@data.read/*/*/recaptcha
+            type:decimal
+         if
+            mt:x:@convert
+               .:decimal:0
+            .lambda
+               .key
+               set-value:x:@.key
+                  config.get:"magic:auth:recaptcha:key"
+               .secret
+               set-value:x:@.secret
+                  config.get:"magic:auth:recaptcha:secret"
+               if
+                  and
+                     not-null:x:@.key
+                     neq:x:@.key
+                        .:
+                     not-null:x:@.secret
+                     neq:x:@.secret
+                        .:
+                  .lambda
+                     validators.mandatory:x:@.arguments/*/recaptcha_response
+                     validators.recaptcha:x:@.arguments/*/recaptcha_response
+                        min:x:@convert
+                        site-key:x:@.key
+                        secret:x:@.secret
+         else
+            execute:magic.auth.captcha-verify
+               token:x:@.arguments/*/recaptcha_response
+   data.delete
+      table:ml_requests
+      where
+         and
+            type.eq:x:@.arguments/*/type
+            user_id.eq:x:@.arguments/*/user_id
+            prompt.eq:x:@.arguments/*/question
+            questionnaire.eq:int:1
+            finish_reason.eq:questionnaire
+   data.create
+      table:ml_requests
+      values
+         type:x:@.arguments/*/type
+         prompt:x:@.arguments/*/question
+         completion:x:@.arguments/*/answer
+         finish_reason:questionnaire
+         questionnaire:int:1
+         user_id:x:@.arguments/*/user_id
+         session:x:@.arguments/*/session
+         context:x:@.arguments/*/context

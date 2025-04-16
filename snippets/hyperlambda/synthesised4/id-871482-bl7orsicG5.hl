@@ -1,0 +1,44 @@
+
+// This Hyperlambda code establishes a connection to a SQLite database named "hospital" and performs a read operation on the "Appointments" table. It joins the "Patients" and "Doctors" tables using left joins, selecting specific columns from each table. The code also processes optional arguments for ordering, direction, limit, and offset, and removes these nodes after processing. Finally, it returns the results of the read operation.
+data.connect:[generic|hospital]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Appointments
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Appointments.PatientID:PatientID.PatientID
+         join:Doctors
+            as:DoctorID
+            type:left
+            on
+               and
+                  Appointments.DoctorID:DoctorID.DoctorID
+      columns
+         Appointments.AppointmentID
+         Appointments.PatientID
+         Appointments.DoctorID
+         Appointments.AppointmentDate
+         Appointments.Reason
+         PatientID.FirstName
+            as:PatientID.FirstName
+         DoctorID.FirstName
+            as:DoctorID.FirstName
+      where
+         and
+   return-nodes:x:@data.read/*

@@ -1,0 +1,48 @@
+
+/*
+ * This Hyperlambda code checks if a file path ends with ".md" and contains "/static-snippets/". If true, it splits the file content by "---". If the split does not result in exactly two parts, it throws an error. Otherwise, it connects to a "fine-tune" database, inserting the split parts into a "hyperlambda" table with a "prompt" and "code" column, marking it as static, and increments a counter. 
+ * 
+ * 1. [else-if] - Checks conditions and executes if true.
+ * 2. [and] - Combines multiple conditions.
+ * 3. [strings.ends-with] - Checks if a string ends with ".md".
+ * 4. [strings.contains] - Checks if a string contains "/static-snippets/".
+ * 5. [.lambda] - Contains the code to execute if conditions are met.
+ * 6. [strings.split] - Splits a string by "---".
+ * 7. [if] - Checks a condition and executes if true.
+ * 8. [not] - Inverts the condition.
+ * 9. [eq] - Checks equality.
+ * 10. [get-count] - Gets the count of nodes.
+ * 11. [throw] - Throws an error if condition is met.
+ * 12. [data.connect] - Connects to a database.
+ * 13. [data.create] - Creates a new entry in the database.
+ * 14. [table] - Specifies the database table.
+ * 15. [values] - Specifies the values to insert.
+ * 16. [prompt] - Inserts the first part of the split.
+ * 17. [code] - Inserts the second part of the split.
+ * 18. [is_static] - Marks the entry as static.
+ * 19. [math.increment] - Increments a counter.
+ */
+else-if
+   and
+      strings.ends-with:x:@.dp/#
+         .:.md
+      strings.contains:x:@.dp/#
+         .:/static-snippets/
+   .lambda
+      strings.split:x:@.dp/#/0
+         .:---
+      if
+         not
+            eq
+               get-count:x:@strings.split/*
+               .:int:2
+         .lambda
+            throw:x:@.dp/#
+      data.connect:fine-tune
+         data.create
+            table:hyperlambda
+            values
+               prompt:x:@strings.split/0
+               code:x:@strings.split/1
+               is_static:int:1
+         math.increment:x:@.no

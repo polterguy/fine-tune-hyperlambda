@@ -1,0 +1,47 @@
+
+// This Hyperlambda code connects to a database and dynamically constructs a SQL query to read data from the "ml_requests" table. It processes optional arguments like "order", "direction", "limit", "offset", and "filter", integrating them into the query. If a "filter" is provided, it constructs a "where" clause using "like" and "eq" conditions for specific columns. The final query retrieves specified columns from the table and returns the results.
+data.connect:[generic|magic]
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   if
+      exists:x:@.arguments/*/filter
+      .lambda
+         strings.concat
+            .:%
+            get-value:x:@.arguments/*/filter
+            .:%
+         unwrap:x:+/*/*/*
+         add:x:@data.connect/*/data.read/*/where/*/and
+            .
+               or
+                  ml_requests.prompt.like:x:@strings.concat
+                  ml_requests.completion.like:x:@strings.concat
+                  ml_requests.user_id.eq:x:@.arguments/*/filter
+         remove-nodes:x:@.arguments/*/filter
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      table:ml_requests
+      columns
+         ml_requests.id
+         ml_requests.created
+         ml_requests.type
+         ml_requests.prompt
+         ml_requests.completion
+         ml_requests.finish_reason
+         ml_requests.cached
+         ml_requests.questionnaire
+         ml_requests.session
+         ml_requests.user_id
+         ml_requests.referrer
+      where
+         and
+   return-nodes:x:@data.read/*
