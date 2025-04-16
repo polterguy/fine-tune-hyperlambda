@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code iterates over nodes resulting from splitting a string, checking if each node contains a specific substring pattern related to function invocations, while excluding certain paths. If conditions are met, it further processes the node by splitting and trimming it, and then adds the result to a specific location in the data structure. 
+ * 
+ * 1. [for-each] - Iterates over nodes resulting from splitting a string.
+ * 2. [if] - Checks conditions on each iterated node.
+ * 3. [and] - Combines multiple conditions that must all be true.
+ * 4. [strings.contains] - Checks if the node contains a specific substring.
+ * 5. [not] - Ensures certain substrings are not present in the node.
+ * 6. [.lambda] - Executes a block of code if conditions are met.
+ * 7. [strings.split] - Splits the node's value by a newline character.
+ * 8. [strings.trim] - Trims whitespace from the first split result.
+ * 9. [unwrap] - Evaluates expressions within the node.
+ * 10. [add] - Adds the processed result to a specific location in the data structure.
+ */
+for-each:x:@strings.split/*
+   if
+      and
+         strings.contains:x:@.dp/#
+            .:FUNCTION_INVOCATION[/
+         not
+            strings.contains:x:@.dp/#
+               .:"FUNCTION_INVOCATION[/FOLDER/FILENAME.hl]:"
+         not
+            strings.contains:x:@.dp/#
+               .:"FUNCTION_INVOCATION[/system/misc/workflows/list-functions.hl]:"
+      .lambda
+         strings.split:x:@.dp/#
+            .:"\n"
+         strings.trim:x:@strings.split/0
+            .:@"# 
+"
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/yield/*/system_functions
+            .
+               .:x:@strings.trim

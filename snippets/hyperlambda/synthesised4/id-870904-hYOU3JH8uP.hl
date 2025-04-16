@@ -1,0 +1,58 @@
+
+/*
+ * This Hyperlambda code connects to a database and performs conditional logic to modify query criteria based on the presence of certain arguments. It dynamically constructs a SQL query to count records from the "ml_training_snippets" table, using conditions derived from the arguments. If specific conditions are met, it adds or removes nodes to refine the query, ensuring the final SQL query is accurately tailored to the provided inputs. The result is a single count value of the matching records. 
+ * 
+ * 1. [data.connect] - Connects to a database.
+ * 2. [if] - Checks conditions to modify the query.
+ * 3. [and] - Combines conditions for logical AND evaluation.
+ * 4. [exists] - Checks if a node exists.
+ * 5. [get-value] - Retrieves the value of a node.
+ * 6. [add] - Adds nodes to the query structure.
+ * 7. [remove-nodes] - Removes nodes from the query structure.
+ * 8. [get-nodes] - Retrieves nodes based on an expression.
+ * 9. [not-exists] - Checks if a node does not exist.
+ * 10. [data.read] - Reads data from the specified table.
+ * 11. [table] - Specifies the table to query.
+ * 12. [columns] - Specifies the columns to select.
+ * 13. [where] - Specifies the conditions for the query.
+ * 14. [limit] - Limits the number of results.
+ * 15. [return-nodes] - Returns the nodes of the query result.
+ */
+data.connect:[generic|magic]
+   if
+      and
+         exists:x:@.arguments/*/not_embedded
+         get-value:x:@.arguments/*/not_embedded
+      .lambda
+         add:x:@data.connect/*/data.read/*/where/*/and
+            .
+               embedding.eq
+         remove-nodes:x:@.arguments/*/not_embedded
+   add:x:./*/data.read/*/where/*/*/or
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.eq
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.eq
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.eq
+   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.eq
+   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.eq
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   if
+      not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
+   data.read
+      table:ml_training_snippets
+      columns
+         count(*)
+            as:count
+      where
+         and
+            or
+      limit:long:1
+   return-nodes:x:@data.read/*/*

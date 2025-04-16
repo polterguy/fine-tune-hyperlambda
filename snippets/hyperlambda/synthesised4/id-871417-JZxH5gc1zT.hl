@@ -1,0 +1,23 @@
+
+// This code connects to a SQLite database and performs an aggregation on the "campaigns" table. It constructs an aggregate function using arguments for the function and column, removes certain argument nodes, adds nodes to a "where" clause, and executes a data read operation. The result of the aggregation is aliased as "result" and limited to one record, which is then returned.
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:campaigns
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

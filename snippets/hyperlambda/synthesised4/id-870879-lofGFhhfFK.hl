@@ -1,0 +1,57 @@
+
+/*
+ * This Hyperlambda code connects to a database to retrieve and process machine learning training snippets and system messages based on a specified type. It uses [data.connect] and [data.select] to fetch prompts from a table, filtering them with a given type and meta pattern. The code iterates over the results with [for-each], extracting prompts and adding them to a [rag_functions] node. It also reads system messages from another table using [data.read], splits them with [strings.split], and filters them with conditions using [if] and [strings.contains]. The filtered results are added to a [system_functions] node, and both [rag_functions] and [system_functions] are yielded as the final output. 
+ * 
+ * 1. [data.connect] - Establishes a connection to a database.
+ * 2. [data.select] - Executes a SQL query to select prompts from a table.
+ * 3. [for-each] - Iterates over the selected data.
+ * 4. [unwrap] - Evaluates expressions to extract data.
+ * 5. [add] - Adds extracted prompts to [rag_functions].
+ * 6. [data.read] - Reads system messages from another table.
+ * 7. [strings.split] - Splits system messages into parts.
+ * 8. [if] - Filters parts based on specific conditions.
+ * 9. [strings.contains] - Checks if a string contains a specified substring.
+ * 10. [strings.trim] - Trims whitespace from strings.
+ * 11. [yield] - Returns [rag_functions] and [system_functions] as output.
+ */
+data.connect:[generic|magic]
+   data.select:"select prompt from ml_training_snippets where type = @type and meta like '%FUNCTION_INVOCATION ==> %'"
+      @type:x:@.arguments/*/_type
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/yield/*/rag_functions
+         .
+            .:x:@.dp/#/*/prompt
+   data.read
+      table:ml_types
+      columns
+         system_message
+      where
+         and
+            type.eq:x:@.arguments/*/_type
+   strings.split:x:@data.read/*/*/system_message
+      .:"# "
+   for-each:x:@strings.split/*
+      if
+         and
+            strings.contains:x:@.dp/#
+               .:FUNCTION_INVOCATION[/
+            not
+               strings.contains:x:@.dp/#
+                  .:"FUNCTION_INVOCATION[/FOLDER/FILENAME.hl]:"
+            not
+               strings.contains:x:@.dp/#
+                  .:"FUNCTION_INVOCATION[/system/misc/workflows/list-functions.hl]:"
+         .lambda
+            strings.split:x:@.dp/#
+               .:"\n"
+            strings.trim:x:@strings.split/0
+               .:@"# 
+"
+            unwrap:x:+/*/*
+            add:x:@data.connect/*/yield/*/system_functions
+               .
+                  .:x:@strings.trim
+   yield
+      rag_functions
+      system_functions
