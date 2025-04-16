@@ -1,0 +1,26 @@
+
+// This Hyperlambda code executes a file and processes its output conditionally based on user roles. It first attempts to execute a specified file, passing in arguments, and if the user has a "root" role, it processes the output, calculates time taken, and sends a signal. The result is then set and returned. The code uses slots like [try], [add], [execute-file], [if], [auth.ticket.in-role], [math.subtract], [sockets.signal], and [set-value] to achieve its functionality.
+try
+   add:x:./*/execute-file
+      get-nodes:x:@.arguments/*/arguments/*
+   execute-file:x:@.arguments/*/filename
+   if
+      auth.ticket.in-role:root
+      .lambda
+         add:x:./*/sockets.signal/*/args/*/output
+            get-nodes:x:@execute-file/*
+         math.subtract
+            date.now
+            get-value:x:@.time
+         unwrap:x:+/**
+         sockets.signal:magic.workflows.action
+            roles:root
+            args
+               type:result
+               time:x:@math.subtract
+               output
+   set-value:x:./*/return
+      get-value:x:@.arguments/*/name
+   add:x:./*/return
+      get-nodes:x:@execute-file/*
+   return
