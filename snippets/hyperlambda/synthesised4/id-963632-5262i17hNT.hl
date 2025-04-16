@@ -1,0 +1,26 @@
+
+/*
+ * This Hyperlambda code connects to a Microsoft SQL Server database named "director_db" and executes a SQL query to select organization numbers, company names, and role names from a directors table, joining with a basic table. The query filters results based on a director ID and active status, with pagination controlled by limit and offset parameters. The results are then yielded as a node list under "companies". 
+ * 
+ * 1. [data.connect] - Establishes a connection to the "director_db" database using Microsoft SQL Server.
+ * 2. [database-type] - Specifies the database type as Microsoft SQL Server.
+ * 3. [data.select] - Executes a SQL query to retrieve specific fields from the directors and basic tables.
+ * 4. [@id] - Binds the director ID parameter from the arguments.
+ * 5. [@limit] - Binds the limit parameter from the arguments for pagination.
+ * 6. [@offset] - Binds the offset parameter from the arguments for pagination.
+ * 7. [yield] - Returns the query results as a node list under "companies".
+ */
+data.connect:[mssql|director_db]
+   database-type:mssql
+   data.select:@"
+select d.org_number, b.company_name, d.role_name
+   from directors d
+      inner join basic b on d.org_number = b.org_number
+   where d.director_id = @id and d.active = 1
+   limit @limit offset @offset"
+      database-type:mssql
+      @id:x:@.arguments/*/director_id
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+   yield
+      companies:x:@data.select/*

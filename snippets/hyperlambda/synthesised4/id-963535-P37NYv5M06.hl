@@ -1,0 +1,45 @@
+
+/*
+ * This Hyperlambda code processes files with specific conditions, checking if a file path ends with ".md" and contains "/ts-templates/". If true, it loads the file, splits its content by newline, and extracts the first line as a "prompt". The remaining content is joined back into a "completion". Both "prompt" and "completion" are trimmed of whitespace, and the result is added to a ".result" node. 
+ * 
+ * 1. [if] - Checks if both conditions in its children are true.
+ * 2. [and] - Combines multiple conditions to be true.
+ * 3. [strings.ends-with] - Checks if the file path ends with ".md".
+ * 4. [strings.contains] - Checks if the file path contains "/ts-templates/".
+ * 5. [load-file] - Loads the file content if conditions are met.
+ * 6. [strings.split] - Splits the file content by newline.
+ * 7. [.prompt] - Creates a node for the prompt.
+ * 8. [set-value] (prompt) - Sets the first line as the prompt after trimming.
+ * 9. [.completion] - Creates a node for the completion.
+ * 10. [remove-nodes] - Removes the first line from the split content.
+ * 11. [set-value] (completion) - Joins the remaining lines into a completion.
+ * 12. [strings.trim] - Trims whitespace from the completion.
+ * 13. [unwrap] - Evaluates expressions within the completion.
+ * 14. [add] - Adds the prompt and completion to the result node.
+ */
+if
+   and
+      strings.ends-with:x:@.dp/#
+         .:.md
+      strings.contains:x:@.dp/#
+         .:/ts-templates/
+   .lambda
+      load-file:x:@.dp/#
+      strings.split:x:@load-file
+         .:"\n"
+      .prompt
+      set-value:x:@.prompt
+         strings.trim:x:@strings.split/0
+      .completion
+      remove-nodes:x:@strings.split/0
+      set-value:x:@.completion
+         strings.join:x:@strings.split/*
+            .:"\n"
+      set-value:x:@.completion
+         strings.trim:x:@.completion
+      unwrap:x:+/*/*/*
+      add:x:@.result
+         .
+            .
+               prompt:x:@.prompt
+               completion:x:@.completion

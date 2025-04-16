@@ -1,0 +1,30 @@
+
+/*
+ * This Hyperlambda code checks if the "chinook.db" file does not exist, and if so, it creates the file and logs the creation. It then loads a SQL template file, connects to the SQLite database, executes the SQL script, and logs the successful creation of the database. Finally, it updates the cache with the new database information. 
+ * 
+ * 1. [if] - Checks a condition.
+ * 2. [not] - Inverts the condition result.
+ * 3. [io.file.exists] - Checks if the "chinook.db" file exists.
+ * 4. [.lambda] - Executes the following nodes if the condition is true.
+ * 5. [io.file.save] - Creates the "chinook.db" file.
+ * 6. [log.info] - Logs the creation of the database file.
+ * 7. [io.file.load] - Loads the SQL template file.
+ * 8. [sqlite.connect] - Connects to the "chinook" SQLite database.
+ * 9. [sqlite.execute] - Executes the loaded SQL script.
+ * 10. [log.info] - Logs the successful creation of the database.
+ * 11. [cache.set] - Updates the cache with the new database information.
+ */
+if
+   not
+      io.file.exists:/data/chinook.db
+   .lambda
+      io.file.save:/data/chinook.db
+         .:
+      log.info:Chinook database file created
+         filename:/data/chinook.db
+      io.file.load:/etc/sqlite/templates/chinook.sql
+      sqlite.connect:chinook
+         sqlite.execute:x:@io.file.load
+      log.info:The chinook database was successfully created
+         filename:/etc/sqlite/templates/chinook.sql
+      cache.set:magic.sql.databases.sqlite.generic

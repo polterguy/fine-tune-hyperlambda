@@ -1,0 +1,56 @@
+
+/*
+ * This Hyperlambda code defines a slot named [magic.auth.create-user] for creating a new user in a database. It checks if the password is already hashed using [if] and [else] slots, hashing it with [crypto.password.hash] if necessary. It then connects to the "magic" database using [data.connect], and inserts the user into the "users" table with [data.create]. It iterates over roles using [for-each] to insert them into the "users_roles" table. If there are extra attributes, it iterates over them and inserts each into the "users_extra" table. 
+ * 
+ * 1. [slots.create] - Creates a new slot named "magic.auth.create-user".
+ * 2. [.password] - Initializes a node to store the password.
+ * 3. [if] - Checks if the password is already hashed.
+ * 4. [get-value] - Retrieves the value of the "is_hashed" argument.
+ * 5. [set-value] - Sets the value of the [.password] node.
+ * 6. [crypto.password.hash] - Hashes the password if not already hashed.
+ * 7. [data.connect] - Connects to the "magic" database.
+ * 8. [data.create] - Inserts the user into the "users" table.
+ * 9. [for-each] - Iterates over roles to insert into "users_roles".
+ * 10. [exists] - Checks if there are extra attributes.
+ * 11. [get-name] - Retrieves the name of the current node.
+ * 12. [get-value] - Retrieves the value of the current node.
+ * 13. [data.create] - Inserts extra attributes into "users_extra".
+ */
+slots.create:magic.auth.create-user
+   .password
+   if
+      get-value:x:@.arguments/*/is_hashed
+      .lambda
+         set-value:x:@.password
+            get-value:x:@.arguments/*/password
+   else
+      set-value:x:@.password
+         crypto.password.hash:x:@.arguments/*/password
+   data.connect:magic
+      data.create
+         table:users
+         values
+            username:x:@.arguments/*/username
+            password:x:@.password
+      for-each:x:@.arguments/*/roles/*
+         data.create
+            table:users_roles
+            values
+               role:x:@.dp/#
+               user:x:@.arguments/*/username
+      if
+         exists:x:@.arguments/*/extra/*
+         .lambda
+            for-each:x:@.arguments/*/extra/*
+               .type
+               .value
+               set-value:x:@.type
+                  get-name:x:@.dp/#
+               set-value:x:@.value
+                  get-value:x:@.dp/#
+               data.create
+                  table:users_extra
+                  values
+                     user:x:@.arguments/*/username
+                     type:x:@.type
+                     value:x:@.value

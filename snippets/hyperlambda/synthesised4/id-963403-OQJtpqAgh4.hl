@@ -1,0 +1,30 @@
+
+// This code connects to a database named "usersdb" and reads user data from the "users" table based on a provided username. It verifies the password using a hashed value and checks if the user exists. If the user is authenticated, it splits the user's roles and creates a JWT token with the username and roles, returning the token as the result. Key slots include [data.connect] for database connection, [crypto.password.verify] for password verification, and [auth.ticket.create] for JWT token creation.
+data.connect:usersdb
+   data.read
+      table:users
+      columns
+         password_hash
+         roles
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Invalid username or password
+   crypto.password.verify:x:@.arguments/*/password
+      hash:x:@data.read/*/*/password_hash
+   if
+      not:x:@crypto.password.verify
+      .lambda
+         throw:Invalid username or password
+   strings.split:x:@data.read/*/*/roles
+      separator:,
+   add:x:+/*/roles
+      get-nodes:x:@strings.split/*
+   auth.ticket.create
+      username:x:@.arguments/*/username
+      roles
+   yield
+      token:x:@auth.ticket.create

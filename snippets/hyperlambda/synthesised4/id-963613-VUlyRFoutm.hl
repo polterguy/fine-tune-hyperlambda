@@ -1,0 +1,34 @@
+
+/*
+ * This Hyperlambda code connects to a database and performs an update operation on the "users" table. It adds values and conditions to the update operation from the arguments provided. If no records are updated, it sets the response status to 404 and returns a "Record not found" message. Otherwise, it sets the response status to 202 and yields the number of affected records. 
+ * 
+ * 1. [data.connect] - Connects to a specified database.
+ * 2. [add] - Adds nodes to the update operation for values and conditions.
+ * 3. [data.update] - Performs the update operation on the "users" table.
+ * 4. [if] - Checks if the update operation affected zero records.
+ * 5. [eq] - Compares the result of the update operation to zero.
+ * 6. [response.status.set] - Sets the HTTP response status.
+ * 7. [return] - Returns a message if no records are updated.
+ * 8. [yield] - Returns the number of affected records if the update is successful.
+ */
+data.connect:[generic|magic]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      table:users
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   yield
+      affected:x:@data.update

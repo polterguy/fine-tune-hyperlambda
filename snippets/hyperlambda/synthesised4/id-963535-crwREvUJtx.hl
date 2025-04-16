@@ -1,0 +1,29 @@
+
+// This Hyperlambda code iterates over files listed recursively, checking if they end with ".md" and contain "/ts-templates/" in their path. For matching files, it loads the file content, splits it by newline, trims the first line as a prompt, and joins the rest as a completion. The prompt and completion are then added to a result node.
+for-each:x:../*/io.file.list-recursively/*
+   if
+      and
+         strings.ends-with:x:@.dp/#
+            .:.md
+         strings.contains:x:@.dp/#
+            .:/ts-templates/
+      .lambda
+         load-file:x:@.dp/#
+         strings.split:x:@load-file
+            .:"\n"
+         .prompt
+         set-value:x:@.prompt
+            strings.trim:x:@strings.split/0
+         .completion
+         remove-nodes:x:@strings.split/0
+         set-value:x:@.completion
+            strings.join:x:@strings.split/*
+               .:"\n"
+         set-value:x:@.completion
+            strings.trim:x:@.completion
+         unwrap:x:+/*/*/*
+         add:x:@.result
+            .
+               .
+                  prompt:x:@.prompt
+                  completion:x:@.completion

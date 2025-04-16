@@ -1,0 +1,32 @@
+
+/*
+ * The code iterates over each node in the current context, splitting their values by the "/" character. It checks if the resulting string ends with ".sql". If true, it concatenates the path "/etc/sqlite/templates/" with the split string. If the concatenated path doesn't exist, it moves the original file to "/etc/sqlite/templates/" and logs the action. 
+ * 
+ * 1. [for-each] - Iterates over each node in the current context.
+ * 2. [strings.split] - Splits the node value by the "/" character.
+ * 3. [if] - Checks if the split string ends with ".sql".
+ * 4. [strings.ends-with] - Determines if the string ends with ".sql".
+ * 5. [strings.concat] - Concatenates "/etc/sqlite/templates/" with the split string.
+ * 6. [not] - Ensures the file doesn't already exist at the destination.
+ * 7. [io.file.exists] - Checks if the file exists at the concatenated path.
+ * 8. [io.file.move] - Moves the file to "/etc/sqlite/templates/" if it doesn't exist.
+ * 9. [log.info] - Logs the action of moving the SQL script.
+ */
+for-each:x:-/*
+   strings.split:x:@.dp/#
+      .:/
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         strings.concat
+            .:/etc/sqlite/templates/
+            get-value:x:@strings.split/0/-
+         if
+            not
+               io.file.exists:x:@strings.concat
+            .lambda
+               io.file.move:x:@.dp/#
+                  .:/etc/sqlite/templates/
+               log.info:SQL script moved into etc folder
+                  filename:x:@.dp/#

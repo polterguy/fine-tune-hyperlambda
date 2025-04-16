@@ -1,0 +1,21 @@
+
+/*
+ * This code connects to a database named "usersdb" and retrieves the password hash for a user specified by the "username" argument. It then verifies the provided password against the retrieved hash using the [crypto.password.verify] slot. Finally, it yields the verification result, indicating whether the password is correct. 
+ * 
+ * 1. [data.connect] - Connects to the "usersdb" database.
+ * 2. [data.read] - Reads the "password_hash" column from the "users" table where the username matches the provided argument.
+ * 3. [crypto.password.verify] - Verifies the provided password against the retrieved password hash.
+ * 4. [yield] - Returns the result of the password verification.
+ */
+data.connect:usersdb
+   data.read
+      table:users
+      columns
+         password_hash
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   crypto.password.verify:x:@.arguments/*/password
+      hash:x:@data.read/*/*/password_hash
+   yield
+      verified:x:@crypto.password.verify
