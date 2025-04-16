@@ -39,11 +39,11 @@ Below are some example prompts you can run through the model after fine tuning i
 * Write an endpoint taking age and name, and responding with a personal greeting
 * Select contacts records from my ERP database.
   - Wrap it into an endpoint and returns contacts.
+  - Change database to chinook and table to Artist. Return ALL columns!
   - Add paging arguments
   - Make paging arguments optional
   - Add sorting arguments
   - Return contacts as [result_from_db]
-  - Change database to chinook and table to Artist
   - Include Album records for each record. Use ArtistId as your foreign key!
   - Add filtering on name
 * Create an endpoint taking a message only allowing admin users to execute it, then log the message
