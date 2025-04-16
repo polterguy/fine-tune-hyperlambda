@@ -1,0 +1,112 @@
+
+/*
+ * Creates a dynamic slot named "magic.http.duckduckgo-and-scrape" that performs a DuckDuckGo search and scrapes URLs. It validates input arguments, manages asynchronous scraping tasks with [fork] and [join], and sends progress updates via sockets if a session is provided. The slot handles errors during scraping and builds a context for the results. 
+ * 
+ * 1. [slots.create] - Defines a new dynamic slot.
+ * 2. [validators.mandatory] - Ensures the "query" argument is provided.
+ * 3. [validators.string] - Validates the "query" argument as a string with length constraints.
+ * 4. [validators.integer] - Validates the "max" argument as an integer with range constraints.
+ * 5. [add] - Adds nodes to the arguments.
+ * 6. [signal] - Invokes the "magic.http.duckduckgo-search" slot.
+ * 7. [if] - Checks for the existence of a "session" argument.
+ * 8. [for-each] - Iterates over search results.
+ * 9. [strings.concat] - Concatenates strings for logging.
+ * 10. [unwrap] - Evaluates expressions.
+ * 11. [sockets.signal] - Sends messages to a session.
+ * 12. [sleep] - Pauses execution for a specified time.
+ * 13. [.exe] - Placeholder for execution context.
+ * 14. [join] - Joins asynchronous tasks.
+ * 15. [fork] - Creates asynchronous tasks for scraping.
+ * 16. [.reference] - Reference to the current node.
+ * 17. [try] - Attempts to scrape a URL.
+ * 18. [signal] - Invokes the "magic.http.scrape-url" slot.
+ * 19. [.catch] - Handles errors during scraping.
+ * 20. [log.error] - Logs errors with URL and message details.
+ * 21. [add] - Adds nodes to the execution context.
+ * 22. [eval] - Executes the built context.
+ * 23. [remove-nodes] - Removes session nodes from the context.
+ * 24. [return] - Returns the final result.
+ */
+slots.create:magic.http.duckduckgo-and-scrape
+   validators.mandatory:x:@.arguments/*/query
+   validators.string:x:@.arguments/*/query
+      min:3
+      max:250
+   validators.integer:x:@.arguments/*/max
+      min:1
+      max:10
+   add:x:+
+      get-nodes:x:@.arguments/*
+   signal:magic.http.duckduckgo-search
+   if
+      exists:x:@.arguments/*/session
+      .lambda
+         for-each:x:@signal/*/result/*
+            strings.concat
+               .:"Scraping: "
+               get-value:x:@.dp/#/*/url
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/session
+               args
+                  message:x:@strings.concat
+                  type:system
+            sleep:100
+   .exe
+      join
+   for-each:x:@signal/*/result/*
+      .cur
+         fork
+            .reference
+            try
+               unwrap:x:+/*
+               signal:magic.http.scrape-url
+                  url:x:@.reference/*/url
+                  semantics:bool:true
+               if
+                  exists:x:@.reference/*/session
+                  .lambda
+                     strings.concat
+                        .:"Done scraping "
+                        get-value:x:@.reference/*/url
+                     unwrap:x:+/**
+                     sockets.signal:x:@.reference/*/session
+                        args
+                           message:x:@strings.concat
+                           type:system
+            .catch
+               log.error:Could not scrape URL
+                  url:x:@.reference/*/url
+                  message:x:@.arguments/*/message
+      add:x:+/+/*
+         get-nodes:x:@.arguments/*/session
+      unwrap:x:+/*/*
+      add:x:@.cur/*/fork/*/.reference
+         .
+            url:x:@.dp/#/*/url
+            title:x:@.dp/#/*/title
+      add:x:@.exe/*/join
+         get-nodes:x:@.cur/*
+   eval:x:@.exe
+   remove-nodes:x:@.exe/**/session
+   if
+      exists:x:@.arguments/*/session
+      .lambda
+         sockets.signal:x:@.arguments/*/session
+            args
+               message:Building context
+               type:system
+         sleep:100
+   for-each:x:@.exe/*/join/*/fork
+      if
+         exists:x:@.dp/#/*/try/*/signal/*/*/prompt/./*/completion
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:../*/return
+               .
+                  .
+                     url:x:@.dp/#/*/.reference/*/url
+                     title:x:@.dp/#/*/.reference/*/title
+                     snippets
+            add:x:../*/return/0/-/*/snippets
+               get-nodes:x:@.dp/#/*/try/*/signal/*
+   return
