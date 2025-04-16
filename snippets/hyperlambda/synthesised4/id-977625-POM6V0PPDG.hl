@@ -1,0 +1,16 @@
+
+// This Hyperlambda code checks if a log file exists, loads its content, and extracts email addresses using a regex pattern. It iterates through each match, adding them to an [.emails] node, and finally returns the list of emails. The slots used are: [if] for conditional checking, [io.file.exists] to verify file existence, [io.file.load] to read the file, [strings.matches] to find regex matches, [for-each] to iterate matches, [unwrap] to evaluate nodes, [add] to append emails, and [yield] to return the result.
+if
+   io.file.exists:/var/logs/server.log
+   .lambda
+      io.file.load:/var/logs/server.log
+      .emails
+      strings.matches:x:@io.file.load
+         .:"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z]{2,6}"
+      for-each:x:@strings.matches/*/match
+         unwrap:x:+/*/*
+         add:x:@.emails
+            .
+               .:x:@.dp/#
+      yield
+         emails:x:@.emails/*

@@ -1,0 +1,23 @@
+
+// This Hyperlambda code connects to a database to read user data based on a provided user ID, converts the retrieved data into a CSV format, and sends an email with the CSV as an attachment. The [data.connect] slot connects to the "appdb" database, [data.read] retrieves user information from the "users" table, and [lambda2csv] converts the data to CSV. The [mail.smtp.send] slot sends an email to the user with their name and email fetched from the database, and attaches the CSV file as an email attachment.
+data.connect:appdb
+   data.read
+      table:users
+      where
+         and
+            id.eq:x:@.arguments/*/user-id
+   lambda2csv:x:@data.read/*
+   mail.smtp.send
+      message
+         to
+            .
+               name:x:@data.connect/*/data.read/*/name
+               email:x:@data.connect/*/data.read/*/email
+         subject:Your Activity Summary
+         entity:multipart/mixed
+            entity:text/plain
+               content:Please find attached your activity summary in CSV format.
+            entity:text/csv
+               headers
+                  Content-Disposition:"attachment; filename=\"summary.csv\""
+               content:x:@lambda2csv

@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code connects to a database and performs an update operation on the "cloudlets" table. It dynamically constructs the "where" and "values" clauses using arguments, executes the update, and checks if any records were affected. If no records are updated, it sets the response status to 404 and returns a "Record not found" message. Otherwise, it sets the response status to 202 and yields the number of affected records.
+ * 
+ * 1. [data.connect] - Connects to the specified database.
+ * 2. [add:x:./*/data.update/*/where/*/and] - Adds nodes to the "where" clause of the update operation.
+ * 3. [add:x:./*/data.update/*/values] - Adds nodes to the "values" clause of the update operation.
+ * 4. [data.update] - Executes the update operation on the "cloudlets" table.
+ * 5. [if] - Checks if the update operation affected any records.
+ * 6. [eq] - Compares the result of the update operation to zero.
+ * 7. [response.status.set:404] - Sets the HTTP response status to 404 if no records are updated.
+ * 8. [return] - Returns a "Record not found" message.
+ * 9. [response.status.set:202] - Sets the HTTP response status to 202 if records are updated.
+ * 10. [yield] - Returns the number of affected records.
+ */
+data.connect:[generic|hub]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   data.update
+      table:cloudlets
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   yield
+      affected:x:@data.update

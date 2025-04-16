@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code connects to a database and checks if an animal with a given ID already exists in the "shelter_animals" table. If the animal exists, it throws an exception. Otherwise, it hashes the RFID tag and inserts a new record into the table with the animal ID and hashed RFID. The code ensures data integrity and security by checking for existing records and hashing sensitive information.
+ * 
+ * 1. [data.connect] - Connects to a specified database.
+ * 2. [data.read] - Reads data from the "shelter_animals" table.
+ * 3. [table] - Specifies the table to read from.
+ * 4. [where] - Applies a condition to filter records.
+ * 5. [and] - Combines multiple conditions.
+ * 6. [id.eq] - Checks if the ID matches the provided animal ID.
+ * 7. [if] - Conditional statement to execute code if a condition is true.
+ * 8. [exists] - Checks if any records exist that match the condition.
+ * 9. [throw] - Throws an exception if the animal already exists.
+ * 10. [crypto.password.hash] - Hashes the RFID tag for security.
+ * 11. [data.create] - Inserts a new record into the "shelter_animals" table.
+ * 12. [values] - Specifies the values to insert into the table.
+ * 13. [id] - Sets the animal ID for the new record.
+ * 14. [rfid_hash] - Sets the hashed RFID tag for the new record.
+ */
+data.connect:[generic|shelter]
+   data.read
+      table:shelter_animals
+      where
+         and
+            id.eq:x:@.arguments/*/animal-id
+   if
+      exists:x:@data.connect/*/data.read/*
+      .lambda
+         throw
+            message:Animal already exists
+   crypto.password.hash:x:@.arguments/*/rfid-tag
+   data.create
+      table:shelter_animals
+      values
+         id:x:@.arguments/*/animal-id
+         rfid_hash:x:@crypto.password.hash

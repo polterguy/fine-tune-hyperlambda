@@ -1,0 +1,19 @@
+
+// This Hyperlambda code connects to a database named "mydb" and reads customer data from the "customers" table, selecting specific columns (name, username, email) where the customer ID matches a given argument. It then sends this data as a payload in an HTTP POST request to an external CRM API endpoint. Finally, it returns the response from the CRM API. The key slots used are [data.connect] for database connection, [data.read] for querying data, [http.post] for sending an HTTP request, and [return] for returning the API response.
+data.connect:mydb
+   data.read
+      table:customers
+      columns
+         name
+         username
+         email
+      where
+         and
+            id.eq:x:@.arguments/*/customerId
+   http.post:"https://api.example.com/crm/customers"
+      payload
+         name:x:@data.read/*/*/name
+         email:x:@data.read/*/*/email
+         username:x:@data.read/*/*/username
+   return
+      crmResponse:x:@http.post/*/content/*

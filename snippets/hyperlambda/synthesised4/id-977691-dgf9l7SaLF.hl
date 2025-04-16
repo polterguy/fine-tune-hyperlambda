@@ -1,0 +1,40 @@
+
+// This Hyperlambda code connects to a database and performs a read operation on the "cloudlets" table, joining it with the "plans" and "clusters" tables using inner joins based on specified conditions. It selects multiple columns from these tables, including cloudlet details, plan attributes, and cluster information. The query filters results based on the current user's authentication ticket and returns the resulting nodes. Key slots used include [data.connect] for database connection, [data.read] for reading data, [join] for table joins, [columns] for selecting specific fields, [where] for filtering, and [return-nodes] for returning the query results.
+data.connect:[generic|hub]
+   data.read
+      table:cloudlets
+         join:plans
+            type:inner
+            on
+               and
+                  cloudlets.plan.eq:plans.name
+         join:clusters
+            type:inner
+            on
+               and
+                  cloudlets.cluster.eq:clusters.id
+      columns
+         cloudlets.id
+         cloudlets.created
+         cloudlets.name
+         cloudlets.plan
+         cloudlets.cluster
+         cloudlets.destruction_date
+         cloudlets.enabled
+         cloudlets.source_cloudlet
+         plans.price
+         plans.storage
+         plans.cpu
+         plans.memory
+         plans.frontend
+         plans.max_upload
+         plans.bandwidth
+         plans.max_timeout
+         clusters.country
+         clusters.name
+            as:node_name
+         plans.description
+      where
+         and
+            user.eq:x:@auth.ticket.get
+   return-nodes:x:@data.read/*
