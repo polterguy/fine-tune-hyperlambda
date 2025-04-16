@@ -1,0 +1,33 @@
+
+// This Hyperlambda code iterates over each node in [vocabulary], executing two workflows for each node to generate context and query results using OpenAI models. The results are then saved to a file. If an error occurs, it logs the error message and waits for 3 seconds before continuing. Key slots include [for-each] for iteration, [try] for error handling, [execute] for running workflows, [set-value] and [io.file.save] for file operations, and [.catch] for logging errors.
+for-each:x:@vocabulary/*
+   try
+      execute:magic.workflows.actions.execute
+         name:openai-context-from-database
+         filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+         arguments
+            type:magic-documentation
+            query:x:@.dp/#
+            threshold:decimal:0.3
+            max_tokens:int:25000
+      execute:magic.workflows.actions.execute
+         name:openai-query
+         filename:/modules/openai/workflows/actions/openai-query.hl
+         arguments
+            model:gpt-4-1106-preview
+            max_tokens:int:1500
+            context:x:@execute/@execute/*/context
+            instruction:x:@io.file.load
+            query:x:@.dp/#
+      .file
+      set-value:x:@.file
+         strings.concat
+            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised2/
+            get-value:x:@.dp/#
+            .:.hl
+      io.file.save:x:@.file
+         get-value:x:@execute/*/answer
+   .catch
+      log.error:x:@.arguments/*/message
+         slot:x:@.dp/#
+      sleep:3000

@@ -1,0 +1,50 @@
+
+// This code connects to a database to retrieve distinct user IDs from the "ml_requests" table based on a specified type and questionnaire condition. It then fetches prompts and completions for each user ID, organizing them into a structured format. If no data is found, it returns a 404 status with a message. The collected data is converted to CSV format and returned as a downloadable file with appropriate headers set for CSV content.
+data.connect:[generic|magic]
+   data.select:select distinct(user_id) from ml_requests where type = @type and questionnaire = 1
+      @type:x:@.arguments/*/type
+   .data
+   for-each:x:@data.select/*
+      add:x:@.data
+         .
+            .
+      data.select:"select prompt, completion from ml_requests where user_id = @user_id and questionnaire = 1 and finish_reason = 'questionnaire'"
+         @user_id:x:@.dp/#/*/user_id
+      for-each:x:@data.select/*
+         set-name:x:./*/add/[0,1]/*/*
+            get-value:x:@.dp/#/*/prompt
+         unwrap:x:+/*/*
+         add:x:@.data/0/-
+            .
+               foo:x:@.dp/#/*/completion
+      .conv:
+      data.select:select prompt, completion from ml_requests where user_id = @user_id and questionnaire = 0
+         @user_id:x:@.dp/#/*/user_id
+      for-each:x:@data.select/*
+         set-value:x:@.conv
+            strings.concat
+               get-value:x:@.conv
+               get-value:x:@.dp/#/*/prompt
+               .:"\n"
+               .:"\n"
+               get-value:x:@.dp/#/*/completion
+               .:"\n"
+               .:"\n"
+      set-value:x:@.conv
+         strings.trim:x:@.conv
+      unwrap:x:+/*/*
+      add:x:@.data/0/-
+         .
+            conversation:x:@.conv
+   if
+      not-exists:x:@.data/*
+      .lambda
+         response.status.set:404
+         return
+            result:No questionnaires found
+   lambda2csv:x:@.data/*
+   response.headers.set
+      Content-Type:text/csv
+      Access-Control-Expose-Headers:Content-Disposition
+      Content-Disposition:"attachment; filename=\"questionnaires.csv\""
+   return:x:@lambda2csv

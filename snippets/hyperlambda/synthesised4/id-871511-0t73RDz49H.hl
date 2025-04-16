@@ -1,0 +1,31 @@
+
+// The code establishes a connection to a SQLite database named "hospital" and performs an update operation on the "Patients" table. It constructs the update values and conditions from the provided arguments, executes the update, and checks if any records were affected. If no records are updated, it sets the HTTP response status to 404 with a "Record not found" message. If records are updated, it sets the response status to 202 and sends a signal to notify about the update, ensuring only users with "admin" or "root" roles can receive it. Finally, it returns the number of affected records.
+data.connect:[generic|hospital]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Patients
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:hospital.Patients.put
+      args
+      roles:admin,root
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

@@ -1,0 +1,48 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and performs a data read operation on the "notes" table, joining it with the "clients" table using a left join. It constructs a distinct SQL function using a provided column name, manages various SQL query parameters like limit and order, and finally returns the result set. 
+ * 
+ * 1. [data.connect] - Establishes a connection to the SQLite database.
+ * 2. [database-type] - Specifies the type of database as SQLite.
+ * 3. [set-name] - Constructs a distinct SQL function using a specified column.
+ * 4. [remove-nodes] - Removes nodes related to distinct column, order, direction, limit, and offset from arguments.
+ * 5. [add] - Adds limit, offset, order, and direction nodes to the data read operation.
+ * 6. [data.read] - Executes the read operation on the "notes" table with a left join on the "clients" table.
+ * 7. [columns] - Specifies the columns to be selected, using the distinct function.
+ * 8. [where] - Specifies the conditions for the SQL query.
+ * 9. [return-nodes] - Returns the nodes from the data read operation.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:notes
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  notes.client_id:client_id.client_id
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

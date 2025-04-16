@@ -1,0 +1,28 @@
+
+// This Hyperlambda code executes two workflows using the [execute] slot within a [try] block. The first workflow, "openai-context-from-database", retrieves context data from a database, while the second, "openai-query", queries the OpenAI API using the retrieved context. The results are then concatenated into a file path and saved using [io.file.save]. Key slots include [execute] for running workflows, [strings.concat] for building file paths, and [io.file.save] for saving the final output.
+try
+   execute:magic.workflows.actions.execute
+      name:openai-context-from-database
+      filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+      arguments
+         type:magic-documentation
+         query:x:@.dp/#
+         threshold:decimal:0.3
+         max_tokens:int:25000
+   execute:magic.workflows.actions.execute
+      name:openai-query
+      filename:/modules/openai/workflows/actions/openai-query.hl
+      arguments
+         model:gpt-4-1106-preview
+         max_tokens:int:1500
+         context:x:@execute/@execute/*/context
+         instruction:x:@io.file.load
+         query:x:@.dp/#
+   .file
+   set-value:x:@.file
+      strings.concat
+         .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised2/
+         get-value:x:@.dp/#
+         .:.hl
+   io.file.save:x:@.file
+      get-value:x:@execute/*/answer

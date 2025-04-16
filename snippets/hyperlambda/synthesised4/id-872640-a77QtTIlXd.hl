@@ -1,0 +1,44 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and performs a read operation on the "Treatments" table, joining it with the "Patients" table using a left join on "PatientID". It constructs an aggregate function dynamically using the provided arguments, removes specific nodes, and adds nodes to the "where" clause. The result of the aggregate function is returned as "result", and the final output is yielded from the "data.read" operation. 
+ * 
+ * 1. [data.connect] - Connects to a SQLite database.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs an aggregate function dynamically.
+ * 4. [remove-nodes] - Removes specific nodes from the arguments.
+ * 5. [add] - Adds nodes to the "where" clause.
+ * 6. [data.read] - Reads data from the "Treatments" table.
+ * 7. [join] - Joins the "Patients" table using a left join.
+ * 8. [columns] - Specifies the columns to be retrieved, including the aggregate function.
+ * 9. [where] - Defines the "where" clause for filtering.
+ * 10. [limit] - Limits the result to one record.
+ * 11. [yield] - Returns the result of the "data.read" operation.
+ */
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Treatments
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Treatments.PatientID:PatientID.PatientID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   yield
+      treatments:x:@data.read/*/*

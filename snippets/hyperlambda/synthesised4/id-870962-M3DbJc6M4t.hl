@@ -1,0 +1,43 @@
+
+/*
+ * This Hyperlambda code checks if a conversion value is greater than zero, and if true, retrieves reCAPTCHA configuration keys. It then validates the presence and non-nullity of these keys. If both keys are valid, it mandates and validates a reCAPTCHA response using the retrieved keys and a minimum conversion value. 
+ * 
+ * 1. [if] - Checks if the conversion value is greater than zero.
+ * 2. [mt] - Compares the conversion value to zero.
+ * 3. [.lambda] - Executes the enclosed logic if the condition is true.
+ * 4. [.key] - Temporary node to store the site key.
+ * 5. [set-value] - Retrieves and assigns the site key from configuration.
+ * 6. [.secret] - Temporary node to store the secret key.
+ * 7. [set-value] - Retrieves and assigns the secret key from configuration.
+ * 8. [if] - Checks if both keys are non-null and not empty.
+ * 9. [and] - Combines multiple conditions ensuring both keys are valid.
+ * 10. [not-null] - Checks if the key or secret is not null.
+ * 11. [neq] - Ensures the key or secret is not an empty string.
+ * 12. [.lambda] - Executes the enclosed logic if both keys are valid.
+ * 13. [validators.mandatory] - Ensures the reCAPTCHA response is provided.
+ * 14. [validators.recaptcha] - Validates the reCAPTCHA response using the keys and minimum value.
+ */
+if
+   mt:x:@convert
+      .:decimal:0
+   .lambda
+      .key
+      set-value:x:@.key
+         config.get:"magic:auth:recaptcha:key"
+      .secret
+      set-value:x:@.secret
+         config.get:"magic:auth:recaptcha:secret"
+      if
+         and
+            not-null:x:@.key
+            neq:x:@.key
+               .:
+            not-null:x:@.secret
+            neq:x:@.secret
+               .:
+         .lambda
+            validators.mandatory:x:@.arguments/*/recaptcha_response
+            validators.recaptcha:x:@.arguments/*/recaptcha_response
+               min:x:@convert
+               site-key:x:@.key
+               secret:x:@.secret

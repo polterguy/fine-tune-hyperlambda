@@ -1,0 +1,29 @@
+
+/*
+ * This Hyperlambda code checks if there are any attachments in the [.arguments] node. If attachments exist, it creates a multipart MIME entity with the specified MIME type and content, adds the attachments, removes the existing entity from the SMTP message, and then adds the newly created entity to the message. It uses [exists] to check for attachments, [entity] to create MIME entities, [add] to append nodes, and [remove-nodes] to delete nodes.
+ * 
+ * 1. [if] - Checks if attachments exist in the [.arguments] node.
+ * 2. [exists] - Evaluates whether there are any attachment nodes present.
+ * 3. [.lambda] - Executes the following block if the condition is true.
+ * 4. [.entity] - Creates a new MIME entity structure.
+ * 5. [entity:multipart/mixed] - Defines a multipart MIME entity.
+ * 6. [entity:x:@.arguments/*/mime-type] - Sets the MIME type for the entity.
+ * 7. [content:x:@.body] - Assigns the content for the MIME entity.
+ * 8. [add:x:@.entity/*] - Adds attachments to the MIME entity.
+ * 9. [get-nodes:x:@.arguments/*/attachments/*] - Retrieves attachment nodes.
+ * 10. [remove-nodes:x:../*/mail.smtp.send/*/message/*/entity] - Removes the existing entity from the SMTP message.
+ * 11. [add:x:../*/mail.smtp.send/*/message] - Adds the new MIME entity to the message.
+ * 12. [get-nodes:x:@.entity/*] - Retrieves the nodes of the newly created entity.
+ */
+if
+   exists:x:@.arguments/*/attachments/*
+   .lambda
+      .entity
+         entity:multipart/mixed
+            entity:x:@.arguments/*/mime-type
+               content:x:@.body
+      add:x:@.entity/*
+         get-nodes:x:@.arguments/*/attachments/*
+      remove-nodes:x:../*/mail.smtp.send/*/message/*/entity
+      add:x:../*/mail.smtp.send/*/message
+         get-nodes:x:@.entity/*

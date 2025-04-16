@@ -1,0 +1,36 @@
+
+// This Hyperlambda code connects to a SQLite database and constructs a SQL query to read distinct columns from the "leads" table, joining it with the "clients" table. It processes arguments to set up distinct column selection, removes unnecessary nodes, and adds conditions for ordering, limiting, and offsetting the results. Finally, it executes the query and returns the results. The key slots are [data.connect] for establishing the connection, [set-name] and [strings.concat] for constructing the distinct function, [add] and [remove-nodes] for query modification, and [data.read] for executing the SQL query.
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:leads
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  leads.client_id:client_id.client_id
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

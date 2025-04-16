@@ -1,0 +1,37 @@
+
+// This Hyperlambda code connects to a SQLite database named "hospital" and performs a left join between the "Medications" and "Patients" tables. It selects specific columns from both tables, including medication details and patient first names. The code also processes optional arguments like order, direction, limit, and offset for the query, and returns the resulting dataset.
+data.connect:[generic|hospital]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Medications
+         join:Patients
+            as:PatientID
+            type:left
+            on
+               and
+                  Medications.PatientID:PatientID.PatientID
+      columns
+         Medications.MedicationID
+         Medications.PatientID
+         Medications.MedicationName
+         Medications.Dosage
+         Medications.StartDate
+         Medications.EndDate
+         PatientID.FirstName
+            as:PatientID.FirstName
+      where
+         and
+   return-nodes:x:@data.read/*

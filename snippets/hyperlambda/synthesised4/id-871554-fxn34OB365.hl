@@ -1,0 +1,39 @@
+
+// This Hyperlambda code checks if the name of the first child of [hyper2lambda] is "..". If true, it sets a prompt value, removes the first child node, and converts the remaining nodes to Hyperlambda text with comments preserved. It then evaluates a validation condition based on randomization and modulo operation or string containment. Finally, it connects to a data source to create a record in the "hyperlambda" table with the generated code, prompt, and validation status, and increments a counter.
+if
+   eq
+      get-name:x:@hyper2lambda/0
+      .:..
+   .lambda
+      .prompt
+      set-value:x:-
+         get-value:x:@hyper2lambda/0
+      remove-nodes:x:@hyper2lambda/0
+      lambda2hyper:x:@hyper2lambda/*
+         comments:true
+      .validation:int:0
+      if
+         and
+            eq:x:@.arguments/*/randomize
+               .:bool:true
+            eq
+               math.modulo:x:@.no
+                  .:int:8
+               .:int:0
+         .lambda
+            set-value:x:@.validation
+               .:int:1
+      else-if
+         strings.contains:x:@.dp/#
+            .:/validation/
+         .lambda
+            set-value:x:@.validation
+               .:int:1
+      data.connect:fine-tune
+         data.create
+            table:hyperlambda
+            values
+               code:x:@lambda2hyper
+               prompt:x:@.prompt
+               validation:x:@.validation
+         math.increment:x:@.no

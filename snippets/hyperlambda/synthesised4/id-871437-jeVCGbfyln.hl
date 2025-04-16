@@ -1,0 +1,29 @@
+
+// This Hyperlambda code connects to a SQLite database and performs a query on the "contacts" table, joining it with the "clients" table using a left join. It constructs an aggregate function using provided arguments, removes certain nodes, and adds conditions to the query. The query is limited to one result, and the result is returned. The code demonstrates dynamic SQL query construction and execution with aggregation and joins.
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:contacts
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  contacts.client_id:client_id.client_id
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

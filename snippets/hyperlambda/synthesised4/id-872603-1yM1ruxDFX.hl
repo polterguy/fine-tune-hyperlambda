@@ -1,0 +1,47 @@
+
+/*
+ * The code establishes a connection to a SQLite database and performs a read operation on the "opportunities" table, joining with the "clients" table using a left join. It constructs a distinct SQL function based on a specified column, integrates additional query parameters like limit and order, and removes these parameters from the arguments after use. Finally, it returns the results of the read operation. The code is structured to dynamically build and execute SQL queries with specified conditions and joins. 
+ * 
+ * 1. [data.connect] - Establishes a connection to the SQLite database.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs a distinct SQL function based on a specified column.
+ * 4. [remove-nodes] - Removes specific argument nodes after use.
+ * 5. [add] - Adds query parameters like limit, offset, order, and direction to the read operation.
+ * 6. [data.read] - Executes the read operation on the "opportunities" table with a join on the "clients" table.
+ * 7. [columns] - Specifies the columns to be selected, including the distinct function.
+ * 8. [return-nodes] - Returns the results of the read operation.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:opportunities
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  opportunities.client_id:client_id.client_id
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

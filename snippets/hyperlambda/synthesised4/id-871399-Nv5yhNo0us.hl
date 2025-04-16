@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code establishes a connection to a SQLite database named "northwind" and constructs a dynamic SQL query to read data from the "Shippers" table. It creates an aggregate function using values from the arguments, removes certain nodes, and appends additional nodes to the "where" clause. The query selects a single result using the aggregate function, aliases it as "result", and returns the result nodes. The code demonstrates dynamic SQL generation and execution using Hyperlambda. 
+ * 
+ * 1. [data.connect] - Connects to the SQLite database "northwind".
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs an aggregate function using argument values.
+ * 4. [remove-nodes] - Removes specified nodes from the arguments.
+ * 5. [add] - Appends nodes to the "where" clause.
+ * 6. [data.read] - Reads data from the "Shippers" table with specified conditions.
+ * 7. [columns] - Specifies the columns to select, using the aggregate function.
+ * 8. [where] - Defines the "where" clause for the query.
+ * 9. [limit] - Limits the query result to one record.
+ * 10. [return-nodes] - Returns the result nodes from the query.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Shippers
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*
