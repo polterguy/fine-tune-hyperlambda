@@ -1,0 +1,47 @@
+
+/*
+ * This Hyperlambda code executes two workflows using the [execute] slot within a [try] block, aiming to retrieve context and query results from OpenAI. The first workflow, "openai-context-from-database", is executed with specific arguments to fetch context data. The second workflow, "openai-query", is executed to perform a query using the GPT-4 model. The results are then concatenated into a file path and saved using [io.file.save]. The code handles exceptions implicitly due to the [try] block. 
+ * 
+ * 1. [try] - Initiates a block to catch exceptions during execution.
+ * 2. [execute:magic.workflows.actions.execute] - Executes the specified workflow action.
+ * 3. [name] - Specifies the name of the workflow to execute.
+ * 4. [filename] - Provides the file path of the workflow.
+ * 5. [arguments] - Supplies arguments to the workflow.
+ * 6. [type] - Specifies the type of documentation.
+ * 7. [query] - Passes the query expression.
+ * 8. [threshold] - Sets the decimal threshold value.
+ * 9. [max_tokens] - Defines the maximum number of tokens.
+ * 10. [model] - Specifies the OpenAI model to use.
+ * 11. [context] - Retrieves context from the previous execution.
+ * 12. [instruction] - Loads instructions from a file.
+ * 13. [.file] - Declares a node for the file path.
+ * 14. [set-value] - Sets the value of the [.file] node.
+ * 15. [strings.concat] - Concatenates strings to form a file path.
+ * 16. [io.file.save] - Saves the result to the specified file path.
+ */
+try
+   execute:magic.workflows.actions.execute
+      name:openai-context-from-database
+      filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+      arguments
+         type:magic-documentation
+         query:x:@.dp/#
+         threshold:decimal:0.3
+         max_tokens:int:25000
+   execute:magic.workflows.actions.execute
+      name:openai-query
+      filename:/modules/openai/workflows/actions/openai-query.hl
+      arguments
+         model:gpt-4-1106-preview
+         max_tokens:int:1500
+         context:x:@execute/@execute/*/context
+         instruction:x:@io.file.load
+         query:x:@.dp/#
+   .file
+   set-value:x:@.file
+      strings.concat
+         .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised2/
+         get-value:x:@.dp/#
+         .:.hl
+   io.file.save:x:@.file
+      get-value:x:@execute/*/answer

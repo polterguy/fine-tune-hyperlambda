@@ -1,0 +1,110 @@
+
+/*
+ * This code creates a dynamic slot [magic.emails.send] to send templated emails using SMTP. It validates mandatory arguments like subject, email, and template file, and checks for a configured SMTP host. It loads the email template, performs substitutions using provided data, and logs the email sending attempt. If attachments exist, it modifies the email structure to include them. Finally, it sends the email using [mail.smtp.send] and logs the success or failure of the operation.
+ * 
+ * 1. [slots.create] - Defines a new dynamic slot for sending emails.
+ * 2. [validators.mandatory] - Ensures required arguments are provided.
+ * 3. [validators.enum] - Validates the MIME type against allowed values.
+ * 4. [config.get] - Retrieves the SMTP host configuration.
+ * 5. [if] - Checks conditions like SMTP configuration and template file existence.
+ * 6. [log.error] - Logs errors if conditions are not met.
+ * 7. [return-value] - Returns false if errors occur.
+ * 8. [.body] - Stores the email body content.
+ * 9. [set-value] - Updates the email body with template content and substitutions.
+ * 10. [for-each] - Iterates over substitution data to replace placeholders.
+ * 11. [strings.replace] - Replaces placeholders in the email body.
+ * 12. [log.info] - Logs information about the email sending attempt.
+ * 13. [exists] - Checks for the presence of attachments.
+ * 14. [.entity] - Constructs the email entity structure for attachments.
+ * 15. [add] - Adds nodes to the email entity.
+ * 16. [remove-nodes] - Removes existing nodes before adding new ones.
+ * 17. [unwrap] - Evaluates expressions for the email sending process.
+ * 18. [mail.smtp.send] - Sends the email using SMTP.
+ * 19. [return-value] - Returns true upon successful email sending.
+ */
+slots.create:magic.emails.send
+   validators.mandatory:x:@.arguments/*/subject
+   validators.mandatory:x:@.arguments/*/email
+   validators.mandatory:x:@.arguments/*/template-file
+   validators.mandatory:x:@.arguments/*/mime-type
+   validators.enum:x:@.arguments/*/mime-type
+      .:text/plain
+      .:text/html
+   config.get:"magic:smtp:host"
+   if
+      eq
+         get-value:x:@config.get
+         .
+      .lambda
+         log.error:"Tried to send an email but couldn't since there is no SMTP server configured in your appSettings.json file"
+         return-value:bool:false
+   if
+      not
+         io.file.exists:x:@.arguments/*/template-file
+      .lambda
+         log.error:Email template not found while trying to send template email
+            template:x:@.arguments/*/template-file
+         return-value:bool:false
+   .body
+   set-value:x:@.body
+      io.file.load:x:@.arguments/*/template-file
+   for-each:x:@.arguments/*/substitutes/*
+      set-value:x:@.body
+         strings.replace:x:@.body
+            strings.concat
+               .:{{
+               get-name:x:@.dp/#
+               .:}}
+            get-value:x:@.dp/#
+   if
+      and
+         exists:x:@.arguments/*/name
+         neq:x:@.arguments/*/name
+            .
+      .lambda
+         set-value:x:@.body
+            strings.replace:x:@.body
+               .:{{name}}
+               get-value:x:@.arguments/*/name
+   set-value:x:@.body
+      strings.replace:x:@.body
+         .:{{email}}
+         get-value:x:@.arguments/*/email
+   log.info:Attempting to send template email
+      email:x:@.arguments/*/email
+      name:x:@.arguments/*/name
+      subject:x:@.arguments/*/subject
+      body:x:@.body
+   if
+      exists:x:@.arguments/*/attachments/*
+      .lambda
+         .entity
+            entity:multipart/mixed
+               entity:x:@.arguments/*/mime-type
+                  content:x:@.body
+         add:x:@.entity/*
+            get-nodes:x:@.arguments/*/attachments/*
+         remove-nodes:x:../*/mail.smtp.send/*/message/*/entity
+         add:x:../*/mail.smtp.send/*/message
+            get-nodes:x:@.entity/*
+   if
+      and
+         exists:x:@.arguments/*/name
+         neq:x:@.arguments/*/name
+            .
+      .lambda
+         set-name:x:../*/mail.smtp.send/*/message/*/to/0
+            get-value:x:@.arguments/*/name
+   unwrap:x:+/**
+   mail.smtp.send
+      message
+         to
+            .
+               email:x:@.arguments/*/email
+         subject:x:@.arguments/*/subject
+         entity:x:@.arguments/*/mime-type
+            content:x:@.body
+   log.info:Template email successfully sent
+      email:x:@.arguments/*/email
+      template:x:@.arguments/*/template-file
+   return-value:bool:true

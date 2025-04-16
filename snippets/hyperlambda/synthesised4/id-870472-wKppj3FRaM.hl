@@ -1,0 +1,29 @@
+
+// This code iterates over files in a directory, checking if they end with ".hl". If true, it loads and parses the file as Hyperlambda, preserving comments. It then checks if the root node name is ".." and, if so, renames specific nodes related to data operations to use "mysql" prefixes. Finally, it converts the modified structure back to Hyperlambda text and saves it back to the original file.
+for-each:x:@io.file.list-recursively/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.hl
+      .lambda
+         io.file.load:x:@.dp/#
+         hyper2lambda:x:@io.file.load
+            comments:true
+         if
+            eq
+               get-name:x:@hyper2lambda/0
+               .:..
+            .lambda
+               set-name:x:@hyper2lambda/**/data.connect
+                  .:mysql.connect
+               set-name:x:@hyper2lambda/**/data.create
+                  .:mysql.create
+               set-name:x:@hyper2lambda/**/data.read
+                  .:mysql.read
+               set-name:x:@hyper2lambda/**/data.update
+                  .:mysql.update
+               set-name:x:@hyper2lambda/**/data.delete
+                  .:mysql.delete
+               lambda2hyper:x:@hyper2lambda/*
+                  comments:true
+               io.file.save:x:@.dp/#
+                  get-value:x:@lambda2hyper
