@@ -25,7 +25,7 @@ Below are some example prompts you can run through the model after fine tuning i
   - Add one item to it
   - Wrap it into and endpoint and return all employees
   - Loop through them and remove their names
-  - Loop through them and add department
+  - Add departments to each entry from within your existing loop
 * How do I open a database connection?
 * How do I concatenate 2 strings?
   - Add a space between
