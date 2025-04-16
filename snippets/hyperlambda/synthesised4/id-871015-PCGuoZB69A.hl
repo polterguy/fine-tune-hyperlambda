@@ -1,0 +1,37 @@
+
+/*
+ * This Hyperlambda code checks if a configuration value is not null and not equal to a specific value, then retrieves the count of machine learning requests made by a user in the last day. If the count exceeds a certain threshold, it sets a block flag to true. The code uses [if] for conditional logic, [not-null] and [neq] for validation, [data.scalar] for database querying, and [mt] for comparison. It also uses [set-value] and [convert] to manipulate and convert data types.
+ * 
+ * 1. [if] - Evaluates a condition and executes its lambda if true.
+ * 2. [and] - Combines multiple conditions, all of which must be true.
+ * 3. [not-null] - Checks if a value is not null.
+ * 4. [neq] - Checks if two values are not equal.
+ * 5. [.lambda] - Contains the code to execute if conditions are met.
+ * 6. [.no] - A node to store a converted configuration value.
+ * 7. [set-value] - Sets the value of a node.
+ * 8. [convert] - Converts a value to a specified type.
+ * 9. [data.scalar] - Executes a SQL query and retrieves a single scalar value.
+ * 10. [@user] - Binds a user ID to the SQL query.
+ * 11. [mt] - Checks if one value is more than another.
+ * 12. [.block] - A node to store a boolean block flag.
+ */
+if
+   and
+      not-null:x:@config.get
+      neq:x:@config.get
+         .:
+   .lambda
+      .no
+      set-value:x:@.no
+         convert:x:@config.get
+            type:int
+      data.scalar:"select count(*) from ml_requests where user_id = @user and created >= date('now', '-1 day')"
+         @user:x:@.arguments/*/user_id
+      if
+         mt
+            convert:x:@data.scalar
+               type:int
+            get-value:x:@.no
+         .lambda
+            set-value:x:@.block
+               .:bool:true

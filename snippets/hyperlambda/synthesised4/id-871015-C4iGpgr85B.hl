@@ -1,0 +1,73 @@
+
+/*
+ * This Hyperlambda code is designed to block users from accessing an AI chatbot if they have been identified as abusive. It checks if an IP address is already blocked, logs the request headers if it is, and throws an exception. It also checks the number of requests a user has made in the past day and blocks them if they exceed a configured limit. If a user is blocked, their IP address and user ID are recorded in a database.
+ * 
+ * 1. [data.connect] - Connects to the Magic database.
+ * 2. [data.read] - Reads from the 'ml_blocked_ips' table to check if the IP address is blocked.
+ * 3. [if] - Checks if the IP address exists in the blocked list.
+ * 4. [request.headers.list] - Lists the request headers.
+ * 5. [add] - Adds log information.
+ * 6. [log.info] - Logs a message indicating potential abuse.
+ * 7. [throw] - Throws an exception to block the user.
+ * 8. [config.get] - Retrieves the maximum daily requests configuration.
+ * 9. [if] - Checks if the configuration is not null and not equal to an empty value.
+ * 10. [set-value] - Sets the value of '.no' to the maximum daily requests.
+ * 11. [data.scalar] - Queries the number of requests made by the user in the past day.
+ * 12. [if] - Checks if the number of requests exceeds the limit.
+ * 13. [set-value] - Sets the '.block' value to true if the limit is exceeded.
+ * 14. [if] - Checks if the user should be blocked.
+ * 15. [data.create] - Adds the user's IP and ID to the 'ml_blocked_ips' table.
+ * 16. [add] - Adds log information.
+ * 17. [log.info] - Logs a message indicating the IP was blocked.
+ * 18. [throw] - Throws an exception to block the user.
+ */
+data.connect:magic
+   data.read
+      table:ml_blocked_ips
+      where
+         and
+            ip_address.eq:x:@request.headers.get
+   if
+      exists:x:@data.read/*
+      .lambda
+         request.headers.list
+         add:x:./*/log.info
+            get-nodes:x:@request.headers.list/*
+         log.info:Potential abuse, user has been permanently blocked
+         throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
+            public:bool:true
+            status:int:401
+   .block:bool:false
+   config.get:"magic:openai:max-daily-requests"
+   if
+      and
+         not-null:x:@config.get
+         neq:x:@config.get
+            .:
+      .lambda
+         .no
+         set-value:x:@.no
+            convert:x:@config.get
+               type:int
+         data.scalar:"select count(*) from ml_requests where user_id = @user and created >= date('now', '-1 day')"
+            @user:x:@.arguments/*/user_id
+         if
+            mt
+               convert:x:@data.scalar
+                  type:int
+               get-value:x:@.no
+            .lambda
+               set-value:x:@.block
+                  .:bool:true
+   if:x:@.block
+      data.create
+         table:ml_blocked_ips
+         values
+            ip_address:x:@request.headers.get
+            user_id:x:@.arguments/*/user_id
+      add:x:./*/log.info
+         request.headers.list
+      log.info:IP address was permanently blocked
+      throw:Sorry, you have been permanently blocked from accessing this AI chatbot because of abuse. Send an email to team@ainiro.io if you think this is not correct.
+         public:bool:true
+         status:int:401

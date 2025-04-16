@@ -1,0 +1,45 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "hospital" and performs a distinct selection on a specified column from the "Doctors" table. It constructs a distinct SQL function using [strings.concat] for the column specified in [distinct_column], removes unnecessary argument nodes, and adds limit, offset, order, and direction nodes to the [data.read] operation. The code then reads from the "Doctors" table, applying the distinct function, and returns the nodes from the read operation. 
+ * 
+ * 1. [data.connect] - Connects to the "hospital" database using SQLite.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs a distinct SQL function for the specified column.
+ * 4. [strings.concat] - Concatenates strings to form the distinct function.
+ * 5. [get-value] - Retrieves the value of the [distinct_column] argument.
+ * 6. [remove-nodes] - Removes specified argument nodes like [distinct_column], [order], [direction], [limit], and [offset].
+ * 7. [add] - Adds nodes for limit, offset, order, and direction to the [data.read] operation.
+ * 8. [get-nodes] - Retrieves nodes for limit, offset, order, and direction.
+ * 9. [data.read] - Reads from the "Doctors" table, applying the distinct function.
+ * 10. [columns] - Specifies the columns to select, using the distinct function.
+ * 11. [where] - Applies conditions for the selection.
+ * 12. [return-nodes] - Returns the nodes from the read operation.
+ */
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Doctors
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

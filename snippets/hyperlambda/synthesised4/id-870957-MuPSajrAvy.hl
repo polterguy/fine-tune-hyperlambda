@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code checks if a manifest file exists and loads it if present. It then converts the file's content into a lambda structure and compares the current module name with the one in the manifest. If they differ, it constructs a path and checks if a folder exists at that path, deleting it if so, before moving another folder to the new path and updating the module name. The code ensures the module's folder structure is consistent with the manifest's module name.
+ * 
+ * 1. [if] - Checks if the manifest file exists.
+ * 2. [io.file.load] - Loads the manifest file.
+ * 3. [hyper2lambda] - Converts the manifest file content into a lambda structure.
+ * 4. [if] - Compares the current module name with the one in the manifest.
+ * 5. [strings.concat] - Constructs a path using the module name from the manifest.
+ * 6. [if] - Checks if a folder exists at the constructed path.
+ * 7. [io.folder.delete] - Deletes the folder if it exists.
+ * 8. [io.folder.move] - Moves a folder to the constructed path.
+ * 9. [set-value] - Updates the current module name to match the manifest.
+ */
+if
+   io.file.exists:x:@.manifest
+   .lambda
+      io.file.load:x:@.manifest
+      hyper2lambda:x:-
+      if
+         neq
+            get-value:x:@.module-name
+            get-value:x:@hyper2lambda/*/module_name
+         .lambda
+            strings.concat
+               .:/modules/
+               get-value:x:@hyper2lambda/*/module_name
+               .:/
+            if
+               io.folder.exists:x:@strings.concat
+               .lambda
+                  io.folder.delete:x:@strings.concat
+            io.folder.move:x:@.folder
+               get-value:x:@strings.concat
+            set-value:x:@.module-name
+               get-value:x:@hyper2lambda/*/module_name
