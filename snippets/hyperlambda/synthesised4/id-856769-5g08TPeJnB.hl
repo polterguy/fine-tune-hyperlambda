@@ -1,0 +1,93 @@
+
+// This Hyperlambda code defines a dynamic slot named [magic.ai.search] that performs an AI-based search using OpenAI's API. It validates mandatory arguments, constructs an HTTP POST request to obtain embeddings, and checks the response status. If successful, it queries a database for matching training snippets based on the embeddings and a threshold, returning the results along with the time taken for the database query. Key slots include [slots.create] for defining the slot, [validators.mandatory] for argument validation, [http.post] for API interaction, and [data.select] for database querying.
+slots.create:magic.ai.search
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/prompt
+   validators.mandatory:x:@.arguments/*/threshold
+   validators.mandatory:x:@.arguments/*/max
+   validators.mandatory:x:@.arguments/*/vector_model
+   validators.string:x:@.arguments/*/prompt
+      min:1
+   set-value:x:@.arguments/*/threshold
+      convert:x:@.arguments/*/threshold
+         type:double
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+   http.post:"https://api.openai.com/v1/embeddings"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         input:x:@.arguments/*/prompt
+         model:x:@.arguments/*/vector_model
+      convert:true
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            error:x:@lambda2hyper
+         throw:x:@http.post/*/content/*/error/*/message
+            public:bool:true
+            status:x:@http.post
+   data.connect:[generic|magic]
+      .prefix-url:"ts.uri is not null and "
+      if
+         and
+            exists:x:@.arguments/*/prefix-url
+            not-null:x:@.arguments/*/prefix-url
+            neq:x:@.arguments/*/prefix-url
+               .:
+         .lambda
+            set-value:x:@.prefix-url
+               .:"ts.uri like @prefix and "
+            add:x:@data.connect/*/data.select
+               .
+                  @prefix:x:@.arguments/*/prefix-url
+      .begin
+      set-value:x:@.begin
+         date.now
+      floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+      math.subtract
+         .:float:1
+         get-value:x:@.arguments/*/threshold
+      strings.concat
+         .:"\nselect vss.distance, ts.prompt, ts.uri\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and "
+         get-value:x:@.prefix-url
+         .:"vss_search(vss.embedding_vss, @embedding) and\n       vss.distance < @threshold\ngroup by ts.uri\norder by vss.distance\nlimit @limit"
+      data.select:x:@strings.concat
+         @embedding:x:@floatArray2bytes
+         @type:x:@.arguments/*/type
+         @threshold:x:@math.subtract
+         @limit:x:@.arguments/*/max
+      .end
+      set-value:x:@.end
+         date.now
+      .time
+      set-value:x:@.time
+         math.subtract
+            get-value:x:@.end
+            get-value:x:@.begin
+      set-value:x:@.time
+         time.format:x:@.time
+            format:"ss\\.fff"
+      if
+         not-exists:x:@data.select/*
+         .lambda
+            remove-nodes:x:../*/return/*/snippets
+      else
+         add:x:@data.connect/*/return/*/snippets
+            get-nodes:x:@data.select/*
+      unwrap:x:./*/return/*
+      return
+         db_time:x:@.time
+         snippets

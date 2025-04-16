@@ -1,0 +1,102 @@
+
+/*
+ * This Hyperlambda code defines a dynamic slot named [magic.http.duckduckgo-search] that performs a search on DuckDuckGo and processes the results. It requires a [query] argument and optionally a [max] argument to limit the number of results. The slot constructs a URL for the search query, optionally logs the URL to a session, and retrieves the search results using [magic.http.get-with-cache]. It then parses the HTML response to extract search result links and descriptions, and returns these as a list of nodes.
+ * 
+ * 1. [slots.create] - Creates a dynamic slot named [magic.http.duckduckgo-search].
+ * 2. [validators.mandatory] - Ensures the [query] argument is provided.
+ * 3. [validators.integer] - Validates the [max] argument as an integer with a minimum value of 1.
+ * 4. [set-value] - Constructs the DuckDuckGo search URL.
+ * 5. [if] - Checks if a [session] argument exists and logs the URL if true.
+ * 6. [signal] - Invokes the [magic.http.get-with-cache] slot to fetch search results.
+ * 7. [html2lambda] - Converts the HTML response to a lambda object.
+ * 8. [for-each] - Iterates over the search result links in the HTML.
+ * 9. [if] - Checks if the [max] limit is not exceeded and processes each result.
+ * 10. [strings.split] - Splits URLs to extract specific parts.
+ * 11. [math.decrement] - Decreases the [max] counter.
+ * 12. [strings.join] - Joins text nodes for descriptions.
+ * 13. [add] - Adds each search result to the result list.
+ * 14. [return-nodes] - Returns the processed search results.
+ */
+slots.create:magic.http.duckduckgo-search
+   .result
+      result
+   validators.mandatory:x:@.arguments/*/query
+   validators.integer:x:@.arguments/*/max
+      min:1
+   .url
+   set-value:x:@.url
+      strings.concat
+         .:"https://html.duckduckgo.com/html/?q="
+         strings.url-encode:x:@.arguments/*/query
+   if
+      exists:x:@.arguments/*/session
+      .lambda
+         strings.concat
+            .:"Invoking DuckDuckGo at: "
+            get-value:x:@.url
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/session
+            args
+               message:x:@strings.concat
+               type:system
+   unwrap:x:+/*
+   signal:magic.http.get-with-cache
+      url:x:@.url
+   unwrap:x:+/*/*
+   insert-before:x:@.result/0
+      .
+         reference:x:@.url
+   html2lambda:x:@signal
+   for-each:x:"@html2lambda/*/html/*/body/**/a/*/\\@class/=result__a/."
+      if
+         or
+            not-exists:x:@.arguments/*/max
+            mt:x:@.arguments/*/max
+               .:int:0
+         .lambda
+            .cur
+            set-value:x:@.cur
+               strings.concat
+                  .:"http:"
+                  get-value:x:"@.dp/#/*/\\@href"
+            strings.split:x:@.cur
+               .:?
+            if
+               mt
+                  get-count:x:@strings.split/*
+                  .:int:1
+               .lambda
+                  strings.split:x:@strings.split/1
+                     .:&
+                  .found:bool:false
+                  for-each:x:@strings.split/*
+                     if
+                        strings.starts-with:x:@.dp/#
+                           strings.concat
+                              .:uddg
+                              .:=
+                        .lambda
+                           set-value:x:@.found
+                              .:bool:true
+                           strings.split:x:@.dp/#
+                              .:=
+                           set-value:x:@.cur
+                              strings.url-decode:x:@strings.split/1
+                  if
+                     not
+                        get-value:x:@.found
+                     .lambda
+                        set-value:x:@.url
+            else
+               set-value:x:@.url
+            math.decrement:x:@.arguments/*/max
+            strings.join:x:"@.dp/#/././**/a/*/\\@class/=result__snippet/./**/\\#text"
+               .:
+            unwrap:x:+/*/*/*
+            add:x:@.result/*/result
+               .
+                  .
+                     url:x:@.cur
+                     title:x:"@.dp/#/*/\\#text"
+                     description:x:@strings.join
+   return-nodes:x:@.result/*

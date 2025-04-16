@@ -1,0 +1,108 @@
+
+/*
+ * This Hyperlambda code defines a dynamic slot named [magic.http.duckduckgo-search] that performs a search on DuckDuckGo and processes the results. It validates mandatory arguments [query] and [max], constructs a search URL, optionally logs the request if a session exists, and retrieves search results using [magic.http.get-with-cache]. The results are converted from HTML to a lambda object using [html2lambda], and relevant links are extracted and processed. The code decrements the [max] argument to limit the number of results and returns a list of search result nodes containing URLs, titles, and descriptions.
+ * 
+ * 1. [slots.create] - Creates a dynamic slot named [magic.http.duckduckgo-search].
+ * 2. [validators.mandatory] - Ensures the [query] argument is provided.
+ * 3. [validators.integer] - Validates [max] as an integer with a minimum value of 1.
+ * 4. [set-value] - Constructs the DuckDuckGo search URL using [strings.concat].
+ * 5. [if] - Checks if the [session] argument exists.
+ * 6. [strings.concat] - Concatenates strings to create log messages.
+ * 7. [sockets.signal] - Sends a log message if a session exists.
+ * 8. [signal] - Invokes [magic.http.get-with-cache] to retrieve search results.
+ * 9. [insert-before] - Inserts the search URL reference before processing results.
+ * 10. [html2lambda] - Converts HTML response to a lambda object.
+ * 11. [for-each] - Iterates over search result links in the HTML.
+ * 12. [if] - Checks conditions to process each search result.
+ * 13. [strings.split] - Splits URLs to extract parameters.
+ * 14. [strings.starts-with] - Checks if a string starts with a specific pattern.
+ * 15. [strings.url-decode] - Decodes URL-encoded strings.
+ * 16. [math.decrement] - Decreases the [max] argument to limit results.
+ * 17. [strings.join] - Joins text content for search result descriptions.
+ * 18. [add] - Adds processed search results to the result list.
+ * 19. [return-nodes] - Returns the list of search result nodes.
+ */
+hyper2lambda
+   slots.create:magic.http.duckduckgo-search
+      .result
+         result
+      validators.mandatory:x:@.arguments/*/query
+      validators.integer:x:@.arguments/*/max
+         min:1
+      .url
+      set-value:x:@.url
+         strings.concat
+            .:"https://html.duckduckgo.com/html/?q="
+            strings.url-encode:x:@.arguments/*/query
+      if
+         exists:x:@.arguments/*/session
+         .lambda
+            strings.concat
+               .:"Invoking DuckDuckGo at: "
+               get-value:x:@.url
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/session
+               args
+                  message:x:@strings.concat
+                  type:system
+      unwrap:x:+/*
+      signal:magic.http.get-with-cache
+         url:x:@.url
+      unwrap:x:+/*/*
+      insert-before:x:@.result/0
+         .
+            reference:x:@.url
+      html2lambda:x:@signal
+      for-each:x:"@html2lambda/*/html/*/body/**/a/*/\\@class/=result__a/."
+         if
+            or
+               not-exists:x:@.arguments/*/max
+               mt:x:@.arguments/*/max
+                  .:int:0
+            .lambda
+               .cur
+               set-value:x:@.cur
+                  strings.concat
+                     .:"http:"
+                     get-value:x:"@.dp/#/*/\\@href"
+               strings.split:x:@.cur
+                  .:?
+               if
+                  mt
+                     get-count:x:@strings.split/*
+                     .:int:1
+                  .lambda
+                     strings.split:x:@strings.split/1
+                        .:&
+                     .found:bool:false
+                     for-each:x:@strings.split/*
+                        if
+                           strings.starts-with:x:@.dp/#
+                              strings.concat
+                                 .:uddg
+                                 .:=
+                           .lambda
+                              set-value:x:@.found
+                                 .:bool:true
+                              strings.split:x:@.dp/#
+                                 .:=
+                              set-value:x:@.cur
+                                 strings.url-decode:x:@strings.split/1
+                     if
+                        not
+                           get-value:x:@.found
+                        .lambda
+                           set-value:x:@.url
+               else
+                  set-value:x:@.url
+               math.decrement:x:@.arguments/*/max
+               strings.join:x:"@.dp/#/././**/a/*/\\@class/=result__snippet/./**/\\#text"
+                  .:
+               unwrap:x:+/*/*/*
+               add:x:@.result/*/result
+                  .
+                     .
+                        url:x:@.cur
+                        title:x:"@.dp/#/*/\\#text"
+                        description:x:@strings.join
+      return-nodes:x:@.result/*

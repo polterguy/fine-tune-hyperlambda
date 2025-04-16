@@ -1,0 +1,107 @@
+
+// This Hyperlambda code defines an endpoint that retrieves and processes embeddings from OpenAI and queries a database for related data. It verifies authentication, validates input arguments, and constructs a SQL query based on optional parameters like type, limit, and offset. The code fetches embeddings from OpenAI, checks for errors, and processes the results to include token counts before returning the data. Key slots include [auth.ticket.verify], [validators.mandatory], [http.post], and [data.connect].
+hyper2lambda
+   .arguments
+      limit:long
+      offset:long
+      filter:string
+      type:string
+   auth.ticket.verify:root
+   validators.mandatory:x:@.arguments/*/filter
+   validators.string:x:@.arguments/*/filter
+      min:1
+      max:1000
+   validators.default:x:@.arguments
+      limit:int:10
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+   .embeddings-model
+   data.connect:[generic|magic]
+      data.read
+         table:ml_types
+         columns
+            vector_model
+         where
+            and
+               type.eq:x:@.arguments/*/type
+      set-value:x:@.embeddings-model
+         get-value:x:@data.read/*/*/vector_model
+   http.post:"https://api.openai.com/v1/embeddings"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         input:x:@.arguments/*/filter
+         model:x:@.embeddings-model
+      convert:true
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            error:x:@lambda2hyper
+         throw:x:@http.post/*/content/*/error/*/message
+            public:bool:true
+            status:x:@http.post
+   floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+   data.connect:[generic|magic]
+      .sql:"\nselect vss.distance, id, created, type, pushed, uri, prompt, completion, filename, cached, meta, embedding as embedding_vss\n   from vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      vss_search(vss.embedding_vss, @embedding)"
+      if
+         exists:x:@.arguments/*/type
+         .lambda
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" and type = @type"
+            unwrap:x:+/*/*
+            add:x:@if/./*/data.select
+               .
+                  @type:x:@.arguments/*/type
+      if
+         exists:x:@.arguments/*/limit
+         .lambda
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" limit "
+                  get-value:x:@.arguments/*/limit
+      if
+         exists:x:@.arguments/*/offset
+         .lambda
+            set-value:x:@.sql
+               strings.concat
+                  get-value:x:@.sql
+                  .:" offset "
+                  get-value:x:@.arguments/*/offset
+      data.select:x:@.sql
+         @embedding:x:@floatArray2bytes
+      for-each:x:@data.select/*
+         if
+            not-null:x:@.dp/#/*/embedding_vss
+            .lambda
+               set-value:x:@.dp/#/*/embedding_vss
+                  .:bool:true
+         else
+            set-value:x:@.dp/#/*/embedding_vss
+               .:bool:false
+         strings.concat
+            get-value:x:@.dp/#/*/prompt
+            .:@"
+
+"
+            get-value:x:@.dp/#/*/completion
+         openai.tokenize:x:@strings.concat
+         unwrap:x:+/*/*
+         add:x:@.dp/#
+            .
+               tokens:x:@openai.tokenize
+      return-nodes:x:@data.select/*

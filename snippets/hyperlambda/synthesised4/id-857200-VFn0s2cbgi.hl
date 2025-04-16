@@ -1,0 +1,144 @@
+
+/*
+ * This Hyperlambda code defines a data retrieval process with filtering, grouping, and aggregation capabilities. It mandates arguments for grouping and aggregation, validates them, and constructs a SQL query to read data from a SQLite database. The query includes joins, conditions, and grouping, with results cached for 300 seconds. The code also verifies guest authentication before executing the query.
+ * 
+ * 1. [.arguments] - Declares the expected arguments for the lambda function, including filters and SQL components.
+ * 2. [validators.mandatory] - Ensures required arguments are provided.
+ * 3. [validators.enum] - Validates that certain arguments have acceptable values.
+ * 4. [response.headers.set] - Sets HTTP response headers for caching.
+ * 5. [auth.ticket.verify] - Verifies guest authentication.
+ * 6. [data.connect] - Connects to a SQLite database and sets up the SQL query.
+ * 7. [set-name] - Configures the group column and aggregate function in the SQL query.
+ * 8. [remove-nodes] - Removes processed arguments to avoid redundancy.
+ * 9. [add] - Adds limit, offset, order, and direction to the SQL query.
+ * 10. [strings.concat] - Constructs the aggregate function string for SQL.
+ * 11. [data.read] - Executes the SQL query with specified conditions, joins, and grouping.
+ * 12. [return-nodes] - Returns the results of the SQL query execution.
+ */
+hyper2lambda
+   .arguments
+      group_column:string
+      limit:long
+      offset:long
+      order:string
+      direction:string
+      aggregate_function:string
+      aggregate_column:string
+      contacts.contact_id.mt:long
+      contacts.contact_id.lt:long
+      contacts.contact_id.mteq:long
+      contacts.contact_id.lteq:long
+      contacts.contact_id.neq:long
+      contacts.contact_id.eq:long
+      contacts.client_id.mt:long
+      contacts.client_id.lt:long
+      contacts.client_id.mteq:long
+      contacts.client_id.lteq:long
+      contacts.client_id.neq:long
+      contacts.client_id.eq:long
+      contacts.name.like:string
+      contacts.name.mt:string
+      contacts.name.lt:string
+      contacts.name.mteq:string
+      contacts.name.lteq:string
+      contacts.name.neq:string
+      contacts.name.eq:string
+      contacts.email.like:string
+      contacts.email.mt:string
+      contacts.email.lt:string
+      contacts.email.mteq:string
+      contacts.email.lteq:string
+      contacts.email.neq:string
+      contacts.email.eq:string
+      contacts.phone.like:string
+      contacts.phone.mt:string
+      contacts.phone.lt:string
+      contacts.phone.mteq:string
+      contacts.phone.lteq:string
+      contacts.phone.neq:string
+      contacts.phone.eq:string
+      contacts.position.like:string
+      contacts.position.mt:string
+      contacts.position.lt:string
+      contacts.position.mteq:string
+      contacts.position.lteq:string
+      contacts.position.neq:string
+      contacts.position.eq:string
+      client_id.name.eq:string
+      client_id.name.like:string
+   validators.mandatory:x:@.arguments/*/group_column
+   validators.mandatory:x:@.arguments/*/aggregate_function
+   validators.mandatory:x:@.arguments/*/aggregate_column
+   validators.enum:x:@.arguments/*/aggregate_function
+      .:min
+      .:max
+      .:sum
+      .:avg
+      .:count
+   validators.enum:x:@.arguments/*/group_column
+      .:contacts.contact_id
+      .:contacts.client_id
+      .:contacts.name
+      .:contacts.email
+      .:contacts.phone
+      .:contacts.position
+      .:client_id.name
+   validators.enum:x:@.arguments/*/aggregate_column
+      .:contacts.contact_id
+      .:contacts.client_id
+      .:contacts.name
+      .:contacts.email
+      .:contacts.phone
+      .:contacts.position
+      .:client_id.name
+   response.headers.set
+      Cache-Control:public, max-age=300
+   auth.ticket.verify:guest
+   data.connect:[generic|crm]
+      database-type:sqlite
+      set-name:x:@data.connect/*/data.read/*/group/*/group_column
+         get-value:x:@.arguments/*/group_column
+      set-name:x:+/*/*
+         get-value:x:@.arguments/*/group_column
+      insert-before:x:@data.connect/*/data.read/*/columns/0
+         .
+            group_column
+      set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+         get-value:x:@.arguments/*/aggregate_function
+      remove-nodes:x:@.arguments/*/group_column
+      add:x:@data.connect/*/data.read
+         get-nodes:x:@.arguments/*/limit
+         get-nodes:x:@.arguments/*/offset
+      remove-nodes:x:@.arguments/*/limit
+      remove-nodes:x:@.arguments/*/offset
+      add:x:./*/data.read
+         get-nodes:x:@.arguments/*/order
+         get-nodes:x:@.arguments/*/direction
+      remove-nodes:x:@.arguments/*/order
+      remove-nodes:x:@.arguments/*/direction
+      set-name:x:./*/data.read/*/columns/*/aggregate_functor
+         strings.concat
+            get-value:x:@.arguments/*/aggregate_function
+            .:(
+            get-value:x:@.arguments/*/aggregate_column
+            .:)
+      remove-nodes:x:@.arguments/*/[0,2]
+      add:x:./*/data.read/*/where/*
+         get-nodes:x:@.arguments/*
+      data.read
+         database-type:sqlite
+         table:contacts
+            join:clients
+               as:client_id
+               type:left
+               on
+                  and
+                     contacts.client_id:client_id.client_id
+         columns
+            aggregate_functor
+               as:result
+         where
+            and
+         group
+            group_column
+      return-nodes:x:@data.read/*
