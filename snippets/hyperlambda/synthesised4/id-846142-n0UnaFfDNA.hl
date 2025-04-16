@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code uses a [switch] statement to handle different HTML tags by their names. It concatenates text content for header tags (h1 to h6) and processes list and preformatted tags (ul, ol, pre) by converting them to markdown, adding them to a snippets collection. The [default] case adds remaining nodes to a separate collection. The code effectively categorizes and processes HTML elements based on their tag names. 
+ * 
+ * 1. [switch] - Evaluates the name of the HTML tag.
+ * 2. [case] - Matches specific HTML tags (h1 to h6, ul, ol, pre).
+ * 3. [set-value] - Concatenates text content for header tags.
+ * 4. [strings.concat] - Concatenates strings for header tags.
+ * 5. [lambda2html] - Converts HTML content to a string.
+ * 6. [html2markdown] - Converts HTML string to markdown.
+ * 7. [unwrap] - Evaluates and unwraps markdown content.
+ * 8. [add] - Adds processed content to collections (snippets or remaining).
+ * 9. [default] - Handles any unmatched HTML tags.
+ */
+switch:x:@get-name
+   case:h1
+   case:h2
+   case:h3
+   case:h4
+   case:h5
+   case:h6
+      set-value:x:@.tmp-prompt
+         strings.concat
+            get-value:x:@.prompt
+            .:" | "
+            get-value:x:"@.dp/#/*/\\#text"
+   case:ul
+   case:ol
+   case:pre
+      lambda2html:x:@.dp/#
+      html2markdown:x:@lambda2html
+         url:x:@.arguments/*/url
+      unwrap:x:+/*/*/*
+      add:x:@.snippets
+         .
+            .
+               prompt:x:@.tmp-prompt
+               completion:x:@html2markdown
+   default
+      add:x:@.remaining
+         get-nodes:x:@.dp/#

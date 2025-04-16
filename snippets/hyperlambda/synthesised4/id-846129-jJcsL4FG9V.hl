@@ -1,0 +1,22 @@
+
+// This Hyperlambda code processes an invocation argument by checking if it contains a colon, splitting it if true, and removing the first part. It then joins the remaining parts and converts the result from JSON to lambda, removing specific nodes before adding the nodes to an execute-file node. The main slots used are [strings.contains], [strings.split], [remove-nodes], [set-value], [strings.join], [json2lambda], and [add].
+if
+   strings.contains:x:@.arguments/*/invocation
+      .:":"
+   .lambda
+      strings.split:x:@.arguments/*/invocation
+         .:":"
+      remove-nodes:x:@strings.split/0
+      set-value:x:@.json
+         strings.join:x:@strings.split/*
+            .:":"
+      if
+         neq:x:@.json
+            .:
+         .lambda
+            json2lambda:x:@.json
+            remove-nodes:x:@json2lambda/*/_session
+            remove-nodes:x:@json2lambda/*/_user-id
+            remove-nodes:x:@json2lambda/*/_type
+            add:x:../*/execute-file
+               get-nodes:x:@json2lambda/*
