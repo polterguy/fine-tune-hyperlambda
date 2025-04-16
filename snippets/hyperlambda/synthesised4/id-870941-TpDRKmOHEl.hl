@@ -1,0 +1,26 @@
+
+// This Hyperlambda code attempts to execute a file specified in the arguments and handles the execution result. It first adds arguments to the [execute-file] slot, then executes the file. If the user is in the "root" role, it calculates the time taken and signals the result using [sockets.signal]. Finally, it sets and adds the execution result to the return node. The slots used are: [try], [add], [execute-file], [if], [auth.ticket.in-role], [math.subtract], [unwrap], [sockets.signal], [set-value], [get-nodes], and [return].
+try
+   add:x:./*/execute-file
+      get-nodes:x:@.arguments/*/arguments/*
+   execute-file:x:@.arguments/*/filename
+   if
+      auth.ticket.in-role:root
+      .lambda
+         add:x:./*/sockets.signal/*/args/*/output
+            get-nodes:x:@execute-file/*
+         math.subtract
+            date.now
+            get-value:x:@.time
+         unwrap:x:+/**
+         sockets.signal:magic.workflows.action
+            roles:root
+            args
+               type:result
+               time:x:@math.subtract
+               output
+   set-value:x:./*/return
+      get-value:x:@.arguments/*/name
+   add:x:./*/return
+      get-nodes:x:@execute-file/*
+   return

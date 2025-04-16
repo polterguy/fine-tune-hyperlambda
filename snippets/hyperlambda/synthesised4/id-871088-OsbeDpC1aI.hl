@@ -1,0 +1,48 @@
+
+// This Hyperlambda code checks if the [_type] argument exists and is not null, then connects to a SQLite database to retrieve the maximum context tokens for a specific type. It converts the result to an integer and stores it in [.max-tokens]. The code then serializes the [execute] node to JSON and enters a loop to remove URLs from the [execute] node while the token count exceeds the maximum allowed. If no URLs exist, it removes the [urls] node. Another loop trims the [result] string to fit within the token limit by reducing its length to 90% until the token count is acceptable.
+if
+   and
+      exists:x:@.arguments/*/_type
+      not-null:x:@.arguments/*/_type
+   .lambda
+      data.connect:[generic|magic]
+         database-type:sqlite
+         data.scalar:select max_context_tokens from ml_types where type = @type
+            database-type:sqlite
+            @type:x:@.arguments/*/_type
+         set-value:x:@.max-tokens
+            convert:x:@data.scalar
+               type:int
+      .json
+      set-value:x:@.json
+         lambda2json:x:@execute/*
+      while
+         and
+            exists:x:@execute/*/urls/0
+            mt
+               openai.tokenize:x:@.json
+               get-value:x:@.max-tokens
+         .lambda
+            remove-nodes:x:@execute/*/urls/0/-
+            set-value:x:@.json
+               lambda2json:x:@execute/*
+      if
+         not
+            exists:x:@execute/*/urls/0
+         .lambda
+            remove-nodes:x:@execute/*/urls
+      while
+         mt
+            openai.tokenize:x:@.json
+            get-value:x:@.max-tokens
+         .lambda
+            math.multiply
+               strings.length:x:@execute/*/result
+               .:decimal:0.9
+            set-value:x:@execute/*/result
+               strings.substring:x:@execute/*/result
+                  .:int:0
+                  convert:x:@math.multiply
+                     type:int
+            set-value:x:@.json
+               lambda2json:x:@execute/*
