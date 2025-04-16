@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "northwind" and constructs a dynamic SQL query to read data from the "Regions" table. It concatenates an aggregate function and column into a single string, removes certain argument nodes, adds additional nodes to the "where" clause, and retrieves a single result with an alias. The result is returned as nodes from the data read operation. 
+ * 
+ * 1. [data.connect] - Connects to the specified database using SQLite.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Concatenates the aggregate function and column into a single string.
+ * 4. [remove-nodes] - Removes specific argument nodes.
+ * 5. [add] - Adds nodes to the "where" clause.
+ * 6. [data.read] - Reads data from the "Regions" table with specified columns and conditions.
+ * 7. [columns] - Specifies the columns to be selected, including an aggregate function with an alias.
+ * 8. [where] - Specifies the conditions for the data selection.
+ * 9. [limit] - Limits the result to one record.
+ * 10. [return-nodes] - Returns the nodes from the data read operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Regions
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

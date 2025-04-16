@@ -1,0 +1,46 @@
+
+/*
+ * This Hyperlambda code connects to a data source and constructs a prompt and completion string using file name and URL arguments. It checks if a training snippet with these values already exists in the "ml_training_snippets" table. If not, it creates a new entry with the constructed prompt, completion, and type. The code uses slots like [strings.concat] to build strings, [data.read] to query the database, and [data.create] to insert new records.
+ * 
+ * 1. [data.connect] - Connects to a data source.
+ * 2. [.prompt] - Declares a node for storing the prompt.
+ * 3. [.completion] - Declares a node for storing the completion.
+ * 4. [set-value] - Sets the value of a node.
+ * 5. [strings.concat] - Concatenates strings to form the prompt and completion.
+ * 6. [get-value] - Retrieves values from specific nodes.
+ * 7. [data.read] - Reads data from a specified table with conditions.
+ * 8. [if] - Checks a condition.
+ * 9. [not-exists] - Checks if a node set is empty.
+ * 10. [.lambda] - Executes a block of code if the condition is true.
+ * 11. [data.create] - Inserts a new record into a table.
+ */
+data.connect:[generic|magic]
+   .prompt
+   .completion
+   set-value:x:@.prompt
+      strings.concat
+         .:"Image - "
+         get-value:x:@.arguments/*/file/*/name
+   set-value:x:@.completion
+      strings.concat
+         .:![
+         get-value:x:@.arguments/*/file/*/name
+         .:](
+         get-value:x:@.url
+         .:)
+   data.read
+      table:ml_training_snippets
+      where
+         and
+            prompt.eq:x:@.prompt
+            completion.eq:x:@.completion
+            type.eq:x:@.arguments/*/type
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         data.create
+            table:ml_training_snippets
+            values
+               prompt:x:@.prompt
+               completion:x:@.completion
+               type:x:@.arguments/*/type
