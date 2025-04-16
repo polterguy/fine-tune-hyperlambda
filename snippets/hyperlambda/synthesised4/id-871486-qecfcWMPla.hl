@@ -1,0 +1,38 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database named "hospital" and performs a query to count distinct values in a specified column from the "Doctors" table. It constructs a SQL function for counting distinct values by concatenating strings and removes the distinct column argument after use. The query results are filtered by conditions specified in the arguments, and the distinct count is returned with an alias "count". The code then returns the results of the query execution. 
+ * 
+ * 1. [data.connect] - Connects to the "hospital" database with SQLite as the database type.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Constructs a SQL function to count distinct values in a specified column.
+ * 4. [strings.concat] - Concatenates strings to form the SQL function for counting distinct values.
+ * 5. [get-value] - Retrieves the value of the distinct column argument.
+ * 6. [remove-nodes] - Removes the distinct column argument after constructing the SQL function.
+ * 7. [add] - Adds filtering conditions to the query from the provided arguments.
+ * 8. [data.read] - Reads data from the "Doctors" table, specifying the database type and table name.
+ * 9. [columns] - Specifies the columns to be selected, including the distinct count function.
+ * 10. [distinct_functor] - Represents the SQL function for counting distinct values.
+ * 11. [as] - Aliases the distinct count result as "count".
+ * 12. [where] - Specifies the filtering conditions for the query.
+ * 13. [and] - Logical operator for combining multiple conditions.
+ * 14. [return-nodes] - Returns the results of the query execution.
+ */
+data.connect:[generic|hospital]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Doctors
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,36 @@
+
+// This Hyperlambda code connects to a SQLite database and performs a read operation on the "leads" table, joining it with the "clients" table using a left join. It dynamically adds and removes nodes related to order, direction, limit, and offset from the arguments, and retrieves specific columns from the joined tables. The results of the read operation are returned.
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:leads
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  leads.client_id:client_id.client_id
+      columns
+         leads.lead_id
+         leads.client_id
+         leads.source
+         leads.status
+         leads.created_date
+         client_id.name
+            as:client_id.name
+      where
+         and
+   return-nodes:x:@data.read/*

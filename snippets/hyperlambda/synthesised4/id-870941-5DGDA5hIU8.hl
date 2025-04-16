@@ -1,0 +1,30 @@
+
+/*
+ * Checks if the current user has the "root" role using [auth.ticket.in-role]. If true, it executes a series of operations: adds nodes to [output] from [execute-file], calculates the time difference using [math.subtract] between the current time and a stored [.time] value, unwraps nodes, and sends a signal [sockets.signal] to "magic.workflows.action" with role "root" and arguments including the result type and calculated time. 
+ * 
+ * 1. [if] - Checks a condition.
+ * 2. [auth.ticket.in-role] - Verifies if the user has the "root" role.
+ * 3. [.lambda] - Executes child nodes if the condition is true.
+ * 4. [add] - Adds nodes to a specified location.
+ * 5. [get-nodes] - Retrieves nodes from a specified path.
+ * 6. [math.subtract] - Subtracts two values.
+ * 7. [date.now] - Gets the current date and time.
+ * 8. [get-value] - Retrieves the value of a node.
+ * 9. [unwrap] - Evaluates expressions in nodes.
+ * 10. [sockets.signal] - Sends a signal with specified arguments.
+ */
+if
+   auth.ticket.in-role:root
+   .lambda
+      add:x:./*/sockets.signal/*/args/*/output
+         get-nodes:x:@execute-file/*
+      math.subtract
+         date.now
+         get-value:x:@.time
+      unwrap:x:+/**
+      sockets.signal:magic.workflows.action
+         roles:root
+         args
+            type:result
+            time:x:@math.subtract
+            output
