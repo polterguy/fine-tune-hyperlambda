@@ -1,0 +1,37 @@
+
+/*
+ * The code iterates over nodes in [disallow], checking if a pattern matches a URL. If a match is found, it sets [allowed] to false. It then iterates over [allow] nodes, checking for matches again, and if a match is found, it sets [allowed] to true. 
+ * 
+ * 1. [for-each:x:@.arguments/*/disallow/*] - Iterates over each child node of [disallow].
+ * 2. [unwrap:x:+/*] - Evaluates the current node's children.
+ * 3. [invoke:x:@.match] - Invokes the [match] slot with URL and pattern.
+ * 4. [if] - Checks if the [invoke] result is true.
+ * 5. [.lambda] - Executes if the condition is true.
+ * 6. [set-value:x:@.allowed] - Sets the [allowed] node's value to false.
+ * 7. [for-each:x:@.arguments/*/allow/*] - Iterates over each child node of [allow].
+ * 8. [unwrap:x:+/*] - Evaluates the current node's children.
+ * 9. [invoke:x:@.match] - Invokes the [match] slot with URL and pattern.
+ * 10. [if] - Checks if the [invoke] result is true.
+ * 11. [.lambda] - Executes if the condition is true.
+ * 12. [set-value:x:@.allowed] - Sets the [allowed] node's value to true.
+ */
+for-each:x:@.arguments/*/disallow/*
+   unwrap:x:+/*
+   invoke:x:@.match
+      url:x:@sort/0
+      pattern:x:@.dp/#
+   if
+      get-value:x:@invoke
+      .lambda
+         set-value:x:@.allowed
+            .:bool:false
+         for-each:x:@.arguments/*/allow/*
+            unwrap:x:+/*
+            invoke:x:@.match
+               url:x:@sort/0
+               pattern:x:@.dp/#
+            if
+               get-value:x:@invoke
+               .lambda
+                  set-value:x:@.allowed
+                     .:bool:true

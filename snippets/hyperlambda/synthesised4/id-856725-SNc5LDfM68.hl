@@ -1,0 +1,42 @@
+
+/*
+ * This Hyperlambda code creates a task that deletes a demo chatbot 7 days after its creation. It connects to a database to execute a delete operation on specific records based on the type, deletes an associated HTML file, logs the deletion, and finally deletes the task itself. The task's name is dynamically generated using string concatenation.
+ * 
+ * 1. [tasks.create] - Creates a new task with a dynamic name.
+ * 2. [description] - Provides a description for the task.
+ * 3. [due] - Sets the task to execute 7 days after creation.
+ * 4. [.lambda] - Defines the operations to execute when the task runs.
+ * 5. [.type] - Retrieves the type of the chatbot.
+ * 6. [data.connect] - Connects to a database.
+ * 7. [data.execute] - Executes a SQL delete command on a specific table.
+ * 8. [type] - Passes the type as a parameter to the SQL command.
+ * 9. [.task] - Generates a task name using string concatenation.
+ * 10. [data.delete] - Deletes records from another table based on the type.
+ * 11. [strings.concat] - Concatenates strings to form a file path.
+ * 12. [io.file.delete] - Deletes a file using the generated path.
+ * 13. [log.info] - Logs a message indicating the chatbot was deleted.
+ * 14. [tasks.delete] - Deletes the task itself after execution.
+ */
+tasks.create:x:@strings.concat
+   description:Deletes demo chatbot 7 days after creating it
+   due:x:@math.add
+   .lambda
+      .type:x:@.type
+      data.connect:[generic|magic]
+         data.execute:"\ndelete from vss_ml_training_snippets\n   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+            type:x:@.type
+      .task:x:@strings.concat
+      data.connect:[generic|magic]
+         data.delete
+            table:ml_types
+            where
+               and
+                  type.eq:x:@.type
+      strings.concat
+         .:/etc/www/
+         get-value:x:@.type
+         .:.html
+      io.file.delete:x:@strings.concat
+      log.info:Demo chatbot was deleted
+         type:x:@.type
+      tasks.delete:x:@.task
