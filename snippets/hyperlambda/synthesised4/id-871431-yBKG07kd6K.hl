@@ -1,0 +1,56 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and dynamically constructs a SQL query with group by and aggregate functions based on provided arguments. It modifies the query structure by inserting group and aggregate function details, removes processed arguments, and adds ordering and pagination parameters. Finally, it reads data from the 'clients' table and returns the query results. 
+ * 
+ * 1. [data.connect] - Opens a connection to the SQLite database.
+ * 2. [set-name] - Sets the name of the group column in the query.
+ * 3. [insert-before] - Inserts the group column into the columns list.
+ * 4. [set-value] - Sets the alias for the aggregate function.
+ * 5. [remove-nodes] - Removes processed arguments like group column and limit.
+ * 6. [add] - Adds limit and offset nodes to the data.read node.
+ * 7. [strings.concat] - Concatenates the aggregate function and column.
+ * 8. [data.read] - Executes the SQL query on the 'clients' table.
+ * 9. [return-nodes] - Returns the query results.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:clients
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

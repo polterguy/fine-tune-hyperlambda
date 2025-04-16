@@ -1,0 +1,27 @@
+
+// The code uses a [switch] statement to establish a database connection based on the [database-type] and executes SQL scripts. For MySQL, it connects using [mysql.connect] and executes a file. For PostgreSQL, it creates a database and executes a file. For SQL Server, it connects to the master database and executes a batch. For SQLite, it constructs a file path, saves it, and executes a file. Each [case] handles a different database type, using the appropriate connection and execution slots.
+switch:x:@.database-type
+   case:mysql
+      mysql.connect:sys
+         mysql.execute:x:@io.file.load
+   case:pgsql
+      pgsql.connect:postgres
+         strings.concat
+            .:"create database "
+            get-value:x:@.arguments/*/database
+         pgsql.execute:x:-
+            database:x:@.arguments/*/database
+      pgsql.connect:x:@.arguments/*/database
+         pgsql.execute:x:@io.file.load
+   case:mssql
+      mssql.connect:master
+         mssql.execute-batch:x:@io.file.load
+   case:sqlite
+      strings.concat
+         .:/data/
+         get-value:x:@.arguments/*/database
+         .:.db
+      io.file.save:x:-
+         .:
+      sqlite.connect:x:@.arguments/*/database
+         sqlite.execute:x:@io.file.load

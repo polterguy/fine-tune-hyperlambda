@@ -1,0 +1,46 @@
+
+// This Hyperlambda code handles HTTP redirection by checking if the status code is 301 or 302. If the URL starts with "http://", it attempts to access the SSL equivalent by replacing "http://" with "https://", signaling the feedback channel, and executing a URL retrieval. If not, it constructs a message indicating the page's new location, signals the feedback channel, and attempts to access the alternative location. The code uses slots like [eq], [strings.starts-with], [sockets.signal], [strings.replace], [execute], and [return] to perform these operations.
+if
+   or
+      eq:x:@http.get
+         .:int:301
+      eq:x:@http.get
+         .:int:302
+   .lambda
+      if
+         strings.starts-with:x:@.arguments/*/url
+            .:"http://"
+         .lambda
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Page moved to, trying SSL equivalent
+                  type:info
+            sleep:100
+            strings.replace:x:@.arguments/*/url
+               .:"http://"
+               .:"https://"
+            add:x:+/*/headers
+               get-nodes:x:@.arguments/*/headers/*
+            execute:magic.ai.url.get
+               url:x:@strings.replace
+               headers
+            return:x:-
+      else
+         strings.concat
+            .:"Page moved to '"
+            get-value:x:@http.get/*/headers/*/Location
+            .:"', trying alternative location"
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         sleep:100
+         add:x:+/+/*/headers
+            get-nodes:x:@.arguments/*/headers/*
+         add:x:+
+            get-nodes:x:@.arguments/*/feedback-channel
+         execute:magic.ai.url.get
+            url:x:@http.get/*/headers/*/Location
+            headers
+         return:x:-

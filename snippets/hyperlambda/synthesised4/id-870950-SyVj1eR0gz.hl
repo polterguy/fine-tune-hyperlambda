@@ -1,0 +1,25 @@
+
+// This Hyperlambda code checks if a file ends with ".sql" and loads it. It then attempts to execute the SQL script in a database connection specified in the arguments. If the database type is Microsoft SQL Server, it renames the execution slot to "mssql.execute-batch". If the execution succeeds, it logs a success message; otherwise, it logs an error and sets the result to false. The code uses a try-catch block to handle potential execution errors.
+if
+   strings.ends-with:x:@.dp/#
+      .:.sql
+   .lambda
+      io.file.load:x:@.dp/#
+      try
+         data.connect:x:@.arguments/*/database
+            if
+               eq
+                  get-value:x:@.database-type
+                  .:mssql
+               .lambda
+                  set-name:x:@data.connect/*/data.execute
+                     .:mssql.execute-batch
+            data.execute:x:@io.file.load
+            log.info:Database migration script successfully executed
+               script:x:@.dp/#
+      .catch
+         log.error:Something went wrong as we tried to execute plugin database migration script
+            script:x:@.dp/#
+            error:x:@.arguments/*/message
+         set-value:x:@.result
+            .:bool:false
