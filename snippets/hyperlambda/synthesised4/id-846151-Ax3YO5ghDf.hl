@@ -1,0 +1,48 @@
+
+/*
+ * This Hyperlambda code connects to a database and reads user information by joining the "users" table with the "users_extra" table twice, using aliases "ue1" and "ue2". It retrieves columns for username, password, email, and name, filtering results where the "type" in "users_extra" matches "email" and "name". The username is matched against a value retrieved from an authentication ticket. The results are then stored in separate nodes for username, password, email, and name.
+ * 
+ * 1. [data.connect] - Connects to a specified database.
+ * 2. [data.read] - Reads data from the database.
+ * 3. [table] - Specifies the main table to read from.
+ * 4. [join] - Joins additional tables to the main table.
+ * 5. [as] - Provides an alias for the joined table.
+ * 6. [on] - Specifies the condition for joining tables.
+ * 7. [columns] - Lists the columns to be retrieved.
+ * 8. [where] - Filters the results based on conditions.
+ * 9. [set-value] - Sets the value of a node.
+ * 10. [get-value] - Retrieves the value of a node.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:users
+         join:users_extra
+            as:ue1
+            on
+               and
+                  users.username.eq:ue1.user
+         join:users_extra
+            as:ue2
+            on
+               and
+                  users.username.eq:ue2.user
+      columns
+         users.username
+         users.password
+         ue1.value
+            as:email
+         ue2.value
+            as:name
+      where
+         and
+            ue1.type.eq:email
+            ue2.type.eq:name
+            users.username.eq:x:@auth.ticket.get
+   set-value:x:@.username
+      get-value:x:@data.read/*/*/username
+   set-value:x:@.password
+      get-value:x:@data.read/*/*/password
+   set-value:x:@.email
+      get-value:x:@data.read/*/*/email
+   set-value:x:@.name
+      get-value:x:@data.read/*/*/name

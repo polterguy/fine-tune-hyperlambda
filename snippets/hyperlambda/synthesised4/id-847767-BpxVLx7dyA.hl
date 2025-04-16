@@ -1,0 +1,107 @@
+
+/*
+ * This Hyperlambda code defines a dynamic SQL query generator for a healthcare database, focusing on treatments and patients. It validates input arguments, ensuring mandatory fields and specific enumerated values for aggregation and grouping. The code establishes a database connection, constructs a SQL query with optional grouping, ordering, and aggregation, and retrieves data from the "Treatments" table with a left join on "Patients". It sets cache control headers and verifies user authentication before executing the query and returning the results.
+ * 
+ * 1. [.arguments] - Defines the expected input arguments for the SQL query.
+ * 2. [validators.mandatory] - Ensures required arguments are provided.
+ * 3. [validators.enum] - Validates that certain arguments match predefined values.
+ * 4. [response.headers.set] - Sets HTTP response headers for caching.
+ * 5. [auth.ticket.verify] - Verifies user authentication and authorization.
+ * 6. [data.connect] - Establishes a connection to the database.
+ * 7. [set-name] - Configures group column and aggregate function names.
+ * 8. [insert-before] - Inserts the group column into the query.
+ * 9. [set-value] - Sets the alias for the aggregate function result.
+ * 10. [remove-nodes] - Removes processed arguments from the node tree.
+ * 11. [add] - Adds limit, offset, order, and direction nodes to the query.
+ * 12. [strings.concat] - Constructs the aggregate function expression.
+ * 13. [data.read] - Executes the SQL query with specified columns, joins, and conditions.
+ * 14. [return-nodes] - Returns the query results.
+ */
+hyper2lambda
+   .arguments
+      group_column:string
+      limit:long
+      offset:long
+      order:string
+      direction:string
+      aggregate_function:string
+      aggregate_column:string
+      Treatments.TreatmentID.eq:long
+      Treatments.PatientID.eq:long
+      Treatments.TreatmentDate.eq:date
+      Treatments.Description.like:string
+      Treatments.Description.eq:string
+      PatientID.FirstName.eq:string
+      PatientID.FirstName.like:string
+   validators.mandatory:x:@.arguments/*/group_column
+   validators.mandatory:x:@.arguments/*/aggregate_function
+   validators.mandatory:x:@.arguments/*/aggregate_column
+   validators.enum:x:@.arguments/*/aggregate_function
+      .:min
+      .:max
+      .:sum
+      .:avg
+      .:count
+   validators.enum:x:@.arguments/*/group_column
+      .:Treatments.TreatmentID
+      .:Treatments.PatientID
+      .:Treatments.TreatmentDate
+      .:Treatments.Description
+      .:PatientID.FirstName
+   validators.enum:x:@.arguments/*/aggregate_column
+      .:Treatments.TreatmentID
+      .:Treatments.PatientID
+      .:Treatments.TreatmentDate
+      .:Treatments.Description
+      .:PatientID.FirstName
+   response.headers.set
+      Cache-Control:public, max-age=300
+   auth.ticket.verify:admin,guest,root
+   data.connect:[generic|hospital]
+      database-type:sqlite
+      set-name:x:@data.connect/*/data.read/*/group/*/group_column
+         get-value:x:@.arguments/*/group_column
+      set-name:x:+/*/*
+         get-value:x:@.arguments/*/group_column
+      insert-before:x:@data.connect/*/data.read/*/columns/0
+         .
+            group_column
+      set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+         get-value:x:@.arguments/*/aggregate_function
+      remove-nodes:x:@.arguments/*/group_column
+      add:x:@data.connect/*/data.read
+         get-nodes:x:@.arguments/*/limit
+         get-nodes:x:@.arguments/*/offset
+      remove-nodes:x:@.arguments/*/limit
+      remove-nodes:x:@.arguments/*/offset
+      add:x:./*/data.read
+         get-nodes:x:@.arguments/*/order
+         get-nodes:x:@.arguments/*/direction
+      remove-nodes:x:@.arguments/*/order
+      remove-nodes:x:@.arguments/*/direction
+      set-name:x:./*/data.read/*/columns/*/aggregate_functor
+         strings.concat
+            get-value:x:@.arguments/*/aggregate_function
+            .:(
+            get-value:x:@.arguments/*/aggregate_column
+            .:)
+      remove-nodes:x:@.arguments/*/[0,2]
+      add:x:./*/data.read/*/where/*
+         get-nodes:x:@.arguments/*
+      data.read
+         database-type:sqlite
+         table:Treatments
+            join:Patients
+               as:PatientID
+               type:left
+               on
+                  and
+                     Treatments.PatientID:PatientID.PatientID
+         columns
+            aggregate_functor
+               as:result
+         where
+            and
+         group
+            group_column
+      return-nodes:x:@data.read/*

@@ -1,0 +1,37 @@
+
+/*
+ * This Hyperlambda code handles the installation of a frontend module by performing several file operations and signaling a success message. It concatenates a URL with a query parameter, fetches data from the URL, processes the response headers to extract a filename, saves the content to a file, unzips it to a specified directory, deletes the temporary file, and finally sends a success message through a socket signal.
+ * 
+ * 1. [case] - Defines a case block for conditional execution.
+ * 2. [strings.concat] - Concatenates the URL with a query parameter for frontend type.
+ * 3. [http.get] - Performs an HTTP GET request using the concatenated URL.
+ * 4. [strings.split] - Splits the Content-Disposition header to extract the filename.
+ * 5. [strings.trim] - Trims quotes from the extracted filename.
+ * 6. [io.file.save.binary] - Saves the HTTP response content to a binary file.
+ * 7. [io.file.unzip] - Unzips the saved file to a specified folder, overwriting if necessary.
+ * 8. [io.file.delete] - Deletes the temporary file after extraction.
+ * 9. [sockets.signal] - Sends a success message indicating the frontend was installed.
+ */
+case:frontend
+   strings.concat
+      get-value:x:@.arguments/*/url
+      .:&type=frontend
+   http.get:x:@strings.concat
+   strings.split:x:@http.get/*/headers/*/Content-Disposition
+      .:=
+   strings.trim:x:@strings.split/1
+      .:"\""
+   strings.concat
+      .:/modules/
+      get-value:x:@strings.trim
+   io.file.save.binary:x:@strings.concat
+      get-value:x:@http.get/*/content
+   io.file.unzip:x:@strings.concat
+      folder:/etc/www/
+      overwrite:true
+   io.file.delete:x:@strings.concat
+   sockets.signal:magic.backend.message
+      roles:root
+      args
+         message:Frontend was successfully installed
+         type:success

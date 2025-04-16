@@ -1,0 +1,128 @@
+
+/*
+ * This Hyperlambda code defines a data retrieval process with SQL-like capabilities, using dynamic arguments for grouping, aggregation, and filtering. It validates mandatory arguments and their values, sets HTTP response headers, and verifies user authentication. The code connects to a SQLite database, dynamically constructs a SQL query with specified grouping and aggregation functions, and retrieves data from the "Patients" table. It returns the query result, allowing for flexible data extraction based on provided parameters.
+ * 
+ * 1. [.arguments] - Defines the expected input parameters for the process.
+ * 2. [validators.mandatory] - Ensures certain arguments are provided.
+ * 3. [validators.enum] - Validates that argument values are within a specified set.
+ * 4. [response.headers.set] - Sets HTTP response headers for caching.
+ * 5. [auth.ticket.verify] - Verifies user authentication with specified roles.
+ * 6. [data.connect] - Connects to the SQLite database and prepares the query.
+ * 7. [set-name] - Dynamically sets node names based on argument values.
+ * 8. [insert-before] - Inserts nodes before specified positions in the structure.
+ * 9. [set-value] - Sets values for nodes based on argument values.
+ * 10. [remove-nodes] - Removes nodes from the structure.
+ * 11. [add] - Adds nodes to the structure.
+ * 12. [strings.concat] - Concatenates strings to form SQL function calls.
+ * 13. [data.read] - Executes the constructed query to retrieve data.
+ * 14. [return-nodes] - Returns the result of the data query.
+ */
+hyper2lambda
+   .arguments
+      group_column:string
+      limit:long
+      offset:long
+      order:string
+      direction:string
+      aggregate_function:string
+      aggregate_column:string
+      Patients.PatientID.eq:long
+      Patients.FirstName.like:string
+      Patients.FirstName.eq:string
+      Patients.LastName.like:string
+      Patients.LastName.eq:string
+      Patients.DateOfBirth.eq:date
+      Patients.Gender.like:string
+      Patients.Gender.eq:string
+      Patients.Address.like:string
+      Patients.Address.eq:string
+      Patients.PhoneNumber.like:string
+      Patients.PhoneNumber.eq:string
+      Patients.Email.like:string
+      Patients.Email.eq:string
+      Patients.EmergencyContactName.like:string
+      Patients.EmergencyContactName.eq:string
+      Patients.EmergencyContactPhone.like:string
+      Patients.EmergencyContactPhone.eq:string
+      Patients.AdmissionDate.eq:date
+      Patients.DischargeDate.eq:date
+   validators.mandatory:x:@.arguments/*/group_column
+   validators.mandatory:x:@.arguments/*/aggregate_function
+   validators.mandatory:x:@.arguments/*/aggregate_column
+   validators.enum:x:@.arguments/*/aggregate_function
+      .:min
+      .:max
+      .:sum
+      .:avg
+      .:count
+   validators.enum:x:@.arguments/*/group_column
+      .:Patients.PatientID
+      .:Patients.FirstName
+      .:Patients.LastName
+      .:Patients.DateOfBirth
+      .:Patients.Gender
+      .:Patients.Address
+      .:Patients.PhoneNumber
+      .:Patients.Email
+      .:Patients.EmergencyContactName
+      .:Patients.EmergencyContactPhone
+      .:Patients.AdmissionDate
+      .:Patients.DischargeDate
+   validators.enum:x:@.arguments/*/aggregate_column
+      .:Patients.PatientID
+      .:Patients.FirstName
+      .:Patients.LastName
+      .:Patients.DateOfBirth
+      .:Patients.Gender
+      .:Patients.Address
+      .:Patients.PhoneNumber
+      .:Patients.Email
+      .:Patients.EmergencyContactName
+      .:Patients.EmergencyContactPhone
+      .:Patients.AdmissionDate
+      .:Patients.DischargeDate
+   response.headers.set
+      Cache-Control:public, max-age=300
+   auth.ticket.verify:admin,guest,root
+   data.connect:[generic|hospital]
+      database-type:sqlite
+      set-name:x:@data.connect/*/data.read/*/group/*/group_column
+         get-value:x:@.arguments/*/group_column
+      set-name:x:+/*/*
+         get-value:x:@.arguments/*/group_column
+      insert-before:x:@data.connect/*/data.read/*/columns/0
+         .
+            group_column
+      set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+         get-value:x:@.arguments/*/aggregate_function
+      remove-nodes:x:@.arguments/*/group_column
+      add:x:@data.connect/*/data.read
+         get-nodes:x:@.arguments/*/limit
+         get-nodes:x:@.arguments/*/offset
+      remove-nodes:x:@.arguments/*/limit
+      remove-nodes:x:@.arguments/*/offset
+      add:x:./*/data.read
+         get-nodes:x:@.arguments/*/order
+         get-nodes:x:@.arguments/*/direction
+      remove-nodes:x:@.arguments/*/order
+      remove-nodes:x:@.arguments/*/direction
+      set-name:x:./*/data.read/*/columns/*/aggregate_functor
+         strings.concat
+            get-value:x:@.arguments/*/aggregate_function
+            .:(
+            get-value:x:@.arguments/*/aggregate_column
+            .:)
+      remove-nodes:x:@.arguments/*/[0,2]
+      add:x:./*/data.read/*/where/*
+         get-nodes:x:@.arguments/*
+      data.read
+         database-type:sqlite
+         table:Patients
+         columns
+            aggregate_functor
+               as:result
+         where
+            and
+         group
+            group_column
+      return-nodes:x:@data.read/*

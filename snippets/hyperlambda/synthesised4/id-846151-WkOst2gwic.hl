@@ -1,0 +1,181 @@
+
+/*
+ * This Hyperlambda code manages database connections and configurations. It verifies user authentication, validates input arguments, and checks for the presence of a "{database}" placeholder in the connection string. Depending on the database type (MySQL, PostgreSQL, or MSSQL), it connects to a specific database and retrieves available databases. The code then updates the configuration with the new connection string and optionally sets it as the default. It also manages user data and roles if the connection is set as default, ensuring the database is correctly configured. Error handling is implemented to return failure messages if exceptions occur.
+ * 
+ * 1. [.arguments] - Declares the expected arguments for the operation.
+ * 2. [auth.ticket.verify] - Verifies user authentication.
+ * 3. [validators.mandatory] - Ensures required arguments are provided.
+ * 4. [validators.enum] - Validates the database type against allowed values.
+ * 5. [if] - Checks if the connection string contains "{database}".
+ * 6. [try] - Attempts to connect to the specified database type and retrieve databases.
+ * 7. [switch] - Selects the database connection logic based on the database type.
+ * 8. [config.load] - Loads the current configuration.
+ * 9. [json2lambda] - Converts JSON configuration to a lambda object.
+ * 10. [if] - Checks if the database type exists in the configuration.
+ * 11. [set-name] - Sets the name of the database connection.
+ * 12. [add] - Adds the connection string to the configuration.
+ * 13. [unwrap] - Evaluates expressions within the lambda object.
+ * 14. [if] - Checks conditions to set the connection as default.
+ * 15. [auth.ticket.get] - Retrieves user authentication details.
+ * 16. [data.connect] - Connects to the database to perform operations.
+ * 17. [data.read] - Reads user data from the database.
+ * 18. [set-value] - Sets values for user data.
+ * 19. [lambda2json] - Converts the lambda object back to JSON.
+ * 20. [config.save] - Saves the updated configuration.
+ * 21. [sleep] - Pauses execution for a specified duration.
+ * 22. [io.file.execute] - Executes a file to ensure database configuration.
+ * 23. [data.delete] - Deletes user data from the database.
+ * 24. [data.create] - Creates new user data in the database.
+ * 25. [for-each] - Iterates over user roles to create entries in the database.
+ * 26. [cache.clear] - Clears the cache.
+ * 27. [.catch] - Handles exceptions and returns failure messages.
+ */
+hyper2lambda
+   .arguments
+      databaseType:string
+      name:string
+      connectionString:string
+      useAsDefault:bool
+   auth.ticket.verify:root
+   validators.mandatory:x:@.arguments/*/databaseType
+   validators.mandatory:x:@.arguments/*/name
+   validators.mandatory:x:@.arguments/*/connectionString
+   validators.enum:x:@.arguments/*/databaseType
+      .:mysql
+      .:pgsql
+      .:mssql
+   if
+      not
+         strings.contains:x:@.arguments/*/connectionString
+            .:{database}
+      .lambda
+         return
+            result:failure
+            message:Connection string does not contain {database}
+   try
+      switch:x:@.arguments/*/databaseType
+         case:mssql
+            strings.replace:x:@.arguments/*/connectionString
+               .:{database}
+               .:master
+            mssql.connect:x:@strings.replace
+               mssql.select:select name from master.dbo.sysdatabases
+         case:mysql
+            strings.replace:x:@.arguments/*/connectionString
+               .:{database}
+               .:information_schema
+            mysql.connect:x:@strings.replace
+               mysql.select:show databases
+         case:pgsql
+            strings.replace:x:@.arguments/*/connectionString
+               .:{database}
+               .:postgres
+            pgsql.connect:x:@strings.replace
+               pgsql.select:select datname from pg_database
+      config.load
+      json2lambda:x:-
+      if
+         not-exists:x:"@json2lambda/*/magic/*/databases/*/\"{@.arguments/*/databaseType}\""
+         .lambda
+            set-name:x:+/*/*
+               get-value:x:@.arguments/*/databaseType
+            add:x:@json2lambda/*/magic/*/databases
+               .
+                  foo
+      set-name:x:+/+/*/*
+         get-value:x:@.arguments/*/name
+      unwrap:x:+/*/*
+      add:x:"@json2lambda/*/magic/*/databases/*/\"{@.arguments/*/databaseType}\""
+         .
+            foo:x:@.arguments/*/connectionString
+      if
+         and
+            eq:x:@.arguments/*/name
+               .:generic
+            exists:x:@.arguments/*/useAsDefault
+            get-value:x:@.arguments/*/useAsDefault
+         .lambda
+            .username
+            .password
+            .email
+            .name
+            auth.ticket.get
+            data.connect:[generic|magic]
+               data.read
+                  table:users
+                     join:users_extra
+                        as:ue1
+                        on
+                           and
+                              users.username.eq:ue1.user
+                     join:users_extra
+                        as:ue2
+                        on
+                           and
+                              users.username.eq:ue2.user
+                  columns
+                     users.username
+                     users.password
+                     ue1.value
+                        as:email
+                     ue2.value
+                        as:name
+                  where
+                     and
+                        ue1.type.eq:email
+                        ue2.type.eq:name
+                        users.username.eq:x:@auth.ticket.get
+               set-value:x:@.username
+                  get-value:x:@data.read/*/*/username
+               set-value:x:@.password
+                  get-value:x:@data.read/*/*/password
+               set-value:x:@.email
+                  get-value:x:@data.read/*/*/email
+               set-value:x:@.name
+                  get-value:x:@data.read/*/*/name
+            set-value:x:@json2lambda/*/magic/*/databases/*/default
+               get-value:x:@.arguments/*/databaseType
+            lambda2json:x:@json2lambda/*
+            config.save:x:-
+            sleep:2000
+            io.file.execute:/system/ensure-magic-database.hl
+            data.connect:[generic|magic]
+               data.delete
+                  table:users
+                  where
+                     and
+                        username.eq:x:@.username
+               data.create
+                  table:users
+                  values
+                     username:x:@.username
+                     password:x:@.password
+               data.create
+                  table:users_extra
+                  values
+                     user:x:@.username
+                     type:email
+                     value:x:@.email
+               data.create
+                  table:users_extra
+                  values
+                     user:x:@.username
+                     type:name
+                     value:x:@.name
+               for-each:x:@auth.ticket.get/*/roles/*
+                  data.create
+                     table:users_roles
+                     values
+                        user:x:@.username
+                        role:x:@.dp/#
+            cache.clear
+      else
+         lambda2json:x:@json2lambda/*
+         config.save:x:-
+      return
+         result:success
+   .catch
+      unwrap:x:+/*
+      return
+         result:failure
+         message:x:@.arguments/*/message

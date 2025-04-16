@@ -1,0 +1,58 @@
+
+/*
+ * This Hyperlambda code snippet dynamically constructs a SQL statement for creating a table with a primary key. It checks if the primary key type is "auto_increment" and adjusts the SQL accordingly. If not, it uses the provided primary key type and length. It also appends a default value to the SQL if specified. The final SQL statement is stored in the [.sql] node.
+ * 
+ * 1. [case:sqlite] - Initiates the case for SQLite.
+ * 2. [.type] - Placeholder for the primary key type.
+ * 3. [if] - Checks if the primary key type is "auto_increment".
+ * 4. [eq] - Compares the primary key type to "auto_increment".
+ * 5. [set-value] - Sets the primary key type to "integer not null primary key autoincrement" if true.
+ * 6. [else] - Handles the case where the primary key type is not "auto_increment".
+ * 7. [strings.concat] - Concatenates the primary key type and length.
+ * 8. [get-value] - Retrieves values for table name, primary key name, type, and length.
+ * 9. [exists] - Checks if a default value for the primary key exists.
+ * 10. [neq] - Ensures the default value is not null or empty.
+ * 11. [set-value] - Appends the default value to the SQL if it exists.
+ * 12. [strings.concat] - Finalizes the SQL statement with a closing parenthesis.
+ */
+case:sqlite
+   .type
+   if
+      eq:x:@.arguments/*/pkType
+         .:auto_increment
+      .lambda
+         set-value:x:@.type
+            strings.concat
+               .:integer not null primary key autoincrement
+   else
+      set-value:x:@.type
+         strings.concat
+            get-value:x:@.arguments/*/pkType
+            .:(
+            get-value:x:@.arguments/*/pkLength
+            .:) not null primary key
+   set-value:x:@.sql
+      strings.concat
+         .:"create table "
+         get-value:x:@.arguments/*/tableName
+         .:(
+         get-value:x:@.arguments/*/pkName
+         .:" "
+         get-value:x:@.type
+   if
+      and
+         exists:x:@.arguments/*/pkDefault
+         neq:x:@.arguments/*/pkDefault
+            .
+         neq:x:@.arguments/*/pkDefault
+            .:
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" default "
+               get-value:x:@.arguments/*/pkDefault
+   set-value:x:@.sql
+      strings.concat
+         get-value:x:@.sql
+         .:);

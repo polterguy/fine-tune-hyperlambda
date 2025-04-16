@@ -1,0 +1,44 @@
+
+// This Hyperlambda code generates a SQL statement to create a PostgreSQL table with a primary key. It checks if the primary key type is "auto_increment" to set it as a "serial primary key", otherwise it constructs the primary key with its specified type and length. It also appends a default value to the SQL statement if provided. The final SQL statement is stored in the [.sql] node.
+case:pgsql
+   .type
+   if
+      eq:x:@.arguments/*/pkType
+         .:auto_increment
+      .lambda
+         set-value:x:@.type
+            strings.concat
+               get-value:x:@.arguments/*/pkName
+               .:" serial primary key"
+   else
+      set-value:x:@.type
+         strings.concat
+            get-value:x:@.arguments/*/pkName
+            .:" "
+            get-value:x:@.arguments/*/pkType
+            .:(
+            get-value:x:@.arguments/*/pkLength
+            .:) primary key
+   set-value:x:@.sql
+      strings.concat
+         .:"create table "
+         get-value:x:@.arguments/*/tableName
+         .:(
+         get-value:x:@.type
+   if
+      and
+         exists:x:@.arguments/*/pkDefault
+         neq:x:@.arguments/*/pkDefault
+            .
+         neq:x:@.arguments/*/pkDefault
+            .:
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" default "
+               get-value:x:@.arguments/*/pkDefault
+   set-value:x:@.sql
+      strings.concat
+         get-value:x:@.sql
+         .:);

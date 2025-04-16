@@ -1,0 +1,33 @@
+
+/*
+ * Connects to a database and reads the 'type' column from the 'ml_types' table where the 'twilio_account_id' matches the provided argument. If no matching record is found, it throws a "Not authorised" exception with a 401 status. The retrieved 'type' value is then set to a variable. 
+ * 
+ * 1. [data.connect] - Opens a connection to the specified database.
+ * 2. [data.read] - Reads data from the 'ml_types' table.
+ * 3. [table] - Specifies the table to read from.
+ * 4. [columns] - Indicates the column to retrieve.
+ * 5. [where] - Defines the condition for data retrieval.
+ * 6. [and] - Combines multiple conditions.
+ * 7. [twilio_account_id.eq] - Checks for equality with the provided argument.
+ * 8. [if] - Conditional execution based on the existence of data.
+ * 9. [not-exists] - Checks if no data was retrieved.
+ * 10. [.lambda] - Executes the following block if the condition is true.
+ * 11. [throw] - Throws an exception with a specified status.
+ * 12. [set-value] - Assigns the retrieved 'type' value to a variable.
+ * 13. [get-value] - Retrieves the value from the specified node.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         type
+      where
+         and
+            twilio_account_id.eq:x:@.arguments/*/twilio_account_id
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Not authorised
+            status:int:401
+   set-value:x:@.type
+      get-value:x:@data.read/*/*/type

@@ -1,0 +1,120 @@
+
+/*
+ * This Hyperlambda code defines a data retrieval operation with dynamic SQL query generation based on input arguments. It validates mandatory and enumerated arguments for grouping and aggregation, sets response headers for caching, verifies user authentication, and connects to a SQLite database. The code constructs SQL queries by setting and removing nodes for grouping, ordering, and aggregation, and performs joins with "Patients" and "Doctors" tables. It finally executes the query and returns the results.
+ * 
+ * 1. [.arguments] - Defines the expected input arguments for the operation.
+ * 2. [validators.mandatory] - Ensures certain arguments are provided.
+ * 3. [validators.enum] - Validates that arguments are within specified enumerations.
+ * 4. [response.headers.set] - Sets HTTP response headers for caching.
+ * 5. [auth.ticket.verify] - Verifies user authentication roles.
+ * 6. [data.connect] - Connects to the SQLite database.
+ * 7. [set-name] - Sets node names for grouping and aggregation.
+ * 8. [insert-before] - Inserts nodes before specified positions.
+ * 9. [set-value] - Sets values for nodes.
+ * 10. [remove-nodes] - Removes specified nodes.
+ * 11. [add] - Adds nodes for limit, offset, order, and direction.
+ * 12. [strings.concat] - Concatenates strings for SQL functions.
+ * 13. [data.read] - Executes the SQL query with joins and returns results.
+ * 
+ */
+hyper2lambda
+   .arguments
+      group_column:string
+      limit:long
+      offset:long
+      order:string
+      direction:string
+      aggregate_function:string
+      aggregate_column:string
+      Appointments.AppointmentID.eq:long
+      Appointments.PatientID.eq:long
+      Appointments.DoctorID.eq:long
+      Appointments.AppointmentDate.eq:date
+      Appointments.Reason.like:string
+      Appointments.Reason.eq:string
+      PatientID.FirstName.eq:string
+      PatientID.FirstName.like:string
+      DoctorID.FirstName.eq:string
+      DoctorID.FirstName.like:string
+   validators.mandatory:x:@.arguments/*/group_column
+   validators.mandatory:x:@.arguments/*/aggregate_function
+   validators.mandatory:x:@.arguments/*/aggregate_column
+   validators.enum:x:@.arguments/*/aggregate_function
+      .:min
+      .:max
+      .:sum
+      .:avg
+      .:count
+   validators.enum:x:@.arguments/*/group_column
+      .:Appointments.AppointmentID
+      .:Appointments.PatientID
+      .:Appointments.DoctorID
+      .:Appointments.AppointmentDate
+      .:Appointments.Reason
+      .:PatientID.FirstName
+      .:DoctorID.FirstName
+   validators.enum:x:@.arguments/*/aggregate_column
+      .:Appointments.AppointmentID
+      .:Appointments.PatientID
+      .:Appointments.DoctorID
+      .:Appointments.AppointmentDate
+      .:Appointments.Reason
+      .:PatientID.FirstName
+      .:DoctorID.FirstName
+   response.headers.set
+      Cache-Control:public, max-age=300
+   auth.ticket.verify:admin,guest,root
+   data.connect:[generic|hospital]
+      database-type:sqlite
+      set-name:x:@data.connect/*/data.read/*/group/*/group_column
+         get-value:x:@.arguments/*/group_column
+      set-name:x:+/*/*
+         get-value:x:@.arguments/*/group_column
+      insert-before:x:@data.connect/*/data.read/*/columns/0
+         .
+            group_column
+      set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+         get-value:x:@.arguments/*/aggregate_function
+      remove-nodes:x:@.arguments/*/group_column
+      add:x:@data.connect/*/data.read
+         get-nodes:x:@.arguments/*/limit
+         get-nodes:x:@.arguments/*/offset
+      remove-nodes:x:@.arguments/*/limit
+      remove-nodes:x:@.arguments/*/offset
+      add:x:./*/data.read
+         get-nodes:x:@.arguments/*/order
+         get-nodes:x:@.arguments/*/direction
+      remove-nodes:x:@.arguments/*/order
+      remove-nodes:x:@.arguments/*/direction
+      set-name:x:./*/data.read/*/columns/*/aggregate_functor
+         strings.concat
+            get-value:x:@.arguments/*/aggregate_function
+            .:(
+            get-value:x:@.arguments/*/aggregate_column
+            .:)
+      remove-nodes:x:@.arguments/*/[0,2]
+      add:x:./*/data.read/*/where/*
+         get-nodes:x:@.arguments/*
+      data.read
+         database-type:sqlite
+         table:Appointments
+            join:Patients
+               as:PatientID
+               type:left
+               on
+                  and
+                     Appointments.PatientID:PatientID.PatientID
+            join:Doctors
+               as:DoctorID
+               type:left
+               on
+                  and
+                     Appointments.DoctorID:DoctorID.DoctorID
+         columns
+            aggregate_functor
+               as:result
+         where
+            and
+         group
+            group_column
+      return-nodes:x:@data.read/*

@@ -1,0 +1,45 @@
+
+// This Hyperlambda code snippet is used to generate a SQL statement for creating a table with a primary key in a Microsoft SQL Server database. It first checks if the primary key type is "auto_increment" and constructs the SQL accordingly with an identity column. If not, it uses the specified primary key type and length. It also appends a default value to the SQL if one is provided. The final SQL statement is stored in the [.sql] node.
+case:mssql
+   .type
+   if
+      eq:x:@.arguments/*/pkType
+         .:auto_increment
+      .lambda
+         set-value:x:@.type
+            strings.concat
+               get-value:x:@.arguments/*/pkName
+               .:" integer"
+               .:" not null identity(1,1) primary key"
+   else
+      set-value:x:@.type
+         strings.concat
+            get-value:x:@.arguments/*/pkName
+            .:" "
+            get-value:x:@.arguments/*/pkType
+            .:(
+            get-value:x:@.arguments/*/pkLength
+            .:) not null primary key
+   set-value:x:@.sql
+      strings.concat
+         .:"create table "
+         get-value:x:@.arguments/*/tableName
+         .:(
+         get-value:x:@.type
+   if
+      and
+         exists:x:@.arguments/*/pkDefault
+         neq:x:@.arguments/*/pkDefault
+            .
+         neq:x:@.arguments/*/pkDefault
+            .:
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" default "
+               get-value:x:@.arguments/*/pkDefault
+   set-value:x:@.sql
+      strings.concat
+         get-value:x:@.sql
+         .:);

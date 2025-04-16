@@ -1,0 +1,59 @@
+
+/*
+ * This Hyperlambda script constructs an SQL statement for creating a table in MySQL. It checks if the primary key type is "auto_increment" and sets the type accordingly. If not, it uses the specified primary key type and length. It then builds the SQL string for creating the table, including the primary key name and type. If a default value for the primary key is provided, it appends it to the SQL string. Finally, it completes the SQL statement with a closing parenthesis.
+ * 
+ * 1. [case:mysql] - Initiates a MySQL-specific case block.
+ * 2. [if] - Checks if the primary key type is "auto_increment".
+ * 3. [eq] - Compares the primary key type to "auto_increment".
+ * 4. [set-value] - Sets the type to "int not null auto_increment primary key" if true.
+ * 5. [else] - Handles the case where the primary key is not "auto_increment".
+ * 6. [strings.concat] - Concatenates the primary key type and length into a string.
+ * 7. [set-value] - Constructs the initial SQL create table statement.
+ * 8. [strings.concat] - Concatenates the table name and primary key details.
+ * 9. [if] - Checks if a default value for the primary key exists and is not null.
+ * 10. [exists] - Verifies the existence of a default value.
+ * 11. [neq] - Ensures the default value is not null or empty.
+ * 12. [set-value] - Appends the default value to the SQL string if applicable.
+ * 13. [strings.concat] - Finalizes the SQL statement with a closing parenthesis.
+ */
+case:mysql
+   .type
+   if
+      eq:x:@.arguments/*/pkType
+         .:auto_increment
+      .lambda
+         set-value:x:@.type
+            strings.concat
+               .:int not null auto_increment primary key
+   else
+      set-value:x:@.type
+         strings.concat
+            get-value:x:@.arguments/*/pkType
+            .:(
+            get-value:x:@.arguments/*/pkLength
+            .:) not null primary key
+   set-value:x:@.sql
+      strings.concat
+         .:"create table "
+         get-value:x:@.arguments/*/tableName
+         .:(
+         get-value:x:@.arguments/*/pkName
+         .:" "
+         get-value:x:@.type
+   if
+      and
+         exists:x:@.arguments/*/pkDefault
+         neq:x:@.arguments/*/pkDefault
+            .
+         neq:x:@.arguments/*/pkDefault
+            .:
+      .lambda
+         set-value:x:@.sql
+            strings.concat
+               get-value:x:@.sql
+               .:" default "
+               get-value:x:@.arguments/*/pkDefault
+   set-value:x:@.sql
+      strings.concat
+         get-value:x:@.sql
+         .:);
