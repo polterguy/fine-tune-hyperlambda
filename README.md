@@ -102,3 +102,13 @@ Below are some example prompts you can run through the model after fine tuning i
 * Create an endpoint allowing me to read a sitemap from a domain, and return all URLs found.
 * Create an endpoint that first fetches 10 Artist records from chinook database using SQLite, then include all their Album records for each Artist. Add filtering support for artist name.
 
+Then there are comments you can ask the system to implement:
+
+```plaintext
+/*
+ * HTTP endpoint that retrieves a joke from Chuck Norris API, in addition to seleting items from chinook
+ * database and its Artist table. Can only be executed by admin user, and allows for filtering Artists by name.
+ *
+ * Log all arguments and return both the joke and the artists. Use pattern matching filtering!
+ */
+```
