@@ -1,0 +1,69 @@
+/*
+ * This snippet sends an email with a file attachment.
+ *
+ * SMTP configuration is loaded from [config.get],
+ * the MIME type is determined based on the file extension,
+ * and [mail.smtp.send] sends the message using the provided arguments.
+ */
+.arguments
+   to:string
+   name:string
+   subject:string
+   content:string
+   filename:string
+
+.host
+set-value:x:-
+   config.get:"smtp:host"
+
+.port
+set-value:x:-
+   config.get:"smtp:port"
+
+.username
+set-value:x:-
+   config.get:"smtp:username"
+
+.password
+set-value:x:-
+   config.get:"smtp:password"
+
+strings.split:x:@.arguments/*/filename
+   .:.
+
+.mimeType
+switch:x:@strings.split/0/-
+   case:".pdf"
+      set-value:x:@.mimeType
+         .:application/pdf
+   case:".jpg"
+      set-value:x:@.mimeType
+         .:image/jpeg
+   case:".png"
+      set-value:x:@.mimeType
+         .:image/png
+   case:".txt"
+      set-value:x:@.mimeType
+         .:text/plain
+   default
+      set-value:x:@.mimeType
+         .:application/octet-stream
+
+mail.smtp.send
+   server
+      host:x:@.host
+      port:x:@.port
+      username:x:@.username
+      password:x:@.password
+   message
+      to
+         .
+            email:x:@.arguments/*/to
+            name:x:@.arguments/*/name
+      subject:x:@.arguments/*/subject
+      entity:multipart/mixed
+         entity:text/plain
+            content:x:@.arguments/*/content
+         entity:x:@.mimeType
+            filename:x:@.arguments/*/filename
+
