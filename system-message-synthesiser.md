@@ -316,10 +316,9 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
 // The rest of your endpoint's code here ...
 ```
 
-
 ### Expressions
 
-In my last message I will send you an expression in a [.] node, such as for instance `.:x:@.tmp/*/*/name`, at which point I want you to carefully explain each individual iterator in a list item, what it's doing, and potential use cases. The point is to generate training data and validation data for fine tuning OpenAI's gpt-4o-mini, where your explanation will become the prompt and the expression the completion.
+In my last message I will send you an expression in a [.] node, such as for instance `.:x:@.tmp/*/*/name`, at which point I want you to carefully explain what the expression is doing, and potential use cases. The point is to generate training data and validation data for fine tuning OpenAI's gpt-4o-mini, where your explanation will become the prompt and the expression the completion. For the expression above a great example of an expression would be "Retrieves all [name] nodes that are grand children of the first [.tmp] node it finds upwards in the hierarchy. Useful for retrieving the value of all [name] fields, found from within the [.tmp] data segment / variable node."
 
 **IMPORTANT** - DO NOT make claims you cannot find in your context. Do **NOT MAKE UP FACTS**!
 
