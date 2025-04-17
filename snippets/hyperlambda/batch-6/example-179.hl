@@ -1,0 +1,32 @@
+/*
+ * Endpoint that sends an email to the specified receiver with the specified subject.
+ * Can only be invoked by admin users.
+ *
+ * Optionally allow for uploading a plain text attachment that's saved with a random file name
+ * into /etc/temp/ before attached into the email.
+ */
+.arguments
+   receiver:string
+   subject:string
+   attachment:*
+auth.ticket.verify:admin
+strings.concat
+   .:/etc/temp/
+   guid.new
+   .:.txt
+io.stream.save-file:x:@strings.concat
+   get-value:x:@.arguments/*/attachment/*/file
+mail.smtp.send
+   message
+      to
+         .
+            email:x:@.arguments/*/receiver
+      subject:x:@.arguments/*/subject
+      entity:multipart/mixed
+         entity:text/plain
+            content:Please find the attachment.
+         entity:text/plain
+            filename:x:@strings.concat
+yield
+   result:Email sent with attachment
+

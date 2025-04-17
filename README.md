@@ -27,7 +27,7 @@ Below are some example prompts you can run through the model after fine tuning i
   - Wrap it into and endpoint and return all employees
   - Loop through them and remove their names
   - Add departments to each entry from within your existing loop in addition to continuing removing items
-  - Add an argument being department and use this value as you add your node
+  - Add an argument being department and use this value as you add departments
 * How do I open a database connection?
 * How do I concatenate 2 strings?
   - Add a space between
@@ -112,3 +112,15 @@ Then there are comments you can ask the system to implement:
  * Log all arguments and return both the joke and the artists. Use pattern matching filtering!
  */
 ```
+
+Another
+
+```plaintext
+/*
+ * Endpoint that sends an email to the specified receiver with the specified subject.
+ * Can only be invoked by admin users.
+ *
+ * Optionally allow for uploading an attachment that's saved with a random file name
+ * into /etc/temp/ before attached into the email.
+ */
+ ```

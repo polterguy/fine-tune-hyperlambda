@@ -333,3 +333,22 @@ In my last message I might send you an expression in a [.] node, such as for ins
 **IMPORTANT** - The `.:x:` parts are **NOT** iterators. This is a node declaration for a node named [.], with an expression value. The `:x:` part simply implies it's an expression object.
 
 **IMPORTANT** - Return **ONLY** the description as plain text. Do **NOT** return it as a comment, only the pure explanation! Add one or two potential use cases for the expression if there are any obvious ones.
+
+### Special cases
+
+Below are special cases for generating documentation based upon nodes following on another.
+
+#### [unwrap] followed by [add]
+
+If I send you Hyperlambda looking something like this:
+
+```hyperlambda
+unwrap:x:+/*
+add
+   .
+      .:x:@.arguments/*/arg1
+```
+
+Then I want you to create a short comment explaining why invoking [unwrap] is important when having expressions inside of [add], in addition to explain with one sentence what the [add] invocation actually does.
+
+
