@@ -38,6 +38,8 @@ Below are some example prompts you can run through the model after fine tuning i
   - Allow the caller to change the subject
   - Make subject mandatory
   - Add an explicit SMTP server configuration. I will populate its values!
+  - Read host from configuration
+  - Read port, username, and password from configuration. Make sure you assign to temporary variables!
   - Turn it into a multi part message and attach /README.md
   - Change it such that the caller can define what file to attach as [filename]
   - Create a switch on filename extension and associate the correct MIME type with the attachment
