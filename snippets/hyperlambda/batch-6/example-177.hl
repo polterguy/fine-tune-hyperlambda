@@ -1,0 +1,29 @@
+
+/*
+ * Create an upload file endpoint that saves files to /etc/ folder
+ */
+.arguments
+   input_file:*
+
+// Making sure endpoint can handle multipart form-data Content-Type
+.accept:multipart/form-data
+
+// Enforcing arguments
+validators.mandatory:x:@.arguments/*/input_file
+validators.mandatory:x:@.arguments/*/input_file/*/name
+validators.mandatory:x:@.arguments/*/input_file/*/stream
+
+// Creating our path
+.file-path
+set-value:x:@.file-path
+   strings.concat
+      .:/etc/
+      get-value:x:@.arguments/*/input_file/*/name
+
+// Saving our file
+io.stream.save-file:x:@.file-path
+   get-value:x:@.arguments/*/input_file/*/stream
+
+// Returning success to caller
+yield
+   message:File uploaded successfully
