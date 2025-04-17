@@ -27,6 +27,7 @@ Below are some example prompts you can run through the model after fine tuning i
   - Wrap it into and endpoint and return all employees
   - Loop through them and remove their names
   - Add departments to each entry from within your existing loop in addition to continuing removing items
+  - Add an argument being department and use this value as you add your node
 * How do I open a database connection?
 * How do I concatenate 2 strings?
   - Add a space between
@@ -35,6 +36,7 @@ Below are some example prompts you can run through the model after fine tuning i
   - Change it such that it becomes and endpoint taking arguments for email message
   - Add name argument
   - Allow the caller to change the subject
+  - Make subject mandatory
   - Add an explicit SMTP server configuration. I will populate its values!
   - Turn it into a multi part message and attach /README.md
   - Change it such that the caller can define what file to attach as [filename]
