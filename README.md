@@ -12,7 +12,7 @@ Below are hyper parameters I've had success with in some example runs for gpt-40
 
 If you're successful, you should have training loss around 0.1 - 0.7, and full validation loss at 0.3 higher than training loss, between 0.4 and 1.0. But you'll need to test the model to make sure it's performing.
 
-Notice, during inference you should use around 0.0 and 0.1 in temperature to tighten results.
+Notice, during inference you should use between 0.0 and 0.1 in temperature to tighten results.
 
 ## Example test prompts
 
