@@ -6,7 +6,7 @@ This project allows you to fine tune OpenAI and their GPT models on Hyperlambda.
 
 Below are hyper parameters I've had success with in some example runs for gpt-40-mini.
 
-1. Epochs - 1
+1. Epochs - 2
 2. Batch size - 8
 3. LR multiplier - 0.3
 
