@@ -38,31 +38,31 @@ data.connect:fine-tune
       for-each:x:@hyper2lambda/**/*
 
          // Verifying currently iterated node's name is a slot invocation.
-         get-name:x:@.dp/#
+         type:x:@.dp/#
          if
-            exists:x:@vocabulary/*/={@get-name}
+            eq:x:@type
+               .:x
             .lambda
 
-               // Creating a lambda object exclusively containing the currently iterated node.
+               // Creating a temporary string of the expression.
                .tmp
-               add:x:@.tmp
-                  get-nodes:x:@.dp/#
-
-               // Converting lambda object to Hyperlambda
-               lambda2hyper:x:@.tmp/*
+               set-value:x:@.tmp
+                  convert:x:@.dp/#
+                     type:string
 
                // Making sure we've NOT previously dealt with this exact snippet.
                data.read
                   table:hyperlambda
                   where
                      and
-                        code.eq:x:@lambda2hyper
+                        code.eq:x:@.tmp
                if
                   not-exists:x:@data.read/*
                   .lambda
 
                      // Logging
                      log.info:Creating synthetic snippet
+                        expression:x:@.tmp
 
                      /*
                       * Returns context for the specified [query] from the specified [type],
@@ -102,12 +102,11 @@ data.connect:fine-tune
                            query:x:@lambda2hyper
 
                      // Injecting comment into Hyperlambda.
-                     unwrap:x:+/*/*
-                     insert-before:x:@.tmp/0
-                        .
-                           ..:x:@execute/*/answer
-                     lambda2hyper:x:@.tmp/*
-                        comments:true
+                     set-value:x:@.tmp
+                        strings.concat
+                           get-value:x:@execute/*/context
+                           .:"\r\n"
+                           get-value:x:@.tmp
 
                      // Saving with a random filename in /synthesised4/ folder
                      .filename

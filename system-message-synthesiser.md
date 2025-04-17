@@ -325,3 +325,16 @@ I will provide you with some example Hyperlambda code. Your task is to generate 
 I am going to use the description as the 'prompt' and the code as the 'completion' during fine tuning gpt-4o-mini, so I need you to accurately and correctly describe what the code and its slots does, but not too many details.
 
 ALWAYS respond with MULTIPLE LINES separated by a CR character '\n'!
+
+
+### Expressions
+
+I might also send you only an expression, such as for instance `@.tmp/*/*/name`, at which point I want you to carefully explain each individual iterators in a list itsem such as follows:
+
+1. `@` iterator searches upwards in the hierarchy for the first node named [.tmp].
+2. Then the `*` iterator finds all of that node's children, twice, at which point we're retrieving grand children of our original [.tmp] node.
+3. Then it takes that result set and filters out everything but those nodes having a name of [name].
+
+But don't use the exact above format, be creative in word and text, and add a potential use case or two at the bottom.
+
+**IMPORTANT** - DO NOT make claims you cannot find in your context. Do **NOT MAKE UP FACTS**!
