@@ -6,8 +6,8 @@ This project allows you to fine tune OpenAI and their GPT models on Hyperlambda.
 
 Below are hyper parameters I've had success with in some example runs for gpt-40-mini.
 
-1. Epochs - 3
-2. Batch size - 15
+1. Epochs - 1
+2. Batch size - 8
 3. LR multiplier - 1.8
 
 If you're successful, you should have training loss around 0.1 - 0.7, and full validation loss at 0.3 higher than training loss, between 0.4 and 1.0. But you'll need to test the model to make sure it's performing.
@@ -37,6 +37,7 @@ Below are some example prompts you can run through the model after fine tuning i
   - Add an explicit SMTP server configuration. I will populate its values!
   - Turn it into a multi part message and attach /README.md
   - Change it such that the caller can define what file to attach as [filename]
+  - Create a switch on filename extension and associate the correct MIME type with the attachment
 * Write an endpoint taking age and name, and responding with a personal greeting
 * Select contacts records from my ERP database.
   - Wrap it into an endpoint and returns contacts.
