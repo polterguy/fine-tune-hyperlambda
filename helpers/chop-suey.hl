@@ -36,95 +36,111 @@ data.connect:fine-tune
       hyper2lambda:x:@.dp/#/*/code
 
       // Looping through all nodes in lambda object.
-      for-each:x:@hyper2lambda/**/*
+      for-each:x:@hyper2lambda/**/*/unwrap
 
          // Verifying currently iterated node's name is a slot invocation.
          get-name:x:@.dp/#
          if
-            exists:x:@vocabulary/*/={@get-name}
+            and
+               exists:x:@vocabulary/*/={@get-name}
+               exists:x:@.dp/#/+
+               eq
+                  get-value:x:@get-name
+                  .:unwrap
+               eq
+                  get-name:x:@.dp/#/+
+                  .:return
             .lambda
 
                // Creating a lambda object exclusively containing the currently iterated node.
                .tmp
                add:x:@.tmp
                   get-nodes:x:@.dp/#
+                  get-nodes:x:@.dp/#/+
 
                // Converting lambda object to Hyperlambda
                lambda2hyper:x:@.tmp/*
 
-               // Making sure we've NOT previously dealt with this exact snippet.
-               data.read
-                  table:hyperlambda
-                  where
-                     and
-                        code.eq:x:@lambda2hyper
+               // Verifying we're not overflowing context window.
                if
-                  not-exists:x:@data.read/*
+                  lt
+                     openai.tokenize:x:@lambda2hyper
+                     .:int:4000
                   .lambda
 
-                     // Logging
-                     log.info:Creating synthetic snippet
+                     // Making sure we've NOT previously dealt with this exact snippet.
+                     data.read
+                        table:hyperlambda
+                        where
+                           and
+                              code.eq:x:@lambda2hyper
+                     if
+                        not-exists:x:@data.read/*
+                        .lambda
 
-                     /*
-                      * Returns context for the specified [query] from the specified [type],
-                      * and returns to caller.
-                      *
-                      * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
-                      * tokens to return. [type] is a machine learning type from your ml_types database table in
-                      * your magic database.
-                      */
-                     execute:magic.workflows.actions.execute
-                        name:openai-context-from-database
-                        filename:/modules/openai/workflows/actions/openai-context-from-database.hl
-                        arguments
-                           type:magic-documentation
-                           query:x:@lambda2hyper
-                           threshold:decimal:0.3
-                           max_tokens:int:3000
+                           // Logging
+                           log.info:Creating synthetic snippet
 
-                     /*
-                      * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
-                      * [instruction] and [query].
-                      *
-                      * Will use the default API key found from configurations.
-                      *
-                      * [context] is additional data you can supply to OpenAI such that it responds using
-                      * your data as its source for information. [instruction] is a system message allowing
-                      * you to change how OpenAI responds.
-                      */
-                     execute:magic.workflows.actions.execute
-                        name:openai-query
-                        filename:/modules/openai/workflows/actions/openai-query.hl
-                        arguments
-                           model:gpt-4o
-                           max_tokens:int:1500
-                           instruction:x:@.system-message
-                           context:x:@execute/@execute/*/context
-                           query:x:@lambda2hyper
+                           /*
+                            * Returns context for the specified [query] from the specified [type],
+                            * and returns to caller.
+                            *
+                            * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
+                            * tokens to return. [type] is a machine learning type from your ml_types database table in
+                            * your magic database.
+                            */
+                           execute:magic.workflows.actions.execute
+                              name:openai-context-from-database
+                              filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+                              arguments
+                                 type:magic-documentation
+                                 query:x:@lambda2hyper
+                                 threshold:decimal:0.3
+                                 max_tokens:int:2000
 
-                     // Injecting comment into Hyperlambda.
-                     unwrap:x:+/*/*
-                     insert-before:x:@.tmp/0
-                        .
-                           ..:x:@execute/*/answer
-                     lambda2hyper:x:@.tmp/*
-                        comments:true
+                           /*
+                            * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+                            * [instruction] and [query].
+                            *
+                            * Will use the default API key found from configurations.
+                            *
+                            * [context] is additional data you can supply to OpenAI such that it responds using
+                            * your data as its source for information. [instruction] is a system message allowing
+                            * you to change how OpenAI responds.
+                            */
+                           execute:magic.workflows.actions.execute
+                              name:openai-query
+                              filename:/modules/openai/workflows/actions/openai-query.hl
+                              arguments
+                                 model:gpt-4o
+                                 max_tokens:int:1500
+                                 instruction:x:@.system-message
+                                 context:x:@execute/@execute/*/context
+                                 query:x:@lambda2hyper
 
-                     // Saving with a random filename in /synthesised4/ folder
-                     .filename
-                     set-value:x:@.filename
-                        strings.concat
-                           .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
-                           .:id-
-                           get-value:x:@for-each/@.dp/#/*/hyperlambda_id
-                           .:-
-                           crypto.random
-                              min:10
-                              max:10
-                           .:.hl
-                     io.file.save:x:@.filename
-                        get-value:x:@lambda2hyper
+                           // Injecting comment into Hyperlambda.
+                           unwrap:x:+/*/*
+                           insert-before:x:@.tmp/0
+                              .
+                                 ..:x:@execute/*/answer
+                           lambda2hyper:x:@.tmp/*
+                              comments:true
 
-               else
+                           // Saving with a random filename in /synthesised4/ folder
+                           .filename
+                           set-value:x:@.filename
+                              strings.concat
+                                 .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
+                                 .:id-
+                                 get-value:x:@for-each/@.dp/#/*/hyperlambda_id
+                                 .:-
+                                 crypto.random
+                                    min:10
+                                    max:10
+                                 .:.hl
+                           io.file.save:x:@.filename
+                              get-value:x:@lambda2hyper
 
-                  log.info:Snippet already exists.
+                     else
+
+                        log.info:Snippet already exists.
