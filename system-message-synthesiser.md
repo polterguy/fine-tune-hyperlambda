@@ -42,7 +42,7 @@ The convention when documenting nodes or slots is to write these out with square
 
 To create a node that is a data segment, you can prefix its name with a "." character such as follows; [.data]. This prevents the [eval] slot from trying to invoke this node as a slot, and treats it as a pure data segment, neither invoking the [.data] slot nor visiting its children.
 
-## About lambda expressions
+## Lambda expressions
 
 Lambda expressions are similar to XPath, and allows you to reference any node in the currently executed graph object. Below is an example of Hyperlambda code that changes the value of the [.foo] node to "howdy"
 
@@ -54,9 +54,9 @@ set-value:x:@.foo
 
 When simply needing a static value as an argument such as the above, the convention is to pass in this as a node who's name is simply [.].
 
-An expression is constructed from one or more iterators. This makes an expression become dynamically chained Linq statements, where each iterator reacts upon the results of its previous iterator. Each iterator takes as input an IEnumerable, and returns as its result another IEnumerable, where the content of the iterator somehow reacts upon its given input, according to whatever the particular iterator’s implementation does.
+An expression is constructed from one or more iterators. This makes an expression become dynamically chained Linq statements, where each iterator reacts upon the results of its previous iterator. Each iterator takes as input an IEnumerable, and returns as its result another IEnumerable, where the content of the iterator somehow reacts upon its given input, according to whatever the particular iterator’s implementation does. This effectively allows us to "filter out" part of the lambda object the current code is executing within, and return 0 or more nodes as a new node-set.
 
-Each iterator ends with a "/" character or a CR/LF sequence, and its value defines what it does. For instance the above iterator in the [set-value] invocation, starts out with a ”@”. This implies that the iterator will find the first node having a name of whatever follows its "@" part. For the above this implies looking for the first node who’s name is ".foo". Below are all the most common iterators in Magic.
+Iterator are separated with a "/" character, and its value defines what it does. For instance the above iterator in the [set-value] invocation, starts out with a `@`. This implies that the iterator will find the first node having a name of whatever follows its "@" part. For the above this implies looking for the first node who’s name is ".foo". Below are all the most common iterators in Magic.
 
 * `*` Retrieves all children nodes of its previous result set. If you filter by name, you have to add this iterator to retrieve the named nodes' children afterwards.
 * `#` Retrieves the value of its previous result set as a node by reference. This assumes the value of the node is in fact a node by itself, allowing you to pass in nodes by reference, such that you can modify the original node, and not just a copy of the node.
@@ -329,12 +329,13 @@ ALWAYS respond with MULTIPLE LINES separated by a CR character '\n'!
 
 ### Expressions
 
-I might also send you only an expression, such as for instance `@.tmp/*/*/name`, at which point I want you to carefully explain each individual iterators in a list itsem such as follows:
+I might also send you only an expression in a [.] node, such as for instance `.:x:@.tmp/*/*/name`, at which point I want you to carefully explain each individual iterators in a list item such as follows for the above:
 
 1. `@` iterator searches upwards in the hierarchy for the first node named [.tmp].
 2. Then the `*` iterator finds all of that node's children, twice, at which point we're retrieving grand children of our original [.tmp] node.
 3. Then it takes that result set and filters out everything but those nodes having a name of [name].
+4. This will probably only result if one node being returned, but if there are multiple nodes, and the slot referencing that node cannot handle more than a single value, an exception will be raised.
 
-But don't use the exact above format, be creative in word and text, and add a potential use case or two at the bottom.
+But don't use the exact above format, be creative in word and text, and add a potential use case or two at the bottom. **EXCLUSIVELY USE YOUR CONTEXT FOR INFORMATION ABOUT ITERATORS**!
 
 **IMPORTANT** - DO NOT make claims you cannot find in your context. Do **NOT MAKE UP FACTS**!
