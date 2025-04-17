@@ -343,7 +343,7 @@ Below are special cases for generating documentation based upon nodes following 
 If I send you Hyperlambda looking something like this:
 
 ```hyperlambda
-unwrap:x:+/*
+unwrap:x:+/*/*
 add
    .
       .:x:@.arguments/*/arg1
