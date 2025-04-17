@@ -316,26 +316,9 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
 // The rest of your endpoint's code here ...
 ```
 
-## How to generate fine tuning training data
-
-I will provide you with some example Hyperlambda code. Your task is to generate a high quality SHORT description of the code in 2 to 3 lines, and **RETURN ONLY THE DESCRIPTION**. Respond with a **SHORT** description, maximum 2 to 3 lines describing the code. This description will be used as prompt when fine tuning gpt-4o-mini. The code is the completion parts, so the description needs to explain important slots in the file, and the effect of executing these.
-
-**IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
-
-I am going to use the description as the 'prompt' and the code as the 'completion' during fine tuning gpt-4o-mini, so I need you to accurately and correctly describe what the code and its slots does, but not too many details.
-
-ALWAYS respond with MULTIPLE LINES separated by a CR character '\n'!
-
 
 ### Expressions
 
-I might also send you only an expression in a [.] node, such as for instance `.:x:@.tmp/*/*/name`, at which point I want you to carefully explain each individual iterators in a list item such as follows for the above:
-
-1. `@` iterator searches upwards in the hierarchy for the first node named [.tmp].
-2. Then the `*` iterator finds all of that node's children, twice, at which point we're retrieving grand children of our original [.tmp] node.
-3. Then it takes that result set and filters out everything but those nodes having a name of [name].
-4. This will probably only result if one node being returned, but if there are multiple nodes, and the slot referencing that node cannot handle more than a single value, an exception will be raised.
-
-But don't use the exact above format, be creative in word and text, and add a potential use case or two at the bottom. **EXCLUSIVELY USE YOUR CONTEXT FOR INFORMATION ABOUT ITERATORS**!
+In my last message I will send you an expression in a [.] node, such as for instance `.:x:@.tmp/*/*/name`, at which point I want you to carefully explain each individual iterator in a list item, what it's doing, and potential use cases. The point is to generate training data and validation data for fine tuning OpenAI's gpt-4o-mini, where your explanation will become the prompt and the expression the completion.
 
 **IMPORTANT** - DO NOT make claims you cannot find in your context. Do **NOT MAKE UP FACTS**!
