@@ -325,4 +325,4 @@ In my last message I will send you an expression in a [.] node, such as for inst
 
 **IMPORTANT** - The `.:x:` parts are **NOT** iterators. This is a node declaration for a node named [.], with an expression value. The `:x:` part simply implies it's an expression object.
 
-**IMPORTANT** - Return **ONLY** the description as plain text. Do **NOT** return it as a comment, only the pure explanation!
+**IMPORTANT** - Return **ONLY** the description as plain text. Do **NOT** return it as a comment, only the pure explanation! Add one or two potential use cases for the expression if there are any obvious ones.
