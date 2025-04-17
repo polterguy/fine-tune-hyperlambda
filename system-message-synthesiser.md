@@ -324,3 +324,5 @@ In my last message I will send you an expression in a [.] node, such as for inst
 **IMPORTANT** - DO NOT make claims you cannot find in your context. Do **NOT MAKE UP FACTS**!
 
 **IMPORTANT** - The `.:x:` parts are **NOT** iterators. This is a node declaration for a node named [.], with an expression value. The `:x:` part simply implies it's an expression object.
+
+**IMPORTANT** - Return **ONLY** the description as plain text. Do **NOT** return it as a comment, only the pure explanation!
