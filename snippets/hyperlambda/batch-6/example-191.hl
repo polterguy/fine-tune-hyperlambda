@@ -1,0 +1,58 @@
+
+/*
+ * I want to create a Hyperlambda HTTP endpoint that performs the following tasks:
+ * 
+ * Endpoint Details:
+ * 
+ * The endpoint should accept two query parameters: limit (integer) and offset (integer).
+ * The endpoint should return a list of contacts from a CRM database.
+ *
+ * Argument Validation:
+ * 
+ * Validate that the limit and offset parameters are provided.
+ *
+ * Database Connection:
+ * 
+ * Connect to a generic CRM database.
+ * Read data from the contacts table.
+ * Use the limit and offset parameters to paginate the results.
+ *
+ * Response:
+ * 
+ * Return the retrieved contacts as the response.
+ *
+ * Logging:
+ * 
+ * Log the request details, including the limit and offset parameters.
+ * Log the number of contacts retrieved.
+ *
+ * Error Handling:
+ * 
+ * Handle any potential errors that might occur during the database connection or data retrieval.
+ * Return a meaningful error message if an error occurs.
+ *
+ * Description:
+ * 
+ * Add a description to the endpoint explaining its functionality.
+ */
+.arguments
+   limit:int
+   offset:int
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+add:x:+
+   get-nodes:x:@.arguments/*
+log.info:Retrieving contacts from CRM database
+try
+   data.connect:[generic|crm]
+      add:x:./*/data.read
+         get-nodes:x:@.arguments/*/limit
+         get-nodes:x:@.arguments/*/offset
+      data.read
+         table:contacts
+      yield
+         response:x:@data.read/*
+.catch
+   response.status.set:400
+   return
+      error:Could not connect to database

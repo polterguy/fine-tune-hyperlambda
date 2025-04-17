@@ -1,0 +1,79 @@
+
+/*
+ * I want to create a Hyperlambda HTTP endpoint that performs the following tasks:
+ * 
+ * Endpoint Details:
+ * 
+ * The endpoint should accept a JSON payload with the following fields:
+ * 
+ * first_name (string)
+ * last_name (string)
+ * email (string)
+ * phone (string)
+ * 
+ * Argument Validation:
+ * 
+ * Validate that all the fields (first_name, last_name, email, and phone) are provided.
+ * Validate that the email field contains a valid email address.
+ * 
+ * Database Connection:
+ * 
+ * Connect to the ERP database.
+ * Insert the provided contact details into the accounts table.
+ * 
+ * Response:
+ * 
+ * Return a success message along with the ID of the newly created contact.
+ * 
+ * Logging:
+ * 
+ * Log the request details, including the provided contact information.
+ * Log the ID of the newly created contact.
+ * 
+ * Error Handling:
+ * 
+ * Handle any potential errors that might occur during the database connection or data insertion.
+ * Return a meaningful error message if an error occurs.
+ * 
+ */
+.arguments
+   first_name:string
+   last_name:string
+   email:string
+   phone:string
+
+// Sanity checking invocation.
+validators.mandatory:x:@.arguments/*/first_name
+validators.mandatory:x:@.arguments/*/last_name
+validators.mandatory:x:@.arguments/*/email
+validators.mandatory:x:@.arguments/*/phone
+validators.email:x:@.arguments/*/email
+
+// Opening up our database connection.
+data.connect:erp
+
+   // Logging the request.
+   log.info:Creating new contact
+      first_name:x:@.arguments/*/first_name
+      last_name:x:@.arguments/*/last_name
+      email:x:@.arguments/*/email
+      phone:x:@.arguments/*/phone
+
+   // Creating our contact.
+   data.create
+      table:accounts
+      values
+         first_name:x:@.arguments/*/first_name
+         last_name:x:@.arguments/*/last_name
+         email:x:@.arguments/*/email
+         phone:x:@.arguments/*/phone
+
+   // Logging the contact creation.
+   log.info:Contact created
+      contact_id:x:@data.create
+
+   // Returning success to caller.
+   yield
+      result:success
+      contact_id:x:@data.create
+
