@@ -63,66 +63,87 @@ for-each:x:@execute/*
                   lambda2hyper:x:@hyper2lambda/*
                      comments:true
 
-                  // Checking if this is validation data.
-                  .validation:int:0
+                  // Checking if the file should be deleted.
                   if
                      and
-                        eq:x:@.arguments/*/randomize
-                           .:int:1
+                        eq:x:@lambda2hyper/1
+                           .:data.read
+                        or
+                           eq:x:@lambda2hyper/2
+                              .:yield
+                           eq:x:@lambda2hyper/2
+                              .:return-nodes
+                           eq:x:@lambda2hyper/2
+                              .:return
                         eq
-                           math.modulo:x:@.no
-                              .:int:8
-                           .:int:0
+                           get-count:x:@hyper2lambda/*
+                           .:int:3
                      .lambda
-                        set-value:x:@.validation
-                           .:int:1
-                  else-if
-                     strings.contains:x:@.dp/#
-                        .:/validation/
-                     .lambda
-                        set-value:x:@.validation
-                           .:int:1
-
-                  // Checking if this is validation data.
-                  .synthesised:int:0
-                  if
-                     strings.contains:x:@.dp/#
-                        .:/synthesised
-                     .lambda
-                        set-value:x:@.synthesised
-                           .:int:1
-
-                  // Saving above code snippet.
-                  data.connect:fine-tune
-
-                     // Verifying that code doesn't already exist in file.
-                     .exists:bool:false
-                     data.read
-                        table:hyperlambda
-                        where
-                           and
-                              code.eq:x:@lambda2hyper
-                        limit:1
-                     if
-                        not-exists:x:@data.read/*
-                        .lambda
-
-                           // Making sure we avoid double inserts.
-                           data.create
-                              table:hyperlambda
-                              values
-                                 prompt:x:@.prompt
-                                 code:x:@lambda2hyper
-                                 validation:x:@.validation
-                                 synthesised:x:@.synthesised
-
-                           // Counting how many training snippets we're inserting
-                           math.increment:x:@.no
-
-                     else-if:x:@.delete_duplicates
-
-                        // Deleting file since it's a duplicate!
+                     
                         io.file.delete:x:@.dp/#
+
+                  else
+
+                     // Checking if this is validation data.
+                     .validation:int:0
+                     if
+                        and
+                           eq:x:@.arguments/*/randomize
+                              .:int:1
+                           eq
+                              math.modulo:x:@.no
+                                 .:int:8
+                              .:int:0
+                        .lambda
+                           set-value:x:@.validation
+                              .:int:1
+                     else-if
+                        strings.contains:x:@.dp/#
+                           .:/validation/
+                        .lambda
+                           set-value:x:@.validation
+                              .:int:1
+
+                     // Checking if this is validation data.
+                     .synthesised:int:0
+                     if
+                        strings.contains:x:@.dp/#
+                           .:/synthesised
+                        .lambda
+                           set-value:x:@.synthesised
+                              .:int:1
+
+                     // Saving above code snippet.
+                     data.connect:fine-tune
+
+                        // Verifying that code doesn't already exist in file.
+                        .exists:bool:false
+                        data.read
+                           table:hyperlambda
+                           where
+                              and
+                                 code.eq:x:@lambda2hyper
+                           limit:1
+                        if
+                           not-exists:x:@data.read/*
+                           .lambda
+
+                              // Making sure we avoid double inserts.
+                              data.create
+                                 table:hyperlambda
+                                 values
+                                    prompt:x:@.prompt
+                                    code:x:@lambda2hyper
+                                    validation:x:@.validation
+                                    synthesised:x:@.synthesised
+
+                              // Counting how many training snippets we're inserting
+                              math.increment:x:@.no
+
+                        else-if:x:@.delete_duplicates
+
+                           // Deleting file since it's a duplicate!
+                           io.file.delete:x:@.dp/#
 
             else
 
