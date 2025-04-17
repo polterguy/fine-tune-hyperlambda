@@ -21,6 +21,7 @@ Below are some example prompts you can run through the model after fine tuning i
 * How do I convert a string to an integer?
 * Generate a list of strings containing names of famous books
   - Add 3 items to it
+  - Add these 3 items as static nodes
 * Generate a list of objects being employees
   - Add one item to it
   - Wrap it into and endpoint and return all employees
