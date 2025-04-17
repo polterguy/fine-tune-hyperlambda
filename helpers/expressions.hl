@@ -70,23 +70,6 @@ data.connect:fine-tune
                         expression:x:@.tmp
 
                      /*
-                      * Returns context for the specified [query] from the specified [type],
-                      * and returns to caller.
-                      *
-                      * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
-                      * tokens to return. [type] is a machine learning type from your ml_types database table in
-                      * your magic database.
-                      */
-                     execute:magic.workflows.actions.execute
-                        name:openai-context-from-database
-                        filename:/modules/openai/workflows/actions/openai-context-from-database.hl
-                        arguments
-                           type:magic-documentation
-                           query:x:@.tmp
-                           threshold:decimal:0.3
-                           max_tokens:int:3000
-
-                     /*
                       * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
                       * [instruction] and [query].
                       *
@@ -103,13 +86,12 @@ data.connect:fine-tune
                            model:gpt-4o
                            max_tokens:int:1500
                            instruction:x:@.system-message
-                           context:x:@execute/@execute/*/context
-                           query:x:@lambda2hyper
+                           query:x:@.tmp
 
                      // Injecting comment into Hyperlambda.
                      set-value:x:@.tmp
                         strings.concat
-                           get-value:x:@execute/*/context
+                           get-value:x:@execute/*/answer
                            .:"\r\n"
                            get-value:x:@.tmp
 
@@ -126,7 +108,7 @@ data.connect:fine-tune
                               max:10
                            .:.hl
                      io.file.save:x:@.filename
-                        get-value:x:@lambda2hyper
+                        get-value:x:@.tmp
 
                else
 
