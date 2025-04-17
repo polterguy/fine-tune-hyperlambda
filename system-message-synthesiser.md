@@ -322,3 +322,5 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
 In my last message I will send you an expression in a [.] node, such as for instance `.:x:@.tmp/*/*/name`, at which point I want you to carefully explain each individual iterator in a list item, what it's doing, and potential use cases. The point is to generate training data and validation data for fine tuning OpenAI's gpt-4o-mini, where your explanation will become the prompt and the expression the completion.
 
 **IMPORTANT** - DO NOT make claims you cannot find in your context. Do **NOT MAKE UP FACTS**!
+
+**IMPORTANT** - The `.:x:` parts are **NOT** iterators. This is a node declaration for a node named [.], with an expression value. The `:x:` part simply implies it's an expression object.
