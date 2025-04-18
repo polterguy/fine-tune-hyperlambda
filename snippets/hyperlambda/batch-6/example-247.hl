@@ -1,17 +1,65 @@
 /*
- * This script generates training data from Hyperlambda files.
+ * This Hyperlambda script generates training data from files stored in the 
+ * '/modules/fine-tune-hyperlambda/snippets/' directory.
  *
- * The script loops through all files recursively inside your '/modules/fine-tune-hyperlambda/snippets/'
- * folder and loads Hyperlambda files, converts to lambda, extracts the top comment, uses it as a prompt value,
- * for then to transform the rest of the lambda object back to Hyperlambda again (minus the first comment).
+ * It supports both `.hl` Hyperlambda source files training snippets.
+ * Each valid file is transformed into a [prompt] and [code] pair and inserted into the 
+ * 'hyperlambda' table in the 'fine-tune' database — optionally marking entries as validation 
+ * data based on their origin or random sampling.
  *
- * The transformed Hyperlambda is then used as 'code' when inserted into database, while the validation
- * column is set to true only if the file was found inside a /validation/ folder.
+ * 🔹 Key Functionalities:
  *
- * If the file is not a Hyperlambda file, but instead a markdown file, it will split it on '---' and
- * us the first part as prompt and the second part as completion, and insert with `is_static` set to true.
+ * 1. [.arguments]
+ *    - Accepts [randomize:int], defaulting to '1'.
+ *    - When randomize is enabled, every 8th file is flagged as validation data.
+ *
+ * 2. [data.execute]
+ *    - Clears the existing records from the 'hyperlambda' table before importing new ones.
+ *
+ * 3. [execute:magic.io.file.load-recursively]
+ *    - Recursively loads all files from the snippets directory for processing.
+ *
+ * 4. [.no] and [.deleted]
+ *    - Counters for successfully inserted records and deleted duplicates.
+ *
+ * 5. [for-each]
+ *    - Iterates over all discovered files and processes each inside a [try] block.
+ *
+ * 🔹 Processing `.hl` Hyperlambda Files:
+ * 
+ * - [hyper2lambda]
+ *   - Parses file into structured lambda format with comments.
+ * - The first node (assumed to be a file-level comment) is extracted as the [prompt].
+ * - The remaining lambda content is converted back to Hyperlambda [code] via [lambda2hyper].
+ *
+ * 🔹 Validation Flagging:
+ * 
+ * - If [randomize=1], then every 8th entry is marked as validation data.
+ * - Files under `/validation/` paths are also automatically flagged.
+ * - Files under `/synthesised/` paths are marked with [synthesised:int:1].
+ *
+ * 🔹 Deduplication and Filtering:
+ * 
+ * - The script checks for existing prompt/code duplicates before inserting.
+ * - If a duplicate is found, the file is deleted.
+ * - If more than 12 entries already exist with the same [code], the new file is discarded.
+ *
+ * 🔹 Data Insertion:
+ * 
+ * - Unique records are inserted using [data.create].
+ * - Prompt, code, validation, and synthesised flags are stored per entry.
+ *
+ * 6. [yield]
+ *    - Returns both the number of inserted records ([count]) and the number of deleted duplicates ([deleted]).
+ *
+ * 🔸 Summary:
+ * This script efficiently curates a high-quality training set by:
+ * - Breaking files into prompts and completions.
+ * - Avoiding duplicates.
+ * - Separating training and validation samples.
+ * - Respecting synthetic and static origins.
+ * Ideal for bootstrapping fine-tuning datasets using curated or programmatically generated examples.
  */
-
 .arguments
    randomize:int
 
