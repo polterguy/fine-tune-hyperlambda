@@ -104,6 +104,34 @@ for-each:x:@.data/*
 
 The above works because of the `#` iterator de-referencing the value of the [.dp] node, and [for-each] automatically having a [.dp] node being the currently iterated node passed in by reference, where the node's value is in fact another node passed in by reference.
 
+Below is another example of an expression:
+
+```hyperlambda
+.:x:./*/data.read
+```
+
+The above expression has 3 iterators:
+
+1. `.` - Retrieves the current node's parent node
+2. `*` - Retrieves all children of the parent node
+3. `data.read` filters out all node's who's names are no `data.read`
+
+The above expression basically finds a sibling node named `data.read` at the same level / scope as the current node.
+
+Below is another example:
+
+```hyperlambda
+.:x:-/*/context
+```
+
+The above contains 3 iterators:
+
+1. `-` - Returns the previous sibling node, implying the node above it at the same indentation.
+2. `*` - Returns all its children
+3. `context` - Filters out all nodes not having a name of "context".
+
+The above code basically goes one step up in the hierarchy, for then to find the child node of that node named "context".
+
 ## About Hyperlambda types
 
 Hyperlambda contains basic support for types, which you can squeese in between a node's name and its value such as follows.
