@@ -100,17 +100,33 @@ for-each:x:@execute/*
                   not-exists:x:@data.read/*
                   .lambda
 
-                     // Making sure we avoid double inserts.
-                     data.create
+                     // Making sure we've not go more than maximum 12 snippets with the same completion.
+                     data.read
                         table:hyperlambda
-                        values
-                           prompt:x:@.prompt
-                           code:x:@lambda2hyper
-                           validation:x:@.validation
-                           synthesised:x:@.synthesised
+                        where
+                           and
+                              code.eq:x:@lambda2hyper
+                     if
+                        mt
+                           get-count:x:@data.read/*
+                           .:int:12
+                        .lambda
 
-                     // Counting how many training snippets we're inserting
-                     math.increment:x:@.no
+                           // Deleting file since it's a duplicate!
+                           io.file.delete:x:@.dp/#
+
+                     else
+
+                        data.create
+                           table:hyperlambda
+                           values
+                              prompt:x:@.prompt
+                              code:x:@lambda2hyper
+                              validation:x:@.validation
+                              synthesised:x:@.synthesised
+
+                        // Counting how many training snippets we're inserting
+                        math.increment:x:@.no
 
                else
 
