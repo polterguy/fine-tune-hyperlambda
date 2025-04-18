@@ -1,0 +1,184 @@
+
+/*
+ * This Hyperlambda script batch-renames training and validation snippet files 
+ * for consistency and clarity. It performs a two-step process on both training 
+ * and validation folders:
+ *
+ * 1. Renames all files to `x-N.hl` as an intermediate step.
+ * 2. Then renames the same files to `example-N.hl` using an incrementing index.
+ *
+ * The script ensures uniform naming for all `.hl` files in:
+ * - `/snippets/hyperlambda/`
+ * - `/snippets/validation/`
+ *
+ * Steps Overview:
+ *
+ * 🔹 [execute:magic.io.file.load-recursively]
+ *    - Loads all Hyperlambda file paths from a specific directory recursively.
+ *
+ * 🔹 [.no:int:1]
+ *    - A counter used to create sequential file names.
+ *
+ * 🔹 [strings.split + remove-nodes]
+ *    - Breaks the full file path into segments, removing the filename.
+ *
+ * 🔹 [strings.join + strings.concat]
+ *    - Reconstructs the directory path and appends a new file name like `x-N.hl` or `example-N.hl`.
+ *
+ * 🔹 [io.file.save + io.file.delete]
+ *    - Saves the content of the original file under the new filename, then deletes the old file.
+ *
+ * 🔹 [math.increment]
+ *    - Increments the counter for the next filename.
+ *
+ * 🔁 The process is repeated for both training and validation folders, 
+ * ensuring uniform naming conventions.
+ *
+ * Resulting Files:
+ * - All training files become: `/snippets/hyperlambda/example-1.hl`, `example-2.hl`, ...
+ * - All validation files become: `/snippets/validation/example-1.hl`, `example-2.hl`, ...
+ *
+ * This ensures clean, human-readable file organization — useful for downstream automation,
+ * dataset packaging, or fine-tuning workflows that expect indexed file names.
+ */
+
+// First renaming training snippets to x-n.hl
+execute:magic.io.file.load-recursively
+   .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/
+
+// Counter
+.no:int:1
+
+// Looping through each file returned above.
+for-each:x:@execute/*
+
+   // Removing existing filename
+   strings.split:x:@.dp/#
+      .:/
+   remove-nodes:x:@strings.split/0/-
+
+   // Creating a new filename based upon the counter
+   strings.concat
+      .:/
+      strings.join:x:@strings.split/*
+         .:/
+      .:/
+      .:x-
+      get-value:x:@.no
+      .:.hl
+
+   // Saving new file
+   io.file.save:x:@strings.concat
+      get-value:x:@.dp/#/*
+
+   // Deleting old file
+   io.file.delete:x:@.dp/#
+
+   // Incrementing counter
+   math.increment:x:@.no
+
+// Then renaming to 'example-n.hl'
+execute:magic.io.file.load-recursively
+   .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/
+
+// Counter
+.no:int:1
+
+// Looping through each file returned above.
+for-each:x:@execute/*
+
+   // Removing existing filename
+   strings.split:x:@.dp/#
+      .:/
+   remove-nodes:x:@strings.split/0/-
+
+   // Creating a new filename based upob the counter
+   strings.concat
+      .:/
+      strings.join:x:@strings.split/*
+         .:/
+      .:/
+      .:example-
+      get-value:x:@.no
+      .:.hl
+
+   // Saving new file
+   io.file.save:x:@strings.concat
+      get-value:x:@.dp/#/*
+
+   // Deleting old file
+   io.file.delete:x:@.dp/#
+
+   // Incrementing counter
+   math.increment:x:@.no
+
+
+// Then validation snippets
+execute:magic.io.file.load-recursively
+   .:/modules/fine-tune-hyperlambda/snippets/validation/
+
+// Counter
+.no:int:1
+
+// Looping through each file returned above.
+for-each:x:@execute/*
+
+   // Removing existing filename
+   strings.split:x:@.dp/#
+      .:/
+   remove-nodes:x:@strings.split/0/-
+
+   // Creating a new filename based upon the counter
+   strings.concat
+      .:/
+      strings.join:x:@strings.split/*
+         .:/
+      .:/
+      .:x-
+      get-value:x:@.no
+      .:.hl
+
+   // Saving new file
+   io.file.save:x:@strings.concat
+      get-value:x:@.dp/#/*
+
+   // Deleting old file
+   io.file.delete:x:@.dp/#
+
+   // Incrementing counter
+   math.increment:x:@.no
+
+// Doing validation folder.
+execute:magic.io.file.load-recursively
+   .:/modules/fine-tune-hyperlambda/snippets/validation/
+
+// Counter
+.no:int:1
+
+// Looping through each file returned above.
+for-each:x:@execute/*
+
+   // Removing existing filename
+   strings.split:x:@.dp/#
+      .:/
+   remove-nodes:x:@strings.split/0/-
+
+   // Creating a new filename based upob the counter
+   strings.concat
+      .:/
+      strings.join:x:@strings.split/*
+         .:/
+      .:/
+      .:example-
+      get-value:x:@.no
+      .:.hl
+
+   // Saving new file
+   io.file.save:x:@strings.concat
+      get-value:x:@.dp/#/*
+
+   // Deleting old file
+   io.file.delete:x:@.dp/#
+
+   // Incrementing counter
+   math.increment:x:@.no

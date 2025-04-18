@@ -1,0 +1,120 @@
+
+/*
+ * This Hyperlambda script generates RAG (Retrieval-Augmented Generation) training data from 
+ * syntactically valid Hyperlambda files. The output is stored in the 'ml_training_snippets' 
+ * table of the 'magic' database for future use in semantic search or contextual AI workflows.
+ *
+ * 1. [execute:magic.io.file.load-recursively]
+ *    - Recursively loads all files under the '/modules/fine-tune-hyperlambda/snippets/' directory.
+ *    - This includes all `.hl` Hyperlambda files intended for processing.
+ *
+ * 2. [for-each]
+ *    - Iterates over each file path returned from the above command.
+ *
+ * 3. [try]
+ *    - Wraps each iteration in a try block to handle and identify individual file errors gracefully.
+ *
+ * 4. [if]
+ *    - Validates two conditions:
+ *      a. File must end with a '.hl' extension (indicating it's Hyperlambda).
+ *      b. File content length must be less than 1000 characters to prevent overloading.
+ *
+ * 5. [hyper2lambda]
+ *    - Parses the file into a structured lambda object, including comments.
+ *    - Prepares the content for manipulation, filtering, and serialization.
+ *
+ * 6. [remove-nodes]
+ *    - Removes all [.description] child nodes to eliminate noise or excess metadata from training input.
+ *
+ * 7. [if eq get-name:x:@hyper2lambda/0 .:..]
+ *    - Ensures the root of the lambda object begins with a valid root-level node ('..').
+ *
+ * 8. [.prompt]
+ *    - Captures the original root node before stripping it from the lambda object.
+ *    - Used as the RAG prompt to represent the context for the associated code.
+ *
+ * 9. [lambda2hyper]
+ *    - Converts the remaining lambda nodes back into Hyperlambda code (as string) with comments intact.
+ *    - This code becomes the 'completion' portion of the training snippet.
+ *
+ * 10. [data.connect:magic]
+ *     - Connects to the 'magic' database where the output RAG data will be stored.
+ *
+ * 11. [data.create]
+ *     - Inserts the training record into 'ml_training_snippets' with:
+ *       - [prompt]      → From the original root node.
+ *       - [completion]  → Serialized Hyperlambda code without the root.
+ *       - [type]        → Set to 'hyperlambda-reference' to denote its content type.
+ *
+ * 12. [.catch]
+ *     - If a failure occurs, the name of the problematic file is thrown for debugging.
+ *
+ * 13. [remove-nodes:x:@execute/*]
+ *     - Cleans up the memory space by removing all loaded file paths after processing.
+ *
+ * 14. [yield]
+ *     - Returns a success message once the entire batch has been processed.
+ *
+ * This script is ideal for bootstrapping a RAG dataset that pairs concise, meaningful Hyperlambda 
+ * expressions with context-rich metadata derived from real-world examples in your codebase.
+ */
+// Loading all files recursively
+execute:magic.io.file.load-recursively
+   .:/modules/fine-tune-hyperlambda/snippets/
+
+// Looping through all files.
+for-each:x:@execute/*
+
+   // Making sure we catch exceptions such that we can see which file fails.
+   try
+
+      // Verifying we're dealing with a Hyperlambda file.
+      if
+         and
+            strings.ends-with:x:@.dp/#
+               .:.hl
+            lt
+               strings.length:x:@.dp/#/0
+               .:int:1000
+         .lambda
+
+            // Transforming file to lambda object.
+            hyper2lambda:x:@.dp/#/0
+               comments:true
+            remove-nodes:x:-/*/.description
+            if
+               eq
+                  get-name:x:@hyper2lambda/0
+                  .:..
+               .lambda
+
+                  .prompt
+                  set-value:x:-
+                     get-value:x:@hyper2lambda/0
+                  remove-nodes:x:@hyper2lambda/0
+
+                  // Creating our code segment
+                  lambda2hyper:x:@hyper2lambda/*
+                     comments:true
+
+                  // Saving above code snippet.
+                  data.connect:magic
+
+                     // Making sure we avoid double inserts.
+                     data.create
+                        table:ml_training_snippets
+                        values
+                           prompt:x:@.prompt
+                           completion:x:@lambda2hyper
+                           type:hyperlambda-reference
+
+   .catch
+   
+      // This throws an exception being the name of the currently processed filename
+      throw:x:@.dp/#
+
+// House cleanups.
+remove-nodes:x:@execute/*
+
+yield
+   result:success!

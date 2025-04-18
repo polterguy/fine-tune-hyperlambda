@@ -1,0 +1,178 @@
+
+/*
+ * This Hyperlambda endpoint generates synthetic training snippets by dissecting 
+ * complex Hyperlambda files into atomic expressions, then expanding each into a 
+ * minimal standalone example with contextual comments using OpenAI.
+ *
+ * 1. [.arguments]
+ *    - Accepts two required parameters:
+ *      - [limit:long]   → The number of records to process per request.
+ *      - [offset:long]  → The offset for paginated record retrieval.
+ *
+ * 2. [validators.mandatory]
+ *    - Ensures both 'limit' and 'offset' arguments are explicitly provided.
+ *
+ * 3. [.system-message]
+ *    - Loads a system prompt from a Markdown file that guides the AI's behavior when commenting.
+ *
+ * 4. [vocabulary]
+ *    - Retrieves all known slots for use during validation or filtering (used implicitly later).
+ *
+ * 5. [data.connect:fine-tune]
+ *    - Connects to the fine-tuning database.
+ *    - Selects Hyperlambda records that are not static and not yet processed, ordered by size.
+ *
+ * 6. [for-each]
+ *    - Iterates through each database record.
+ *
+ * 7. [hyper2lambda]
+ *    - Converts the [code] field from text to a structured lambda object.
+ *
+ * 8. [for-each] (nested)
+ *    - Traverses every node in the parsed lambda tree.
+ *
+ * 9. [if]
+ *    - Filters out non-slot expressions by checking for non-null and 'x' typed nodes.
+ *
+ * 10. [.tmp]
+ *     - Builds a simplified snippet containing just the current expression in a safe string format.
+ *
+ * 11. [data.read]
+ *     - Checks if a snippet for this exact expression already exists to avoid duplication.
+ *
+ * 12. [execute:magic.workflows.actions.execute]
+ *     - Uses OpenAI’s API to generate a context-rich, natural-language comment for the snippet.
+ *     - Supplies the model, max token limit, system instruction, and the snippet as the query.
+ *
+ * 13. [lambda2hyper] + [add]
+ *     - Converts the AI-enriched lambda back to Hyperlambda syntax with embedded comments.
+ *     - Appends the original expression to the output.
+ *
+ * 14. [.filename]
+ *     - Dynamically generates a random file path using the snippet's ID and a random suffix.
+ *
+ * 15. [io.file.save]
+ *     - Persists the result in the '/synthesised4/' directory for future training use.
+ *
+ * 16. [else]
+ *     - If a duplicate snippet already exists, logs this fact and skips generation.
+ *
+ * This endpoint ensures larger Hyperlambda files are decomposed into atomic, high-quality 
+ * training snippets with consistent documentation—automatically enriching your dataset 
+ * for fine-tuning purposes.
+ */
+.arguments
+   limit:long
+   offset:long
+.type:public
+
+// Ensuring both arguments are specified by caller!
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+
+// Loading our system message file.
+.system-message
+set-value:x:@.system-message
+   io.file.load:/modules/fine-tune-hyperlambda/system-message-synthesiser.md
+
+vocabulary
+
+// Connecting to our fine-tune database.
+data.connect:fine-tune
+
+   // Selecting records.
+   data.select:"select * from hyperlambda where is_static = 0 and synthesised = 0 order by length(code) + length(prompt) desc limit @limit offset @offset"
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   // Looping through each record returned from above.
+   for-each:x:@data.select/*
+
+      // Converting code to lambda.
+      hyper2lambda:x:@.dp/#/*/code
+
+      // Looping through all nodes in lambda object.
+      for-each:x:@hyper2lambda/**/*
+
+         // Verifying currently iterated node's name is a slot invocation.
+         if
+            and
+               not-null:x:@.dp/#
+               eq
+                  type:x:@.dp/#
+                  .:x
+            .lambda
+
+               // Creating a temporary string of the expression.
+               .tmp
+               set-value:x:@.tmp
+                  strings.concat
+                     .:".:x:"
+                     convert:x:@.dp/#
+                        type:string
+
+               // Making sure we've NOT previously dealt with this exact snippet.
+               data.read
+                  table:hyperlambda
+                  where
+                     and
+                        code.eq:x:@.tmp
+               if
+                  not-exists:x:@data.read/*
+                  .lambda
+
+                     // Logging
+                     log.info:Creating synthetic snippet
+                        expression:x:@.tmp
+
+                     /*
+                      * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+                      * [instruction] and [query].
+                      *
+                      * Will use the default API key found from configurations.
+                      *
+                      * [context] is additional data you can supply to OpenAI such that it responds using
+                      * your data as its source for information. [instruction] is a system message allowing
+                      * you to change how OpenAI responds.
+                      */
+                     execute:magic.workflows.actions.execute
+                        name:openai-query
+                        filename:/modules/openai/workflows/actions/openai-query.hl
+                        arguments
+                           model:gpt-4o
+                           max_tokens:int:1500
+                           instruction:x:@.system-message
+                           query:x:@.tmp
+
+                     // Injecting comment into Hyperlambda.
+                     .foo
+                     unwrap:x:+/*/*
+                     add:x:@.foo
+                        .
+                           ..:x:@execute/*/answer
+                     lambda2hyper:x:@.foo/*
+                        comments:true
+                     set-value:x:@.tmp
+                        strings.concat
+                           get-value:x:@lambda2hyper
+                           .:"\r\n"
+                           get-value:x:@.tmp
+
+                     // Saving with a random filename in /synthesised4/ folder
+                     .filename
+                     set-value:x:@.filename
+                        strings.concat
+                           .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
+                           .:id-
+                           get-value:x:@for-each/@.dp/#/*/hyperlambda_id
+                           .:-
+                           crypto.random
+                              min:10
+                              max:10
+                           .:.hl
+                     io.file.save:x:@.filename
+                        get-value:x:@.tmp
+
+               else
+
+                  log.info:Snippet already exists.

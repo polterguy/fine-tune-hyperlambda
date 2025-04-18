@@ -1,0 +1,161 @@
+/*
+ * This Hyperlambda endpoint generates JSONL files for OpenAI fine-tuning using all available 
+ * data from your 'hyperlambda' database table.
+ *
+ * It handles both training and validation datasets separately and includes a system prompt 
+ * for each, loaded from disk. The resulting files are suitable for supervised fine-tuning of 
+ * OpenAI chat models (e.g., GPT-4).
+ *
+ * 1. [.result]
+ *    - Acts as a buffer to store the serialized JSONL lines for training data.
+ *
+ * 2. [.system-message]
+ *    - Loads a static system message from disk (system-message.md) to be used in each training sample.
+ *
+ * 3. [data.connect:fine-tune] + [data.select]
+ *    - Retrieves all training data entries (where [validation = 0]) from the database.
+ *    - Ordered using a modular hash function to pseudo-randomize rows.
+ *
+ * 4. [for-each]
+ *    - Iterates over every training entry in the dataset.
+ *
+ * 5. [.prompt] + [.completion]
+ *    - Extracts and prepares the prompt and expected assistant response for each entry.
+ *    - Adds a newline to ensure OpenAI completes after the assistant's reply.
+ *
+ * 6. [.data/messages]
+ *    - Creates a proper OpenAI-compliant message array containing system, user, and assistant roles.
+ *
+ * 7. [lambda2json]
+ *    - Converts the message structure to a single JSON line suitable for a .jsonl file.
+ *
+ * 8. [set-value:x:@.result]
+ *    - Appends the new line to the [.result] buffer with a newline separator.
+ *
+ * 9. [io.file.save]
+ *    - Saves the complete training set to `/modules/fine-tune-hyperlambda/training-material.jsonl`.
+ *
+ * 10. [.validation]
+ *     - Buffer to hold the JSONL lines for validation data.
+ *
+ * 11. [io.file.load] for validation message
+ *     - Loads a different system message for the validation samples from `system-message-validation.md`.
+ *
+ * 12. The process is repeated for validation data:
+ *     - Fetch validation rows ([validation = 1]), generate message structure, convert to JSONL, and save.
+ *
+ * 13. [return]
+ *     - Returns paths to the generated training and validation `.jsonl` files so the caller can download them.
+ *
+ * Note: This endpoint **does not auto-download** the files. You must manually retrieve the 
+ * `training-material.jsonl` and `validation-material.jsonl` files for fine-tuning.
+ */
+
+// Buffer for snippets.
+.result:
+
+// Loading up system message
+.system-message
+set-value:x:-
+   strings.concat
+      io.file.load:/modules/fine-tune-hyperlambda/system-message.md
+      .:"\n"
+
+// Retrieving all training snippets.
+data.connect:fine-tune
+   data.select:select * from hyperlambda where validation = 0 order by mod(length(prompt), 11)
+
+   // Iterating through snippets to generate training data.
+   for-each:x:@data.select/*
+
+      // Generating training record, starting with prompt.
+      .prompt
+      set-value:x:@.prompt
+         get-value:x:@.dp/#/*/prompt
+
+      // Then completion.
+      .completion
+      set-value:x:@.completion
+         strings.concat
+            get-value:x:@.dp/#/*/code
+            .:"\n"
+
+      // Creating our buffer object to hold our messages.
+      unwrap:x:+/**
+      .data
+         messages
+            .
+               role:system
+               content:x:@.system-message
+            .
+               role:user
+               content:x:@.prompt
+            .
+               role:assistant
+               content:x:@.completion
+
+      // Adding training data to above [.result].
+      set-value:x:@.result
+         strings.concat
+            get-value:x:@.result
+            lambda2json:x:@.data/*
+            .:"\n"
+
+// Saving files.
+io.file.save:/modules/fine-tune-hyperlambda/training-material.jsonl
+   get-value:x:@.result
+
+// Buffer for validation data.
+.validation:
+
+// Loading up system message
+.system-message
+set-value:x:-
+   io.file.load:/modules/fine-tune-hyperlambda/system-message-validation.md
+
+   // Retrieving all training snippets.
+data.connect:fine-tune
+   data.select:select * from hyperlambda where validation = 1 order by mod(length(prompt), 11)
+
+   // Iterating through snippets to generate training data.
+   for-each:x:@data.select/*
+
+      // Generating training record, starting with prompt.
+      .prompt
+      set-value:x:@.prompt
+         get-value:x:@.dp/#/*/prompt
+
+      // Then completion.
+      .completion
+      set-value:x:@.completion
+         get-value:x:@.dp/#/*/code
+
+      // Creating our buffer object to hold our messages.
+      unwrap:x:+/**
+      .data
+         messages
+            .
+               role:system
+               content:x:@.system-message
+            .
+               role:user
+               content:x:@.prompt
+            .
+               role:assistant
+               content:x:@.completion
+
+      // Adding training data to above [.result].
+      set-value:x:@.validation
+         strings.concat
+            get-value:x:@.validation
+            lambda2json:x:@.data/*
+            .:"\n"
+
+// Saving files.
+io.file.save:/modules/fine-tune-hyperlambda/validation-material.jsonl
+   get-value:x:@.validation
+
+// Returning result to caller.
+return
+   training_file:/modules/fine-tune/training-material.jsonl
+   validation_file:/modules/fine-tune/validation-material.jsonl

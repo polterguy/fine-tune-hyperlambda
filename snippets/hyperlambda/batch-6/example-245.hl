@@ -1,9 +1,68 @@
+
 /*
- * Loads all Hyperlambda files from database, finds all individual slot invocation in these files,
- * and creates one unique training snippet for every single "function invocation" (slot invocation)
- * that exists in the original training set.
+ * This Hyperlambda endpoint processes training records from the 'hyperlambda' table of the 
+ * 'fine-tune' database and dissects them into smaller, isolated training snippets — one per 
+ * slot invocation (function-like call).
  *
- * This breaks up larger pieces of code into smaller snippets.
+ * Each snippet is contextually enriched via OpenAI and saved as a unique file for use in 
+ * fine-tuning models. This method is known internally as the “Chop Suey” approach, breaking 
+ * up full scripts into atomic examples.
+ *
+ * 1. [.arguments]
+ *    - Accepts two required arguments:
+ *      - [limit:long]   → Number of records to process.
+ *      - [offset:long]  → Offset for pagination.
+ *
+ * 2. [.system-message]
+ *    - Loads the OpenAI instruction from 'system-message-synthesiser.md' for comment generation.
+ *
+ * 3. [vocabulary]
+ *    - Retrieves all slot names available in the system to validate what constitutes a real slot invocation.
+ *
+ * 4. [data.connect:fine-tune]
+ *    - Connects to the fine-tune database to access training entries.
+ *    - Filters for unsynthesized, non-static records and orders them by code complexity (prompt + code length).
+ *
+ * 5. [for-each:x:@data.select/*]
+ *    - Loops through each Hyperlambda training record.
+ *
+ * 6. [hyper2lambda]
+ *    - Converts the code field of each record to a lambda object for structured traversal.
+ *
+ * 7. [for-each:x:@hyper2lambda/**/*]
+ *    - Recursively visits every node in the lambda tree structure.
+ *
+ * 8. [get-name + if exists in vocabulary]
+ *    - Ensures the node is a valid slot invocation before processing.
+ *
+ * 9. [.tmp + add]
+ *    - Creates a minimal lambda structure containing only the current node.
+ *
+ * 10. [lambda2hyper]
+ *     - Converts the node to a raw Hyperlambda code snippet as string.
+ *
+ * 11. [log.info]
+ *     - Logs the snippet being synthesized.
+ *
+ * 12. [execute:openai-context-from-database]
+ *     - Retrieves contextual documentation from the 'magic-documentation' set, based on the current snippet.
+ *
+ * 13. [execute:openai-query]
+ *     - Sends the snippet and retrieved context to OpenAI (using 'gpt-4o') to generate a relevant comment.
+ *
+ * 14. [unwrap + insert-before]
+ *     - Adds the AI-generated comment to the beginning of the snippet as a file-level comment.
+ *
+ * 15. [lambda2hyper]
+ *     - Re-serializes the annotated snippet back into Hyperlambda format with comments.
+ *
+ * 16. [.filename + io.file.save]
+ *     - Constructs a unique filename using the original training ID and a 10-digit random suffix.
+ *     - Saves the final result into the 'synthesised4' directory for downstream fine-tuning.
+ *
+ * This approach allows comprehensive coverage of your slot API surface, generating 
+ * focused, context-rich examples that serve well in both supervised fine-tuning and 
+ * retrieval-augmented workflows.
  */
 .arguments
    limit:long

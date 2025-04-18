@@ -127,9 +127,3 @@ Another
  * into /etc/temp/ before attached into the email.
  */
  ```
-
-
-## Making it stronger
-
-* Examples of arguments
-* Examples of "How to split string and retrieve last entry", "how to split string and return first item", etc
