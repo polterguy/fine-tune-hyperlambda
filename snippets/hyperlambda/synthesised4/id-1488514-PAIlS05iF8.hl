@@ -1,0 +1,46 @@
+
+// If the previous conditions are not met, this code parses a JSON string into a lambda structure, then checks for a "finish_reason" in the parsed data and, if present and not null, sets a local [finish_reason] node and signals it over a socket. It also checks if there is non-empty "content" in the delta, appends it to a [result] node, and sends a socket signal with the message unless the result contains "___". If the result contains "FUNCTION_INVOCATION[" and a waiting signal hasn't been sent yet, it signals that a function is waiting and marks that the waiting signal has been sent.
+else
+   json2lambda:x:@strings.trim
+   if
+      and
+         exists:x:@json2lambda/*/choices/0/*/finish_reason
+         not-null:x:@json2lambda/*/choices/0/*/finish_reason
+      .lambda
+         set-value:x:@.finish_reason
+            get-value:x:@json2lambda/*/choices/0/*/finish_reason
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               finish_reason:x:@.finish_reason
+   if
+      and
+         not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+         neq:x:@json2lambda/*/choices/0/*/delta/*/content
+            .:
+      .lambda
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+         if
+            not
+               strings.contains:x:@.result
+                  .:___
+            .lambda
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     message:x:@json2lambda/*/choices/0/*/delta/*/content
+         else-if
+            and
+               strings.contains:x:@.result
+                  .:FUNCTION_INVOCATION[
+               neq:x:@.has-sent-waiting
+                  .:bool:true
+            .lambda
+               sockets.signal:x:@.session
+                  args
+                     function_waiting:bool:true
+               set-value:x:@.has-sent-waiting
+                  .:bool:true

@@ -1,0 +1,30 @@
+
+// Checks if a [cached] node exists under [signal], and if so, further checks if the [.arguments/supervised] value exists, is not null, and equals 1 (after converting to int). If all conditions are met, it inserts a new record into the [ml_requests] table with details from the arguments and the cached completion. Finally, it returns the cached result, sets [finish_reason] to "cached", and [stream] to false.
+if
+   exists:x:@signal/*/cached
+   .lambda
+      if
+         and
+            exists:x:@.arguments/*/supervised
+            not-null:x:@.arguments/*/supervised
+            eq
+               convert:x:@.arguments/*/supervised
+                  type:int
+               .:int:1
+         .lambda
+            data.connect:[generic|magic]
+               data.create
+                  table:ml_requests
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@.arguments/*/prompt
+                     completion:x:@signal/*/cached
+                     finish_reason:cached
+                     session:x:@.arguments/*/session
+                     user_id:x:@.arguments/*/user_id
+                     referrer:x:@.arguments/*/referrer
+      unwrap:x:+/*
+      return
+         result:x:@signal/*/cached
+         finish_reason:cached
+         stream:bool:false

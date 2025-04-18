@@ -1,0 +1,22 @@
+
+// This code repeatedly processes session nodes, converting them from lambda to Hyperlambda format, and checks if the combined token count (including extra tokens and a max_tokens argument) is less than a specified model size. If the limit is exceeded, it stops the loop; otherwise, it concatenates session and fixed values, removes nodes of type "x" from the session, and continues looping.
+while:x:@.cont
+   lambda2hyper:x:@.session/*
+   if
+      lt
+         math.add
+            get-value:x:@.arguments/*/max_tokens
+            openai.tokenize:x:@lambda2hyper
+            get-value:x:@.extra-tokens
+         get-value:x:@.arguments/*/model_size
+      .lambda
+         set-value:x:@.cont
+            .:bool:false
+   else
+      strings.concat
+         .:@.session/
+         get-value:x:@.fixed
+      set-x:x:./*/remove-nodes
+         convert:x:@strings.concat
+            type:x
+      remove-nodes

@@ -1,0 +1,47 @@
+
+// Checks if a session argument exists and is not null, then conditionally adds assistant and system messages to the session based on the presence and non-emptiness of result and new-prompt values. It then copies session messages to a cache-session node, trims it to a fixed length by removing oldest entries, converts the cache-session to Hyperlambda format, and caches the updated session with a specified timeout.
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      if
+         and
+            not-null:x:@.result
+            neq:x:@.result
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:assistant
+                     content:x:@.result
+      if
+         and
+            not-null:x:@.new-prompt
+            neq:x:@.new-prompt
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:system
+                     content:x:@.new-prompt
+      .cache-session
+      add:x:@.cache-session
+         get-nodes:x:@.session/*
+      .tmp
+      set-value:x:@.tmp
+         get-value:x:@.fixed
+      while
+         mt:x:@.tmp
+            .:int:0
+         .lambda
+            remove-nodes:x:@.cache-session/0
+            math.decrement:x:@.tmp
+      lambda2hyper:x:@.cache-session/*
+      cache.set:x:@.arguments/*/session
+         expiration:x:@.arguments/*/session_timeout
+         value:x:@lambda2hyper

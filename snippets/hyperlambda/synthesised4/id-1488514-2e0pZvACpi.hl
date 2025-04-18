@@ -1,0 +1,33 @@
+
+// This code checks if a specific content value exists and is not empty in a JSON structure, appends it to a result string, and then conditionally sends a socket signal with either the content or a function waiting message, depending on the contents of the result and a flag indicating if a waiting message has already been sent.
+if
+   and
+      not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+      neq:x:@json2lambda/*/choices/0/*/delta/*/content
+         .:
+   .lambda
+      set-value:x:@.result
+         strings.concat
+            get-value:x:@.result
+            get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+      if
+         not
+            strings.contains:x:@.result
+               .:___
+         .lambda
+            unwrap:x:+/*/*
+            sockets.signal:x:@.session
+               args
+                  message:x:@json2lambda/*/choices/0/*/delta/*/content
+      else-if
+         and
+            strings.contains:x:@.result
+               .:FUNCTION_INVOCATION[
+            neq:x:@.has-sent-waiting
+               .:bool:true
+         .lambda
+            sockets.signal:x:@.session
+               args
+                  function_waiting:bool:true
+            set-value:x:@.has-sent-waiting
+               .:bool:true
