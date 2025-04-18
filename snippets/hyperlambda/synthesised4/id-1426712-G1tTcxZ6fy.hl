@@ -1,0 +1,32 @@
+
+/*
+ * This Hyperlambda code checks if a cache item exists using [cache.get]. If the cache item is not null, it converts a maximum session items argument to an integer and transforms the cache item into a Hyperlambda node set using [hyper2lambda]. It then enters a [while] loop that continues as long as the number of nodes in the converted cache item exceeds the maximum session items. Within the loop, it removes the first node from the converted cache item. Finally, it adds the remaining nodes from the converted cache item to a session node. The code effectively limits the number of session items by removing excess nodes from the cache item before adding them to the session.
+ * 
+ * 1. [if] - Checks if the cache item is not null.
+ * 2. [not-null:x:@cache.get] - Retrieves a cache item and checks if it is not null.
+ * 3. [.lambda] - Executes the following code block if the cache item is not null.
+ * 4. [convert:x:@.arguments/*/max_session_items] - Converts the maximum session items argument to an integer.
+ * 5. [hyper2lambda:x:@cache.get] - Transforms the cache item into a Hyperlambda node set.
+ * 6. [while] - Loops while the number of nodes in the converted cache item exceeds the maximum session items.
+ * 7. [mt] - Checks if the number of nodes is greater than the maximum session items.
+ * 8. [get-count:x:@hyper2lambda/*] - Retrieves the count of nodes in the converted cache item.
+ * 9. [get-value:x:@convert] - Retrieves the converted maximum session items value.
+ * 10. [.lambda] - Executes the following code block within the while loop.
+ * 11. [remove-nodes:x:@hyper2lambda/0] - Removes the first node from the converted cache item.
+ * 12. [add:x:@.session] - Adds the remaining nodes from the converted cache item to the session node.
+ * 13. [get-nodes:x:@hyper2lambda/*] - Retrieves the nodes from the converted cache item to add to the session.
+ */
+if
+   not-null:x:@cache.get
+   .lambda
+      convert:x:@.arguments/*/max_session_items
+         type:int
+      hyper2lambda:x:@cache.get
+      while
+         mt
+            get-count:x:@hyper2lambda/*
+            get-value:x:@convert
+         .lambda
+            remove-nodes:x:@hyper2lambda/0
+      add:x:@.session
+         get-nodes:x:@hyper2lambda/*

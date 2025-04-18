@@ -1,0 +1,84 @@
+
+/*
+ * This Hyperlambda code is designed to handle outgoing webhook signals conditionally. It first checks if the [outgoing] node is not null and not empty using [and], [not-null], and [neq]. If true, it sets up an execution environment with a URL from either the [webhook_outgoing_url] argument or a configuration value, and signals the outgoing webhook. It then adds a [signal] node with [result] and [session] data. If both [to] and [from] arguments exist and contain a colon, it splits these values to set up a [channel], [to], and [from] nodes, adding them to the [signal]. If not, it adds the [to] and [from] nodes directly. Finally, it evaluates the execution environment. 
+ * 
+ * 1. [if] - Checks if the [outgoing] node is not null and not empty.
+ * 2. [and] - Combines multiple conditions.
+ * 3. [not-null] - Checks if [outgoing] is not null.
+ * 4. [neq] - Checks if [outgoing] is not empty.
+ * 5. [.lambda] - Executes if conditions are true.
+ * 6. [.exe] - Sets up execution environment.
+ * 7. [.hook-url] - Temporary node for the hook URL.
+ * 8. [set-value] - Sets the value of [hook-url].
+ * 9. [get-first-value] - Retrieves the first non-null value.
+ * 10. [get-value] - Retrieves values from arguments or config.
+ * 11. [unwrap] - Evaluates URL expressions.
+ * 12. [signal] - Sends a signal with URL.
+ * 13. [add] - Adds nodes to the [signal].
+ * 14. [if] - Checks additional conditions for [to] and [from].
+ * 15. [exists] - Checks if nodes exist.
+ * 16. [strings.contains] - Checks if [to] and [from] contain a colon.
+ * 17. [.channel], [.to], [.from] - Temporary nodes for split values.
+ * 18. [strings.split] - Splits [to] and [from] values.
+ * 19. [set-value] - Sets split values.
+ * 20. [unwrap] - Evaluates expressions.
+ * 21. [add] - Adds [to], [from], [channel] to [signal].
+ * 22. [else] - Handles case where [to] and [from] don't contain a colon.
+ * 23. [get-nodes] - Retrieves [to] and [from] nodes.
+ * 24. [eval] - Evaluates the execution environment.
+ */
+if
+   and
+      not-null:x:@.outgoing
+      neq:x:@.outgoing
+         .:
+   .lambda
+      .exe
+         .hook-url
+         set-value:x:@.hook-url
+            get-first-value
+               get-value:x:@.arguments/*/webhook_outgoing_url
+               config.get:"magic:openai:integrations:outgoing:url"
+         unwrap:x:./*/signal/*/url
+         signal:x:@.outgoing
+            url:x:@.hook-url
+      unwrap:x:+/*/*
+      add:x:@.exe/*/signal
+         .
+            result:x:@.result
+            session:x:@.arguments/*/session
+      if
+         and
+            exists:x:@.arguments/*/to
+            exists:x:@.arguments/*/from
+            not-null:x:@.arguments/*/to
+            not-null:x:@.arguments/*/from
+            strings.contains:x:@.arguments/*/to
+               .:":"
+            strings.contains:x:@.arguments/*/from
+               .:":"
+         .lambda
+            .channel
+            .to
+            .from
+            strings.split:x:@.arguments/*/to
+               .:":"
+            set-value:x:@.channel
+               get-value:x:@strings.split/0
+            set-value:x:@.to
+               get-value:x:@strings.split/1
+            strings.split:x:@.arguments/*/from
+               .:":"
+            set-value:x:@.from
+               get-value:x:@strings.split/1
+            unwrap:x:+/*/*
+            add:x:@.exe/*/signal
+               .
+                  to:x:@.from
+                  from:x:@.to
+                  channel:x:@.channel
+      else
+         add:x:@.exe/*/signal
+            get-nodes:x:@.arguments/*/to
+            get-nodes:x:@.arguments/*/from
+      eval:x:@.exe

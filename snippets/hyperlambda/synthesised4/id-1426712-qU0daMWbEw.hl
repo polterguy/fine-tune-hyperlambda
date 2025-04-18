@@ -1,0 +1,33 @@
+
+/*
+ * This Hyperlambda code connects to a generic database using the [data.connect] slot and executes a SQL query with [data.select] to retrieve prompts and their maximum completion values from the "ml_requests" table, filtered by a specific user ID and certain conditions. The results are grouped by the prompt. For each result, it unwraps the content and adds it to a session node, alternating between roles of "assistant" and "user" with the respective prompt and completion content. The [for-each] loop iterates over the query results, processing each record to build a session log. 
+ * 
+ * 1. [data.connect] - Establishes a connection to a generic database.
+ * 2. [data.select] - Executes a SQL query to select prompts and their maximum completion values.
+ * 3. [user_id] - Filters the SQL query by a specific user ID.
+ * 4. [for-each] - Iterates over each result from the SQL query.
+ * 5. [unwrap] - Evaluates and extracts content from the current node.
+ * 6. [add] - Adds a new node to the session, alternating roles between "assistant" and "user".
+ * 7. [role] - Specifies the role (assistant/user) for the session entry.
+ * 8. [content] - Sets the content for the session entry using the prompt or completion value.
+ */
+data.connect:[generic|magic]
+   data.select:@"
+select prompt, max(completion) as completion
+   from ml_requests
+   where user_id = @user_id and questionnaire = 1 and context = 1
+   group by prompt"
+      user_id:x:@.arguments/*/user_id
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:assistant
+               content:x:@.dp/#/*/prompt
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:user
+               content:x:@.dp/#/*/completion

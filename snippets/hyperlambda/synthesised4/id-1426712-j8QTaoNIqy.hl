@@ -1,0 +1,80 @@
+
+/*
+ * This Hyperlambda code manages a session cache by checking for the existence and non-null status of a session argument. If conditions are met, it processes the session by adding assistant and system roles with respective content, caches the session, and removes nodes based on a fixed value. Finally, it converts the session to a Hyperlambda format and sets it in the cache with a specified expiration time. The code ensures that session data is updated and stored efficiently in the cache. 
+ * 
+ * 1. [if] - Checks if session exists and is not null.
+ * 2. [and] - Combines multiple conditions to be true.
+ * 3. [exists] - Checks if session argument exists.
+ * 4. [not-null] - Checks if session argument is not null.
+ * 5. [.lambda] - Executes if the above conditions are true.
+ * 6. [if] - Nested condition to check result status.
+ * 7. [neq] - Checks if result is not equal to an empty value.
+ * 8. [unwrap] - Processes content for assistant role.
+ * 9. [add] - Adds processed content to session.
+ * 10. [role] - Specifies the role as assistant.
+ * 11. [content] - Sets content from result.
+ * 12. [if] - Checks new-prompt status.
+ * 13. [neq] - Checks if new-prompt is not equal to an empty value.
+ * 14. [unwrap] - Processes content for system role.
+ * 15. [add] - Adds processed content to session.
+ * 16. [role] - Specifies the role as system.
+ * 17. [content] - Sets content from new-prompt.
+ * 18. [.cache-session] - Prepares session for caching.
+ * 19. [add] - Adds session nodes to cache-session.
+ * 20. [get-nodes] - Retrieves session nodes.
+ * 21. [.tmp] - Temporary node for processing.
+ * 22. [set-value] - Sets temporary value from fixed.
+ * 23. [while] - Loops while tmp is greater than 0.
+ * 24. [mt] - Checks if tmp is more than 0.
+ * 25. [remove-nodes] - Removes nodes from cache-session.
+ * 26. [math.decrement] - Decreases tmp value.
+ * 27. [lambda2hyper] - Converts session to Hyperlambda format.
+ * 28. [cache.set] - Sets session in cache with expiration.
+ * 29. [expiration] - Sets expiration time for cache.
+ * 30. [value] - Sets value from lambda2hyper.
+ */
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      if
+         and
+            not-null:x:@.result
+            neq:x:@.result
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:assistant
+                     content:x:@.result
+      if
+         and
+            not-null:x:@.new-prompt
+            neq:x:@.new-prompt
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:system
+                     content:x:@.new-prompt
+      .cache-session
+      add:x:@.cache-session
+         get-nodes:x:@.session/*
+      .tmp
+      set-value:x:@.tmp
+         get-value:x:@.fixed
+      while
+         mt:x:@.tmp
+            .:int:0
+         .lambda
+            remove-nodes:x:@.cache-session/0
+            math.decrement:x:@.tmp
+      lambda2hyper:x:@.cache-session/*
+      cache.set:x:@.arguments/*/session
+         expiration:x:@.arguments/*/session_timeout
+         value:x:@lambda2hyper

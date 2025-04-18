@@ -1,0 +1,46 @@
+
+// The provided Hyperlambda code is a complex conditional logic structure that processes JSON data and sends signals based on specific conditions. It first converts a JSON string into a lambda structure using [json2lambda] and checks if a "finish_reason" exists and is not null. If true, it sets the "finish_reason" and sends a signal with this information. It also checks if "content" in the JSON delta is not null or empty, concatenates it to a result, and sends a signal if the result does not contain "___". If the result contains "FUNCTION_INVOCATION[" and a waiting signal has not been sent, it sends a "function_waiting" signal and marks that the waiting signal has been sent. The code uses [if], [else-if], and [unwrap] to handle various conditions and signal sending.
+else
+   json2lambda:x:@strings.trim
+   if
+      and
+         exists:x:@json2lambda/*/choices/0/*/finish_reason
+         not-null:x:@json2lambda/*/choices/0/*/finish_reason
+      .lambda
+         set-value:x:@.finish_reason
+            get-value:x:@json2lambda/*/choices/0/*/finish_reason
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               finish_reason:x:@.finish_reason
+   if
+      and
+         not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+         neq:x:@json2lambda/*/choices/0/*/delta/*/content
+            .:
+      .lambda
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+         if
+            not
+               strings.contains:x:@.result
+                  .:___
+            .lambda
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     message:x:@json2lambda/*/choices/0/*/delta/*/content
+         else-if
+            and
+               strings.contains:x:@.result
+                  .:FUNCTION_INVOCATION[
+               neq:x:@.has-sent-waiting
+                  .:bool:true
+            .lambda
+               sockets.signal:x:@.session
+                  args
+                     function_waiting:bool:true
+               set-value:x:@.has-sent-waiting
+                  .:bool:true

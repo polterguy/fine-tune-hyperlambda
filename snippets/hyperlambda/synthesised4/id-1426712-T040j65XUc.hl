@@ -1,0 +1,39 @@
+
+/*
+ * This Hyperlambda code checks if there are any nodes under the [result] node within the [execute] node. If such nodes exist, it updates the [.new-prompt] node by concatenating a string that includes a message about the response from a specific workflow and the JSON representation of the lambda object. It also updates the [.function-result] node by appending the JSON representation of the lambda object followed by a newline character. The code effectively logs or stores the response from a workflow execution in a formatted manner.
+ * 
+ * 1. [if] - Checks if there are any nodes under the [result] node within the [execute] node.
+ * 2. [exists] - Evaluates the existence of nodes under the [result] node within the [execute] node.
+ * 3. [.lambda] - Contains the actions to perform if the condition is true.
+ * 4. [set-value] - Updates the value of a specified node.
+ * 5. [strings.concat] - Concatenates multiple strings into one.
+ * 6. [get-value] - Retrieves the value of a specified node.
+ * 7. [get-value:x:@execute/*/workflow] - Retrieves the value of the [workflow] node under the [execute] node.
+ * 8. [get-value:x:@lambda2json] - Retrieves the JSON representation of the lambda object.
+ * 9. [.new-prompt] - Node being updated with concatenated string.
+ * 10. [.function-result] - Node being updated with concatenated JSON representation and newline.
+ */
+if
+   exists:x:@execute/*/result/*
+   .lambda
+      set-value:x:@.new-prompt
+         strings.concat
+            get-value:x:@.new-prompt
+            .:"Response from '"
+            get-value:x:@execute/*/workflow
+            .:@"' was:
+```json
+"
+            get-value:x:@lambda2json
+            .:@"
+"
+            .:```
+            .:@"
+"
+            .:@"
+"
+      set-value:x:@.function-result
+         strings.concat
+            get-value:x:@.function-result
+            get-value:x:@lambda2json
+            .:"\n"

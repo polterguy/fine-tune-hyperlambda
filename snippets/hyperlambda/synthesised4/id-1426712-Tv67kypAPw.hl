@@ -1,0 +1,33 @@
+
+// This Hyperlambda code evaluates a set of conditions based on JSON data converted to a lambda structure. It first checks if a specific content node exists and is not empty, then appends this content to a result node. If the result does not contain the string "___", it sends a signal with the content. If the result contains "FUNCTION_INVOCATION[" and a flag indicating a waiting state hasn't been sent yet, it sends a signal indicating a function is waiting and sets the flag to true. The code uses logical operators like [and], [not], and [neq] to determine the flow of execution, and employs [set-value] and [strings.concat] for data manipulation.
+if
+   and
+      not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+      neq:x:@json2lambda/*/choices/0/*/delta/*/content
+         .:
+   .lambda
+      set-value:x:@.result
+         strings.concat
+            get-value:x:@.result
+            get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+      if
+         not
+            strings.contains:x:@.result
+               .:___
+         .lambda
+            unwrap:x:+/*/*
+            sockets.signal:x:@.session
+               args
+                  message:x:@json2lambda/*/choices/0/*/delta/*/content
+      else-if
+         and
+            strings.contains:x:@.result
+               .:FUNCTION_INVOCATION[
+            neq:x:@.has-sent-waiting
+               .:bool:true
+         .lambda
+            sockets.signal:x:@.session
+               args
+                  function_waiting:bool:true
+            set-value:x:@.has-sent-waiting
+               .:bool:true
