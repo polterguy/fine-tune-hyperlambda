@@ -1,0 +1,32 @@
+
+/*
+ * This Hyperlambda code checks if a cache item exists and, if so, converts a specified argument to an integer, retrieves the cached item, and iterates through it while the count of nodes exceeds a specified maximum. During each iteration, it removes the first node until the count is within the limit, and then adds the remaining nodes to a session node.
+ * 
+ * 1. [if] - Checks if a cache item exists.
+ * 2. [not-null] - Ensures the cache item is not null.
+ * 3. [.lambda] - Executes the following code block if the condition is true.
+ * 4. [convert] - Converts the 'max_session_items' argument to an integer.
+ * 5. [hyper2lambda] - Retrieves the cached item.
+ * 6. [while] - Iterates while the number of nodes exceeds the maximum allowed.
+ * 7. [mt] - Checks if the node count is greater than the maximum.
+ * 8. [get-count] - Retrieves the count of nodes.
+ * 9. [get-value] - Retrieves the converted maximum value.
+ * 10. [.lambda] - Executes the following code block during each iteration.
+ * 11. [remove-nodes] - Removes the first node from the cached item.
+ * 12. [add] - Adds the remaining nodes to the session node.
+ * 13. [get-nodes] - Retrieves the nodes from the cached item.
+ */
+if
+   not-null:x:@cache.get
+   .lambda
+      convert:x:@.arguments/*/max_session_items
+         type:int
+      hyper2lambda:x:@cache.get
+      while
+         mt
+            get-count:x:@hyper2lambda/*
+            get-value:x:@convert
+         .lambda
+            remove-nodes:x:@hyper2lambda/0
+      add:x:@.session
+         get-nodes:x:@hyper2lambda/*

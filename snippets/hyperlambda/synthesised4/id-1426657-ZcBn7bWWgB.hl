@@ -1,0 +1,191 @@
+
+/*
+ * This Hyperlambda code defines a dynamic slot named [magic.http.html2markdown-links] that extracts and converts hyperlinks from a given URL into Markdown format. It validates input arguments, fetches HTML content, and processes anchor tags to construct Markdown links, considering optional filters like URL prefixes and class attributes. The slot handles relative URLs, query parameters, and limits the number of links processed based on a maximum count. The result is a Markdown string containing the extracted links. The code includes the following slots:
+ * 
+ * 1. [slots.create] - Creates the dynamic slot named [magic.http.html2markdown-links].
+ * 2. [validators.mandatory] - Ensures the presence of required arguments.
+ * 3. [validators.url] - Validates that the URL argument is a valid URL.
+ * 4. [validators.integer] - Validates that the max argument is an integer within a specified range.
+ * 5. [if] - Checks conditions to modify the max argument if necessary.
+ * 6. [set-value] - Sets values for nodes during processing.
+ * 7. [strings.split] - Splits strings based on specified delimiters.
+ * 8. [strings.concat] - Concatenates strings to form base URLs and Markdown links.
+ * 9. [add] - Adds nodes to the signal for fetching HTML content.
+ * 10. [signal] - Fetches HTML content from the specified URL.
+ * 11. [html2lambda] - Converts HTML content to a lambda object.
+ * 12. [for-each] - Iterates over anchor tags in the HTML content.
+ * 13. [or] - Combines conditions to determine link processing.
+ * 14. [strings.starts-with] - Checks if strings start with specified prefixes.
+ * 15. [strings.contains] - Checks if strings contain specified substrings.
+ * 16. [strings.trim] - Trims whitespace from strings.
+ * 17. [strings.replace] - Replaces substrings within strings.
+ * 18. [math.decrement] - Decrements the max argument.
+ * 19. [return] - Returns the final Markdown string.
+ */
+slots.create:magic.http.html2markdown-links
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
+   validators.integer:x:@.arguments/*/max
+      min:1
+      max:200
+   validators.url:x:@.arguments/*/starts_with
+   if
+      and
+         exists:x:@.arguments/*/max
+         not-null:x:@.arguments/*/max
+      .lambda
+         set-value:x:@.arguments/*/max
+            convert:x:@.arguments/*/max
+               type:int
+   .base
+   strings.split:x:@.arguments/*/url
+      .:"://"
+   strings.split:x:@strings.split/1
+      .:/
+   set-value:x:@.base
+      strings.concat
+         get-value:x:@strings.split/@strings.split/0
+         .:"://"
+         get-value:x:@strings.split/0
+   add:x:./*/signal
+      get-nodes:x:@.arguments/*/url
+   signal:magic.http.get-with-cache
+   .markdown:
+   html2lambda:x:@signal
+   for-each:x:@html2lambda/*/html/*/body/**/a
+      if
+         or
+            not-exists:x:@.arguments/*/max
+            mt:x:@.arguments/*/max
+               .:int:0
+         .lambda
+            .url
+            set-value:x:@.url
+               get-value:x:"@.dp/#/*/\\@href"
+            if
+               strings.starts-with:x:@.url
+                  .://
+               .lambda
+                  strings.split:x:@.base
+                     .:"://"
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@strings.split/0
+                        .:":"
+                        get-value:x:@.url
+            else-if
+               strings.starts-with:x:@.url
+                  .:/
+               .lambda
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        get-value:x:@.url
+            else-if
+               and
+                  not
+                     strings.starts-with:x:@.url
+                        .:"https://"
+                  not
+                     strings.starts-with:x:@.url
+                        .:"http://"
+               .lambda
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        .:/
+                        get-value:x:"@.dp/#/*/\\@href"
+            if
+               and
+                  or
+                     not-exists:x:@.arguments/*/starts_with
+                     strings.starts-with:x:@.url
+                        get-value:x:@.arguments/*/starts_with
+                  or
+                     not-exists:x:@.arguments/*/class
+                     strings.contains:x:"@.dp/#/*/\\@class"
+                        get-value:x:@.arguments/*/class
+               .lambda
+                  .anchor:
+                  for-each:x:"@.dp/#/**/\\#text"
+                     set-value:x:@.anchor
+                        strings.concat
+                           get-value:x:@.anchor
+                           .:" "
+                           get-value:x:@.dp/#
+                  set-value:x:@.anchor
+                     strings.trim:x:@.anchor
+                        .:@" 	
+"
+                  set-value:x:@.anchor
+                     strings.replace:x:@.anchor
+                        .:"  "
+                        .:" "
+                  set-value:x:@.anchor
+                     strings.replace:x:@.anchor
+                        .:"\r"
+                        .:" "
+                  set-value:x:@.anchor
+                     strings.replace:x:@.anchor
+                        .:"\n"
+                        .:" "
+                  if
+                     and
+                        not-null:x:@.anchor
+                        neq:x:@.anchor
+                           .:
+                        not
+                           strings.contains:x:@.url
+                              .:#
+                     .lambda
+                        if
+                           exists:x:@.arguments/*/query
+                           .lambda
+                              strings.split:x:@.url
+                                 .:?
+                              if
+                                 mt
+                                    get-count:x:@strings.split/*
+                                    .:int:1
+                                 .lambda
+                                    strings.split:x:@strings.split/1
+                                       .:&
+                                    .found:bool:false
+                                    for-each:x:@strings.split/*
+                                       if
+                                          strings.starts-with:x:@.dp/#
+                                             strings.concat
+                                                get-value:x:@.arguments/*/query
+                                                .:=
+                                          .lambda
+                                             set-value:x:@.found
+                                                .:bool:true
+                                             strings.split:x:@.dp/#
+                                                .:=
+                                             set-value:x:@.url
+                                                strings.url-decode:x:@strings.split/1
+                                    if
+                                       not
+                                          get-value:x:@.found
+                                       .lambda
+                                          set-value:x:@.url
+                              else
+                                 set-value:x:@.url
+                        if
+                           not-null:x:@.url
+                           .lambda
+                              math.decrement:x:@.arguments/*/max
+                              set-value:x:@.markdown
+                                 strings.concat
+                                    get-value:x:@.markdown
+                                    .:* [
+                                    get-value:x:@.anchor
+                                    .:](
+                                    get-value:x:@.url
+                                    .:)
+                                    .:@"
+"
+   strings.trim:x:@.markdown
+      .:@"
+	 "
+   return:x:-

@@ -1,0 +1,153 @@
+
+/*
+ * This Hyperlambda code is designed to summarize text snippets using OpenAI's API. It first checks if summarization is required based on the input arguments. If so, it retrieves necessary configuration data from a database, including the maximum token size, API key, and model type. It then iterates over each text snippet, concatenating its prompt and completion. If the token count of a snippet exceeds 80% of the maximum context size, it attempts to summarize the snippet using OpenAI's API. The code handles API responses, providing feedback through a feedback channel and logging errors if necessary. It retries the API call up to three times if it fails.
+ * 
+ * 1. [if] - Checks if summarization is required based on input arguments.
+ * 2. [data.connect] - Connects to a database to retrieve configuration data.
+ * 3. [data.read] - Reads the maximum token size, API key, and model from the database.
+ * 4. [set-value] - Sets configuration values for max size, API key, and model.
+ * 5. [for-each] - Iterates over each text snippet.
+ * 6. [strings.concat] - Concatenates the prompt and completion of a snippet.
+ * 7. [openai.tokenize] - Calculates the token count of the concatenated snippet.
+ * 8. [if] - Checks if the token count exceeds 80% of the max size.
+ * 9. [sockets.signal] - Sends feedback messages to a feedback channel.
+ * 10. [http.post] - Sends a request to OpenAI's API to summarize the snippet.
+ * 11. [if] - Handles API response codes, logging errors or updating the snippet as needed.
+ * 12. [while] - Retries the API call up to three times if it fails.
+ * 13. [.catch] - Decrements the retry counter in case of an exception.
+ */
+if
+   and
+      exists:x:@.arguments/*/summarize
+      eq:x:@.arguments/*/summarize
+         .:bool:true
+   .lambda
+      .max-size
+      .api-key
+      .model
+      data.connect:[generic|magic]
+         data.read
+            table:ml_types
+            columns
+               max_context_tokens
+               api_key
+               model
+            where
+               and
+                  type.eq:x:@.arguments/*/type
+         set-value:x:@.max-size
+            math.multiply
+               convert:x:@data.read/*/*/max_context_tokens
+                  type:decimal
+               .:decimal:0.8
+         set-value:x:@.max-size
+            convert:x:@.max-size
+               type:int
+         set-value:x:@.api-key
+            get-value:x:@data.read/*/*/api_key
+         set-value:x:@.model
+            get-value:x:@data.read/*/*/model
+      for-each:x:@.snippets/*
+         .tmp
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.dp/#/*/prompt
+               .:@"
+"
+               .:@"
+"
+               get-value:x:@.dp/#/*/completion
+         if
+            mt
+               openai.tokenize:x:@.tmp
+               get-value:x:@.max-size
+            .lambda
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Summarizing snippet since it is larger than 80% of maximum context size for type
+                     type:info
+               sleep:100
+               .token
+               set-value:x:@.token
+                  strings.concat
+                     .:"Bearer "
+                     get-first-value
+                        get-value:x:@.api-key
+                        config.get:"magic:openai:key"
+               .no:int:3
+               while
+                  mt:x:@.no
+                     .:int:0
+                  .lambda
+                     try
+                        unwrap:x:+/**
+                        http.post:"https://api.openai.com/v1/chat/completions"
+                           headers
+                              Authorization:x:@.token
+                              Content-Type:application/json
+                           payload
+                              model:x:@.model
+                              max_tokens:x:@.max-size
+                              temperature:decimal:0.3
+                              messages
+                                 .
+                                    role:system
+                                    content:Create a summary of the following information
+                                 .
+                                    role:user
+                                    content:x:@.dp/#/*/completion
+                           convert:true
+                        if
+                           eq:x:@http.post
+                              .:int:400
+                           .lambda
+                              sockets.signal:x:@.arguments/*/feedback-channel
+                                 args
+                                    message:Could not summarize snippet, check your log for details
+                                    type:warning
+                              sleep:100
+                              lambda2hyper:x:@http.post
+                              log.error:Something went wrong while invoking OpenAI
+                                 message:x:@http.post/*/content/*/error/*/message
+                                 status:x:@http.post
+                                 error:x:@lambda2hyper
+                              set-value:x:@.no
+                                 .:int:0
+                        else-if
+                           and
+                              mte:x:@http.post
+                                 .:int:200
+                              lt:x:@http.post
+                                 .:int:300
+                           .lambda
+                              sockets.signal:x:@.arguments/*/feedback-channel
+                                 args
+                                    message:Successfully created summary of snippet
+                                    type:info
+                              sleep:100
+                              set-value:x:@.dp/#/*/completion
+                                 strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+                                    .:@"
+	 "
+                              set-value:x:@.dp/#/*/prompt
+                                 strings.concat
+                                    .:"Summary; "
+                                    strings.substring:x:@.dp/#/*/prompt
+                                       .:int:0
+                                       .:int:150
+                              set-value:x:@.no
+                                 .:int:0
+                        else
+                           sockets.signal:x:@.arguments/*/feedback-channel
+                              args
+                                 message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+                                 type:warning
+                           sleep:3000
+                           lambda2hyper:x:@http.post
+                           log.error:Something went wrong while invoking OpenAI
+                              message:x:@http.post/*/content/*/error/*/message
+                              status:x:@http.post
+                              error:x:@lambda2hyper
+                           math.decrement:x:@.no
+                     .catch
+                        math.decrement:x:@.no

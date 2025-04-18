@@ -1,0 +1,155 @@
+
+/*
+ * // This Hyperlambda code is designed to summarize a given text snippet using OpenAI's API. It first checks if the token count of the snippet exceeds a specified maximum size. If so, it attempts to create a summary by sending a request to OpenAI's chat completions endpoint. It handles different HTTP responses, signaling the status of the operation through a feedback channel, and retries the request up to three times in case of failure. The code also logs errors and trims the resulting summary if successful.
+ * // 1. [if] - Checks if the token count of the snippet exceeds the maximum size.
+ * // 2. [mt] - Compares the token count with the maximum size.
+ * // 3. [openai.tokenize] - Calculates the token count of the snippet.
+ * // 4. [get-value] - Retrieves the maximum size value.
+ * // 5. [.lambda] - Executes the following code if the condition is true.
+ * // 6. [sockets.signal] - Sends a signal to the feedback channel.
+ * // 7. [sleep] - Pauses execution for a specified time.
+ * // 8. [.token] - Declares a token variable.
+ * // 9. [set-value] - Sets the value of the token.
+ * // 10. [strings.concat] - Concatenates strings to form the token.
+ * // 11. [get-first-value] - Retrieves the first available API key.
+ * // 12. [config.get] - Retrieves the API key from the configuration.
+ * // 13. [.no] - Declares a retry counter.
+ * // 14. [while] - Loops while the retry counter is greater than zero.
+ * // 15. [mt] - Checks if the retry counter is greater than zero.
+ * // 16. [.lambda] - Executes the following code if the condition is true.
+ * // 17. [try] - Attempts to execute the following code.
+ * // 18. [unwrap] - Evaluates all expressions.
+ * // 19. [http.post] - Sends a POST request to OpenAI's API.
+ * // 20. [headers] - Sets the HTTP headers for the request.
+ * // 21. [Authorization] - Sets the authorization header.
+ * // 22. [Content-Type] - Sets the content type header.
+ * // 23. [payload] - Sets the payload for the request.
+ * // 24. [model] - Specifies the model to use.
+ * // 25. [max_tokens] - Specifies the maximum tokens for the response.
+ * // 26. [temperature] - Sets the temperature for the response.
+ * // 27. [messages] - Sets the messages for the request.
+ * // 28. [role] - Specifies the role of the message sender.
+ * // 29. [content] - Sets the content of the message.
+ * // 30. [convert] - Converts the response to a specified type.
+ * // 31. [if] - Checks if the HTTP response status is 400.
+ * // 32. [eq] - Compares the HTTP response status with 400.
+ * // 33. [.lambda] - Executes the following code if the condition is true.
+ * // 34. [sockets.signal] - Sends a warning signal to the feedback channel.
+ * // 35. [sleep] - Pauses execution for a specified time.
+ * // 36. [lambda2hyper] - Converts the response to Hyperlambda.
+ * // 37. [log.error] - Logs an error message.
+ * // 38. [set-value] - Sets the retry counter to zero.
+ * // 39. [else-if] - Checks if the HTTP response status is between 200 and 300.
+ * // 40. [and] - Combines multiple conditions.
+ * // 41. [mte] - Checks if the response status is more than or equal to 200.
+ * // 42. [lt] - Checks if the response status is less than 300.
+ * // 43. [.lambda] - Executes the following code if the condition is true.
+ * // 44. [sockets.signal] - Sends an info signal to the feedback channel.
+ * // 45. [sleep] - Pauses execution for a specified time.
+ * // 46. [set-value] - Sets the completion and prompt values.
+ * // 47. [strings.trim] - Trims the response content.
+ * // 48. [strings.concat] - Concatenates strings to form the prompt.
+ * // 49. [strings.substring] - Extracts a substring from the prompt.
+ * // 50. [else] - Executes the following code if no conditions are met.
+ * // 51. [sockets.signal] - Sends a warning signal to the feedback channel.
+ * // 52. [sleep] - Pauses execution for a specified time.
+ * // 53. [lambda2hyper] - Converts the response to Hyperlambda.
+ * // 54. [log.error] - Logs an error message.
+ * // 55. [math.decrement] - Decrements the retry counter.
+ * // 56. [.catch] - Executes the following code if an exception occurs.
+ * // 57. [math.decrement] - Decrements the retry counter in case of an exception.
+ */
+if
+   mt
+      openai.tokenize:x:@.tmp
+      get-value:x:@.max-size
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Summarizing snippet since it is larger than 80% of maximum context size for type
+            type:info
+      sleep:100
+      .token
+      set-value:x:@.token
+         strings.concat
+            .:"Bearer "
+            get-first-value
+               get-value:x:@.api-key
+               config.get:"magic:openai:key"
+      .no:int:3
+      while
+         mt:x:@.no
+            .:int:0
+         .lambda
+            try
+               unwrap:x:+/**
+               http.post:"https://api.openai.com/v1/chat/completions"
+                  headers
+                     Authorization:x:@.token
+                     Content-Type:application/json
+                  payload
+                     model:x:@.model
+                     max_tokens:x:@.max-size
+                     temperature:decimal:0.3
+                     messages
+                        .
+                           role:system
+                           content:Create a summary of the following information
+                        .
+                           role:user
+                           content:x:@.dp/#/*/completion
+                  convert:true
+               if
+                  eq:x:@http.post
+                     .:int:400
+                  .lambda
+                     sockets.signal:x:@.arguments/*/feedback-channel
+                        args
+                           message:Could not summarize snippet, check your log for details
+                           type:warning
+                     sleep:100
+                     lambda2hyper:x:@http.post
+                     log.error:Something went wrong while invoking OpenAI
+                        message:x:@http.post/*/content/*/error/*/message
+                        status:x:@http.post
+                        error:x:@lambda2hyper
+                     set-value:x:@.no
+                        .:int:0
+               else-if
+                  and
+                     mte:x:@http.post
+                        .:int:200
+                     lt:x:@http.post
+                        .:int:300
+                  .lambda
+                     sockets.signal:x:@.arguments/*/feedback-channel
+                        args
+                           message:Successfully created summary of snippet
+                           type:info
+                     sleep:100
+                     set-value:x:@.dp/#/*/completion
+                        strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+                           .:@"
+	 "
+                     set-value:x:@.dp/#/*/prompt
+                        strings.concat
+                           .:"Summary; "
+                           strings.substring:x:@.dp/#/*/prompt
+                              .:int:0
+                              .:int:150
+                     set-value:x:@.no
+                        .:int:0
+               else
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+                        type:warning
+                  sleep:3000
+                  lambda2hyper:x:@http.post
+                  log.error:Something went wrong while invoking OpenAI
+                     message:x:@http.post/*/content/*/error/*/message
+                     status:x:@http.post
+                     error:x:@lambda2hyper
+                  math.decrement:x:@.no
+            .catch
+               math.decrement:x:@.no

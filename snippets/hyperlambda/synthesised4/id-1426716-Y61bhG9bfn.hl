@@ -1,0 +1,22 @@
+
+// This Hyperlambda code checks if the [invocation] argument contains a colon. If it does, it splits the string by the colon, removes the first part, and joins the remaining parts back with a colon. If the resulting string is not empty, it converts the JSON string to a lambda structure, removes specific nodes (_session, _user-id, _type), and adds the remaining nodes to an [execute-file] node for further execution.
+if
+   strings.contains:x:@.arguments/*/invocation
+      .:":"
+   .lambda
+      strings.split:x:@.arguments/*/invocation
+         .:":"
+      remove-nodes:x:@strings.split/0
+      set-value:x:@.json
+         strings.join:x:@strings.split/*
+            .:":"
+      if
+         neq:x:@.json
+            .:
+         .lambda
+            json2lambda:x:@.json
+            remove-nodes:x:@json2lambda/*/_session
+            remove-nodes:x:@json2lambda/*/_user-id
+            remove-nodes:x:@json2lambda/*/_type
+            add:x:../*/execute-file
+               get-nodes:x:@json2lambda/*

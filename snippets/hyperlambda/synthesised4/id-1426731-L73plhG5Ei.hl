@@ -1,0 +1,207 @@
+
+/*
+ * This Hyperlambda code processes a list of URLs to retrieve and parse XML sitemaps. It first checks if the number of URLs is less than 10,000. If true, it constructs a domain URL, adds HTTP headers, and performs an HTTP GET request. It verifies the response status and content type to ensure it is an XML sitemap. If valid, it parses the XML content to extract URLs, ensuring they are complete and unique before adding them to the list. It also processes nested sitemaps and signals further sitemap loading if necessary. The code maintains a flag indicating if a sitemap was successfully processed. 
+ * 
+ * 1. [if] - Checks if the number of URLs is less than 10,000.
+ * 2. [strings.split] - Splits the URL to extract the domain.
+ * 3. [set-value] - Constructs the domain URL.
+ * 4. [add] - Adds HTTP headers for the request.
+ * 5. [http.get] - Performs an HTTP GET request with a timeout.
+ * 6. [if] - Verifies the HTTP response status is successful.
+ * 7. [log.error] - Logs an error if the status is not successful.
+ * 8. [throw] - Throws an error if the sitemap retrieval fails.
+ * 9. [if] - Checks if the content type is XML.
+ * 10. [throw] - Throws an error if the content is not XML.
+ * 11. [else] - Processes the XML sitemap if valid.
+ * 12. [strings.trim] - Trims the HTTP response content.
+ * 13. [xml2lambda] - Converts the XML content to a lambda structure.
+ * 14. [for-each] - Iterates over URL text nodes in the XML.
+ * 15. [if] - Checks if the number of URLs is still less than 10,000.
+ * 16. [set-value] - Sets the current URL.
+ * 17. [if] - Ensures the URL is complete with a protocol.
+ * 18. [set-value] - Concatenates the domain with the URL if needed.
+ * 19. [if] - Checks if the URL is unique before adding.
+ * 20. [unwrap] - Unwraps the URL node.
+ * 21. [add] - Adds the URL to the list.
+ * 22. [for-each] - Iterates over CDATA section nodes for URLs.
+ * 23. [if] - Checks if the number of URLs is still less than 10,000.
+ * 24. [set-value] - Sets the current URL.
+ * 25. [if] - Ensures the URL is complete with a protocol.
+ * 26. [set-value] - Concatenates the domain with the URL if needed.
+ * 27. [if] - Checks if the URL is unique before adding.
+ * 28. [unwrap] - Unwraps the URL node.
+ * 29. [add] - Adds the URL to the list.
+ * 30. [for-each] - Iterates over sitemap index CDATA section nodes.
+ * 31. [if] - Checks if the number of URLs is still less than 10,000.
+ * 32. [add] - Adds signal headers.
+ * 33. [unwrap] - Unwraps the signal node.
+ * 34. [signal] - Signals to load more sitemaps.
+ * 35. [add] - Adds URLs from the signal to the list.
+ * 36. [if] - Checks if the sitemap has no URLs and sets the flag.
+ * 37. [set-value] - Sets the has-sitemap flag to false.
+ * 38. [for-each] - Iterates over sitemap index text nodes.
+ * 39. [if] - Checks if the number of URLs is still less than 10,000.
+ * 40. [unwrap] - Unwraps the signal node.
+ * 41. [signal] - Signals to load more sitemaps.
+ * 42. [add] - Adds URLs from the signal to the list.
+ * 43. [if] - Checks if the sitemap has no URLs and sets the flag.
+ * 44. [set-value] - Sets the has-sitemap flag to false.
+ */
+if
+   lt
+      get-count:x:@.urls/*
+      .:int:10000
+   .lambda
+      .domain
+      strings.split:x:@.dp/#
+         .:/
+      set-value:x:@.domain
+         strings.concat
+            get-value:x:@strings.split/0
+            .://
+            get-value:x:@strings.split/1
+      add:x:./*/http.get
+         get-nodes:x:@.arguments/*/headers
+      http.get:x:@.dp/#
+         timeout:60
+      if
+         and
+            not
+               mte:x:@http.get
+                  .:int:200
+            not
+               lt:x:@http.get
+                  .:int:300
+         .lambda
+            log.error:Sitemap invocation did not return success status
+               url:x:@.dp/#
+               status:x:@http.get
+            throw:Could not retrieve sitemap
+      if
+         not
+            or
+               strings.starts-with:x:@http.get/*/headers/*/Content-Type
+                  .:application/xml
+               strings.starts-with:x:@http.get/*/headers/*/content-type
+                  .:application/xml
+               strings.starts-with:x:@http.get/*/headers/*/Content-Type
+                  .:text/xml
+               strings.starts-with:x:@http.get/*/headers/*/content-type
+                  .:text/xml
+         .lambda
+            throw:Sitemap was not XML
+      else
+         set-value:x:@.has-sitemap
+            .:bool:true
+         strings.trim:x:@http.get/*/content
+         xml2lambda:x:@strings.trim
+         for-each:x:"@xml2lambda/*/urlset/*/url/*/loc/*/\\#text"
+            if
+               lt
+                  get-count:x:@.urls/*
+                  .:int:10000
+               .lambda
+                  .url
+                  set-value:x:@.url
+                     get-value:x:@.dp/#
+                  if
+                     and
+                        not
+                           strings.starts-with:x:@.dp/#
+                              .:"http://"
+                        not
+                           strings.starts-with:x:@.dp/#
+                              .:"https://"
+                     .lambda
+                        set-value:x:@.url
+                           strings.concat
+                              get-value:x:@.domain
+                              get-value:x:@.dp/#
+                  if
+                     not-exists:x:@.urls/*/={@.url}
+                     .lambda
+                        unwrap:x:+/*/*
+                        add:x:@.urls
+                           .
+                              .:x:@.url
+         for-each:x:"@xml2lambda/*/urlset/*/url/*/loc/*/\\#cdata-section"
+            if
+               lt
+                  get-count:x:@.urls/*
+                  .:int:10000
+               .lambda
+                  .url
+                  set-value:x:@.url
+                     get-value:x:@.dp/#
+                  if
+                     and
+                        not
+                           strings.starts-with:x:@.dp/#
+                              .:"http://"
+                        not
+                           strings.starts-with:x:@.dp/#
+                              .:"https://"
+                     .lambda
+                        set-value:x:@.url
+                           strings.concat
+                              get-value:x:@.domain
+                              get-value:x:@.dp/#
+                  if
+                     not-exists:x:@.urls/*/={@.url}
+                     .lambda
+                        unwrap:x:+/*/*
+                        add:x:@.urls
+                           .
+                              .:x:@.url
+         for-each:x:"@xml2lambda/*/sitemapindex/*/sitemap/*/[0,25]/loc/*/\\#cdata-section"
+            if
+               lt
+                  get-count:x:@.urls/*
+                  .:int:10000
+               .lambda
+                  add:x:./*/signal
+                     get-nodes:x:@.arguments/*/headers
+                  unwrap:x:+/**
+                  signal:magic.ai.load-sitemap
+                     max:int:10000
+                     feedback-channel:x:@.arguments/*/feedback-channel
+                     filter-on-url:x:@.arguments/*/filter-on-url
+                     sitemap
+                        .:x:@.dp/#
+                  add:x:@.urls
+                     get-nodes:x:@signal/*/urls/*
+                  if
+                     and
+                        eq:x:@signal/*/has-sitemap
+                           .:bool:false
+                        eq
+                           get-count:x:@.urls/*
+                           .:int:0
+                     .lambda
+                        set-value:x:@.has-sitemap
+                           .:bool:false
+         for-each:x:"@xml2lambda/*/sitemapindex/*/sitemap/*/[0,25]/loc/*/\\#text"
+            if
+               lt
+                  get-count:x:@.urls/*
+                  .:int:10000
+               .lambda
+                  unwrap:x:+/**
+                  signal:magic.ai.load-sitemap
+                     max:int:10000
+                     feedback-channel:x:@.arguments/*/feedback-channel
+                     filter-on-url:x:@.arguments/*/filter-on-url
+                     sitemap
+                        .:x:@.dp/#
+                  add:x:@.urls
+                     get-nodes:x:@signal/*/urls/*
+                  if
+                     and
+                        eq:x:@signal/*/has-sitemap
+                           .:bool:false
+                        eq
+                           get-count:x:@.urls/*
+                           .:int:0
+                     .lambda
+                        set-value:x:@.has-sitemap
+                           .:bool:false

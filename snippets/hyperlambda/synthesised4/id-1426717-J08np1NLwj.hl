@@ -1,0 +1,33 @@
+
+/*
+ * This Hyperlambda code connects to a database and performs a query to retrieve machine learning training snippets based on certain criteria. It converts a float array to bytes, calculates a threshold, concatenates a SQL query string, executes the query, and adds the results to a scan node. The code performs the following steps:
+ * 
+ * 1. [data.connect] - Establishes a connection to a database.
+ * 2. [floatArray2bytes] - Converts a float array from HTTP POST content into bytes.
+ * 3. [math.subtract] - Subtracts the threshold value from 1.
+ * 4. [strings.concat] - Concatenates parts of a SQL query string.
+ * 5. [data.select] - Executes the SQL query using the concatenated string and parameters.
+ * 6. [add] - Adds the results of the query to a scan node.
+ */
+data.connect:[generic|magic]
+   floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+   math.subtract
+      .:float:1
+      get-value:x:@.arguments/*/threshold
+   strings.concat
+      .:@"
+select vss.distance, vss.rowid as id, ts.prompt, ts.completion, ts.uri, ts.cached
+	from vss_ml_training_snippets as vss
+    	inner join ml_training_snippets ts on ts.id = vss.rowid
+   where
+      ts.type = @type and
+      vss_search(vss.embedding_vss, @embedding) and
+      vss.distance < @threshold"
+      get-value:x:@.tail
+      .:" limit 20"
+   data.select:x:@strings.concat
+      embedding:x:@floatArray2bytes
+      type:x:@.arguments/*/type
+      threshold:x:@math.subtract
+   add:x:@.scan
+      get-nodes:x:@data.select/*

@@ -1,0 +1,123 @@
+
+/*
+ * This Hyperlambda code iterates over a collection of data nodes, checking if vectorization should continue. It concatenates prompt and completion texts, checks their token count, and if within limits, sends them to OpenAI's API for embeddings. It handles API responses, logging errors and signaling feedback. If successful, it updates the database with embeddings; otherwise, it logs and signals errors, pausing for rate limits or aborting on critical errors.
+ * 
+ * 1. [for-each] - Iterates over each node in the data collection.
+ * 2. [if] - Checks if vectorization should continue.
+ * 3. [set-value] - Concatenates prompt and completion texts into an embedding.
+ * 4. [if] - Checks if the token count is within limits.
+ * 5. [strings.concat] - Prepares a message for vectorization.
+ * 6. [sockets.signal] - Sends feedback messages.
+ * 7. [http.post] - Sends data to OpenAI API for embeddings.
+ * 8. [if] - Checks if the API response indicates success.
+ * 9. [math.increment] - Increments the failed counter on error.
+ * 10. [lambda2hyper] - Converts the HTTP response to Hyperlambda for logging.
+ * 11. [log.error] - Logs errors from the API response.
+ * 12. [strings.concat] - Prepares error messages.
+ * 13. [sockets.signal] - Sends error feedback messages.
+ * 14. [if] - Checks for specific error codes to handle rate limits.
+ * 15. [sleep] - Pauses execution for rate limiting.
+ * 16. [sockets.signal] - Sends a critical error message and aborts.
+ * 17. [set-value] - Updates the continue flag to false on critical errors.
+ * 18. [else] - Handles successful API responses.
+ * 19. [set-value] - Updates the embedding with the API response.
+ * 20. [data.connect] - Updates the database with the new embedding.
+ * 21. [math.increment] - Increments the success counter.
+ * 22. [else] - Logs and increments failed counter if snippet is too long.
+ */
+for-each:x:@.data/*
+   if:x:@.continue
+      .embedding
+      set-value:x:@.embedding
+         strings.concat
+            get-value:x:@.dp/#/*/prompt
+            .:@"
+"
+            .:@"
+"
+            get-value:x:@.dp/#/*/completion
+      if
+         lt
+            openai.tokenize:x:@.embedding
+            .:int:8191
+         .lambda
+            strings.concat
+               .:"Vectorizing: \""
+               get-value:x:@.dp/#/*/prompt
+               .:"\""
+            unwrap:x:+/*/args/*/message
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info
+            http.post:"https://api.openai.com/v1/embeddings"
+               headers
+                  Authorization:x:@.token
+                  Content-Type:application/json
+               payload
+                  model:x:@.vector-model
+                  input:x:@.embedding
+               convert:true
+            if
+               not
+                  and
+                     mte:x:@http.post
+                        .:int:200
+                     lt:x:@http.post
+                        .:int:300
+               .lambda
+                  math.increment:x:@.failed
+                  lambda2hyper:x:@http.post
+                  log.error:Something went wrong while invoking OpenAI
+                     message:x:@http.post/*/content/*/error/*/message
+                     error:x:@lambda2hyper
+                  strings.concat
+                     .:"OpenAI failed, could not create vectors for '"
+                     get-value:x:@.dp/#/*/prompt
+                     .:"'"
+                  unwrap:x:+/*/args/*/message
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:x:@strings.concat
+                        type:warning
+                  if
+                     or
+                        eq:x:@http.post
+                           .:int:429
+                        eq:x:@http.post
+                           .:int:500
+                     .lambda
+                        sockets.signal:x:@.arguments/*/feedback-channel
+                           args
+                              message:Continuing in 5 seconds with the next snippet to let OpenAI cool down first
+                              type:info
+                        sleep:5000
+                  else
+                     sockets.signal:magic.backend.message
+                        roles:root
+                        args
+                           message:Could not vectorize snippet and it was a non-transitional error, aborting vectorization for type
+                           type:error
+                     set-value:x:@.continue
+                        .:bool:false
+            else
+               .embedding
+               set-value:x:@.embedding
+                  strings.concat
+                     .:[
+                     strings.join:x:@http.post/*/content/*/data/0/*/embedding/*
+                        .:,
+                     .:]
+               data.connect:[generic|magic]
+                  data.update
+                     table:ml_training_snippets
+                     values
+                        embedding:x:@.embedding
+                     where
+                        and
+                           id.eq:x:@.dp/#/*/id
+               math.increment:x:@.success
+      else
+         log.info:Cannot vectorize snippet, too long
+            id:x:@.dp/#/*/id
+         math.increment:x:@.failed

@@ -1,0 +1,27 @@
+
+/*
+ * This Hyperlambda code performs the following operations:
+ * 
+ * 1. **[try]**: Begins a try block to handle potential exceptions during execution.
+ * 2. **[execute]**: Calls the "magic.ai.create-system-message" slot, passing in URL, template, and instruction parameters to create a system message.
+ * 3. **[data.connect]**: Connects to a database, either "generic" or "magic".
+ * 4. **[data.update]**: Updates the "ml_types" table in the database, setting the "system_message" column to the result of the "execute" slot where the "type" matches a specified value.
+ * 5. **[sockets.signal]**: Sends a signal to a specified feedback channel with a message and type "info".
+ */
+try
+   execute:magic.ai.create-system-message
+      url:x:@.url
+      template:x:@.flavor
+      instruction:x:@.instruction
+   data.connect:[generic|magic]
+      data.update
+         table:ml_types
+         values
+            system_message:x:@execute
+         where
+            and
+               type.eq:x:@.type
+   sockets.signal:x:@.feedback-channel
+      args
+         message:------------------------------------------------------------------------------------------------------------------------
+         type:info

@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code snippet is a loop that continues while a condition is true. It converts session data to a Hyperlambda format and checks if the sum of max tokens, tokenized session data, and extra tokens is less than the model size. If true, it sets a continuation flag to false. Otherwise, it concatenates session data with a fixed value, converts it to a specific type, and removes nodes. 
+ * 
+ * 1. [while] - Loops while the condition is true.
+ * 2. [lambda2hyper] - Converts session data to Hyperlambda format.
+ * 3. [if] - Checks if the sum of tokens is less than the model size.
+ * 4. [lt] - Compares the sum of tokens and model size.
+ * 5. [math.add] - Adds max tokens, tokenized session data, and extra tokens.
+ * 6. [openai.tokenize] - Tokenizes the session data.
+ * 7. [set-value] - Sets the continuation flag to false if the condition is true.
+ * 8. [else] - Executes if the condition is false.
+ * 9. [strings.concat] - Concatenates session data with a fixed value.
+ * 10. [set-x] - Converts concatenated data to a specific type.
+ * 11. [remove-nodes] - Removes nodes from the data.
+ */
+while:x:@.cont
+   lambda2hyper:x:@.session/*
+   if
+      lt
+         math.add
+            get-value:x:@.arguments/*/max_tokens
+            openai.tokenize:x:@lambda2hyper
+            get-value:x:@.extra-tokens
+         get-value:x:@.arguments/*/model_size
+      .lambda
+         set-value:x:@.cont
+            .:bool:false
+   else
+      strings.concat
+         .:@.session/
+         get-value:x:@.fixed
+      set-x:x:./*/remove-nodes
+         convert:x:@strings.concat
+            type:x
+      remove-nodes

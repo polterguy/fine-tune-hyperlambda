@@ -1,0 +1,155 @@
+
+/*
+ * This Hyperlambda code is designed to scrape URLs from a sitemap and create OpenAI training data. It checks for the presence of a sitemap, counts URLs, and sends feedback messages through sockets. It handles different scenarios, such as when no URLs are found, when the site has more URLs than can be scraped, and iterates over each URL to scrape it. It includes error handling and logs the completion of the data creation process.
+ * 
+ * 1. [if] - Checks if the sitemap exists and is true.
+ * 2. [eq] - Compares the value to determine if the sitemap is true.
+ * 3. [get-count] - Counts the number of URLs to be scraped.
+ * 4. [strings.concat] - Concatenates strings to create feedback messages.
+ * 5. [unwrap] - Evaluates expressions to produce a final string message.
+ * 6. [sockets.signal] - Sends feedback messages through a socket.
+ * 7. [sleep] - Pauses execution for a specified time.
+ * 8. [else-if] - Checks if the total URLs exceed the count to be scraped.
+ * 9. [mt] - Compares values to determine if one is greater than the other.
+ * 10. [for-each] - Iterates over each URL in the sitemap.
+ * 11. [try] - Attempts to scrape each URL and handles potential errors.
+ * 12. [signal] - Triggers the URL scraping process.
+ * 13. [neq] - Checks if the current URL is not the first one.
+ * 14. [math.divide] - Divides values to calculate wait time.
+ * 15. [.catch] - Handles exceptions during the scraping process.
+ * 16. [log.error] - Logs errors encountered during scraping.
+ * 17. [exists] - Checks if a specific argument exists.
+ * 18. [eval] - Executes a lambda object if a condition is met.
+ */
+if
+   eq:x:@signal/*/has-sitemap
+      .:bool:true
+   .lambda
+      get-count:x:@signal/*/urls/*
+      strings.concat
+         .:"We found "
+         get-value:x:@signal/*/total
+         .:" URLs in sitemap(s), we will be scraping "
+         get-value:x:@get-count
+         .:" URLs"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      sleep:100
+      if
+         eq:x:@get-count
+            .:int:0
+         .lambda
+            strings.concat
+               .:Warning, we could not find a single valid URL in site
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:warning
+            sleep:100
+      else-if
+         mt
+            get-value:x:@signal/*/total
+            get-value:x:@get-count
+         .lambda
+            strings.concat
+               .:"Warning, site contains more than "
+               get-value:x:@get-count
+               .:" URLs and will only be partially scraped"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:warning
+            sleep:100
+      if
+         mt:x:@get-count
+            .:int:0
+         .lambda
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:------------------------------------------------------------------------------------------------------------------------
+                  type:info
+            sleep:100
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:"URLs we will scrape are as follows:"
+                  type:info
+            sleep:100
+      for-each:x:@signal/*/urls/*
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@.dp/#
+               type:info
+         sleep:10
+      for-each:x:@signal/*/urls/*
+         try
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:------------------------------------------------------------------------------------------------------------------------
+                  type:info
+            sleep:100
+            unwrap:x:+/*
+            signal:magic.ai.url.scrape
+               url:x:@.dp/#
+               type:x:@.arguments/*/type
+               threshold:x:@.arguments/*/threshold
+               summarize:x:@.arguments/*/summarize
+               feedback-channel:x:@.arguments/*/feedback-channel
+               images:x:@.arguments/*/images
+               lists:x:@.arguments/*/lists
+               code:x:@.arguments/*/code
+               insert_url:x:@.arguments/*/insert_url
+            if
+               neq:x:@.dp/#
+                  get-value:x:@signal/@signal/*/urls/0/-
+               .lambda
+                  strings.concat
+                     .:"Waiting for "
+                     math.divide:x:@.arguments/*/delay
+                        .:int:1000
+                     .:" seconds to avoid exhausting web server"
+                  unwrap:x:+/**
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:x:@strings.concat
+                        type:info
+                  sleep:100
+                  sleep:x:@.arguments/*/delay
+         .catch
+            log.error:Could not scrape URL
+               url:x:@.dp/#
+               message:x:@.arguments/*/message
+            strings.concat
+               .:"Could not scrape URL, error was: '"
+               get-value:x:@.arguments/*/message
+               .:"'"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/@.arguments/*/feedback-channel
+               roles:root
+               args
+                  message:x:@strings.concat
+                  type:warning
+            sleep:100
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:------------------------------------------------------------------------------------------------------------------------
+            type:info
+      sleep:100
+      sockets.signal:magic.backend.message
+         roles:root
+         args
+            message:Done creating OpenAI training data from URL
+            type:success
+      sleep:100
+      log.info:OpenAI training data successfully created
+         url:x:@.arguments/*/url
+         type:x:@.arguments/*/type
+      if
+         exists:x:@.arguments/*/.onafter
+         .lambda
+            eval:x:@.arguments/*/.onafter

@@ -1,0 +1,44 @@
+
+/*
+ * This Hyperlambda code snippet is a switch-case structure that processes different HTML elements based on their tag names. It handles headings (h1 to h6) by concatenating their text content to a temporary prompt. For list (ul, ol) and preformatted (pre) elements, it converts them to markdown and adds them to a snippets collection. Any other elements are added to a remaining collection. The code uses various slots like [set-value], [strings.concat], [lambda2html], and [html2markdown] to achieve this processing.
+ * 
+ * 1. [switch] - Initiates a switch-case structure based on the evaluated value of [get-name].
+ * 2. [case:h1] to [case:h6] - Handles heading elements by concatenating their text content to [.tmp-prompt].
+ * 3. [set-value] - Sets the value of [.tmp-prompt] by concatenating existing prompt with the heading text.
+ * 4. [strings.concat] - Concatenates the current prompt with a separator and the heading text.
+ * 5. [get-value] - Retrieves values for concatenation.
+ * 6. [case:ul], [case:ol], [case:pre] - Handles list and preformatted elements by converting them to markdown.
+ * 7. [lambda2html] - Converts the current element to HTML.
+ * 8. [html2markdown] - Converts the HTML to markdown.
+ * 9. [unwrap] - Unwraps the markdown content for further processing.
+ * 10. [add] - Adds the processed markdown to the [.snippets] collection.
+ * 11. [default] - Handles any other elements by adding them to the [.remaining] collection.
+ * 12. [get-nodes] - Retrieves nodes for adding to the [.remaining] collection.
+ */
+switch:x:@get-name
+   case:h1
+   case:h2
+   case:h3
+   case:h4
+   case:h5
+   case:h6
+      set-value:x:@.tmp-prompt
+         strings.concat
+            get-value:x:@.prompt
+            .:" | "
+            get-value:x:"@.dp/#/*/\\#text"
+   case:ul
+   case:ol
+   case:pre
+      lambda2html:x:@.dp/#
+      html2markdown:x:@lambda2html
+         url:x:@.arguments/*/url
+      unwrap:x:+/*/*/*
+      add:x:@.snippets
+         .
+            .
+               prompt:x:@.tmp-prompt
+               completion:x:@html2markdown
+   default
+      add:x:@.remaining
+         get-nodes:x:@.dp/#

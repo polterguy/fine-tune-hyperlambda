@@ -1,0 +1,83 @@
+
+/*
+ * /*
+ *  * This Hyperlambda code processes product data retrieved from an HTTP GET request, filters it based on specific conditions, and then formats it into a prompt-completion pair for machine learning training purposes. It checks if the product is in stock and has a non-empty description, then converts the description to Markdown format. It also includes the price, URL, and optionally the short description and images if available. Finally, it stores the formatted data into a database table named "ml_training_snippets".
+ *  * 
+ *  * 1. [data.connect] - Establishes a connection to a data source.
+ *  * 2. [for-each] - Iterates over each product in the retrieved content.
+ *  * 3. [if] - Checks if the product is in stock, has a non-null and non-empty description.
+ *  * 4. [set-value] - Sets the value of the prompt and completion nodes.
+ *  * 5. [strings.concat] - Concatenates strings to form the prompt and completion.
+ *  * 6. [html2markdown] - Converts HTML descriptions to Markdown format.
+ *  * 7. [get-value] - Retrieves values from the product data.
+ *  * 8. [exists] - Checks if images exist for the product.
+ *  * 9. [data.create] - Inserts the formatted data into the "ml_training_snippets" table.
+ *  */
+ */
+data.connect:[generic|magic]
+   for-each:x:@http.get/*/content/*
+      if
+         and
+            eq:x:@.dp/#/*/stock_status
+               .:instock
+            not-null:x:@.dp/#/*/description
+            neq:x:@.dp/#/*/description
+               .:
+         .lambda
+            .prompt
+            .completion
+            set-value:x:@.prompt
+               strings.concat
+                  html2markdown:x:@.dp/#/*/description
+            set-value:x:@.completion
+               strings.concat
+                  .:"Price: "
+                  get-value:x:@.dp/#/*/price
+                  .:@"
+
+"
+                  .:"URL: "
+                  get-value:x:@.dp/#/*/permalink
+            if
+               and
+                  not-null:x:@.dp/#/*/short_description
+                  neq:x:@.dp/#/*/short_description
+                     .:
+               .lambda
+                  set-value:x:@.completion
+                     strings.concat
+                        get-value:x:@.completion
+                        .:@"
+
+"
+                        .:"Short description: "
+                        html2markdown:x:@.dp/#/*/short_description
+            if
+               exists:x:@.dp/#/*/images/*
+               .lambda
+                  set-value:x:@.completion
+                     strings.concat
+                        get-value:x:@.completion
+                        .:@"
+
+Images of product:"
+                  for-each:x:@.dp/#/*/images/*
+                     set-value:x:@.completion
+                        strings.concat
+                           get-value:x:@.completion
+                           .:@"
+
+"
+                           .:![
+                           get-value:x:@.dp/#/*/name
+                           .:](
+                           get-value:x:@.dp/#/*/src
+                           .:)
+            data.create
+               table:ml_training_snippets
+               values
+                  type:x:@.arguments/*/type
+                  prompt:x:@.prompt
+                  completion:x:@.completion
+                  uri:x:@.uri
+                  meta:woocommerce-import

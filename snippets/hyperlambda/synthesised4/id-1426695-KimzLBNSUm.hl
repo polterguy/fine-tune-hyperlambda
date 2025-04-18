@@ -1,0 +1,73 @@
+
+/*
+ * This Hyperlambda code snippet is a loop that processes a list of snippets, concatenating their prompts and completions into a temporary context variable until a certain token limit is reached. It checks for the existence and non-nullity of specific nodes before concatenating their values, and removes processed nodes from the list. 
+ * 
+ * 1. [while] - Initiates a loop that continues as long as both conditions are true.
+ * 2. [and] - Combines multiple conditions that must all be true for the loop to continue.
+ * 3. [exists:x:@signal/*/snippets/0] - Checks if the first snippet exists.
+ * 4. [lt] - Checks if the token count of the temporary variable is less than 5000.
+ * 5. [openai.tokenize:x:@.tmp] - Retrieves the token count of the temporary variable.
+ * 6. [.lambda] - Contains the code to execute if the loop conditions are met.
+ * 7. [set-value:x:@.context] - Sets the context variable to the current temporary value.
+ * 8. [if] - Checks conditions to determine if the prompt should be concatenated.
+ * 9. [exists:x:@signal/*/snippets/0/*/prompt] - Checks if the prompt node exists.
+ * 10. [not-null:x:@signal/*/snippets/0/*/prompt] - Ensures the prompt node is not null.
+ * 11. [neq:x:@signal/*/snippets/0/*/prompt] - Ensures the prompt node is not empty.
+ * 12. [.lambda] - Contains the code to execute if the prompt conditions are met.
+ * 13. [set-value:x:@.tmp] - Concatenates the prompt to the temporary variable.
+ * 14. [strings.concat] - Concatenates multiple strings together.
+ * 15. [get-value:x:@.tmp] - Retrieves the current value of the temporary variable.
+ * 16. [.:@"] - Adds a newline character to the concatenated string.
+ * 17. [get-value:x:@signal/*/snippets/0/*/prompt] - Retrieves the prompt value.
+ * 18. [if] - Checks conditions to determine if the completion should be concatenated.
+ * 19. [exists:x:@signal/*/snippets/0/*/completion] - Checks if the completion node exists.
+ * 20. [not-null:x:@signal/*/snippets/0/*/completion] - Ensures the completion node is not null.
+ * 21. [neq:x:@signal/*/snippets/0/*/completion] - Ensures the completion node is not empty.
+ * 22. [.lambda] - Contains the code to execute if the completion conditions are met.
+ * 23. [set-value:x:@.tmp] - Concatenates the completion to the temporary variable.
+ * 24. [strings.concat] - Concatenates multiple strings together.
+ * 25. [get-value:x:@.tmp] - Retrieves the current value of the temporary variable.
+ * 26. [.:@"] - Adds a newline character to the concatenated string.
+ * 27. [get-value:x:@signal/*/snippets/0/*/completion] - Retrieves the completion value.
+ * 28. [remove-nodes:x:@signal/*/snippets/0] - Removes the processed snippet node.
+ */
+while
+   and
+      exists:x:@signal/*/snippets/0
+      lt
+         openai.tokenize:x:@.tmp
+         .:int:5000
+   .lambda
+      set-value:x:@.context
+         get-value:x:@.tmp
+      if
+         and
+            exists:x:@signal/*/snippets/0/*/prompt
+            not-null:x:@signal/*/snippets/0/*/prompt
+            neq:x:@signal/*/snippets/0/*/prompt
+               .:
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.tmp
+                  .:@"
+"
+                  .:@"
+"
+                  get-value:x:@signal/*/snippets/0/*/prompt
+      if
+         and
+            exists:x:@signal/*/snippets/0/*/completion
+            not-null:x:@signal/*/snippets/0/*/completion
+            neq:x:@signal/*/snippets/0/*/completion
+               .:
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.tmp
+                  .:@"
+"
+                  .:@"
+"
+                  get-value:x:@signal/*/snippets/0/*/completion
+      remove-nodes:x:@signal/*/snippets/0

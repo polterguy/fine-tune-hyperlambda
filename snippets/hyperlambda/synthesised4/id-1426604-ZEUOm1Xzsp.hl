@@ -1,0 +1,70 @@
+
+/*
+ * This Hyperlambda code snippet is designed to dynamically construct a JSON schema for an HTTP request body. It iterates over input nodes and checks if a corresponding property already exists in the schema. If not, it creates a new property node with a name and type derived from the input node. It also adds a description if available. Finally, it appends the constructed schema to a buffer if properties are present.
+ * 
+ * 1. [else] - Begins the else block for conditional logic.
+ * 2. [.body] - Declares a node for the request body.
+ * 3. [requestBody] - Represents the request body content.
+ * 4. [content] - Specifies the content type.
+ * 5. [application/json] - Indicates JSON content type.
+ * 6. [schema] - Declares the schema for the JSON content.
+ * 7. [type:object] - Specifies the schema type as an object.
+ * 8. [properties] - Placeholder for schema properties.
+ * 9. [for-each] - Iterates over input nodes.
+ * 10. [if] - Checks if a property does not exist in the schema.
+ * 11. [not-exists] - Condition to verify non-existence of a property.
+ * 12. [.lambda] - Executes if the condition is true.
+ * 13. [.prop] - Temporary node for property construction.
+ * 14. [name] - Placeholder for property name.
+ * 15. [type] - Placeholder for property type.
+ * 16. [set-value] - Sets the type of the property.
+ * 17. [get-value] - Retrieves the type from the input node.
+ * 18. [set-name] - Sets the name of the property.
+ * 19. [if] - Checks if a description exists for the input node.
+ * 20. [exists] - Condition to verify existence of a description.
+ * 21. [.lambda] - Executes if the description exists.
+ * 22. [unwrap] - Unwraps the description node.
+ * 23. [add] - Adds the description to the property node.
+ * 24. [add] - Appends the constructed property to the schema.
+ * 25. [get-nodes] - Retrieves the constructed property node.
+ * 26. [if] - Checks if properties exist in the schema.
+ * 27. [exists] - Condition to verify existence of properties.
+ * 28. [.lambda] - Executes if properties exist.
+ * 29. [add] - Appends the schema to the buffer.
+ * 30. [get-nodes] - Retrieves the schema node.
+ */
+else
+   .body
+      requestBody
+         content
+            application/json
+               schema
+                  type:object
+                  properties
+   for-each:x:@.dp/#/*/input/*
+      if
+         not-exists:x:"@.body/*/requestBody/*/content/*/*/schema/*/properties/*/\"{@.dp/#/*/name}\""
+         .lambda
+            .prop
+               name
+                  type
+            set-value:x:@.prop/*/*/type
+               get-value:x:@.dp/#/*/type
+            set-name:x:@.prop/*
+               get-value:x:@.dp/#/*/name
+            if
+               exists:x:@.dp/#/*/description
+               .lambda
+                  unwrap:x:+/*/*
+                  add:x:@.prop/*
+                     .
+                        description:x:@.dp/#/*/description
+            add:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+               get-nodes:x:@.prop/*
+   if
+      exists:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+      .lambda
+         add:x:+/*
+            get-nodes:x:@.body/*
+         add:x:@.buffer/*/*
+            .

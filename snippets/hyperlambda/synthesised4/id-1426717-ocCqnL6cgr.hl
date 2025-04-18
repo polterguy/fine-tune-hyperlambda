@@ -1,0 +1,48 @@
+
+// The code checks if a specific substring is not present in a given text completion. If the substring is absent, it concatenates various strings and checks if the total token count is within a specified limit. If within the limit, it updates context and adds an ID to a list. It further checks for a non-null URI and if it doesn't already exist in the result, it adds prompt, URI, and distance to the result. If the token count exceeds the limit, it resets the temporary value to the current context.
+if
+   not
+      strings.contains:x:@.dp/#/*/completion
+         .:{{
+   .lambda
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@.tmp
+            .:@"
+"
+            get-value:x:@.dp/#/*/prompt
+            .:@"
+"
+            .:@"
+"
+            get-value:x:@.dp/#/*/completion
+            .:@"
+
+---
+"
+      if
+         lt
+            openai.tokenize:x:@.tmp
+            get-value:x:@.arguments/*/max_tokens
+         .lambda
+            set-value:x:@.context
+               get-value:x:@.tmp
+            unwrap:x:+/*/*
+            add:x:@.ids
+               .
+                  .:x:@.dp/#/*/id
+            if
+               and
+                  not-null:x:@.dp/#/*/uri
+                  not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+               .lambda
+                  unwrap:x:+/*/*/*
+                  add:x:@.result
+                     .
+                        .
+                           prompt:x:@.dp/#/*/prompt
+                           uri:x:@.dp/#/*/uri
+                           distance:x:@.dp/#/*/distance
+      else
+         set-value:x:@.tmp
+            get-value:x:@.context

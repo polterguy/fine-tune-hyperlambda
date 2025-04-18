@@ -1,0 +1,79 @@
+
+/*
+ * This Hyperlambda code handles the execution of a function and processes its results. It first attempts to execute a function using [execute] with various parameters, and then converts the result to JSON using [lambda2json]. It checks if the token count of the JSON result exceeds a maximum limit using [openai.tokenize] and throws an error if it does. If successful, it retrieves a success message from the configuration and signals the result through sockets. It also updates a prompt with the function's response or success message.
+ * 
+ * 1. [else] - Executes the block if the previous condition is false.
+ * 2. [execute] - Invokes the function with specified parameters.
+ * 3. [lambda2json] - Converts the execution result to JSON format.
+ * 4. [if] - Checks if the token count of the JSON result exceeds the limit.
+ * 5. [mt] - Compares the token count with the maximum allowed tokens.
+ * 6. [throw] - Throws an error if the result is too large.
+ * 7. [config.get] - Retrieves a success message from the configuration.
+ * 8. [unwrap] - Unwraps the configuration result.
+ * 9. [sockets.signal] - Signals the result through sockets.
+ * 10. [if] - Checks if the execution result exists.
+ * 11. [set-value] - Updates the prompt with the function's response.
+ * 12. [strings.concat] - Concatenates strings to form the new prompt.
+ * 13. [else] - Executes if the execution result does not exist.
+ * 14. [set-value] - Updates the prompt with a success message.
+ */
+else
+   execute:magic.ai.functions.invoke
+      type:x:@.type
+      session:x:@.session
+      user-id:x:@.user-id
+      invocation:x:@.dp/#
+      extra:x:@.extra
+   lambda2json:x:@execute/*/result/*
+      format:true
+   if
+      mt
+         openai.tokenize:x:@lambda2json
+         get-value:x:@.arguments/@.arguments/*/max_context_tokens
+      .lambda
+         throw:Result too large, try to limit your result
+            status:int:400
+            public:bool:true
+   config.get:"magic:chat:functions:success-message"
+      .:Success!
+   unwrap:x:+/*/*
+   sockets.signal:x:@.session
+      args
+         function_result:x:@config.get
+         invocation:x:@execute/*/json
+         file:x:@execute/*/workflow
+   if
+      exists:x:@execute/*/result/*
+      .lambda
+         set-value:x:@.new-prompt
+            strings.concat
+               get-value:x:@.new-prompt
+               .:"Response from '"
+               get-value:x:@execute/*/workflow
+               .:@"' was:
+```json
+"
+               get-value:x:@lambda2json
+               .:@"
+"
+               .:```
+               .:@"
+"
+               .:@"
+"
+         set-value:x:@.function-result
+            strings.concat
+               get-value:x:@.function-result
+               get-value:x:@lambda2json
+               .:"\n"
+   else
+      set-value:x:@.new-prompt
+         strings.concat
+            get-value:x:@.new-prompt
+            .:"Invocation of '"
+            get-value:x:@execute/*/workflow
+            .:"' was a success."
+            .:@"
+"
+            .:@"
+"

@@ -1,0 +1,30 @@
+
+/*
+ * This Hyperlambda code performs a loop that repeatedly executes a SQL insert operation until a certain condition is met. It inserts records from the "ml_training_snippets" table into the "vss_ml_training_snippets" table, selecting only those records where the "embedding" is not null, the "type" matches a specified argument, and the record does not already exist in the target table. The loop continues until fewer than 500 records are inserted in one execution, at which point it sets a flag to stop further iterations.
+ * 
+ * 1. [while] - Initiates a loop that continues as long as the [.more] node is true.
+ * 2. [.sql] - Defines a SQL query to insert records into the "vss_ml_training_snippets" table.
+ * 3. [data.connect] - Establishes a connection to a database, using a generic or magic data source.
+ * 4. [data.execute] - Executes the SQL query defined in [.sql], passing in a "type" argument.
+ * 5. [if] - Checks if the number of inserted records is less than 500.
+ * 6. [lt] - Compares the result of [data.execute] to the integer 500.
+ * 7. [.lambda] - Contains the code to execute if the condition in [if] is true.
+ * 8. [set-value] - Sets the value of [.more] to false, stopping the loop.
+ */
+while:x:@.more
+   .sql:@"
+insert into vss_ml_training_snippets (rowid, embedding_vss)
+   select id as rowid, embedding as embedding_vss
+      from ml_training_snippets ts
+      where ts.embedding is not null and
+         type = @type and
+         not exists (select rowid from vss_ml_training_snippets as vss where ts.id = vss.rowid) limit 500"
+   data.connect:[generic|magic]
+      data.execute:x:@.sql
+         type:x:@.arguments/*/type
+      if
+         lt:x:@data.execute
+            .:int:500
+         .lambda
+            set-value:x:@.more
+               .:bool:false

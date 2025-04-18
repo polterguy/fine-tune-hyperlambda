@@ -1,0 +1,68 @@
+
+/*
+ * This code checks the HTTP response status code to ensure it's between 200 and 300, indicating a successful request. If the content status is "succeeded," it logs a success message, updates database tables for machine learning models and training snippets, deletes a task, and sends a success signal. If the content status is "failed," it logs an error, deletes the task, and sends an error signal.
+ * 
+ * 1. [if] - Checks if the HTTP status code is between 200 and 300.
+ * 2. [and] - Combines multiple conditions to evaluate if both are true.
+ * 3. [mte] - Checks if the HTTP status code is more than or equal to 200.
+ * 4. [lt] - Checks if the HTTP status code is less than 300.
+ * 5. [.lambda] - Executes the following block if the conditions are true.
+ * 6. [if] - Checks if the content status is "succeeded."
+ * 7. [eq] - Compares the content status to "succeeded."
+ * 8. [log.info] - Logs a success message.
+ * 9. [data.connect] - Connects to a data source.
+ * 10. [data.update] - Updates the "ml_types" table with the fine-tuned model.
+ * 11. [where] - Specifies conditions for the update.
+ * 12. [data.update] - Updates the "ml_training_snippets" table to mark it as pushed.
+ * 13. [tasks.delete] - Deletes a task by its ID.
+ * 14. [sockets.signal] - Sends a success signal with a message.
+ * 15. [else-if] - Checks if the content status is "failed."
+ * 16. [eq] - Compares the content status to "failed."
+ * 17. [log.error] - Logs an error message.
+ * 18. [tasks.delete] - Deletes a task by its ID.
+ * 19. [sockets.signal] - Sends an error signal with a message.
+ */
+if
+   and
+      mte:x:@http.get
+         .:int:200
+      lt:x:@http.get
+         .:int:300
+   .lambda
+      if
+         eq:x:@http.get/*/content/*/status
+            .:succeeded
+         .lambda
+            log.info:Training of OpenAI model completed successfully
+            data.connect:[generic|magic]
+               data.update
+                  table:ml_types
+                  values
+                     model:x:@http.get/*/content/*/fine_tuned_model
+                  where
+                     and
+                        type.eq:x:@.type
+               data.update
+                  table:ml_training_snippets
+                  values
+                     pushed:int:1
+                  where
+                     and
+                        type.eq:x:@.type
+            tasks.delete:x:@.task-id
+            sockets.signal:magic.backend.message
+               roles:root
+               args
+                  message:Training of your OpenAI model succeeded!
+                  type:success
+      else-if
+         eq:x:@http.get/*/content/*/status
+            .:failed
+         .lambda
+            log.error:Training of OpenAI model FAILED!!
+            tasks.delete:x:@.task-id
+            sockets.signal:magic.backend.message
+               roles:root
+               args
+                  message:Training of your OpenAI model FAILED!
+                  type:error

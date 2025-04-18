@@ -1,0 +1,53 @@
+
+/*
+ * This Hyperlambda code checks if the default database is SQLite and manages a scheduled task to create a daily backup of the Magic database at 1AM UTC. If the task already exists, it deletes and recreates it. The task connects to the database, deletes an existing backup file if present, creates a new backup, flushes connections, and logs the action. It also executes the backup task immediately if the database is not corrupt. The code includes the following slots:
+ * 
+ * 1. [if] - Checks if the default database is SQLite.
+ * 2. [eq] - Compares the default database configuration value to "sqlite".
+ * 3. [config.get] - Retrieves the default database configuration value.
+ * 4. [tasks.list] - Lists existing tasks to check for the backup task.
+ * 5. [exists] - Checks if the backup task already exists.
+ * 6. [tasks.delete] - Deletes the existing backup task if it exists.
+ * 7. [tasks.create] - Creates a new backup task with a daily schedule.
+ * 8. [description] - Provides a description for the backup task.
+ * 9. [repeats] - Sets the task to repeat every day at 1AM UTC.
+ * 10. [data.connect] - Connects to the database.
+ * 11. [io.file.exists] - Checks if the backup file already exists.
+ * 12. [io.file.delete] - Deletes the existing backup file if it exists.
+ * 13. [sqlite.backup] - Creates a new backup of the database.
+ * 14. [sqlite.connections.flush] - Flushes the database connections.
+ * 15. [log.info] - Logs the creation of the backup.
+ * 16. [console.log] - Logs the successful creation of the backup task.
+ * 17. [eq] - Checks if the database is not corrupt.
+ * 18. [tasks.execute] - Executes the backup task immediately if not corrupt.
+ * 19. [console.log] - Logs the immediate execution of the backup task.
+ */
+if
+   eq
+      config.get:"magic:databases:default"
+      .:sqlite
+   .lambda
+      tasks.list:sqlite.create-backup
+      if
+         exists:x:@tasks.list/*
+         .lambda
+            tasks.delete:sqlite.create-backup
+      tasks.create:sqlite.create-backup
+         description:Creates a backup of your magic database 1AM UTC time every day.
+         repeats:**.**.01.00.00
+         .lambda
+            data.connect:[generic|magic]
+               if
+                  io.file.exists:/data/magic.backup
+                  .lambda
+                     io.file.delete:/data/magic.backup
+               sqlite.backup:magic.backup
+               sqlite.connections.flush
+               log.info:Created backup of magic database
+      console.log:Successfully created database backup task that creates a backup of magic.db 1AM UTC every day
+      if
+         eq:x:@.corrupt
+            .:bool:false
+         .lambda
+            tasks.execute:sqlite.create-backup
+            console.log:Executed task that creates backup of magic database

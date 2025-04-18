@@ -1,0 +1,127 @@
+
+/*
+ * This Hyperlambda code uses a [switch] statement to determine the file type based on its extension and updates metadata accordingly. It evaluates the first part of a split string and matches it against various [case] nodes, each representing a file extension. If a match is found, it sets a [.handle] node to true and appends a description of the file type to [.file-meta]. If no match is found, it constructs a message indicating the file is ignored and sends it through a feedback channel. The [.file-meta] is updated using [strings.concat] to append the file type description.
+ * 
+ * 1. [switch] - Evaluates the first part of a split string to determine the file extension.
+ * 2. [case:cs] - Handles C# files, setting [.handle] to true and appending "File type: VB.NET" to [.file-meta].
+ * 3. [case:vb] - Handles VB.NET files, setting [.handle] to true and appending "Programming language: VB.NET" to [.file-meta].
+ * 4. [case:py] - Handles Python files, setting [.handle] to true and appending "Programming language: Python" to [.file-meta].
+ * 5. [case:rb] - Handles Ruby files, setting [.handle] to true and appending "Programming language: Ruby" to [.file-meta].
+ * 6. [case:js] - Handles JavaScript files, setting [.handle] to true and appending "Programming language: JavaScript" to [.file-meta].
+ * 7. [case:ts] - Handles TypeScript files, setting [.handle] to true and appending "Programming language: TypeScript" to [.file-meta].
+ * 8. [case:txt] - Handles text files, setting [.handle] to true and appending "Text file" to [.file-meta].
+ * 9. [case:css] - Handles CSS files, setting [.handle] to true and appending "CSS file" to [.file-meta].
+ * 10. [case:html] and [case:htm] - Handles HTML files, setting [.handle] to true and appending "HTML file" to [.file-meta].
+ * 11. [case:sass] - Handles SASS files, setting [.handle] to true and appending "SASS file" to [.file-meta].
+ * 12. [case:scss] - Handles SCSS files, setting [.handle] to true and appending "SCSS file" to [.file-meta].
+ * 13. [case:sql] - Handles SQL files, setting [.handle] to true and appending "SQL file" to [.file-meta].
+ * 14. [case:md] - Handles Markdown files, setting [.handle] to true and appending "Markdown file" to [.file-meta], unless the file is "/etc/system/openai/temp/README.md".
+ * 15. [default] - Constructs a message indicating the file is ignored and sends it through a feedback channel if no case matches.
+ */
+switch:x:@strings.split/0/-
+   case:cs
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:"File type: VB.NET"
+   case:vb
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:"Programming language: VB.NET"
+   case:py
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:"Programming language: Python"
+   case:rb
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:"Programming language: Ruby"
+   case:js
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:"Programming language: JavaScript"
+   case:ts
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:"Programming language: TypeScript"
+   case:txt
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:Text file
+   case:css
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:CSS file
+   case:html
+   case:htm
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:HTML file
+   case:sass
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:SASS file
+   case:scss
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:SCSS file
+   case:sql
+      set-value:x:@.handle
+         .:bool:true
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:SQL file
+   case:md
+      if
+         neq:x:@.dp/#
+            .:/etc/system/openai/temp/README.md
+         .lambda
+            set-value:x:@.handle
+               .:bool:true
+            set-value:x:@.file-meta
+               strings.concat
+                  get-value:x:@.file-meta
+                  .:Markdown file
+   default
+      strings.concat
+         .:"File: "
+         get-value:x:@.dp/#
+         .:" is ignored"
+      unwrap:x:+/*/*/message
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info

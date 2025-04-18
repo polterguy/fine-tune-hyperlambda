@@ -1,0 +1,39 @@
+
+/*
+ * This Hyperlambda code connects to a database using a connection string named "generic" and a database named "magic". It then checks multiple conditions: if there is no error in the result, if there are no existing records from a data read operation, and if a supervised argument is greater than zero. If all conditions are met, it creates a new record in the "ml_requests" table with values taken from the arguments and result nodes. The slots used in this code are:
+ * 
+ * 1. [data.connect] - Opens a database connection.
+ * 2. [if] - Initiates a conditional branching.
+ * 3. [and] - Combines multiple conditions that must all be true.
+ * 4. [not] - Inverts the condition of its child node.
+ * 5. [get-value] - Retrieves the value of a node.
+ * 6. [exists] - Checks if a node exists.
+ * 7. [mt] - Checks if a value is more than another value.
+ * 8. [convert] - Converts a value to a specified type.
+ * 9. [.lambda] - Executes the child nodes if the conditions are true.
+ * 10. [data.create] - Inserts a new record into a database table.
+ * 11. [table] - Specifies the table name for the data creation.
+ * 12. [values] - Defines the values to be inserted into the table.
+ */
+data.connect:[generic|magic]
+   if
+      and
+         not
+            get-value:x:@.result/*/error
+         not
+            exists:x:@data.read/*/*
+         mt
+            convert:x:@.arguments/*/supervised
+               type:int
+            .:int:0
+      .lambda
+         data.create
+            table:ml_requests
+            values
+               type:x:@.arguments/*/type
+               prompt:x:@.arguments/*/prompt
+               completion:x:@.result/*/result
+               finish_reason:x:@.result/*/finish_reason
+               session:x:@.arguments/*/session
+               user_id:x:@.arguments/*/user_id
+               referrer:x:@.arguments/*/referrer

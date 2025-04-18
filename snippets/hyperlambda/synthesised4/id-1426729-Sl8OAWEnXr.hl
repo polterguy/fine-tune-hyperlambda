@@ -1,0 +1,47 @@
+
+/*
+ * The provided Hyperlambda code iterates through nodes resulting from converting HTML to a lambda object and processes them based on their type. It constructs a prompt from header elements and converts list and preformatted elements to Markdown, appending them to a snippets collection. Other elements are added to a remaining collection. The code uses slots like [for-each], [switch], [set-value], [strings.concat], [lambda2html], [html2markdown], [unwrap], and [add] to achieve this.
+ * 
+ * 1. **[for-each]**: Iterates through each node resulting from the HTML to lambda conversion.
+ * 2. **[get-name]**: Retrieves the name of the currently iterated node.
+ * 3. **[switch]**: Determines the type of the current node and executes corresponding actions.
+ * 4. **[case]**: Matches header elements (h1 to h6) and constructs a prompt.
+ * 5. **[set-value]**: Sets the value of [.tmp-prompt] by concatenating existing prompt with the header text.
+ * 6. **[strings.concat]**: Concatenates strings to build the prompt.
+ * 7. **[case]**: Matches list (ul, ol) and preformatted (pre) elements for conversion.
+ * 8. **[lambda2html]**: Converts the current node back to HTML.
+ * 9. **[html2markdown]**: Converts HTML to Markdown, using a URL argument.
+ * 10. **[unwrap]**: Evaluates expressions to retrieve the Markdown content.
+ * 11. **[add]**: Appends the converted Markdown to the [.snippets] collection.
+ * 12. **[default]**: Handles other elements by adding them to [.remaining].
+ * 13. **[get-nodes]**: Retrieves nodes for the default case.
+ */
+for-each:x:@html2lambda/*
+   get-name:x:@.dp/#
+   switch:x:@get-name
+      case:h1
+      case:h2
+      case:h3
+      case:h4
+      case:h5
+      case:h6
+         set-value:x:@.tmp-prompt
+            strings.concat
+               get-value:x:@.prompt
+               .:" | "
+               get-value:x:"@.dp/#/*/\\#text"
+      case:ul
+      case:ol
+      case:pre
+         lambda2html:x:@.dp/#
+         html2markdown:x:@lambda2html
+            url:x:@.arguments/*/url
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
+               .
+                  prompt:x:@.tmp-prompt
+                  completion:x:@html2markdown
+      default
+         add:x:@.remaining
+            get-nodes:x:@.dp/#

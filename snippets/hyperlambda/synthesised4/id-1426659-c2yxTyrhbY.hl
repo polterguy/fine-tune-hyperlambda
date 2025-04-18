@@ -1,0 +1,100 @@
+
+/*
+ * This Hyperlambda code processes an image node, constructing a URL based on its source attribute. It checks if the source exists and is not null, then determines the URL format. If the source doesn't start with "http://" or "https://", it prepends the base URL. Finally, it appends a Markdown image link to a completion node if it exists, or creates a new one if not. The code ensures proper URL formatting and Markdown syntax for image representation.
+ * 
+ * 1. [case] - Starts a case block for processing an image node.
+ * 2. [if] - Checks if the image source exists, is not null, and is not empty.
+ * 3. [and] - Combines multiple conditions to ensure all are true.
+ * 4. [exists] - Checks if the source attribute exists.
+ * 5. [not-null] - Checks if the source attribute is not null.
+ * 6. [neq] - Checks if the source attribute is not empty.
+ * 7. [.lambda] - Contains actions to execute if conditions are met.
+ * 8. [.url] - Declares a node for storing the constructed URL.
+ * 9. [if] - Checks if the source does not start with "http://" or "https://".
+ * 10. [not] - Negates the following condition.
+ * 11. [strings.starts-with] - Checks if the source starts with a specific string.
+ * 12. [else-if] - Checks if the source starts with a single slash.
+ * 13. [else] - Handles cases where the source doesn't start with a slash.
+ * 14. [set-value] - Sets the value of the URL node.
+ * 15. [strings.concat] - Concatenates strings to form the URL.
+ * 16. [get-value] - Retrieves values from nodes.
+ * 17. [strings.split] - Splits the base URL by "://".
+ * 18. [get-first-value] - Retrieves the first non-null value.
+ * 19. [unwrap] - Evaluates and unwraps expressions.
+ * 20. [add] - Adds a new node to the snippets collection.
+ * 21. [completion] - Stores the Markdown image link.
+ */
+case:img
+   if
+      and
+         exists:x:"@.dp/#/*/\\@src/[0,1]"
+         not-null:x:"@.dp/#/*/\\@src/[0,1]"
+         neq:x:"@.dp/#/*/\\@src/[0,1]"
+            .:
+      .lambda
+         .url
+         if
+            and
+               not
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:"http://"
+               not
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:"https://"
+            .lambda
+               if
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .://
+                  .lambda
+                     strings.split:x:@.base
+                        .:"://"
+                     set-value:x:@.url
+                        strings.concat
+                           get-value:x:@strings.split/0
+                           .:":"
+                           get-value:x:"@.dp/#/*/\\@src/[0,1]"
+               else-if
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:/
+                  .lambda
+                     set-value:x:@.url
+                        strings.concat
+                           get-value:x:@.base
+                           get-value:x:"@.dp/#/*/\\@src/[0,1]"
+               else
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        .:/
+                        get-value:x:"@.dp/#/*/\\@src/[0,1]"
+         else
+            set-value:x:@.url
+               get-value:x:"@.dp/#/*/\\@src/[0,1]"
+         if
+            exists:x:@.snippets/0/-/*/completion
+            .lambda
+               set-value:x:@.snippets/0/-/*/completion
+                  strings.concat
+                     get-value:x:@.snippets/0/-/*/completion
+                     .:@"
+
+!["
+                     get-first-value
+                        get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                        .:"Image "
+                     .:](
+                     get-value:x:@.url
+                     .:)
+         else
+            strings.concat
+               .:![
+               get-first-value
+                  get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                  .:"Image "
+               .:](
+               get-value:x:@.url
+               .:)
+            unwrap:x:+/*/*
+            add:x:@.snippets/0/-
+               .
+                  completion:x:@strings.concat

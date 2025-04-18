@@ -1,0 +1,28 @@
+
+/*
+ * This Hyperlambda code checks if the HTTP POST request resulted in a 400 status code. If true, it sends a warning message to a specified feedback channel, logs an error with details from the HTTP response, and sets a node value to 0. The steps are as follows:
+ * 
+ * 1. [if] - Checks if the HTTP POST request returned a 400 status code.
+ * 2. [eq] - Compares the HTTP POST status code to 400.
+ * 3. [sockets.signal] - Sends a warning message to a feedback channel.
+ * 4. [sleep] - Pauses execution for 100 milliseconds.
+ * 5. [lambda2hyper] - Converts the HTTP POST response to a Hyperlambda string.
+ * 6. [log.error] - Logs an error with details from the HTTP response.
+ * 7. [set-value] - Sets the value of a node to 0.
+ */
+if
+   eq:x:@http.post
+      .:int:400
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Could not summarize snippet, check your log for details
+            type:warning
+      sleep:100
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      set-value:x:@.no
+         .:int:0

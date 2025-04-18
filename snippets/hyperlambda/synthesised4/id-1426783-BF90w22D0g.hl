@@ -1,0 +1,79 @@
+
+/*
+ * This Hyperlambda code is responsible for managing a session, ensuring that certain conditions are met before performing operations on session data. It checks if a session exists and is not null, then processes the session data based on certain conditions, such as the presence of a result or a new prompt. It adds roles and content to the session, caches the session data, and manages the session's size by removing nodes if necessary. Finally, it converts the session data to Hyperlambda format and stores it in the cache with a specified expiration time.
+ * 
+ * 1. [if] - Checks if the session exists and is not null.
+ * 2. [and] - Combines conditions to ensure both are true.
+ * 3. [exists] - Checks if the session node exists.
+ * 4. [not-null] - Checks if the session node is not null.
+ * 5. [.lambda] - Executes the following code block if the condition is true.
+ * 6. [if] - Checks if the result is not null and not empty.
+ * 7. [neq] - Checks if the result is not equal to an empty value.
+ * 8. [unwrap] - Unwraps content from a specific location.
+ * 9. [add] - Adds a new node to the session with role and content.
+ * 10. [role] - Specifies the role as "assistant".
+ * 11. [content] - Sets the content to the result value.
+ * 12. [if] - Checks if the new prompt is not null and not empty.
+ * 13. [neq] - Checks if the new prompt is not equal to an empty value.
+ * 14. [unwrap] - Unwraps content from a specific location.
+ * 15. [add] - Adds a new node to the session with role and content.
+ * 16. [role] - Specifies the role as "system".
+ * 17. [content] - Sets the content to the new prompt value.
+ * 18. [.cache-session] - Creates a temporary cache session.
+ * 19. [add] - Adds session nodes to the cache session.
+ * 20. [get-nodes] - Retrieves nodes from the session.
+ * 21. [.tmp] - Temporary variable for session management.
+ * 22. [set-value] - Sets the value of the temporary variable.
+ * 23. [get-value] - Retrieves the value of the fixed node.
+ * 24. [while] - Loops while the temporary variable is greater than zero.
+ * 25. [mt] - Checks if the temporary variable is greater than zero.
+ * 26. [remove-nodes] - Removes nodes from the cache session.
+ * 27. [math.decrement] - Decrements the temporary variable.
+ * 28. [lambda2hyper] - Converts cache session nodes to Hyperlambda format.
+ * 29. [cache.set] - Stores the session data in the cache with expiration.
+ */
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      if
+         and
+            not-null:x:@.result
+            neq:x:@.result
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:assistant
+                     content:x:@.result
+      if
+         and
+            not-null:x:@.new-prompt
+            neq:x:@.new-prompt
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:system
+                     content:x:@.new-prompt
+      .cache-session
+      add:x:@.cache-session
+         get-nodes:x:@.session/*
+      .tmp
+      set-value:x:@.tmp
+         get-value:x:@.fixed
+      while
+         mt:x:@.tmp
+            .:int:0
+         .lambda
+            remove-nodes:x:@.cache-session/0
+            math.decrement:x:@.tmp
+      lambda2hyper:x:@.cache-session/*
+      cache.set:x:@.arguments/*/session
+         expiration:x:@.arguments/*/session_timeout
+         value:x:@lambda2hyper

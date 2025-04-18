@@ -1,0 +1,22 @@
+
+/*
+ * // This Hyperlambda code checks if a backup file exists, and if so, it flushes SQLite connections, deletes the current database, copies the backup to replace the database, logs the action, and sets a flag indicating corruption.
+ * // 1. [if] - Initiates a conditional check.
+ * // 2. [io.file.exists] - Checks if the backup file exists.
+ * // 3. [.lambda] - Executes the following nodes if the condition is true.
+ * // 4. [sqlite.connections.flush] - Flushes cached SQLite connections.
+ * // 5. [io.file.delete] - Deletes the current database file.
+ * // 6. [io.file.copy] - Copies the backup file to replace the database.
+ * // 7. [console.log] - Logs a message indicating the database has been reverted to the backup.
+ * // 8. [set-value] - Sets a flag indicating the database was corrupted.
+ */
+if
+   io.file.exists:/data/magic.backup
+   .lambda
+      sqlite.connections.flush
+      io.file.delete:/data/magic.db
+      io.file.copy:/data/magic.backup
+         .:/data/magic.db
+      console.log:Reverted to backup of magic database
+      set-value:x:@.corrupt
+         .:bool:true

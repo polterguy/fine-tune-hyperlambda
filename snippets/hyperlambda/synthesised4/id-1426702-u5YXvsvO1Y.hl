@@ -1,0 +1,26 @@
+
+/*
+ * This Hyperlambda code checks if the status of an HTTP GET request's content is "failed". If true, it logs an error message indicating that the training of an OpenAI model failed, deletes a task using its task ID, and sends a signal to a socket with a message about the failure, targeting users with the "root" role and specifying the message type as an error.
+ * 
+ * 1. [else-if] - Evaluates a condition if the previous if or else-if condition was false.
+ * 2. [eq] - Compares the status value from the HTTP GET request's content to "failed".
+ * 3. [.lambda] - Executes the following block if the condition is true.
+ * 4. [log.error] - Logs an error message indicating the training failure.
+ * 5. [tasks.delete] - Deletes a task using the specified task ID.
+ * 6. [sockets.signal] - Sends a signal to a socket with a message.
+ * 7. [roles] - Specifies the target roles for the socket signal.
+ * 8. [args] - Contains the arguments for the socket signal.
+ * 9. [message] - The message to be sent through the socket.
+ * 10. [type] - Specifies the type of message as an error.
+ */
+else-if
+   eq:x:@http.get/*/content/*/status
+      .:failed
+   .lambda
+      log.error:Training of OpenAI model FAILED!!
+      tasks.delete:x:@.task-id
+      sockets.signal:magic.backend.message
+         roles:root
+         args
+            message:Training of your OpenAI model FAILED!
+            type:error

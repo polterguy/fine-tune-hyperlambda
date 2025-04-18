@@ -1,0 +1,29 @@
+
+/*
+ * This Hyperlambda code checks if an HTTP POST request to the OpenAI API did not return a successful status code (i.e., not between 200 and 299). If the request was unsuccessful, it logs an error with the details of the HTTP response, sets the HTTP response status to 500, and returns a message indicating that something went wrong during the API invocation.
+ * 
+ * 1. [if] - Initiates a conditional check.
+ * 2. [not] - Inverts the condition that follows.
+ * 3. [and] - Combines multiple conditions that must all be true.
+ * 4. [mte] - Checks if the HTTP POST status code is more than or equal to 200.
+ * 5. [lt] - Checks if the HTTP POST status code is less than 300.
+ * 6. [.lambda] - Executes the following nodes if the condition is true.
+ * 7. [lambda2hyper] - Converts the HTTP POST response to a Hyperlambda object.
+ * 8. [log.error] - Logs an error message with the response details.
+ * 9. [response.status.set] - Sets the HTTP response status code to 500.
+ * 10. [return] - Returns a message indicating an error occurred.
+ */
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         error:x:@lambda2hyper
+      response.status.set:500
+      return
+         message:Something went wrong as we invoked OpenAI API

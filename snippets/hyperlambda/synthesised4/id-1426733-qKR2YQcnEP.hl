@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code checks if the HTTP POST request's status code is between 200 and 299. If true, it sends a success signal through a socket, waits for 100 milliseconds, trims and sets the completion message from the HTTP response, concatenates and sets a summary prompt, and finally sets a numeric value to zero. 
+ * 
+ * 1. [else-if] - Evaluates the condition if the previous conditions were false.
+ * 2. [and] - Combines multiple conditions that must all be true.
+ * 3. [mte] - Checks if the HTTP POST status code is more than or equal to 200.
+ * 4. [lt] - Checks if the HTTP POST status code is less than 300.
+ * 5. [.lambda] - Contains the actions to execute if the conditions are true.
+ * 6. [sockets.signal] - Sends a signal with a message and type to a specified feedback channel.
+ * 7. [sleep] - Pauses execution for 100 milliseconds.
+ * 8. [set-value] - Sets the value of a specified node.
+ * 9. [strings.trim] - Trims whitespace from the content of the HTTP POST response.
+ * 10. [strings.concat] - Concatenates strings to form a summary prompt.
+ * 11. [strings.substring] - Extracts a substring from the prompt for concatenation.
+ * 12. [.] - Represents a static value or string used in operations.
+ */
+else-if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Successfully created summary of snippet
+            type:info
+      sleep:100
+      set-value:x:@.dp/#/*/completion
+         strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+            .:@"
+	 "
+      set-value:x:@.dp/#/*/prompt
+         strings.concat
+            .:"Summary; "
+            strings.substring:x:@.dp/#/*/prompt
+               .:int:0
+               .:int:150
+      set-value:x:@.no
+         .:int:0

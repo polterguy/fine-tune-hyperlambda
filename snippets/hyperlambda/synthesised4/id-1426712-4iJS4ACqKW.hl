@@ -1,0 +1,57 @@
+
+/*
+ * This Hyperlambda code checks if a specific JSON path within a deserialized JSON object is not null and not equal to an empty string. If both conditions are true, it appends the content to a result node. It further checks if the result does not contain a specific substring; if so, it sends a signal with the content. If the result contains another specific substring and a flag is not set, it sends a different signal and sets the flag to true.
+ * 
+ * 1. [if] - Checks if both conditions are true.
+ * 2. [and] - Combines two conditions.
+ * 3. [not-null] - Checks if the JSON path is not null.
+ * 4. [neq] - Checks if the JSON path is not equal to an empty string.
+ * 5. [.lambda] - Executes if the conditions are true.
+ * 6. [set-value] - Appends content to the result.
+ * 7. [strings.concat] - Concatenates strings.
+ * 8. [get-value] - Retrieves values from nodes.
+ * 9. [if] - Checks if the result does not contain a specific substring.
+ * 10. [not] - Negates the condition.
+ * 11. [strings.contains] - Checks if a string contains a substring.
+ * 12. [.lambda] - Executes if the condition is true.
+ * 13. [unwrap] - Evaluates expressions.
+ * 14. [sockets.signal] - Sends a signal with arguments.
+ * 15. [else-if] - Checks another condition if the first is false.
+ * 16. [and] - Combines two conditions.
+ * 17. [strings.contains] - Checks if the result contains a specific substring.
+ * 18. [neq] - Checks if a flag is not set.
+ * 19. [.lambda] - Executes if the conditions are true.
+ * 20. [sockets.signal] - Sends a different signal.
+ * 21. [set-value] - Sets the flag to true.
+ */
+if
+   and
+      not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+      neq:x:@json2lambda/*/choices/0/*/delta/*/content
+         .:
+   .lambda
+      set-value:x:@.result
+         strings.concat
+            get-value:x:@.result
+            get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+      if
+         not
+            strings.contains:x:@.result
+               .:___
+         .lambda
+            unwrap:x:+/*/*
+            sockets.signal:x:@.session
+               args
+                  message:x:@json2lambda/*/choices/0/*/delta/*/content
+      else-if
+         and
+            strings.contains:x:@.result
+               .:FUNCTION_INVOCATION[
+            neq:x:@.has-sent-waiting
+               .:bool:true
+         .lambda
+            sockets.signal:x:@.session
+               args
+                  function_waiting:bool:true
+            set-value:x:@.has-sent-waiting
+               .:bool:true

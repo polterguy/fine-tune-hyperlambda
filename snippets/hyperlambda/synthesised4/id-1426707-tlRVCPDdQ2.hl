@@ -1,0 +1,122 @@
+
+/*
+ * This Hyperlambda code snippet processes a file upload, saves it, and interacts with the OpenAI API to generate a response based on the file's content. It first checks if a condition is true, then constructs file paths and saves the file stream. It loads the file content and constructs a URI for downloading the file. If a massage prompt is provided, it sends a request to the OpenAI API with the file name as a prompt and processes the response. The code handles potential errors during the API call and logs them. Finally, it adds the URI and file path to the signal and file-data nodes for further processing.
+ * 
+ * 1. [if] - Checks if the condition is true to execute the subsequent code.
+ * 2. [eq] - Compares the value of [.text] to true.
+ * 3. [.lambda] - Contains the code to execute if the condition is true.
+ * 4. [.filename] - Declares a node to store the file name.
+ * 5. [set-value] - Sets the value of [.filename] to the file name from the arguments.
+ * 6. [.filepath] - Declares a node to store the file path.
+ * 7. [strings.concat] - Concatenates strings to form the file path.
+ * 8. [io.stream.save-file] - Saves the file stream to the specified file path.
+ * 9. [io.file.load] - Loads the file content from the file path.
+ * 10. [.uri] - Declares a node to store the URI.
+ * 11. [strings.concat] - Concatenates strings to form the URI.
+ * 12. [unwrap] - Evaluates expressions in the current context.
+ * 13. [signal] - Sends a signal with content and prompt to the magic.ai.massage slot.
+ * 14. [if] - Checks if a massage prompt is provided.
+ * 15. [and] - Combines conditions to check if the massage prompt is not null and not empty.
+ * 16. [.lambda] - Contains the code to execute if the massage prompt is provided.
+ * 17. [.token] - Declares a node to store the authorization token.
+ * 18. [strings.concat] - Concatenates strings to form the authorization token.
+ * 19. [for-each] - Iterates over each signal node.
+ * 20. [http.post] - Sends a POST request to the OpenAI API with the specified headers and payload.
+ * 21. [if] - Checks if the HTTP response status is not between 200 and 299.
+ * 22. [not] - Inverts the condition.
+ * 23. [and] - Combines conditions to check the HTTP response status.
+ * 24. [lambda2hyper] - Converts the HTTP response to a Hyperlambda object.
+ * 25. [log.error] - Logs an error message if the API call fails.
+ * 26. [else] - Executes code if the API call succeeds.
+ * 27. [set-value] - Sets the prompt value from the API response.
+ * 28. [unwrap] - Evaluates expressions in the current context.
+ * 29. [add] - Adds nodes to the signal and file-data nodes for further processing.
+ */
+if
+   eq:x:@.text
+      .:bool:true
+   .lambda
+      .filename
+      set-value:x:@.filename
+         get-value:x:@.arguments/*/file/*/name
+      .filepath
+      set-value:x:@.filepath
+         strings.concat
+            .:/etc/system/openai/pdf/
+            get-value:x:@.filename
+      io.stream.save-file:x:@.filepath
+         get-value:x:@.arguments/*/file/*/stream
+      io.file.load:x:@.filepath
+      .uri
+      set-value:x:@.uri
+         strings.concat
+            request.scheme
+            .:"://"
+            request.host
+            .:/magic/system/openai/download-txt?file=
+            strings.url-encode:x:@.filename
+      unwrap:x:+/*
+      signal:magic.ai.massage
+         content:x:@io.file.load
+         prompt:x:@.arguments/*/file/*/name
+         type:x:@.arguments/*/type
+      .uri
+      set-value:x:@.uri
+         strings.concat
+            request.scheme
+            .:"://"
+            request.host
+            .:/magic/system/openai/download-txt?file=
+            strings.url-encode:x:@.filename
+      if
+         and
+            not-null:x:@.arguments/*/massagePrompt
+            neq:x:@.arguments/*/massagePrompt
+               .:
+         .lambda
+            .token
+            set-value:x:@.token
+               strings.concat
+                  .:"Bearer "
+                  config.get:"magic:openai:key"
+            for-each:x:@signal/*
+               http.post:"https://api.openai.com/v1/chat/completions"
+                  convert:bool:true
+                  headers
+                     Authorization:x:@.token
+                     Content-Type:application/json
+                     Accept:text/event-stream
+                  payload
+                     model:gpt-3.5-turbo
+                     max_tokens:int:1000
+                     temperature:decimal:0.3
+                     messages
+                        .
+                           role:system
+                           content:x:@.arguments/*/massagePrompt
+                        .
+                           role:user
+                           content:x:@.dp/#/*/completion
+               if
+                  not
+                     and
+                        mte:x:@http.post
+                           .:int:200
+                        lt:x:@http.post
+                           .:int:300
+                  .lambda
+                     lambda2hyper:x:@http.post
+                     log.error:Something went wrong while invoking OpenAI
+                        message:x:@http.post/*/content/*/error/*/message
+                        status:x:@http.post
+                        error:x:@lambda2hyper
+               else
+                  set-value:x:@.dp/#/*/prompt
+                     get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+      unwrap:x:+/*/*
+      add:x:@signal/*
+         .
+            uri:x:@.uri
+            filename:x:@.filepath
+      add:x:@.file-data
+         get-nodes:x:@signal/*

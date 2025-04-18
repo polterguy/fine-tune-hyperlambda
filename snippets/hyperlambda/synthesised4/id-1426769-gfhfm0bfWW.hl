@@ -1,0 +1,191 @@
+
+/*
+ * This Hyperlambda code defines a dynamic slot named [magic.db.pgsql.columns] that retrieves metadata about columns from a specified PostgreSQL database table. It validates the presence of mandatory arguments [database] and [table], constructs a connection string, and connects to the database using [pgsql.connect]. It executes a SQL query to fetch column details such as name, data type, nullability, primary key status, and default values. The code processes these details, applies transformations to data types, and constructs a structured response with metadata for each column, including whether it is nullable, a primary key, or has automatic values. The processed column metadata is returned as a node set.
+ * 
+ * 1. [slots.create] - Creates a dynamic slot named [magic.db.pgsql.columns].
+ * 2. [validators.mandatory] - Ensures [database] and [table] arguments are provided.
+ * 3. [.connection] - Initializes the connection string with a default value.
+ * 4. [if] - Checks if a custom connection string is provided.
+ * 5. [set-value] - Sets the connection string based on the provided arguments.
+ * 6. [pgsql.connect] - Connects to the PostgreSQL database using the constructed connection string.
+ * 7. [strings.concat] - Constructs a SQL query to retrieve column metadata.
+ * 8. [pgsql.select] - Executes the SQL query and retrieves column metadata.
+ * 9. [for-each] - Iterates over each column metadata result.
+ * 10. [unwrap] - Evaluates expressions within the current context.
+ * 11. [.tmp] - Temporary node to store processed column metadata.
+ * 12. [if] - Checks if the column is nullable.
+ * 13. [add] - Adds nullable status to the temporary node.
+ * 14. [if] - Checks if the column is a primary key.
+ * 15. [add] - Adds primary key status to the temporary node.
+ * 16. [if] - Checks if the column has a default value.
+ * 17. [add] - Adds automatic value status to the temporary node.
+ * 18. [.type] - Processes and normalizes the column data type.
+ * 19. [strings.regex-replace] - Removes specific patterns from the data type.
+ * 20. [strings.replace] - Removes specific substrings from the data type.
+ * 21. [switch] - Maps PostgreSQL data types to Hyperlambda types.
+ * 22. [set-value] - Sets the normalized data type.
+ * 23. [unwrap] - Evaluates expressions within the current context.
+ * 24. [add] - Adds Hyperlambda type to the temporary node.
+ * 25. [add] - Adds processed column metadata to the result set.
+ * 26. [return-nodes] - Returns the processed column metadata as a node set.
+ */
+slots.create:magic.db.pgsql.columns
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
+   .connection:[postgres]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   pgsql.connect:x:@.connection
+      strings.concat
+         .:@"
+select c.column_name, c.is_nullable, c.data_type, c.column_default, exists(
+   select *
+      from information_schema.key_column_usage kcu  
+         join information_schema.table_constraints tc on tc.constraint_name = kcu.constraint_name 
+      where tc.constraint_type = 'PRIMARY KEY' and
+         kcu.table_name = @table and 
+         c.column_name = kcu.column_name and c.table_name = kcu.table_name
+   ) as is_pk
+   from information_schema.columns c
+   where c.table_name = @table and c.table_catalog = @database order by is_pk desc, c.column_name asc"
+      pgsql.select:x:@strings.concat
+         @table:x:@.arguments/*/table
+         @database:x:@.arguments/*/database
+      for-each:x:@pgsql.select/*
+         unwrap:x:+/*/*
+         .tmp
+            ""
+               name:x:@.dp/#/*/column_name
+               db:x:@.dp/#/*/data_type
+         if
+            eq
+               get-value:x:@.dp/#/*/is_nullable
+               .:NO
+            .lambda
+               add:x:@.tmp/*
+                  .
+                     nullable:bool:false
+         else
+            add:x:@.tmp/*
+               .
+                  nullable:bool:true
+         if
+            get-value:x:@.dp/#/*/is_pk
+            .lambda
+               add:x:@.tmp/*
+                  .
+                     primary:bool:true
+         else
+            add:x:@.tmp/*
+               .
+                  primary:bool:false
+         if
+            and
+               not
+                  eq
+                     get-value:x:@.dp/#/*/column_default
+                     .:
+               not
+                  eq
+                     get-value:x:@.dp/#/*/column_default
+                     .
+            .lambda
+               add:x:@.tmp/*
+                  .
+                     automatic:bool:true
+         else
+            add:x:@.tmp/*
+               .
+                  automatic:bool:false
+         .type
+         strings.regex-replace:x:@.dp/#/*/data_type
+            .:" \\([0-9,]+\\)"
+            .:
+         strings.regex-replace:x:@strings.regex-replace
+            .:" \\[[0-9,]+\\]"
+            .:
+         strings.replace:x:@strings.regex-replace
+            .:" unsigned"
+            .:
+         strings.replace:x:@strings.replace
+            .:" without time zone"
+            .:
+         strings.replace:x:@strings.replace
+            .:" with time zone"
+            .:
+         switch:x:@strings.replace
+            case:smallserial
+            case:serial
+            case:smallint
+               set-value:x:@.type
+                  .:int
+            case:timestamp
+               set-value:x:@.type
+                  .:date
+            case:numeric
+            case:decimal
+            case:real
+            case:money
+               set-value:x:@.type
+                  .:decimal
+            case:double precision
+               set-value:x:@.type
+                  .:double
+            case:integer
+            case:bigint
+            case:bigserial
+            case:interval
+               set-value:x:@.type
+                  .:long
+            case:string
+            case:bit
+            case:bit varying
+            case:character
+            case:character varying
+            case:json
+            case:text
+            case:xml
+               set-value:x:@.type
+                  .:string
+            case:boolean
+               set-value:x:@.type
+                  .:bool
+            default
+               if
+                  strings.starts-with:x:@strings.replace
+                     .:enum
+                  .lambda
+                     set-value:x:@.type
+                        .:string
+               else
+                  set-value:x:@.type
+                     .:string
+         unwrap:x:+/*/*
+         add:x:@.tmp/*
+            .
+               hl:x:@.type
+         add:x:../*/pgsql.connect/*/return-nodes
+            get-nodes:x:@.tmp/*
+      return-nodes

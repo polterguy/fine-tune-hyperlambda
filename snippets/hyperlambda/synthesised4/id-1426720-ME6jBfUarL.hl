@@ -1,0 +1,123 @@
+
+/*
+ * This Hyperlambda code snippet is designed to handle the process of vectorizing text using OpenAI's API, specifically for generating embeddings. It first checks if the token count of the input text is below a certain threshold (8191 tokens). If it is, it proceeds to make an HTTP POST request to OpenAI's embeddings endpoint. The response from OpenAI is checked for success, and if the request fails, it logs an error and may retry or abort based on the type of error. If successful, it updates a database with the new embedding data. Throughout the process, it sends feedback messages via a socket channel.
+ * 
+ * 1. [if] - Checks if the token count of the input text is less than 8191.
+ * 2. [lt] - Compares the token count to 8191.
+ * 3. [openai.tokenize] - Calculates the token count of the input text.
+ * 4. [strings.concat] - Concatenates strings to create a feedback message.
+ * 5. [unwrap] - Evaluates expressions to create a message.
+ * 6. [sockets.signal] - Sends feedback messages to a specified channel.
+ * 7. [http.post] - Sends a POST request to OpenAI's API to generate embeddings.
+ * 8. [headers] - Specifies HTTP headers for the request.
+ * 9. [payload] - Provides the data payload for the request.
+ * 10. [convert] - Converts the response to a specified format.
+ * 11. [if] - Checks if the HTTP response indicates success.
+ * 12. [not] - Inverts the condition to check for failure.
+ * 13. [and] - Combines multiple conditions.
+ * 14. [mte] - Checks if the response status code is greater than or equal to 200.
+ * 15. [lt] - Checks if the response status code is less than 300.
+ * 16. [math.increment] - Increments a failure counter.
+ * 17. [lambda2hyper] - Converts the response to a Hyperlambda string for logging.
+ * 18. [log.error] - Logs an error message if the request fails.
+ * 19. [strings.concat] - Creates a warning message.
+ * 20. [unwrap] - Evaluates expressions to create a message.
+ * 21. [sockets.signal] - Sends a warning message to a specified channel.
+ * 22. [if] - Checks for specific error status codes to determine retry logic.
+ * 23. [or] - Combines multiple conditions.
+ * 24. [eq] - Checks if the response status code is 429 or 500.
+ * 25. [sockets.signal] - Sends a message indicating a delay before retrying.
+ * 26. [sleep] - Pauses execution for a specified duration.
+ * 27. [else] - Handles non-transitional errors by aborting the process.
+ * 28. [sockets.signal] - Sends an error message indicating abort.
+ * 29. [set-value] - Sets a flag to indicate whether to continue processing.
+ * 30. [else] - Handles successful responses by updating the database.
+ * 31. [.embedding] - Temporary storage for the embedding data.
+ * 32. [set-value] - Updates the embedding data with the response.
+ * 33. [strings.concat] - Formats the embedding data for storage.
+ * 34. [strings.join] - Joins embedding values into a string.
+ * 35. [data.connect] - Connects to a database to update records.
+ * 36. [data.update] - Updates the database with the new embedding data.
+ * 37. [math.increment] - Increments a success counter.
+ */
+if
+   lt
+      openai.tokenize:x:@.embedding
+      .:int:8191
+   .lambda
+      strings.concat
+         .:"Vectorizing: \""
+         get-value:x:@.dp/#/*/prompt
+         .:"\""
+      unwrap:x:+/*/args/*/message
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      http.post:"https://api.openai.com/v1/embeddings"
+         headers
+            Authorization:x:@.token
+            Content-Type:application/json
+         payload
+            model:x:@.vector-model
+            input:x:@.embedding
+         convert:true
+      if
+         not
+            and
+               mte:x:@http.post
+                  .:int:200
+               lt:x:@http.post
+                  .:int:300
+         .lambda
+            math.increment:x:@.failed
+            lambda2hyper:x:@http.post
+            log.error:Something went wrong while invoking OpenAI
+               message:x:@http.post/*/content/*/error/*/message
+               error:x:@lambda2hyper
+            strings.concat
+               .:"OpenAI failed, could not create vectors for '"
+               get-value:x:@.dp/#/*/prompt
+               .:"'"
+            unwrap:x:+/*/args/*/message
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:warning
+            if
+               or
+                  eq:x:@http.post
+                     .:int:429
+                  eq:x:@http.post
+                     .:int:500
+               .lambda
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:Continuing in 5 seconds with the next snippet to let OpenAI cool down first
+                        type:info
+                  sleep:5000
+            else
+               sockets.signal:magic.backend.message
+                  roles:root
+                  args
+                     message:Could not vectorize snippet and it was a non-transitional error, aborting vectorization for type
+                     type:error
+               set-value:x:@.continue
+                  .:bool:false
+      else
+         .embedding
+         set-value:x:@.embedding
+            strings.concat
+               .:[
+               strings.join:x:@http.post/*/content/*/data/0/*/embedding/*
+                  .:,
+               .:]
+         data.connect:[generic|magic]
+            data.update
+               table:ml_training_snippets
+               values
+                  embedding:x:@.embedding
+               where
+                  and
+                     id.eq:x:@.dp/#/*/id
+         math.increment:x:@.success

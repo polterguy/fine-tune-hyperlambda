@@ -1,0 +1,39 @@
+
+/*
+ * This Hyperlambda code checks if there are any child nodes under the [result] node of an [execute] node. If such nodes exist, it concatenates and sets a new prompt message in the [.new-prompt] node, detailing the response from a workflow execution, formatted as a JSON string. It also updates the [.function-result] node by appending the JSON representation of the result. The code uses [strings.concat] to build the strings and [set-value] to assign them to the respective nodes.
+ * 
+ * 1. [if] - Checks if there are any child nodes under the [result] node of an [execute] node.
+ * 2. [exists] - Evaluates whether the specified node set exists.
+ * 3. [.lambda] - Contains the code to execute if the [if] condition is true.
+ * 4. [set-value] - Assigns a new value to a specified node.
+ * 5. [strings.concat] - Concatenates multiple strings into one.
+ * 6. [get-value] - Retrieves the value of a specified node.
+ * 7. [get-value:x:@execute/*/workflow] - Retrieves the workflow name from the [execute] node.
+ * 8. [get-value:x:@lambda2json] - Retrieves the JSON representation of the result.
+ * 9. [.new-prompt] - Node where the concatenated prompt message is stored.
+ * 10. [.function-result] - Node where the concatenated function result is stored.
+ */
+if
+   exists:x:@execute/*/result/*
+   .lambda
+      set-value:x:@.new-prompt
+         strings.concat
+            get-value:x:@.new-prompt
+            .:"Response from '"
+            get-value:x:@execute/*/workflow
+            .:@"' was:
+```json
+"
+            get-value:x:@lambda2json
+            .:@"
+"
+            .:```
+            .:@"
+"
+            .:@"
+"
+      set-value:x:@.function-result
+         strings.concat
+            get-value:x:@.function-result
+            get-value:x:@lambda2json
+            .:"\n"

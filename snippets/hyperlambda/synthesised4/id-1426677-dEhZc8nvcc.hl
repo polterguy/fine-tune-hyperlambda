@@ -1,0 +1,206 @@
+
+/*
+ * This Hyperlambda code defines a signal named [magic.ai.crawl-site] which is responsible for orchestrating the process of crawling a website to gather training data for an AI chatbot. It includes error handling, feedback mechanisms, and conditional logic to manage the workflow. The code performs the following tasks:
+ * 
+ * 1. [signal:magic.ai.crawl-site] - Declares the main signal for the website crawling process.
+ * 2. [delay] - Sets a delay before starting the process.
+ * 3. [threshold] - Defines a threshold value for the process.
+ * 4. [summarize] - Indicates whether to summarize the data.
+ * 5. [type] - Retrieves the type of the process from the current context.
+ * 6. [.onerror] - Handles errors by deleting entries in the [ml_types] table if an error occurs.
+ * 7. [.onafter] - Executes after the main process, performing various tasks such as reading data, sending feedback, and creating training snippets.
+ * 8. [data.connect] - Connects to the database to perform read, delete, and create operations.
+ * 9. [if] - Checks conditions to determine the next steps, such as sending feedback or creating tasks.
+ * 10. [sockets.signal] - Sends feedback messages to a specified channel.
+ * 11. [sleep] - Introduces a delay between operations.
+ * 12. [strings.concat] - Concatenates strings to form messages or identifiers.
+ * 13. [unwrap] - Evaluates expressions to retrieve values.
+ * 14. [signal:magic.ai.create-landing-page] - Triggers the creation of a landing page for the AI model.
+ * 15. [try] - Attempts to execute a block of code, with error handling provided by [.catch].
+ * 16. [execute] - Invokes a slot to create a system message using OpenAI.
+ * 17. [math.add] - Performs date calculations for scheduling tasks.
+ * 18. [tasks.create] - Creates a scheduled task to delete the chatbot after a specified period.
+ * 19. [io.file.delete] - Deletes a file from the server.
+ * 20. [log.info] - Logs informational messages about the process.
+ * 21. [tasks.delete] - Deletes a task after it has been executed.
+ * 22. [sockets.signal] - Sends a final success message to the feedback channel.
+ */
+signal:magic.ai.crawl-site
+   delay:int:1000
+   threshold:int:150
+   summarize:bool:true
+   type:x:@.type
+   .onerror
+      .type:x:@.type
+      .feedback-channel:x:@.arguments/*/feedback-channel
+      data.connect:[generic|magic]
+         data.delete
+            table:ml_types
+            where
+               and
+                  type.eq:x:@.type
+   .onafter
+      .type:x:@.type
+      .url:x:@.arguments/*/url
+      .flavor:x:@.arguments/*/flavor
+      .instruction:x:@.arguments/*/instruction
+      .host:x:@request.host
+      .feedback-channel:x:@.arguments/*/feedback-channel
+      .vectorize:x:@.arguments/*/vectorize
+      .auto_destruct:x:@.arguments/*/auto_destruct
+      data.connect:[generic|magic]
+         data.read
+            table:ml_training_snippets
+            columns
+               count(*)
+                  as:count
+            where
+               and
+                  type.eq:x:@.type
+      if
+         eq
+            convert:x:@data.connect/*/data.read/*/*/count
+               type:int
+            .:int:0
+         .lambda
+            sockets.signal:x:@.feedback-channel
+               args
+                  message:We could not find any training data on your website
+                  type:error
+            data.connect:[generic|magic]
+               data.delete
+                  table:ml_types
+                  where
+                     and
+                        type.eq:x:@.type
+      else
+         strings.concat
+            .:"We found "
+            get-value:x:@data.connect/*/data.read/*/*/count
+            .:" training snippets we could use on website in total"
+         unwrap:x:+/**
+         sockets.signal:x:@.feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         sleep:100
+         if
+            lt
+               convert:x:@data.connect/*/data.read/*/*/count
+                  type:int
+               .:int:10
+            .lambda
+               strings.concat
+                  .:"Warning! Only "
+                  get-value:x:@data.connect/*/data.read/*/*/count
+                  .:" training snippets will provide a poor chatbot experience!"
+               unwrap:x:+/**
+               sockets.signal:x:@.feedback-channel
+                  args
+                     message:x:@strings.concat
+                     type:warning
+               sleep:100
+         data.connect:[generic|magic]
+            data.create
+               table:ml_training_snippets
+               values
+                  type:x:@.type
+                  prompt:Who created this AI chatbot?
+                  completion:"This chatbot is a custom AI chatbot powered by OpenAI allowing you to use natural language to ask questions related to the website you're currently visiting. It was created by [AINIRO.IO](https://ainiro.io). If you want a similar AI chatbot for your own site, you can [contact AINIRO here](https://ainiro.io/contact-us)."
+                  uri:"https://ainiro.io"
+         unwrap:x:+/*
+         signal:magic.ai.create-landing-page
+            url:x:@.url
+            type:x:@.type
+            host:x:@.host
+            feedback-channel:x:@.feedback-channel
+         if
+            and
+               exists:x:@.arguments/*/instruction
+               neq:x:@.arguments/*/instruction
+                  .:
+            .lambda
+               sockets.signal:x:@.feedback-channel
+                  args
+                     message:Invoking OpenAI to create a custom system message. Notice, this might take some time ...
+                     type:info
+               try
+                  execute:magic.ai.create-system-message
+                     url:x:@.url
+                     template:x:@.flavor
+                     instruction:x:@.instruction
+                  data.connect:[generic|magic]
+                     data.update
+                        table:ml_types
+                        values
+                           system_message:x:@execute
+                        where
+                           and
+                              type.eq:x:@.type
+                  sockets.signal:x:@.feedback-channel
+                     args
+                        message:------------------------------------------------------------------------------------------------------------------------
+                        type:info
+               .catch
+                  log.error:x:@.arguments/*/message
+                  sockets.signal:x:@.feedback-channel
+                     args
+                        message:We could not create a custom system message, check your log for details
+                        type:warning
+         if
+            eq:x:@.vectorize
+               .:bool:true
+            .lambda
+               unwrap:x:+/*
+               signal:magic.ai.vectorise
+                  type:x:@.type
+                  feedback-channel:x:@.feedback-channel
+         else
+            sockets.signal:x:@.feedback-channel
+               args
+                  message:Remember to vectorize before attempting to use your model
+                  type:info
+         if:x:@.auto_destruct
+            sockets.signal:x:@.feedback-channel
+               args
+                  message:Creating scheduled task that deletes chatbot 7 days from now
+                  type:info
+            sleep:100
+            math.add
+               date.now
+               time
+                  days:7
+            strings.concat
+               .:delete-chatbot-
+               get-value:x:@.type
+            unwrap:x:+/+/*/.lambda/*/.task
+            unwrap:x:+/*/.lambda/*/.type
+            tasks.create:x:@strings.concat
+               description:Deletes demo chatbot 7 days after creating it
+               due:x:@math.add
+               .lambda
+                  .type:x:@.type
+                  data.connect:[generic|magic]
+                     data.execute:@"
+delete from vss_ml_training_snippets
+   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+                        type:x:@.type
+                  .task:x:@strings.concat
+                  data.connect:[generic|magic]
+                     data.delete
+                        table:ml_types
+                        where
+                           and
+                              type.eq:x:@.type
+                  strings.concat
+                     .:/etc/www/
+                     get-value:x:@.type
+                     .:.html
+                  io.file.delete:x:@strings.concat
+                  log.info:Demo chatbot was deleted
+                     type:x:@.type
+                  tasks.delete:x:@.task
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Done!
+               type:success

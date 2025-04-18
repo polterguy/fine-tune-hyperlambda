@@ -1,0 +1,74 @@
+
+/*
+ * This Hyperlambda code checks if a cached value exists and is not null, and if it equals 1, or if references do not exist or are false. If these conditions are met, it connects to a database, reads from the "ml_requests" table, and checks if the prompt and type match the arguments. If a matching record is found and its cached value equals 1, it returns the completion and indicates the result was cached. The code ensures efficient retrieval of cached data, reducing database queries. 
+ * 
+ * 1. [if] - Checks a series of conditions to determine if the subsequent lambda should be executed.
+ * 2. [and] - Ensures all conditions within it are true for execution to proceed.
+ * 3. [exists] - Checks if the 'cached' argument exists.
+ * 4. [not-null] - Ensures the 'cached' argument is not null.
+ * 5. [eq] - Compares the converted 'cached' argument to 1.
+ * 6. [convert] - Converts the 'cached' argument to an integer.
+ * 7. [or] - Allows execution if either of its conditions is true.
+ * 8. [not-exists] - Checks if 'references' do not exist.
+ * 9. [not] - Inverts the value of 'references'.
+ * 10. [.lambda] - Contains the code to execute if conditions are met.
+ * 11. [data.connect] - Connects to a specified database.
+ * 12. [data.read] - Reads data from the 'ml_requests' table.
+ * 13. [table] - Specifies the table to read from.
+ * 14. [columns] - Lists the columns to retrieve.
+ * 15. [where] - Sets conditions for data retrieval.
+ * 16. [and] - Ensures both prompt and type conditions are met.
+ * 17. [prompt.eq] - Compares the 'prompt' argument to a database value.
+ * 18. [type.eq] - Compares the 'type' argument to a database value.
+ * 19. [limit] - Restricts the query to one result.
+ * 20. [order] - Orders results by creation date.
+ * 21. [direction] - Specifies descending order.
+ * 22. [if] - Checks if the read data meets conditions.
+ * 23. [and] - Ensures conditions within it are true.
+ * 24. [exists] - Checks if data was read.
+ * 25. [eq] - Compares the converted 'cached' value to 1.
+ * 26. [convert] - Converts the 'cached' value to an integer.
+ * 27. [.lambda] - Executes if data conditions are met.
+ * 28. [unwrap] - Evaluates and returns the data.
+ * 29. [return] - Returns the completion and finish reason.
+ * 30. [result] - Specifies the completion result.
+ * 31. [finish_reason] - Indicates the result was cached.
+ */
+if
+   and
+      exists:x:@.arguments/*/cached
+      not-null:x:@.arguments/*/cached
+      eq
+         convert:x:@.arguments/*/cached
+            type:int
+         .:int:1
+      or
+         not-exists:x:@.arguments/*/references
+         not
+            get-value:x:@.arguments/*/references
+   .lambda
+      data.connect:[generic|magic]
+         data.read
+            table:ml_requests
+            columns
+               completion
+               cached
+            where
+               and
+                  prompt.eq:x:@.arguments/*/prompt
+                  type.eq:x:@.arguments/*/type
+            limit:1
+            order:created
+            direction:desc
+         if
+            and
+               exists:x:@data.read/*/*
+               eq
+                  convert:x:@data.read/*/*/cached
+                     type:int
+                  .:int:1
+            .lambda
+               unwrap:x:+/*
+               return
+                  result:x:@data.read/*/*/completion
+                  finish_reason:cached

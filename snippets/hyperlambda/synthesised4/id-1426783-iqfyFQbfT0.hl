@@ -1,0 +1,65 @@
+
+/*
+ * This Hyperlambda code checks the status of an HTTP POST request. If the status code is not between 200 and 299, it logs an error with details from the response and checks if streaming is disabled or not specified. If streaming is disabled, it throws an error with a public message. Otherwise, it sends a signal with error details and resets an iteration counter.
+ * 
+ * 1. [if] - Begins a conditional statement.
+ * 2. [not] - Inverts the condition.
+ * 3. [and] - Combines multiple conditions.
+ * 4. [mte] - Checks if the HTTP POST status is more than or equal to 200.
+ * 5. [lt] - Checks if the HTTP POST status is less than 300.
+ * 6. [.lambda] - Executes if the condition is true.
+ * 7. [lambda2hyper] - Converts the HTTP POST response to a Hyperlambda object.
+ * 8. [log.error] - Logs an error with details from the HTTP POST response.
+ * 9. [message] - Retrieves the error message from the HTTP POST response.
+ * 10. [status] - Retrieves the HTTP POST status.
+ * 11. [error] - Retrieves the converted error details.
+ * 12. [if] - Begins another conditional statement.
+ * 13. [or] - Combines multiple conditions.
+ * 14. [not-exists] - Checks if the stream argument does not exist.
+ * 15. [eq] - Checks if the stream argument is false.
+ * 16. [.lambda] - Executes if the condition is true.
+ * 17. [throw] - Throws an error with details from the HTTP POST response.
+ * 18. [public] - Sets the error message as public.
+ * 19. [status] - Retrieves the HTTP POST status.
+ * 20. [else] - Executes if the previous condition is false.
+ * 21. [unwrap] - Unwraps and evaluates expressions.
+ * 22. [sockets.signal] - Sends a signal with error details.
+ * 23. [args] - Specifies arguments for the signal.
+ * 24. [error] - Sets the error flag to true.
+ * 25. [status] - Retrieves the HTTP POST status.
+ * 26. [message] - Retrieves the error message from the HTTP POST response.
+ * 27. [set-value] - Sets the value of the iterations node.
+ * 28. [.iterations] - Node to store the iteration count.
+ * 29. [.:int:0] - Sets the iteration count to 0.
+ */
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking Ollama
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      if
+         or
+            not-exists:x:@.arguments/*/stream
+            eq:x:@.arguments/*/stream
+               .:bool:false
+         .lambda
+            throw:x:@http.post/*/content/*/error/*/message
+               public:bool:true
+               status:x:@http.post
+      else
+         unwrap:x:+/*/*
+         sockets.signal:x:@.arguments/*/session
+            args
+               error:bool:true
+               status:x:@http.post
+               message:x:@http.post/*/content/*/error/*/message
+         set-value:x:@.iterations
+            .:int:0

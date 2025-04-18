@@ -1,0 +1,60 @@
+
+/*
+ * This Hyperlambda code snippet is designed to process a node structure and generate an argument definition based on the type of each node. It checks if the node type is not a wildcard, then creates an argument node with a name and schema type, determined by the node's type. The code handles different data types, including integers, numbers, booleans, and strings, and assigns the appropriate schema type. If a description exists, it is added to the argument node. Finally, the argument node is added to a buffer's parameters list. 
+ * 
+ * 1. [if] - Checks if the node type is not a wildcard.
+ * 2. [.arg] - Initializes an argument node with name and schema.
+ * 3. [set-value] - Sets the argument name based on the node's name.
+ * 4. [switch] - Determines the schema type based on the node's type.
+ * 5. [case] - Handles integer types and sets schema type to "integer".
+ * 6. [case] - Handles number types and sets schema type to "number".
+ * 7. [case] - Handles boolean type and sets schema type to "boolean".
+ * 8. [default] - Sets schema type to "string" for other types.
+ * 9. [if] - Checks if a description exists for the node.
+ * 10. [unwrap] - Unwraps and processes the description node.
+ * 11. [insert-after] - Inserts the description into the argument node.
+ * 12. [add] - Adds the argument node to a buffer's parameters list.
+ */
+if
+   neq:x:@.dp/#/*/type
+      .:*
+   .lambda
+      .arg
+         name
+         in:query
+         schema
+            type
+      set-value:x:@.arg/*/name
+         get-value:x:@.dp/#/*/name
+      switch:x:@.dp/#/*/type
+         case:short
+         case:ushort
+         case:int
+         case:uint
+         case:long
+         case:ulong
+            set-value:x:@.arg/*/schema/*/type
+               .:integer
+         case:float
+         case:double
+         case:decimal
+            set-value:x:@.arg/*/schema/*/type
+               .:number
+         case:bool
+            set-value:x:@.arg/*/schema/*/type
+               .:boolean
+         default
+            set-value:x:@.arg/*/schema/*/type
+               .:string
+      if
+         exists:x:@.dp/#/*/description
+         .lambda
+            unwrap:x:+/*/*
+            insert-after:x:@.arg/*/name
+               .
+                  description:x:@.dp/#/*/description
+      add:x:+/*/*
+         get-nodes:x:@.arg/*
+      add:x:@.buffer/*/*/*/parameters
+         .
+            .

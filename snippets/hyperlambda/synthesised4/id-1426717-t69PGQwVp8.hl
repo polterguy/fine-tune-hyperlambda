@@ -1,0 +1,43 @@
+
+/*
+ * The provided Hyperlambda code evaluates a condition to determine if the token count of a temporary node is less than a specified maximum. If true, it sets the context to the temporary node's value, unwraps and adds specific IDs to a list, and further checks if a URI exists and is not already in the result set. If both conditions are met, it unpacks and adds prompt, URI, and distance information to the result set.
+ * 
+ * 1. [if] - Evaluates a condition to determine if the subsequent lambda should be executed.
+ * 2. [lt] - Checks if the token count of a temporary node is less than a specified maximum.
+ * 3. [openai.tokenize] - Calculates the token count of the temporary node.
+ * 4. [get-value] - Retrieves the maximum token value from the arguments.
+ * 5. [.lambda] - Contains the operations to execute if the condition is true.
+ * 6. [set-value] - Sets the context to the temporary node's value.
+ * 7. [unwrap] - Unwraps the next level of nodes.
+ * 8. [add] - Adds specific IDs to a list.
+ * 9. [if] - Further condition to check URI existence and uniqueness.
+ * 10. [and] - Combines two conditions that must both be true.
+ * 11. [not-null] - Checks if the URI is not null.
+ * 12. [not-exists] - Ensures the URI is not already in the result set.
+ * 13. [.lambda] - Contains operations to execute if the URI conditions are met.
+ * 14. [unwrap] - Unpacks the next level of nodes.
+ * 15. [add] - Adds prompt, URI, and distance information to the result set.
+ */
+if
+   lt
+      openai.tokenize:x:@.tmp
+      get-value:x:@.arguments/*/max_tokens
+   .lambda
+      set-value:x:@.context
+         get-value:x:@.tmp
+      unwrap:x:+/*/*
+      add:x:@.ids
+         .
+            .:x:@.dp/#/*/id
+      if
+         and
+            not-null:x:@.dp/#/*/uri
+            not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:@.result
+               .
+                  .
+                     prompt:x:@.dp/#/*/prompt
+                     uri:x:@.dp/#/*/uri
+                     distance:x:@.dp/#/*/distance

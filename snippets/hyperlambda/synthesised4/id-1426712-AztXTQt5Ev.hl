@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code checks if a session exists and is not null, then retrieves cached session data. If the cached data is not null, it converts a maximum session items value to an integer, converts the cached data to Hyperlambda, and removes nodes from the Hyperlambda until its count is less than or equal to the maximum session items. Finally, it adds the remaining nodes to a session node.
+ * 
+ * 1. [if] - Checks if the session exists and is not null.
+ * 2. [exists] - Verifies the existence of the session argument.
+ * 3. [not-null] - Ensures the session argument is not null.
+ * 4. [neq] - Confirms the session argument is not an empty string.
+ * 5. [cache.get] - Retrieves cached data for the session.
+ * 6. [if] - Checks if the cached data is not null.
+ * 7. [convert] - Converts the max_session_items argument to an integer.
+ * 8. [hyper2lambda] - Converts cached data to Hyperlambda format.
+ * 9. [while] - Loops while the node count is greater than the max session items.
+ * 10. [mt] - Checks if the node count is greater than the max session items.
+ * 11. [get-count] - Retrieves the count of nodes in the Hyperlambda.
+ * 12. [get-value] - Retrieves the converted max session items value.
+ * 13. [remove-nodes] - Removes the first node from the Hyperlambda.
+ * 14. [add] - Adds the remaining nodes to the session node.
+ */
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+      neq:x:@.arguments/*/session
+         .:
+   .lambda
+      cache.get:x:@.arguments/*/session
+      if
+         not-null:x:@cache.get
+         .lambda
+            convert:x:@.arguments/*/max_session_items
+               type:int
+            hyper2lambda:x:@cache.get
+            while
+               mt
+                  get-count:x:@hyper2lambda/*
+                  get-value:x:@convert
+               .lambda
+                  remove-nodes:x:@hyper2lambda/0
+            add:x:@.session
+               get-nodes:x:@hyper2lambda/*

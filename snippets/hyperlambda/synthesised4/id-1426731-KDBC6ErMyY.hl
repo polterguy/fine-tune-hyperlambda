@@ -1,0 +1,45 @@
+
+/*
+ * This Hyperlambda code checks if the number of nodes in [.urls] is less than 10,000. If true, it proceeds to execute a series of operations. It unwraps and signals a sitemap loading process with specific parameters, adds the resulting URLs to [.urls], and checks if both the sitemap is absent and [.urls] is empty. If both conditions are true, it sets [.has-sitemap] to false.
+ * 
+ * 1. [if] - Checks if the count of [.urls] nodes is less than 10,000.
+ * 2. [lt] - Compares the count of [.urls] nodes to 10,000.
+ * 3. [get-count] - Retrieves the number of nodes in [.urls].
+ * 4. [.lambda] - Executes if the [if] condition is true.
+ * 5. [unwrap] - Evaluates all expressions in the current context.
+ * 6. [signal] - Sends a signal to load a sitemap with specified parameters.
+ * 7. [max] - Sets the maximum number of URLs to 10,000.
+ * 8. [feedback-channel] - Specifies the feedback channel for the sitemap loading process.
+ * 9. [filter-on-url] - Applies a URL filter during the sitemap loading process.
+ * 10. [sitemap] - References the current sitemap node.
+ * 11. [add] - Adds nodes to [.urls].
+ * 12. [get-nodes] - Retrieves nodes from the signal result.
+ * 13. [if] - Checks additional conditions after adding nodes.
+ * 14. [and] - Combines two conditions to evaluate together.
+ * 15. [eq] - Checks if the sitemap is absent and [.urls] is empty.
+ * 16. [set-value] - Sets the value of [.has-sitemap] to false if conditions are met.
+ */
+if
+   lt
+      get-count:x:@.urls/*
+      .:int:10000
+   .lambda
+      unwrap:x:+/**
+      signal:magic.ai.load-sitemap
+         max:int:10000
+         feedback-channel:x:@.arguments/*/feedback-channel
+         filter-on-url:x:@.arguments/*/filter-on-url
+         sitemap
+            .:x:@.dp/#
+      add:x:@.urls
+         get-nodes:x:@signal/*/urls/*
+      if
+         and
+            eq:x:@signal/*/has-sitemap
+               .:bool:false
+            eq
+               get-count:x:@.urls/*
+               .:int:0
+         .lambda
+            set-value:x:@.has-sitemap
+               .:bool:false

@@ -1,0 +1,123 @@
+
+/*
+ * This Hyperlambda code snippet is part of a system that handles AI function invocations, ensuring they don't exceed a specified number of iterations and managing the results or errors accordingly. It checks if a function invocation is present, and if the number of iterations is within the limit, it attempts to execute the function. If successful, it processes the result, checking its size, and sends a success signal with the result. If the function invocation fails or exceeds the iteration limit, it logs an error and sends an error signal. The code also updates a prompt with the result or error message.
+ * 
+ * 1. [if] - Checks if the current node's value contains the string "FUNCTION_INVOCATION[/", indicating a function invocation.
+ * 2. [try] - Attempts to execute a block of code that may throw exceptions.
+ * 3. [if] - Checks if the number of iterations is less than or equal to 1.
+ * 4. [log.error] - Logs an error message indicating too many function invocations.
+ * 5. [sockets.signal] - Sends a signal to the session with various arguments, indicating an error or completion.
+ * 6. [else] - Executes if the number of iterations is greater than 1.
+ * 7. [execute] - Invokes the "magic.ai.functions.invoke" slot with specified arguments.
+ * 8. [lambda2json] - Converts the result of the execution to JSON format.
+ * 9. [if] - Checks if the tokenized JSON result exceeds the maximum context tokens.
+ * 10. [throw] - Throws an error if the result is too large.
+ * 11. [config.get] - Retrieves a success message from the configuration.
+ * 12. [unwrap] - Evaluates all expressions in the current node.
+ * 13. [sockets.signal] - Sends a success signal to the session with the function result.
+ * 14. [if] - Checks if the execution result exists.
+ * 15. [set-value] - Sets the value of the new prompt with the function result.
+ * 16. [else] - Executes if the execution result does not exist, setting a success message in the new prompt.
+ * 17. [.catch] - Handles exceptions thrown in the try block.
+ * 18. [log.error] - Logs an error message indicating the AI function could not be executed.
+ * 19. [unwrap] - Evaluates all expressions in the current node.
+ * 20. [sockets.signal] - Sends an error signal to the session with the exception message.
+ * 21. [set-value] - Sets the value of the new prompt with the exception message.
+ */
+if
+   strings.contains:x:@.dp/#
+      .:FUNCTION_INVOCATION[/
+   .lambda
+      try
+         if
+            lte:x:@.iterations
+               .:int:1
+            .lambda
+               log.error:Too many function invocations
+               sockets.signal:x:@.session
+                  args
+                     function_error:Too many function invocations
+               sockets.signal:x:@.session
+                  args
+                     function_waiting:bool:false
+               sockets.signal:x:@.session
+                  args
+                     error:bool:true
+                     status:int:500
+                     message:Too many function invocations. Configure your type to handle more invocations or change your prompt.
+               sockets.signal:x:@.session
+                  args
+                     finished:bool:true
+         else
+            execute:magic.ai.functions.invoke
+               type:x:@.type
+               session:x:@.session
+               user-id:x:@.user-id
+               invocation:x:@.dp/#
+            lambda2json:x:@execute/*/result/*
+               format:true
+            if
+               mt
+                  openai.tokenize:x:@lambda2json
+                  get-value:x:@.arguments/@.arguments/*/max_context_tokens
+               .lambda
+                  throw:Result too large, try to limit your result
+                     status:int:400
+                     public:bool:true
+            config.get:"magic:chat:functions:success-message"
+               .:Success!
+            unwrap:x:+/*/*
+            sockets.signal:x:@.session
+               args
+                  function_result:x:@config.get
+                  invocation:x:@execute/*/json
+                  file:x:@execute/*/workflow
+            if
+               exists:x:@execute/*/result/*
+               .lambda
+                  set-value:x:@.new-prompt
+                     strings.concat
+                        get-value:x:@.new-prompt
+                        .:"Response from '"
+                        get-value:x:@execute/*/workflow
+                        .:@"' was:
+```json
+"
+                        get-value:x:@lambda2json
+                        .:@"
+"
+                        .:```
+                        .:@"
+"
+                        .:@"
+"
+                  set-value:x:@.function-result
+                     get-value:x:@lambda2json
+            else
+               set-value:x:@.new-prompt
+                  strings.concat
+                     get-value:x:@.new-prompt
+                     .:"Invocation of '"
+                     get-value:x:@execute/*/workflow
+                     .:"' was a success."
+                     .:@"
+"
+                     .:@"
+"
+      .catch
+         log.error:Could not execute AI function
+            message:x:@.arguments/*/message
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               function_error:x:@.arguments/*/message
+         set-value:x:@.new-prompt
+            strings.concat
+               get-value:x:@.new-prompt
+               .:"Invocation failed, exception message was: '"
+               get-value:x:@.arguments/*/message
+               .:"'"
+               .:@"
+"
+               .:@"
+"

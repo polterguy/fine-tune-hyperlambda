@@ -1,0 +1,197 @@
+
+/*
+ * This Hyperlambda code iterates over a list of endpoints and processes each endpoint based on certain conditions. It checks if the endpoint is not internal and either matches a system flag, starts with a specific path, or matches a filter. If conditions are met, it processes the endpoint's description, verb, and input parameters, constructing a buffer for each endpoint with relevant information like URL, verb, operationId, and description. It handles different HTTP methods (GET, DELETE, POST, PUT, PATCH) differently, adding parameters or request bodies as needed. The code also ensures that parameters are correctly typed and described. Finally, it adds the processed endpoint data to a result set, either under existing paths or as new entries.
+ * 
+ * 1. [for-each] - Iterates over each endpoint in the list.
+ * 2. [if] - Checks conditions for processing the endpoint.
+ * 3. [and], [or], [neq], [eq], [strings.starts-with], [not-exists], [null], [strings.contains] - Logical and comparison slots to evaluate conditions.
+ * 4. [.lambda] - Executes code if conditions are met.
+ * 5. [.exists] - Flag to track if the endpoint already exists.
+ * 6. [for-each] - Iterates over paths to check for existing endpoints.
+ * 7. [if] - Checks if the current path matches the endpoint path.
+ * 8. [set-value] - Sets values in the buffer or other nodes.
+ * 9. [set-name] - Sets the name of nodes in the buffer.
+ * 10. [switch], [case] - Handles different HTTP verbs.
+ * 11. [unwrap], [insert-after] - Manipulates node structure.
+ * 12. [strings.concat], [strings.split], [strings.length], [strings.substring] - String manipulation slots.
+ * 13. [add] - Adds nodes to the buffer or result.
+ * 14. [get-value], [get-name], [get-nodes] - Retrieves values or nodes.
+ * 15. [remove-nodes] - Removes nodes if conditions are not met.
+ * 16. [exists], [mt], [neq], [not-exists] - Additional logical checks.
+ * 17. [return] - Ends the lambda execution.
+ */
+for-each:x:@endpoints.list/*
+   if
+      and
+         neq:x:@.dp/#/*/type
+            .:internal
+         or
+            eq:x:@.arguments/*/system
+               .:bool:true
+            strings.starts-with:x:@.dp/#/*/path
+               .:magic/modules/
+         or
+            not-exists:x:@.arguments/*/filter
+            null:x:@.arguments/*/filter
+            strings.contains:x:@.dp/#/*/path
+               get-value:x:@.arguments/*/filter
+      .lambda
+         .exists:bool:false
+         for-each:x:@.result/*/paths/*
+            if
+               eq
+                  get-name:x:@.dp/#
+                  strings.concat
+                     .:/
+                     get-value:x:@for-each/@.dp/#/*/path
+               .lambda
+                  set-value:x:@.exists
+                     .:bool:true
+         .buffer
+            url
+               verb
+                  operationId
+                  description
+         if
+            and
+               exists:x:@.dp/#/*/description
+               mt
+                  strings.length:x:@.dp/#/*/description
+                  .:int:300
+            .lambda
+               set-value:x:@.dp/#/*/description
+                  strings.substring:x:@.dp/#/*/description
+                     .:int:0
+                     .:int:300
+         set-value:x:@.buffer/*/url/*/verb/*/description
+            get-value:x:@.dp/#/*/description
+         set-name:x:@.buffer/*/url/*/verb
+            get-value:x:@.dp/#/*/verb
+         switch:x:@.dp/#/*/verb
+            case:post
+            case:put
+            case:patch
+               unwrap:x:+/*/*/*
+               insert-after:x:@.buffer/*/*/*/operationId
+                  .
+                     consumes
+                        .:x:@.dp/#/*/consumes
+                     produces
+                        .:application/json
+         set-name:x:@.buffer/*/url
+            strings.concat
+               .:/
+               get-value:x:@.dp/#/*/path
+         strings.split:x:@.dp/#/*/path
+            .:/
+         set-value:x:@.buffer/*/*/*/operationId
+            strings.concat
+               get-value:x:@.dp/#/*/verb
+               .:_
+               get-value:x:@strings.split/0/-/-
+               .:_
+               get-value:x:@strings.split/0/-
+         if
+            or
+               eq:x:@.dp/#/*/verb
+                  .:get
+               eq:x:@.dp/#/*/verb
+                  .:delete
+            .lambda
+               add:x:@.buffer/*/*
+                  .
+                     parameters
+               for-each:x:@.dp/#/*/input/*
+                  if
+                     neq:x:@.dp/#/*/type
+                        .:*
+                     .lambda
+                        .arg
+                           name
+                           in:query
+                           schema
+                              type
+                        set-value:x:@.arg/*/name
+                           get-value:x:@.dp/#/*/name
+                        switch:x:@.dp/#/*/type
+                           case:short
+                           case:ushort
+                           case:int
+                           case:uint
+                           case:long
+                           case:ulong
+                              set-value:x:@.arg/*/schema/*/type
+                                 .:integer
+                           case:float
+                           case:double
+                           case:decimal
+                              set-value:x:@.arg/*/schema/*/type
+                                 .:number
+                           case:bool
+                              set-value:x:@.arg/*/schema/*/type
+                                 .:boolean
+                           default
+                              set-value:x:@.arg/*/schema/*/type
+                                 .:string
+                        if
+                           exists:x:@.dp/#/*/description
+                           .lambda
+                              unwrap:x:+/*/*
+                              insert-after:x:@.arg/*/name
+                                 .
+                                    description:x:@.dp/#/*/description
+                        add:x:+/*/*
+                           get-nodes:x:@.arg/*
+                        add:x:@.buffer/*/*/*/parameters
+                           .
+                              .
+         else
+            .body
+               requestBody
+                  content
+                     application/json
+                        schema
+                           type:object
+                           properties
+            for-each:x:@.dp/#/*/input/*
+               if
+                  not-exists:x:"@.body/*/requestBody/*/content/*/*/schema/*/properties/*/\"{@.dp/#/*/name}\""
+                  .lambda
+                     .prop
+                        name
+                           type
+                     set-value:x:@.prop/*/*/type
+                        get-value:x:@.dp/#/*/type
+                     set-name:x:@.prop/*
+                        get-value:x:@.dp/#/*/name
+                     if
+                        exists:x:@.dp/#/*/description
+                        .lambda
+                           unwrap:x:+/*/*
+                           add:x:@.prop/*
+                              .
+                                 description:x:@.dp/#/*/description
+                     add:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+                        get-nodes:x:@.prop/*
+            if
+               exists:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+               .lambda
+                  add:x:+/*
+                     get-nodes:x:@.body/*
+                  add:x:@.buffer/*/*
+                     .
+         if
+            not-exists:x:@.buffer/*/*/*/parameters/*
+            .lambda
+               remove-nodes:x:@.buffer/*/*/*/parameters
+         if:x:@.exists
+            strings.concat
+               .:/
+               get-value:x:@.dp/#/*/path
+            add:x:@.result/*/paths/*/{@strings.concat}
+               get-nodes:x:@.buffer/*/*
+         else
+            add:x:+/*
+               get-nodes:x:@.buffer/*
+            add:x:@.result/*/paths
+               .

@@ -1,0 +1,37 @@
+
+/*
+ * This Hyperlambda code connects to a data source and performs a series of SQL queries to check for the existence of certain records based on provided arguments. It first constructs a string using the [strings.concat] slot, then executes a SQL query to count records in the "ml_training_snippets" table based on "type", "meta", and "completion" criteria. If no records are found, it performs another query on the "ml_types" table to check for the existence of a function related to the specified "type". If this second query also returns no results, it throws an exception indicating that the function does not exist for the specified type. 
+ * 
+ * 1. [data.connect] - Connects to a data source using either a generic or magic connection.
+ * 2. [strings.concat] - Concatenates strings to form a part of the SQL query.
+ * 3. [data.scalar] - Executes a SQL query to count records in the "ml_training_snippets" table.
+ * 4. [if] - Checks if the result of the SQL query is zero.
+ * 5. [eq] - Compares the result of the SQL query to zero.
+ * 6. [throw] - Throws an exception if the function does not exist for the specified type.
+ */
+data.connect:[generic|magic]
+   strings.concat
+      :%FUNCTION_INVOCATION[
+      get-value:x:@.file
+      .:]%
+   strings.concat
+      :"FUNCTION_INVOCATION ==> "
+      get-value:x:@.file
+   data.scalar:select count(*) from ml_training_snippets where type = @type and (meta = @meta or completion like @completion)
+      @type:x:@.arguments/*/type
+      @meta:x:@strings.concat
+      @completion:x:@strings.concat/@strings.concat
+   if
+      eq:x:@data.scalar
+         .:long:0
+      .lambda
+         data.scalar:select count(*) from ml_types where type = @type and system_message like @func
+            @type:x:@.arguments/*/type
+            @func:x:@strings.concat/@strings.concat
+         if
+            eq:x:@data.scalar
+               .:long:0
+            .lambda
+               throw:"That function doesn't exist on type"
+                  public:bool:true
+                  status:int:400

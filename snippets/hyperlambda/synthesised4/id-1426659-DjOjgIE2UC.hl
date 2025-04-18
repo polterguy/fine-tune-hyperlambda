@@ -1,0 +1,52 @@
+
+/*
+ * This Hyperlambda code snippet is designed to manage and format text content within a node structure, specifically focusing on handling text nodes and appending or creating formatted code blocks. It checks for the existence of text content within a specific node path and performs conditional operations based on the presence of a "completion" node. If a "completion" node exists, it appends formatted text to it; otherwise, it creates a new formatted text block. The code utilizes string manipulation and node traversal to achieve its functionality.
+ * 
+ * 1. [case:pre] - Initiates a conditional block for pre-processing.
+ * 2. [if] - Checks if a specific text node exists within the current node structure.
+ * 3. [exists] - Evaluates the existence of a text node at the specified path.
+ * 4. [.lambda] - Defines a lambda block to execute if the condition is true.
+ * 5. [if] - Checks for the existence of a "completion" node within a specific path.
+ * 6. [exists] - Evaluates the existence of a "completion" node.
+ * 7. [.lambda] - Executes a block if the "completion" node exists.
+ * 8. [set-value] - Updates the value of the "completion" node.
+ * 9. [strings.concat] - Concatenates strings to form a formatted code block.
+ * 10. [get-value] - Retrieves the current value of the "completion" node.
+ * 11. [strings.trim] - Trims whitespace and special characters from the text node.
+ * 12. [else] - Executes if the "completion" node does not exist.
+ * 13. [strings.concat] - Creates a new formatted code block.
+ * 14. [unwrap] - Evaluates and processes the concatenated string.
+ * 15. [add] - Adds a new "completion" node with the formatted text.
+ */
+case:pre
+   if
+      exists:x:"@.dp/#/**/\\#text"
+      .lambda
+         if
+            exists:x:@.snippets/0/-/*/completion
+            .lambda
+               set-value:x:@.snippets/0/-/*/completion
+                  strings.concat
+                     get-value:x:@.snippets/0/-/*/completion
+                     .:@"
+
+```
+"
+                     strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                        .:@"  
+	"
+                     .:@"
+```"
+         else
+            strings.concat
+               .:@"```
+"
+               strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                  .:@"  
+	"
+               .:@"
+```"
+            unwrap:x:+/*/*
+            add:x:@.snippets/0/-
+               .
+                  completion:x:@strings.concat

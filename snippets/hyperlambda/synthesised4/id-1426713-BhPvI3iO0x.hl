@@ -1,0 +1,44 @@
+
+/*
+ * This Hyperlambda code checks multiple conditions and if all are true, it creates a new entry in the "ml_requests" table. The conditions are: no error exists in the result, no data is read, and the supervised argument is greater than 0. If these conditions are met, it uses the provided arguments and result data to populate the new entry in the table.
+ * 
+ * 1. [if] - Initiates a conditional statement that evaluates its child nodes.
+ * 2. [and] - Combines multiple conditions, all of which must be true for the block to execute.
+ * 3. [not] - Checks that the specified condition is false.
+ * 4. [get-value:x:@.result/*/error] - Retrieves the error value from the result node.
+ * 5. [exists:x:@data.read/*/*] - Checks if any data has been read.
+ * 6. [mt] - Compares two values to see if the first is greater than the second.
+ * 7. [convert:x:@.arguments/*/supervised] - Converts the supervised argument to an integer.
+ * 8. [.lambda] - Contains the code to execute if the conditions are met.
+ * 9. [data.create] - Creates a new entry in the specified table.
+ * 10. [table:ml_requests] - Specifies the table where the new entry will be added.
+ * 11. [values] - Contains the data to be inserted into the new table entry.
+ * 12. [type:x:@.arguments/*/type] - Retrieves the type argument to insert into the table.
+ * 13. [prompt:x:@.arguments/*/prompt] - Retrieves the prompt argument to insert into the table.
+ * 14. [completion:x:@.result/*/result] - Retrieves the result from the result node to insert into the table.
+ * 15. [finish_reason:x:@.result/*/finish_reason] - Retrieves the finish reason from the result node to insert into the table.
+ * 16. [session:x:@.arguments/*/session] - Retrieves the session argument to insert into the table.
+ * 17. [user_id:x:@.arguments/*/user_id] - Retrieves the user ID argument to insert into the table.
+ * 18. [referrer:x:@.arguments/*/referrer] - Retrieves the referrer argument to insert into the table.
+ */
+if
+   and
+      not
+         get-value:x:@.result/*/error
+      not
+         exists:x:@data.read/*/*
+      mt
+         convert:x:@.arguments/*/supervised
+            type:int
+         .:int:0
+   .lambda
+      data.create
+         table:ml_requests
+         values
+            type:x:@.arguments/*/type
+            prompt:x:@.arguments/*/prompt
+            completion:x:@.result/*/result
+            finish_reason:x:@.result/*/finish_reason
+            session:x:@.arguments/*/session
+            user_id:x:@.arguments/*/user_id
+            referrer:x:@.arguments/*/referrer

@@ -1,0 +1,92 @@
+
+/*
+ * This Hyperlambda code processes a query URL and extracts HTML content if the URL starts with "http://" or "https://". It concatenates a message indicating the URL being scraped, signals a session with the message, and pauses briefly. It then signals to retrieve and extract HTML content from the URL, including images, code, lists, and main content. The extracted snippets are processed in a loop, concatenating prompts and completions into a temporary context string, ensuring the total token count remains below 5000. The first snippet is removed after processing, and the loop continues until no more snippets are available or the token limit is reached.
+ * 
+ * 1. [if] - Checks if the query starts with "http://" or "https://".
+ * 2. [or] - Combines conditions for checking URL prefixes.
+ * 3. [strings.starts-with] - Checks if the query starts with specified prefixes.
+ * 4. [.lambda] - Executes if the URL condition is true.
+ * 5. [strings.concat] - Concatenates a message with the query URL.
+ * 6. [unwrap] - Evaluates and executes the concatenated message.
+ * 7. [sockets.signal] - Sends a signal with the message to the session.
+ * 8. [sleep] - Pauses execution for 100 milliseconds.
+ * 9. [signal] - Signals to retrieve and extract HTML content.
+ * 10. [while] - Loops while conditions on snippets and token count are met.
+ * 11. [and] - Combines conditions for the while loop.
+ * 12. [exists] - Checks if snippets exist.
+ * 13. [lt] - Compares token count to a limit.
+ * 14. [.lambda] - Executes loop body if conditions are true.
+ * 15. [set-value] - Sets the context with the temporary value.
+ * 16. [if] - Checks conditions on snippet prompts and completions.
+ * 17. [not-null] - Checks if a value is not null.
+ * 18. [neq] - Checks if a value is not equal to an empty string.
+ * 19. [remove-nodes] - Removes the first snippet after processing.
+ */
+if
+   or
+      strings.starts-with:x:@.arguments/*/query
+         .:"http://"
+      strings.starts-with:x:@.arguments/*/query
+         .:"https://"
+   .lambda
+      strings.concat
+         .:"Scraping URL: "
+         get-value:x:@.arguments/*/query
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/session
+         args
+            message:x:@strings.concat
+            type:system
+      sleep:100
+      unwrap:x:+/*
+      signal:magic.ai.url.get
+         url:x:@.arguments/*/query
+      unwrap:x:+/*
+      signal:magic.ai.html.extract
+         url:x:@.arguments/*/query
+         images:bool:true
+         code:bool:true
+         lists:bool:true
+         main:bool:true
+         html:x:@signal/@signal
+      .tmp:
+      while
+         and
+            exists:x:@signal/*/snippets/0
+            lt
+               openai.tokenize:x:@.tmp
+               .:int:5000
+         .lambda
+            set-value:x:@.context
+               get-value:x:@.tmp
+            if
+               and
+                  exists:x:@signal/*/snippets/0/*/prompt
+                  not-null:x:@signal/*/snippets/0/*/prompt
+                  neq:x:@signal/*/snippets/0/*/prompt
+                     .:
+               .lambda
+                  set-value:x:@.tmp
+                     strings.concat
+                        get-value:x:@.tmp
+                        .:@"
+"
+                        .:@"
+"
+                        get-value:x:@signal/*/snippets/0/*/prompt
+            if
+               and
+                  exists:x:@signal/*/snippets/0/*/completion
+                  not-null:x:@signal/*/snippets/0/*/completion
+                  neq:x:@signal/*/snippets/0/*/completion
+                     .:
+               .lambda
+                  set-value:x:@.tmp
+                     strings.concat
+                        get-value:x:@.tmp
+                        .:@"
+"
+                        .:@"
+"
+                        get-value:x:@signal/*/snippets/0/*/completion
+            remove-nodes:x:@signal/*/snippets/0

@@ -1,0 +1,117 @@
+
+/*
+ * This Hyperlambda code is designed to interact with the OpenAI API to generate chat completions. It constructs an HTTP POST request to the OpenAI endpoint, using an API key for authorization, and processes the streaming response to handle chat messages. The code checks for specific conditions in the response to determine if a message is complete or if additional content is available, updating the session and signaling the client accordingly. It also logs the success of the API invocation.
+ * 
+ * 1. [try] - Begins a try block to handle potential exceptions.
+ * 2. [.token] - Declares a data node for storing the authorization token.
+ * 3. [set-value] - Sets the value of the [.token] node by concatenating "Bearer " with the API key.
+ * 4. [unwrap] - Unwraps the session node from the arguments.
+ * 5. [http.post] - Sends a POST request to the OpenAI chat completions endpoint.
+ * 6. [.sse] - Declares a data node for server-sent events session handling.
+ * 7. [if] - Checks if the message starts with "data:".
+ * 8. [strings.substring] - Extracts the substring from the message.
+ * 9. [strings.trim] - Trims whitespace from the substring.
+ * 10. [if] - Checks if the trimmed message is not empty.
+ * 11. [if] - Checks if the message is "[DONE]".
+ * 12. [sockets.signal] - Signals the session that the process is finished.
+ * 13. [else] - Handles non-DONE messages.
+ * 14. [json2lambda] - Converts JSON string to Hyperlambda nodes.
+ * 15. [if] - Checks for the existence of a finish reason.
+ * 16. [unwrap] - Unwraps nodes for further processing.
+ * 17. [sockets.signal] - Signals the session with the finish reason.
+ * 18. [if] - Checks if content is not null and not empty.
+ * 19. [set-value] - Updates the result with concatenated content.
+ * 20. [unwrap] - Unwraps nodes for further processing.
+ * 21. [sockets.signal] - Signals the session with the message content.
+ * 22. [headers] - Sets HTTP headers for the request.
+ * 23. [payload] - Constructs the payload for the POST request.
+ * 24. [if] - Checks if the HTTP response status code is not in the 200 range.
+ * 25. [throw] - Throws an exception with the error message from the response.
+ * 26. [else] - Logs a success message if the API invocation was successful.
+ */
+try
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         get-first-value
+            get-value:x:@.arguments/*/api_key
+            config.get:"magic:openai:key"
+   unwrap:x:+/*/.sse/*/.session
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:true
+      .sse
+         .session:x:@.arguments/*/session
+         if
+            and
+               exists:x:@.arguments/*/message
+               not-null:x:@.arguments/*/message
+               strings.starts-with:x:@.arguments/*/message
+                  .:"data:"
+            .lambda
+               strings.substring:x:@.arguments/*/message
+                  .:int:5
+               strings.trim:x:@strings.substring
+               if
+                  neq:x:@strings.trim
+                     .:
+                  .lambda
+                     if
+                        eq:x:@strings.trim
+                           .:[DONE]
+                        .lambda
+                           sockets.signal:x:@.session
+                              args
+                                 finished:bool:true
+                     else
+                        json2lambda:x:@strings.trim
+                        if
+                           and
+                              exists:x:@json2lambda/*/choices/0/*/finish_reason
+                              not-null:x:@json2lambda/*/choices/0/*/finish_reason
+                           .lambda
+                              unwrap:x:+/*/*
+                              sockets.signal:x:@.session
+                                 args
+                                    finish_reason:x:@json2lambda/*/choices/0/*/finish_reason
+                        if
+                           and
+                              not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+                              neq:x:@json2lambda/*/choices/0/*/delta/*/content
+                                 .:
+                           .lambda
+                              set-value:x:@.result
+                                 strings.concat
+                                    get-value:x:@.result
+                                    get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+                              unwrap:x:+/*/*
+                              sockets.signal:x:@.session
+                                 args
+                                    message:x:@json2lambda/*/choices/0/*/delta/*/content
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+         Accept:text/event-stream
+      payload
+         model:gpt-4o
+         max_tokens:int:4000
+         temperature:decimal:0.3
+         stream:bool:true
+         messages
+            .
+               role:system
+               content:x:@.arguments/*/instruction
+            .
+               role:system
+               content:x:@.context
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         throw:x:@http.post/*/content/*/error/*/message
+   else
+      log.info:Invoking OpenAI was a success

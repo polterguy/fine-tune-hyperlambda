@@ -1,0 +1,91 @@
+
+/*
+ * This Hyperlambda code continuously processes URLs by scraping them and sending feedback through a socket signal. It loops while there are URLs to process and the number of processed URLs is less than a specified maximum. During each iteration, it sends a feedback signal, waits briefly, and then scrapes the first URL in the list. The scraped URLs are added to a "done" list, and removed from the "urls" list. The code also checks for new URLs to add to the list, ensuring they are not duplicates. After processing, it sends another feedback signal indicating a wait time to avoid server exhaustion.
+ * 
+ * 1. [while] - Initiates a loop that continues while certain conditions are met.
+ * 2. [and] - Combines multiple conditions that must all be true for the loop to continue.
+ * 3. [exists] - Checks if there are any URLs left to process.
+ * 4. [lt] - Compares the count of processed URLs with a maximum value.
+ * 5. [get-count] - Retrieves the number of processed URLs.
+ * 6. [get-value] - Retrieves the maximum number of URLs to process from arguments.
+ * 7. [.lambda] - Contains the actions to perform during each loop iteration.
+ * 8. [sockets.signal] - Sends a feedback signal through a specified channel.
+ * 9. [args] - Arguments for the feedback signal.
+ * 10. [message] - Static message for feedback.
+ * 11. [type] - Type of feedback message.
+ * 12. [sleep] - Pauses execution for a short duration.
+ * 13. [unwrap] - Evaluates expressions in the next node.
+ * 14. [signal] - Triggers a URL scraping process.
+ * 15. [url] - Specifies the URL to scrape.
+ * 16. [type] - Retrieves the type of scraping from arguments.
+ * 17. [images] - Boolean flag for scraping images.
+ * 18. [code] - Boolean flag for scraping code.
+ * 19. [lists] - Boolean flag for scraping lists.
+ * 20. [main] - Boolean flag for scraping main content.
+ * 21. [empty-completion] - Boolean flag for empty completion.
+ * 22. [threshold] - Retrieves the threshold value from arguments.
+ * 23. [summarize] - Retrieves the summarize option from arguments.
+ * 24. [feedback-channel] - Retrieves the feedback channel from arguments.
+ * 25. [add] - Adds the processed URL to the "done" list.
+ * 26. [get-nodes] - Retrieves the first URL from the list.
+ * 27. [remove-nodes] - Removes the processed URL from the list.
+ * 28. [for-each] - Iterates over the results of the scraping signal.
+ * 29. [if] - Checks conditions for new URLs to add to the list.
+ * 30. [not-exists] - Ensures the URL is not already processed or in the list.
+ * 31. [strings.starts-with] - Checks if the URL starts with a specified prefix.
+ * 32. [add] - Adds new URLs to the list.
+ * 33. [strings.concat] - Constructs a wait message.
+ * 34. [math.divide] - Calculates the wait time in seconds.
+ * 35. [unwrap] - Evaluates expressions in the next node.
+ * 36. [sockets.signal] - Sends a wait message through the feedback channel.
+ * 37. [sleep] - Pauses execution to avoid server exhaustion.
+ */
+while
+   and
+      exists:x:@.urls/*
+      lt
+         get-count:x:@.done/*
+         get-value:x:@.arguments/*/max
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:------------------------------------------------------------------------------------------------------------------------
+            type:info
+      sleep:100
+      unwrap:x:+/*
+      signal:magic.ai.url.scrape
+         url:x:@.urls/0
+         type:x:@.arguments/*/type
+         images:bool:true
+         code:bool:true
+         lists:bool:true
+         main:bool:true
+         empty-completion:bool:false
+         threshold:x:@.arguments/*/threshold
+         summarize:x:@.arguments/*/summarize
+         feedback-channel:x:@.arguments/*/feedback-channel
+      add:x:@.done
+         get-nodes:x:@.urls/0
+      remove-nodes:x:@.urls/0
+      for-each:x:@signal/*
+         if
+            and
+               not-exists:x:"@.done/*/\"={@.dp/#}\""
+               not-exists:x:"@.urls/*/\"={@.dp/#}\""
+               strings.starts-with:x:@.dp/#
+                  get-value:x:@.arguments/*/url
+            .lambda
+               add:x:@.urls
+                  get-nodes:x:@.dp/#
+      strings.concat
+         .:"Waiting for "
+         math.divide:x:@.arguments/*/delay
+            .:int:1000
+         .:" seconds to avoid exhausting web server"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      sleep:100
+      sleep:x:@.arguments/*/delay

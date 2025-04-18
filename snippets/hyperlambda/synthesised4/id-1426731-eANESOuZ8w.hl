@@ -1,0 +1,49 @@
+
+/*
+ * // This Hyperlambda code checks if the number of URLs is less than 10,000 and, if true, performs several operations related to loading and processing a sitemap. It adds a signal node, unwraps its contents, and loads a sitemap using the magic.ai.load-sitemap signal. It then adds URLs from the signal to the existing URL list. Finally, it checks if the sitemap is absent and if there are no URLs, setting a has-sitemap flag to false if both conditions are met.
+ * // 1. [if] - Checks if the number of URLs is less than 10,000.
+ * // 2. [lt] - Compares the count of URLs to 10,000.
+ * // 3. [get-count] - Retrieves the number of nodes under the URLs node.
+ * // 4. [.lambda] - Executes the following operations if the condition is true.
+ * // 5. [add] - Adds a signal node to the current node.
+ * // 6. [get-nodes] - Retrieves header nodes from the arguments.
+ * // 7. [unwrap] - Unwraps the contents of the signal node.
+ * // 8. [signal] - Loads a sitemap using the magic.ai.load-sitemap signal.
+ * // 9. [max] - Sets the maximum number of URLs to 10,000.
+ * // 10. [feedback-channel] - Retrieves the feedback channel from the arguments.
+ * // 11. [filter-on-url] - Retrieves the filter-on-url from the arguments.
+ * // 12. [sitemap] - Sets the sitemap node with a reference to the current node.
+ * // 13. [add] - Adds URLs from the signal to the existing URL list.
+ * // 14. [if] - Checks if the sitemap is absent and if there are no URLs.
+ * // 15. [and] - Combines two conditions to check both are true.
+ * // 16. [eq] - Compares the has-sitemap value to false.
+ * // 17. [get-count] - Retrieves the number of nodes under the URLs node.
+ * // 18. [.lambda] - Executes the following operation if both conditions are true.
+ * // 19. [set-value] - Sets the has-sitemap flag to false.
+ */
+if
+   lt
+      get-count:x:@.urls/*
+      .:int:10000
+   .lambda
+      add:x:./*/signal
+         get-nodes:x:@.arguments/*/headers
+      unwrap:x:+/**
+      signal:magic.ai.load-sitemap
+         max:int:10000
+         feedback-channel:x:@.arguments/*/feedback-channel
+         filter-on-url:x:@.arguments/*/filter-on-url
+         sitemap
+            .:x:@.dp/#
+      add:x:@.urls
+         get-nodes:x:@signal/*/urls/*
+      if
+         and
+            eq:x:@signal/*/has-sitemap
+               .:bool:false
+            eq
+               get-count:x:@.urls/*
+               .:int:0
+         .lambda
+            set-value:x:@.has-sitemap
+               .:bool:false

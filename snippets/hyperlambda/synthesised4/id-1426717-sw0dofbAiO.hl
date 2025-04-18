@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code checks if a session argument exists and is not null. If true, it constructs a cache key by concatenating the session value with ".IDs". It then retrieves a value from the cache using this key. If the cache retrieval is successful and the value is not null, it appends a SQL condition to exclude certain IDs and sets a variable with the cached value.
+ * 
+ * 1. [if] - Checks if the session argument exists and is not null.
+ * 2. [and] - Combines the two conditions to ensure both are true.
+ * 3. [exists] - Checks if the session argument exists.
+ * 4. [not-null] - Checks if the session argument is not null.
+ * 5. [.lambda] - Executes the following code if the conditions are true.
+ * 6. [set-value] - Sets the cache key by concatenating the session value with ".IDs".
+ * 7. [strings.concat] - Concatenates the session value with ".IDs".
+ * 8. [get-value] - Retrieves the session value.
+ * 9. [cache.get] - Retrieves a value from the cache using the constructed cache key.
+ * 10. [if] - Checks if the cache retrieval is not null.
+ * 11. [not-null] - Checks if the cache retrieval result is not null.
+ * 12. [.lambda] - Executes the following code if the cache retrieval is not null.
+ * 13. [set-value] - Sets the tail variable with a SQL condition to exclude certain IDs.
+ * 14. [strings.concat] - Concatenates the SQL condition with the cached value.
+ * 15. [get-value] - Retrieves the cached value.
+ * 16. [set-value] - Sets the next variable with the cached value.
+ */
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      set-value:x:@.cache-key
+         strings.concat
+            get-value:x:@.arguments/*/session
+            .:.IDs
+      cache.get:x:@.cache-key
+      if
+         not-null:x:@cache.get
+         .lambda
+            set-value:x:@.tail
+               strings.concat
+                  .:" and id not in("
+                  get-value:x:@cache.get
+                  .:)
+            set-value:x:@.next
+               get-value:x:@cache.get

@@ -1,0 +1,162 @@
+
+/*
+ * // This Hyperlambda code is a comprehensive workflow for managing AI chatbot training data and operations. It includes creating training snippets, signaling feedback, handling conditions for vectorization, and scheduling tasks for auto-deletion of chatbots. The code integrates with OpenAI for creating system messages and vectorization, and it uses database operations to manage training data. It also provides feedback via sockets and logs errors if any occur during the process. The code ensures that the chatbot is vectorized before use and schedules a task to delete the chatbot after 7 days if auto-destruct is enabled.
+ * // 1. [else] - Executes if the preceding condition is false, concatenates a message about training snippets, and signals feedback.
+ * // 2. [strings.concat] - Concatenates strings to form a message.
+ * // 3. [unwrap] - Evaluates and unwraps expressions.
+ * // 4. [sockets.signal] - Sends a signal with a message to a feedback channel.
+ * // 5. [sleep] - Pauses execution for a specified duration.
+ * // 6. [if] - Checks if the count of training snippets is less than 10 and sends a warning if true.
+ * // 7. [data.connect] - Connects to a database and performs operations.
+ * // 8. [data.create] - Creates a new entry in the database with training snippet details.
+ * // 9. [signal] - Sends a signal to create a landing page.
+ * // 10. [and] - Logical AND condition to check multiple conditions.
+ * // 11. [exists] - Checks if a node exists.
+ * // 12. [neq] - Checks if a value is not equal to another.
+ * // 13. [try] - Attempts to execute a block of code and catches exceptions.
+ * // 14. [execute] - Executes a dynamic slot.
+ * // 15. [data.update] - Updates a database entry.
+ * // 16. [.catch] - Handles exceptions and logs errors.
+ * // 17. [log.error] - Logs an error message.
+ * // 18. [eq] - Checks if a value is equal to another.
+ * // 19. [signal] - Sends a signal for vectorization.
+ * // 20. [math.add] - Adds a time duration to the current date.
+ * // 21. [tasks.create] - Creates a scheduled task for auto-deletion of the chatbot.
+ * // 22. [data.execute] - Executes a database command to delete entries.
+ * // 23. [data.delete] - Deletes a database entry.
+ * // 24. [io.file.delete] - Deletes a file.
+ * // 25. [log.info] - Logs an informational message.
+ * // 26. [tasks.delete] - Deletes a task.
+ * // 27. [sockets.signal] - Sends a final success message to the feedback channel.
+ */
+else
+   strings.concat
+      .:"We found "
+      get-value:x:@data.connect/*/data.read/*/*/count
+      .:" training snippets we could use on website in total"
+   unwrap:x:+/**
+   sockets.signal:x:@.feedback-channel
+      args
+         message:x:@strings.concat
+         type:info
+   sleep:100
+   if
+      lt
+         convert:x:@data.connect/*/data.read/*/*/count
+            type:int
+         .:int:10
+      .lambda
+         strings.concat
+            .:"Warning! Only "
+            get-value:x:@data.connect/*/data.read/*/*/count
+            .:" training snippets will provide a poor chatbot experience!"
+         unwrap:x:+/**
+         sockets.signal:x:@.feedback-channel
+            args
+               message:x:@strings.concat
+               type:warning
+         sleep:100
+   data.connect:[generic|magic]
+      data.create
+         table:ml_training_snippets
+         values
+            type:x:@.type
+            prompt:Who created this AI chatbot?
+            completion:"This chatbot is a custom AI chatbot powered by OpenAI allowing you to use natural language to ask questions related to the website you're currently visiting. It was created by [AINIRO.IO](https://ainiro.io). If you want a similar AI chatbot for your own site, you can [contact AINIRO here](https://ainiro.io/contact-us)."
+            uri:"https://ainiro.io"
+   unwrap:x:+/*
+   signal:magic.ai.create-landing-page
+      url:x:@.url
+      type:x:@.type
+      host:x:@.host
+      feedback-channel:x:@.feedback-channel
+   if
+      and
+         exists:x:@.arguments/*/instruction
+         neq:x:@.arguments/*/instruction
+            .:
+      .lambda
+         sockets.signal:x:@.feedback-channel
+            args
+               message:Invoking OpenAI to create a custom system message. Notice, this might take some time ...
+               type:info
+         try
+            execute:magic.ai.create-system-message
+               url:x:@.url
+               template:x:@.flavor
+               instruction:x:@.instruction
+            data.connect:[generic|magic]
+               data.update
+                  table:ml_types
+                  values
+                     system_message:x:@execute
+                  where
+                     and
+                        type.eq:x:@.type
+            sockets.signal:x:@.feedback-channel
+               args
+                  message:------------------------------------------------------------------------------------------------------------------------
+                  type:info
+         .catch
+            log.error:x:@.arguments/*/message
+            sockets.signal:x:@.feedback-channel
+               args
+                  message:We could not create a custom system message, check your log for details
+                  type:warning
+   if
+      eq:x:@.vectorize
+         .:bool:true
+      .lambda
+         unwrap:x:+/*
+         signal:magic.ai.vectorise
+            type:x:@.type
+            feedback-channel:x:@.feedback-channel
+   else
+      sockets.signal:x:@.feedback-channel
+         args
+            message:Remember to vectorize before attempting to use your model
+            type:info
+   if:x:@.auto_destruct
+      sockets.signal:x:@.feedback-channel
+         args
+            message:Creating scheduled task that deletes chatbot 7 days from now
+            type:info
+      sleep:100
+      math.add
+         date.now
+         time
+            days:7
+      strings.concat
+         .:delete-chatbot-
+         get-value:x:@.type
+      unwrap:x:+/+/*/.lambda/*/.task
+      unwrap:x:+/*/.lambda/*/.type
+      tasks.create:x:@strings.concat
+         description:Deletes demo chatbot 7 days after creating it
+         due:x:@math.add
+         .lambda
+            .type:x:@.type
+            data.connect:[generic|magic]
+               data.execute:@"
+delete from vss_ml_training_snippets
+   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+                  type:x:@.type
+            .task:x:@strings.concat
+            data.connect:[generic|magic]
+               data.delete
+                  table:ml_types
+                  where
+                     and
+                        type.eq:x:@.type
+            strings.concat
+               .:/etc/www/
+               get-value:x:@.type
+               .:.html
+            io.file.delete:x:@strings.concat
+            log.info:Demo chatbot was deleted
+               type:x:@.type
+            tasks.delete:x:@.task
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:Done!
+         type:success

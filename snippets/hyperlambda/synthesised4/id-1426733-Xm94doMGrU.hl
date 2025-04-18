@@ -1,0 +1,514 @@
+
+/*
+ * This Hyperlambda code attempts to extract and process training snippets from a specified URL. It performs the following steps: 
+ * 
+ * 1. [try] - Begins a try block to handle potential errors during execution.
+ * 2. [.html] - Initializes an HTML variable.
+ * 3. [add] - Combines headers and feedback-channel nodes.
+ * 4. [unwrap] - Evaluates the combined nodes.
+ * 5. [signal:magic.ai.url.get] - Fetches HTML content from the specified URL.
+ * 6. [set-value] - Stores the fetched HTML content.
+ * 7. [unwrap] - Evaluates the stored HTML content.
+ * 8. [signal:magic.ai.html.extract] - Extracts snippets and URLs from the HTML.
+ * 9. [.urls] - Initializes a URLs variable.
+ * 10. [add] - Adds extracted URLs to the URLs variable.
+ * 11. [if] - Checks if snippets were found.
+ * 12. [mt] - Compares snippet count to zero.
+ * 13. [.lambda] - Logs the number of snippets found.
+ * 14. [sockets.signal] - Sends feedback via a socket.
+ * 15. [sleep] - Pauses execution briefly.
+ * 16. [.snippets] - Initializes a snippets variable.
+ * 17. [add] - Adds extracted snippets to the snippets variable.
+ * 18. [if] - Checks if no snippets were found.
+ * 19. [eq] - Compares snippet count to zero.
+ * 20. [.lambda] - Sends a warning if no snippets were found.
+ * 21. [else] - Handles the case where snippets were found.
+ * 22. [if] - Checks if summarization is required.
+ * 23. [and] - Combines conditions for summarization.
+ * 24. [exists] - Checks if the summarize argument exists.
+ * 25. [eq] - Compares the summarize argument to true.
+ * 26. [.lambda] - Summarizes snippets if necessary.
+ * 27. [.max-size] - Initializes a max-size variable.
+ * 28. [.api-key] - Initializes an API key variable.
+ * 29. [.model] - Initializes a model variable.
+ * 30. [data.connect] - Connects to a database.
+ * 31. [data.read] - Reads max context tokens, API key, and model from the database.
+ * 32. [set-value] - Sets the max-size variable.
+ * 33. [math.multiply] - Multiplies max context tokens by 0.8.
+ * 34. [convert] - Converts max-size to an integer.
+ * 35. [set-value] - Sets the API key variable.
+ * 36. [set-value] - Sets the model variable.
+ * 37. [for-each] - Iterates over snippets.
+ * 38. [.tmp] - Initializes a temporary variable.
+ * 39. [set-value] - Concatenates prompt and completion into the temporary variable.
+ * 40. [if] - Checks if the snippet exceeds the max-size.
+ * 41. [mt] - Compares token count to max-size.
+ * 42. [.lambda] - Summarizes the snippet if necessary.
+ * 43. [sockets.signal] - Sends feedback about summarization.
+ * 44. [sleep] - Pauses execution briefly.
+ * 45. [.token] - Initializes a token variable.
+ * 46. [set-value] - Concatenates Bearer with the API key.
+ * 47. [.no] - Initializes a retry counter.
+ * 48. [while] - Retries summarization if necessary.
+ * 49. [mt] - Compares retry counter to zero.
+ * 50. [.lambda] - Attempts to summarize the snippet.
+ * 51. [try] - Begins a try block for summarization.
+ * 52. [unwrap] - Evaluates the summarization request.
+ * 53. [http.post] - Sends a POST request to OpenAI for summarization.
+ * 54. [headers] - Sets authorization and content-type headers.
+ * 55. [payload] - Sets the payload for the POST request.
+ * 56. [convert] - Converts the response to JSON.
+ * 57. [if] - Checks if the response indicates an error.
+ * 58. [eq] - Compares the response status to 400.
+ * 59. [.lambda] - Logs an error if summarization fails.
+ * 60. [sockets.signal] - Sends feedback about the error.
+ * 61. [sleep] - Pauses execution briefly.
+ * 62. [lambda2hyper] - Converts the response to Hyperlambda.
+ * 63. [log.error] - Logs the error details.
+ * 64. [set-value] - Sets the retry counter to zero.
+ * 65. [else-if] - Checks if the response indicates success.
+ * 66. [and] - Combines conditions for success.
+ * 67. [mte] - Compares the response status to 200.
+ * 68. [lt] - Compares the response status to 300.
+ * 69. [.lambda] - Processes the successful response.
+ * 70. [sockets.signal] - Sends feedback about success.
+ * 71. [sleep] - Pauses execution briefly.
+ * 72. [set-value] - Trims the completion content.
+ * 73. [strings.trim] - Trims whitespace from the completion.
+ * 74. [set-value] - Concatenates Summary with the prompt.
+ * 75. [strings.concat] - Concatenates strings.
+ * 76. [strings.substring] - Extracts a substring from the prompt.
+ * 77. [set-value] - Sets the retry counter to zero.
+ * 78. [else] - Handles the case where the response is neither success nor error.
+ * 79. [sockets.signal] - Sends feedback about retrying.
+ * 80. [sleep] - Pauses execution for 3 seconds.
+ * 81. [lambda2hyper] - Converts the response to Hyperlambda.
+ * 82. [log.error] - Logs the error details.
+ * 83. [math.decrement] - Decrements the retry counter.
+ * 84. [.catch] - Handles exceptions during summarization.
+ * 85. [math.decrement] - Decrements the retry counter.
+ * 86. [.below-threshold] - Initializes a below-threshold counter.
+ * 87. [.total-snippets] - Initializes a total-snippets counter.
+ * 88. [set-value] - Sets the total-snippets counter.
+ * 89. [get-count] - Counts the number of snippets.
+ * 90. [.already-exists] - Initializes an already-exists counter.
+ * 91. [.failed] - Initializes a failed counter.
+ * 92. [data.connect] - Connects to a database.
+ * 93. [data.read] - Reads the ID of the machine learning type.
+ * 94. [if] - Checks if the machine learning type exists.
+ * 95. [not-exists] - Checks if the type does not exist.
+ * 96. [.lambda] - Throws an error if the type does not exist.
+ * 97. [throw] - Throws an error with details.
+ * 98. [data.read] - Reads the count of existing snippets.
+ * 99. [if] - Checks if existing snippets need to be deleted.
+ * 100. [neq] - Compares the count to zero.
+ * 101. [.lambda] - Deletes existing snippets if necessary.
+ * 102. [strings.concat] - Concatenates strings for logging.
+ * 103. [unwrap] - Evaluates the concatenated strings.
+ * 104. [sockets.signal] - Sends feedback about deletion.
+ * 105. [sleep] - Pauses execution briefly.
+ * 106. [data.execute] - Executes a SQL delete statement.
+ * 107. [data.delete] - Deletes existing snippets.
+ * 108. [.similar] - Initializes a similar counter.
+ * 109. [
+ */
+try
+   .html
+   add:x:+/+
+      get-nodes:x:@.arguments/*/headers
+      get-nodes:x:@.arguments/*/feedback-channel
+   unwrap:x:+/*
+   signal:magic.ai.url.get
+      url:x:@.arguments/*/url
+   set-value:x:@.html
+      get-value:x:@signal
+   unwrap:x:+/*
+   signal:magic.ai.html.extract
+      html:x:@.html
+      url:x:@.arguments/*/url
+      feedback-channel:x:@.arguments/*/feedback-channel
+      images:x:@.arguments/*/images
+      lists:x:@.arguments/*/lists
+      code:x:@.arguments/*/code
+   .urls
+   add:x:@.urls
+      get-nodes:x:@signal/*/urls/*
+   if
+      mt
+         get-count:x:@signal/*/snippets/*
+         .:int:0
+      .lambda
+         get-count:x:@signal/*/snippets/*
+         strings.concat
+            .:"Found "
+            get-count:x:@signal/*/snippets/*
+            .:" training snippets on page"
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         sleep:100
+   .snippets
+   add:x:@.snippets
+      get-nodes:x:@signal/*/snippets/*
+   if
+      eq
+         get-count:x:@.snippets/*
+         .:int:0
+      .lambda
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:WARNING! We could not find any training snippets at the specified URL!
+               type:warning
+         sleep:100
+   else
+      if
+         and
+            exists:x:@.arguments/*/summarize
+            eq:x:@.arguments/*/summarize
+               .:bool:true
+         .lambda
+            .max-size
+            .api-key
+            .model
+            data.connect:[generic|magic]
+               data.read
+                  table:ml_types
+                  columns
+                     max_context_tokens
+                     api_key
+                     model
+                  where
+                     and
+                        type.eq:x:@.arguments/*/type
+               set-value:x:@.max-size
+                  math.multiply
+                     convert:x:@data.read/*/*/max_context_tokens
+                        type:decimal
+                     .:decimal:0.8
+               set-value:x:@.max-size
+                  convert:x:@.max-size
+                     type:int
+               set-value:x:@.api-key
+                  get-value:x:@data.read/*/*/api_key
+               set-value:x:@.model
+                  get-value:x:@data.read/*/*/model
+            for-each:x:@.snippets/*
+               .tmp
+               set-value:x:@.tmp
+                  strings.concat
+                     get-value:x:@.dp/#/*/prompt
+                     .:@"
+"
+                     .:@"
+"
+                     get-value:x:@.dp/#/*/completion
+               if
+                  mt
+                     openai.tokenize:x:@.tmp
+                     get-value:x:@.max-size
+                  .lambda
+                     sockets.signal:x:@.arguments/*/feedback-channel
+                        args
+                           message:Summarizing snippet since it is larger than 80% of maximum context size for type
+                           type:info
+                     sleep:100
+                     .token
+                     set-value:x:@.token
+                        strings.concat
+                           .:"Bearer "
+                           get-first-value
+                              get-value:x:@.api-key
+                              config.get:"magic:openai:key"
+                     .no:int:3
+                     while
+                        mt:x:@.no
+                           .:int:0
+                        .lambda
+                           try
+                              unwrap:x:+/**
+                              http.post:"https://api.openai.com/v1/chat/completions"
+                                 headers
+                                    Authorization:x:@.token
+                                    Content-Type:application/json
+                                 payload
+                                    model:x:@.model
+                                    max_tokens:x:@.max-size
+                                    temperature:decimal:0.3
+                                    messages
+                                       .
+                                          role:system
+                                          content:Create a summary of the following information
+                                       .
+                                          role:user
+                                          content:x:@.dp/#/*/completion
+                                 convert:true
+                              if
+                                 eq:x:@http.post
+                                    .:int:400
+                                 .lambda
+                                    sockets.signal:x:@.arguments/*/feedback-channel
+                                       args
+                                          message:Could not summarize snippet, check your log for details
+                                          type:warning
+                                    sleep:100
+                                    lambda2hyper:x:@http.post
+                                    log.error:Something went wrong while invoking OpenAI
+                                       message:x:@http.post/*/content/*/error/*/message
+                                       status:x:@http.post
+                                       error:x:@lambda2hyper
+                                    set-value:x:@.no
+                                       .:int:0
+                              else-if
+                                 and
+                                    mte:x:@http.post
+                                       .:int:200
+                                    lt:x:@http.post
+                                       .:int:300
+                                 .lambda
+                                    sockets.signal:x:@.arguments/*/feedback-channel
+                                       args
+                                          message:Successfully created summary of snippet
+                                          type:info
+                                    sleep:100
+                                    set-value:x:@.dp/#/*/completion
+                                       strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+                                          .:@"
+	 "
+                                    set-value:x:@.dp/#/*/prompt
+                                       strings.concat
+                                          .:"Summary; "
+                                          strings.substring:x:@.dp/#/*/prompt
+                                             .:int:0
+                                             .:int:150
+                                    set-value:x:@.no
+                                       .:int:0
+                              else
+                                 sockets.signal:x:@.arguments/*/feedback-channel
+                                    args
+                                       message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+                                       type:warning
+                                 sleep:3000
+                                 lambda2hyper:x:@http.post
+                                 log.error:Something went wrong while invoking OpenAI
+                                    message:x:@http.post/*/content/*/error/*/message
+                                    status:x:@http.post
+                                    error:x:@lambda2hyper
+                                 math.decrement:x:@.no
+                           .catch
+                              math.decrement:x:@.no
+      .below-threshold:int:0
+      .total-snippets
+      set-value:x:@.total-snippets
+         get-count:x:@.snippets/*
+      .already-exists:int:0
+      .failed:int:0
+      data.connect:[generic|magic]
+         data.read
+            table:ml_types
+            columns
+               id
+            where
+               and
+                  type.eq:x:@.arguments/*/type
+         if
+            not-exists:x:@data.read/*
+            .lambda
+               throw:Machine learning type does not exist.
+                  type:x:@.arguments/*/type
+         data.read
+            table:ml_training_snippets
+            columns
+               count(*)
+                  as:count
+            where
+               and
+                  type.eq:x:@.arguments/*/type
+                  uri.eq:x:@.arguments/*/url
+                  meta.eq:AINIRO-Website-Crawler
+         if
+            neq
+               convert:x:@data.read/*/*/count
+                  type:int
+               .:int:0
+            .lambda
+               strings.concat
+                  .:"Deleting "
+                  get-value:x:@data.read/*/*/count
+                  .:" old training snippets with the same URL"
+               unwrap:x:+/**
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:x:@strings.concat
+                     type:info
+               sleep:10
+         data.execute:@"
+   delete from vss_ml_training_snippets
+      where rowid in (select id as rowid from ml_training_snippets where type = @type and uri = @url)"
+            @type:x:@.arguments/*/type
+            @url:x:@.arguments/*/url
+         data.delete
+            table:ml_training_snippets
+            where
+               and
+                  type.eq:x:@.arguments/*/type
+                  uri.eq:x:@.arguments/*/url
+                  meta.eq:AINIRO-Website-Crawler
+         .similar:int:0
+         for-each:x:@.snippets/*
+            if
+               and
+                  exists:x:@.dp/#/*/completion
+                  not-null:x:@.dp/#/*/completion
+               .lambda
+                  if
+                     mt
+                        strings.length:x:@.dp/#/*/completion
+                        get-value:x:@.arguments/*/threshold
+                     .lambda
+                        add:x:+
+                           get-nodes:x:@.arguments/*/type
+                        try-signal:magic.ai.can-create-snippet
+                        strings.concat
+                           get-value:x:@.dp/#/*/completion
+                           .:@"
+"
+                           .:@"
+"
+                           .:This information was taken from [this URL](
+                           .:%
+                        data.read
+                           table:ml_training_snippets
+                           columns
+                              id
+                              prompt
+                              completion
+                              uri
+                           where
+                              and
+                                 type.eq:x:@.arguments/*/type
+                                 or
+                                    completion.eq:x:@.dp/#/*/completion
+                                    completion.like:x:@strings.concat
+                        if
+                           not-exists:x:@data.read/*
+                           .lambda
+                              if:x:@.arguments/*/insert_url
+                                 set-value:x:@.dp/#/*/completion
+                                    strings.concat
+                                       get-value:x:@.dp/#/*/completion
+                                       .:@"
+"
+                                       .:@"
+"
+                                       .:This information was taken from [this URL](
+                                       get-value:x:@.arguments/*/url
+                                       .:)
+                              data.create
+                                 table:ml_training_snippets
+                                 values
+                                    type:x:@.arguments/*/type
+                                    uri:x:@.arguments/*/url
+                                    prompt:x:@.dp/#/*/prompt
+                                    completion:x:@.dp/#/*/completion
+                                    meta:AINIRO-Website-Crawler
+                        else-if
+                           eq:x:@data.read/0/*/prompt
+                              .:Common
+                           .lambda
+                              math.increment:x:@.already-exists
+                        else-if
+                           not
+                              eq:x:@data.read/*/*/prompt
+                                 get-value:x:@.dp/#/*/prompt
+                           .lambda
+                              math.increment:x:@.similar
+                              data.update
+                                 table:ml_training_snippets
+                                 values
+                                    prompt:Common
+                                 where
+                                    and
+                                       id.eq:x:@data.read/0/*/id
+                  else
+                     math.increment:x:@.below-threshold
+         if
+            neq:x:@.similar
+               .:int:0
+            .lambda
+               strings.concat
+                  get-value:x:@.similar
+                  .:" snippets with similar completion exists, updating prompt to 'Common'"
+               unwrap:x:+/**
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:x:@strings.concat
+                     type:info
+               sleep:10
+      .imported
+      set-value:x:@.imported
+         math.subtract:x:@.total-snippets
+            math.add
+               get-value:x:@.below-threshold
+               get-value:x:@.already-exists
+      if
+         mt:x:@.below-threshold
+            .:int:0
+         .lambda
+            strings.concat
+               get-value:x:@.below-threshold
+               .:" snippets was below threshold and hence was not imported"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info
+            sleep:100
+      if
+         mt:x:@.already-exists
+            .:int:0
+         .lambda
+            strings.concat
+               get-value:x:@.already-exists
+               .:" snippets already exists in database and hence was not imported"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info
+            sleep:100
+      if
+         mt:x:@.failed
+            .:int:0
+         .lambda
+            strings.concat
+               get-value:x:@.failed
+               .:" snippets failed during import, probably because of OpenAI not being able to summarize them"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:warning
+            sleep:100
+      if
+         mt:x:@.imported
+            .:int:0
+         .lambda
+            strings.concat
+               .:"Done importing or updating "
+               get-value:x:@.imported
+               .:" training snippets from page"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info
+            sleep:100
+      else
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:We were not able to successfully import any snippets from page!
+               type:warning
+         sleep:100
+   return:x:@.urls/*

@@ -1,0 +1,59 @@
+
+/*
+ * This Hyperlambda code checks if a session exists and is not null, then processes a list of IDs by joining them into a comma-separated string. If a tail value exists, it appends it to the string, trims any trailing commas, and splits the string back into a list. If the list has 20 or more items, it removes items 15 to 20. Finally, it caches the processed value with a specified expiration time. 
+ * 
+ * 1. [if] - Checks if the session exists and is not null.
+ * 2. [and] - Combines two conditions to ensure both are true.
+ * 3. [exists] - Checks if the session node exists.
+ * 4. [not-null] - Checks if the session node is not null.
+ * 5. [.lambda] - Executes the following nodes if the condition is true.
+ * 6. [.value] - Declares a node to store the processed value.
+ * 7. [set-value] - Sets the value of the [.value] node.
+ * 8. [strings.join] - Joins the IDs into a comma-separated string.
+ * 9. [if] - Checks if a tail value exists.
+ * 10. [not-null] - Checks if the tail node is not null.
+ * 11. [.lambda] - Executes the following nodes if the condition is true.
+ * 12. [strings.concat] - Concatenates the current value with the tail.
+ * 13. [strings.trim] - Trims trailing commas from the value.
+ * 14. [strings.split] - Splits the value into a list by commas.
+ * 15. [if] - Checks if the list has 20 or more items.
+ * 16. [mte] - Compares the count of items to 20.
+ * 17. [.lambda] - Executes the following nodes if the condition is true.
+ * 18. [remove-nodes] - Removes items 15 to 20 from the list.
+ * 19. [strings.join] - Joins the modified list back into a string.
+ * 20. [cache.set] - Caches the processed value with a specified expiration.
+ */
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      .value
+      set-value:x:@.value
+         strings.join:x:@.ids/*
+            .:,
+      if
+         not-null:x:@.tail/+
+         .lambda
+            set-value:x:@.value
+               strings.concat
+                  get-value:x:@.value
+                  .:,
+                  get-value:x:@.tail/+
+            set-value:x:@.value
+               strings.trim:x:@.value
+                  .:,
+            strings.split:x:@.value
+               .:,
+            if
+               mte
+                  get-count:x:@strings.split/*
+                  .:int:20
+               .lambda
+                  remove-nodes:x:@strings.split/*/[15,20]
+                  set-value:x:@.value
+                     strings.join:x:@strings.split/*
+                        .:,
+      cache.set:x:@.cache-key
+         value:x:@.value
+         expiration:x:@.arguments/*/session_timeout

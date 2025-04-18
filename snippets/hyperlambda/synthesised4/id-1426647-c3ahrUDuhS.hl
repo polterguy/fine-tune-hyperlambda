@@ -1,0 +1,43 @@
+
+/*
+ * This Hyperlambda code checks if certain nodes exist or not in a given structure, and based on the conditions, it constructs and sets a value for a node and potentially adds a new candidate node with specific attributes. The code uses a combination of logical operations and node manipulations to achieve its goal.
+ * 
+ * 1. [if] - Initiates a conditional block that will execute if the conditions specified in its children are met.
+ * 2. [and] - Combines multiple conditions that must all be true for the block to execute.
+ * 3. [exists] - Checks if nodes with names [yield], [return], or [return-nodes] exist within the [hyper2lambda] structure.
+ * 4. [not-exists] - Checks if there are no child nodes under nodes with names [yield], [return], or [return-nodes] within the [hyper2lambda] structure.
+ * 5. [.lambda] - Contains the code to execute if the [if] condition is true.
+ * 6. [.x] - Declares a node for storing a constructed string value.
+ * 7. [set-value] - Sets the value of the [.x] node to a concatenated string.
+ * 8. [strings.concat] - Concatenates several string parts to form a complete string.
+ * 9. [get-value] - Retrieves the value of a node, used here to get a name from a specific path.
+ * 10. [if] - Nested conditional block that checks if a specific expression does not exist in the [return] structure.
+ * 11. [not-exists] - Checks if a specific expression does not exist in the [return] structure.
+ * 12. [.lambda] - Contains the code to execute if the nested [if] condition is true.
+ * 13. [unwrap] - Evaluates expressions and executes the nodes they point to.
+ * 14. [add] - Adds a new candidate node with specific attributes to the [return] structure.
+ * 15. [name] - Sets the name attribute of the new candidate node.
+ * 16. [expression] - Sets the expression attribute of the new candidate node.
+ * 17. [complete] - Sets the complete attribute of the new candidate node to false.
+ */
+if
+   and
+      exists:x:@hyper2lambda/**/[yield|return|return-nodes]
+      not-exists:x:@hyper2lambda/**/[yield|return|return-nodes]/*
+   .lambda
+      .x
+      set-value:x:@.x
+         strings.concat
+            .:--/execute/=
+            get-value:x:@.dp/#/*/name
+            .:/*
+      if
+         not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:../*/return/*/candidates
+               .
+                  .
+                     name:x:@.x
+                     expression:x:@.x
+                     complete:bool:false

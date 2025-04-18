@@ -1,0 +1,47 @@
+
+/*
+ * /*
+ *  * This Hyperlambda code checks if the database type is SQLite and attempts to connect to a "magic" database.
+ *  * If the connection is successful, it logs a success message. If an exception occurs, indicating potential database corruption,
+ *  * it checks for the existence of a backup file. If the backup exists, it flushes the SQLite connection cache,
+ *  * deletes the corrupted database, copies the backup to replace it, logs the action, and sets a flag indicating corruption.
+ *  * 
+ *  * 1. [else-if] - Checks if the previous conditions are false and evaluates its condition.
+ *  * 2. [eq] - Compares the value of [.db-type] to "sqlite".
+ *  * 3. [.lambda] - Executes the following code block if the condition is true.
+ *  * 4. [try] - Attempts to execute the database connection and selection.
+ *  * 5. [data.connect] - Connects to the "magic" database using a generic connection string.
+ *  * 6. [data.select] - Executes a SQL query to count entries in the "log_entries" table.
+ *  * 7. [console.log] - Logs a success message if the connection is successful.
+ *  * 8. [.catch] - Catches exceptions during the try block execution.
+ *  * 9. [console.log] - Logs a message indicating database corruption.
+ *  * 10. [if] - Checks if a backup file exists.
+ *  * 11. [io.file.exists] - Checks for the existence of the backup file.
+ *  * 12. [.lambda] - Executes the following code block if the backup file exists.
+ *  * 13. [sqlite.connections.flush] - Flushes cached SQLite connections.
+ *  * 14. [io.file.delete] - Deletes the corrupted database file.
+ *  * 15. [io.file.copy] - Copies the backup file to replace the corrupted database.
+ *  * 16. [console.log] - Logs a message indicating the database has been reverted to the backup.
+ *  * 17. [set-value] - Sets a flag indicating the database was corrupted.
+ *  */
+ */
+else-if
+   eq:x:@.db-type
+      .:sqlite
+   .lambda
+      try
+         data.connect:[generic|magic]
+            data.select:select count(*) from log_entries
+         console.log:Successfully connected to magic database
+      .catch
+         console.log:Magic database is corrupted
+         if
+            io.file.exists:/data/magic.backup
+            .lambda
+               sqlite.connections.flush
+               io.file.delete:/data/magic.db
+               io.file.copy:/data/magic.backup
+                  .:/data/magic.db
+               console.log:Reverted to backup of magic database
+               set-value:x:@.corrupt
+                  .:bool:true

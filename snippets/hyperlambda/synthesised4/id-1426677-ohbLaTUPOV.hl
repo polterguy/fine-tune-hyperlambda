@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code checks if the count of records retrieved from a data source is zero. If true, it sends an error message through a socket signal and deletes records from the "ml_types" table where the type matches a specified value. 
+ * 
+ * 1. [if] - Initiates a conditional statement.
+ * 2. [eq] - Compares two values for equality.
+ * 3. [convert] - Converts the count value from the data source to an integer.
+ * 4. [type] - Specifies the conversion type as integer.
+ * 5. [.lambda] - Executes the following block if the condition is true.
+ * 6. [sockets.signal] - Sends a signal through a specified feedback channel.
+ * 7. [args] - Contains arguments for the socket signal.
+ * 8. [message] - Specifies the error message to be sent.
+ * 9. [type] - Specifies the type of message as an error.
+ * 10. [data.connect] - Connects to a data source.
+ * 11. [data.delete] - Deletes records from a specified table.
+ * 12. [table] - Specifies the table name "ml_types".
+ * 13. [where] - Defines the condition for deletion.
+ * 14. [and] - Combines multiple conditions.
+ * 15. [type.eq] - Checks if the type matches a specified value.
+ */
+if
+   eq
+      convert:x:@data.connect/*/data.read/*/*/count
+         type:int
+      .:int:0
+   .lambda
+      sockets.signal:x:@.feedback-channel
+         args
+            message:We could not find any training data on your website
+            type:error
+      data.connect:[generic|magic]
+         data.delete
+            table:ml_types
+            where
+               and
+                  type.eq:x:@.type

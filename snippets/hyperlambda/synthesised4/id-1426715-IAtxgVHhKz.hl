@@ -1,0 +1,62 @@
+
+/*
+ * This Hyperlambda code is a conditional logic block that performs reCAPTCHA validation. It first checks if a user is authenticated and if the reCAPTCHA score is greater than zero and not null. If these conditions are met, it further checks if the reCAPTCHA response is missing or null, setting an error status if so. If the response is present, it retrieves the reCAPTCHA site key and secret from the configuration, converts the reCAPTCHA score to a decimal, and validates the reCAPTCHA response using these credentials.
+ * 
+ * 1. [if] - Initiates a conditional block.
+ * 2. [and] - Logical AND to combine multiple conditions.
+ * 3. [eq] - Checks if the authentication ticket exists.
+ * 4. [auth.ticket.get] - Retrieves the authentication ticket.
+ * 5. [mt] - Checks if the reCAPTCHA score is greater than zero.
+ * 6. [convert] - Converts the reCAPTCHA score to a decimal.
+ * 7. [not-null] - Ensures the reCAPTCHA score is not null.
+ * 8. [.lambda] - Executes the following block if conditions are true.
+ * 9. [if] - Nested conditional block.
+ * 10. [or] - Logical OR to combine conditions.
+ * 11. [not-exists] - Checks if the reCAPTCHA response does not exist.
+ * 12. [null] - Checks if the reCAPTCHA response is null.
+ * 13. [.lambda] - Executes the following block if conditions are true.
+ * 14. [response.status.set] - Sets the response status to 499.
+ * 15. [return] - Returns an error message.
+ * 16. [.key] - Temporary storage for the site key.
+ * 17. [set-value] - Sets the site key value.
+ * 18. [config.get] - Retrieves the site key from configuration.
+ * 19. [.secret] - Temporary storage for the secret key.
+ * 20. [set-value] - Sets the secret key value.
+ * 21. [config.get] - Retrieves the secret key from configuration.
+ * 22. [convert] - Converts the reCAPTCHA score to a decimal.
+ * 23. [validators.recaptcha] - Validates the reCAPTCHA response.
+ * 24. [min] - Sets the minimum score threshold.
+ * 25. [site-key] - Uses the retrieved site key.
+ * 26. [secret] - Uses the retrieved secret key.
+ */
+if
+   and
+      eq
+         auth.ticket.get
+         .
+      mt
+         convert:x:@.model/*/recaptcha
+            type:decimal
+         .:decimal:0
+      not-null:x:@.model/*/recaptcha
+   .lambda
+      if
+         or
+            not-exists:x:@.arguments/*/recaptcha_response
+            null:x:@.arguments/*/recaptcha_response
+         .lambda
+            response.status.set:499
+            return
+               error:No reCAPTCHA supplied
+      .key
+      set-value:x:@.key
+         config.get:"magic:auth:recaptcha:key"
+      .secret
+      set-value:x:@.secret
+         config.get:"magic:auth:recaptcha:secret"
+      convert:x:@.model/*/recaptcha
+         type:decimal
+      validators.recaptcha:x:@.arguments/*/recaptcha_response
+         min:x:@convert
+         site-key:x:@.key
+         secret:x:@.secret

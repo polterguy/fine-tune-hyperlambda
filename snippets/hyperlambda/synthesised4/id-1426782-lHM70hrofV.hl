@@ -1,0 +1,193 @@
+
+/*
+ * // This Hyperlambda code defines a dynamic slot named "woocommerce.products.ingest" which is responsible for importing products from a WooCommerce API into a database. It ensures mandatory arguments are provided, sets default values, and logs the process. The code connects to a database to delete existing records related to WooCommerce imports, then retrieves product data from the WooCommerce API using HTTP requests. It processes each product, converting descriptions and images into markdown format, and stores them in the database. If vectorization is enabled, it triggers a vectorization process after the import. The process is logged, and errors are handled with logging.
+ * // 
+ * // 1. [slots.create] - Creates a dynamic slot named "woocommerce.products.ingest".
+ * // 2. [validators.mandatory] - Ensures mandatory arguments "type", "base-url", "username", and "secret" are provided.
+ * // 3. [validators.default] - Sets default values for "quantity", "vectorize", and "max_tokens".
+ * // 4. [log.info] - Logs information about the deletion and import process.
+ * // 5. [set-value] - Modifies the base URL to ensure it doesn't end with a slash.
+ * // 6. [try] - Begins a try block to handle potential errors during the import process.
+ * // 7. [data.connect] - Connects to a database using a specified connection string.
+ * // 8. [data.execute] - Deletes records from the database related to WooCommerce imports.
+ * // 9. [data.delete] - Deletes records from the "ml_training_snippets" table based on conditions.
+ * // 10. [.products] - Initializes a node to store product data.
+ * // 11. [.auth] - Initializes a node to store authentication data.
+ * // 12. [strings.concat] - Concatenates strings for authentication and other purposes.
+ * // 13. [convert] - Converts data types, such as converting authentication data to bytes and base64.
+ * // 14. [.page] - Initializes a page counter for pagination.
+ * // 15. [.continue] - Initializes a boolean to control the while loop.
+ * // 16. [while] - Loops to retrieve product data from the WooCommerce API.
+ * // 17. [http.get] - Sends an HTTP GET request to the WooCommerce API to retrieve products.
+ * // 18. [add] - Adds retrieved product data to the products node.
+ * // 19. [if] - Conditional logic to control the flow, such as checking if more pages exist.
+ * // 20. [math.increment] - Increments the page counter for pagination.
+ * // 21. [for-each] - Iterates over each product retrieved from the API.
+ * // 22. [and] - Logical AND condition to check multiple conditions.
+ * // 23. [not-null] - Checks if a node is not null.
+ * // 24. [neq] - Checks if a node's value is not equal to a specified value.
+ * // 25. [.lambda] - Defines a block of code to execute if conditions are met.
+ * // 26. [.prompt] - Initializes a node to store the prompt for each product.
+ * // 27. [.completion] - Initializes a node to store the completion for each product.
+ * // 28. [html2markdown] - Converts HTML content to markdown format.
+ * // 29. [exists] - Checks if a node exists.
+ * // 30. [data.create] - Inserts data into the "ml_training_snippets" table.
+ * // 31. [signal] - Sends a signal to trigger vectorization if enabled.
+ * // 32. [.catch] - Catches errors and logs them.
+ */
+slots.create:woocommerce.products.ingest
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/base-url
+   validators.mandatory:x:@.arguments/*/username
+   validators.mandatory:x:@.arguments/*/secret
+   validators.default:x:@.arguments
+      quantity:bool:true
+      vectorize:bool:true
+      max_tokens:int:1000
+   log.info:Deleting products to prepare for import using WooCommerce API
+      type:x:@.arguments/*/type
+      shop:x:@.arguments/*/base-url
+   set-value:x:@.arguments/*/base-url
+      strings.trim-end:x:@.arguments/*/base-url
+         .:/
+   try
+      data.connect:[generic|magic]
+         data.execute:"delete from vss_ml_training_snippets where rowid in (select id as rowid from ml_training_snippets where type = @type and meta = 'woocommerce-import')"
+            @type:x:@.arguments/*/type
+         data.delete
+            table:ml_training_snippets
+            where
+               and
+                  type.eq:x:@.arguments/*/type
+                  meta.eq:woocommerce-import
+      log.info:Importing products using WooCommerce API
+         type:x:@.arguments/*/type
+         shop:x:@.arguments/*/base-url
+      .products
+      .auth
+      set-value:x:@.auth
+         strings.concat
+            get-value:x:@.arguments/*/username
+            .:":"
+            get-value:x:@.arguments/*/secret
+      set-value:x:@.auth
+         convert:x:@.auth
+            type:bytes
+      set-value:x:@.auth
+         strings.concat
+            .:"Basic "
+            convert:x:@.auth
+               type:base64
+      .page:int:0
+      .continue:bool:true
+      while:x:@.continue
+         .base-url:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10"
+         if
+            mt:x:@.page
+               .:int:0
+            .lambda
+               set-value:x:@.base-url
+                  strings.concat
+                     .:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10&page="
+                     get-value:x:@.page
+         http.get:x:@.base-url
+            headers
+               Authorization:x:@.auth
+            convert:bool:true
+         add:x:@.products
+            get-nodes:x:@http.get/*/content/*
+         if
+            lt
+               get-count:x:@http.get/*/content/*
+               .:int:10
+            .lambda
+               set-value:x:@.continue
+                  .:bool:false
+         math.increment:x:@.page
+            .:int:10
+         data.connect:[generic|magic]
+            for-each:x:@http.get/*/content/*
+               if
+                  and
+                     eq:x:@.dp/#/*/stock_status
+                        .:instock
+                     not-null:x:@.dp/#/*/description
+                     neq:x:@.dp/#/*/description
+                        .:
+                  .lambda
+                     .prompt
+                     .completion
+                     set-value:x:@.prompt
+                        strings.concat
+                           html2markdown:x:@.dp/#/*/description
+                     set-value:x:@.completion
+                        strings.concat
+                           .:"Price: "
+                           get-value:x:@.dp/#/*/price
+                           .:@"
+
+"
+                           .:"URL: "
+                           get-value:x:@.dp/#/*/permalink
+                     if
+                        and
+                           not-null:x:@.dp/#/*/short_description
+                           neq:x:@.dp/#/*/short_description
+                              .:
+                        .lambda
+                           set-value:x:@.completion
+                              strings.concat
+                                 get-value:x:@.completion
+                                 .:@"
+
+"
+                                 .:"Short description: "
+                                 html2markdown:x:@.dp/#/*/short_description
+                     if
+                        exists:x:@.dp/#/*/images/*
+                        .lambda
+                           set-value:x:@.completion
+                              strings.concat
+                                 get-value:x:@.completion
+                                 .:@"
+
+Images of product:"
+                           for-each:x:@.dp/#/*/images/*
+                              set-value:x:@.completion
+                                 strings.concat
+                                    get-value:x:@.completion
+                                    .:@"
+
+"
+                                    .:![
+                                    get-value:x:@.dp/#/*/name
+                                    .:](
+                                    get-value:x:@.dp/#/*/src
+                                    .:)
+                     data.create
+                        table:ml_training_snippets
+                        values
+                           type:x:@.arguments/*/type
+                           prompt:x:@.prompt
+                           completion:x:@.completion
+                           uri:x:@.uri
+                           meta:woocommerce-import
+      if:x:@.arguments/*/vectorize
+         log.info:Started vectorizing model after WooCommerce import
+            type:x:@.arguments/*/type
+            shop:x:@.arguments/*/base-url
+         unwrap:x:+/*
+         signal:magic.ai.vectorise
+            feedback-channel:non-existing
+            type:x:@.arguments/*/type
+         log.info:Done vectorizing model after WooCommerce import
+            type:x:@.arguments/*/type
+            shop:x:@.arguments/*/base-url
+      log.info:Done with WooCommerce import
+         type:x:@.arguments/*/type
+         shop:x:@.arguments/*/base-url
+   .catch
+      log.error:Something went wrong as we tried to import products from WooCommerce
+         error:x:@.arguments/*/message
+         type:x:@.arguments/*/type
+         shop:x:@.arguments/*/base-url

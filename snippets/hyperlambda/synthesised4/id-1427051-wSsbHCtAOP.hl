@@ -1,0 +1,49 @@
+
+/*
+ * // This Hyperlambda code connects to a SQLite database and performs a data read operation with a left join on the Employees table. It constructs an aggregate function dynamically and removes specific nodes from the arguments. The code then adds nodes to the where clause and executes a data read operation with a limit of 1, returning the results.
+ * // 1. [data.connect] - Connects to a database, specifying the database type as SQLite.
+ * // 2. [database-type] - Specifies the type of database to connect to, in this case, SQLite.
+ * // 3. [set-name] - Constructs an aggregate function dynamically by concatenating values.
+ * // 4. [strings.concat] - Concatenates strings to form the aggregate function.
+ * // 5. [get-value] - Retrieves values from specified nodes.
+ * // 6. [remove-nodes] - Removes specific nodes from the arguments.
+ * // 7. [add] - Adds nodes to the where clause.
+ * // 8. [get-nodes] - Retrieves nodes from the arguments.
+ * // 9. [data.read] - Executes a data read operation on the SQLite database.
+ * // 10. [table] - Specifies the table to read from, in this case, Employees.
+ * // 11. [join] - Performs a left join on the Employees table.
+ * // 12. [type] - Specifies the type of join, in this case, left.
+ * // 13. [on] - Specifies the join condition.
+ * // 14. [columns] - Specifies the columns to select, including the dynamically constructed aggregate function.
+ * // 15. [as] - Aliases the result of the aggregate function.
+ * // 16. [where] - Specifies the where clause for the data read operation.
+ * // 17. [limit] - Limits the number of results to 1.
+ * // 18. [return-nodes] - Returns the results of the data read operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Employees
+         join:Employees
+            as:ReportsTo
+            type:left
+            on
+               and
+                  Employees.ReportsTo:ReportsTo.EmployeeID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

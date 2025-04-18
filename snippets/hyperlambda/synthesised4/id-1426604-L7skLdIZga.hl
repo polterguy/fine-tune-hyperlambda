@@ -1,0 +1,38 @@
+
+/*
+ * This Hyperlambda code checks if a property does not exist in a JSON schema and adds it if necessary. It first verifies the non-existence of a property in the schema using [not-exists]. If the property is absent, it creates a new property node with a name and type, using [set-value] and [set-name] to assign values based on the current node. If a description exists, it adds this to the property. Finally, it adds the new property to the schema's properties node using [add].
+ * 
+ * 1. [if] - Checks if a property does not exist in the schema.
+ * 2. [not-exists] - Verifies the non-existence of a property in the schema.
+ * 3. [.lambda] - Executes the following nodes if the property does not exist.
+ * 4. [.prop] - Creates a new property node.
+ * 5. [name] - Declares a name node under the property.
+ * 6. [type] - Declares a type node under the property.
+ * 7. [set-value] - Sets the type value of the new property.
+ * 8. [set-name] - Sets the name of the new property.
+ * 9. [if] - Checks if a description exists for the current node.
+ * 10. [exists] - Verifies the existence of a description.
+ * 11. [.lambda] - Executes the following nodes if a description exists.
+ * 12. [unwrap] - Unwraps the current node.
+ * 13. [add] - Adds a description to the property.
+ * 14. [add] - Adds the new property to the schema's properties node.
+ */
+if
+   not-exists:x:"@.body/*/requestBody/*/content/*/*/schema/*/properties/*/\"{@.dp/#/*/name}\""
+   .lambda
+      .prop
+         name
+            type
+      set-value:x:@.prop/*/*/type
+         get-value:x:@.dp/#/*/type
+      set-name:x:@.prop/*
+         get-value:x:@.dp/#/*/name
+      if
+         exists:x:@.dp/#/*/description
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.prop/*
+               .
+                  description:x:@.dp/#/*/description
+      add:x:@.body/*/requestBody/*/content/*/*/schema/*/properties
+         get-nodes:x:@.prop/*

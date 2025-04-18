@@ -1,0 +1,250 @@
+
+/*
+ * // This Hyperlambda code processes HTTP GET response headers and content to parse and handle specific directives from a robots.txt file. It checks if the Content-Type is "text/plain" and processes each line of the content. It identifies and handles directives like "Crawl-Delay," "User-Agent," "Sitemap," "Disallow," and "Allow," performing actions based on their values. It sets a crawl delay, handles user-agent specific rules, and manages lists of allowed and disallowed URLs, while providing feedback through a signaling mechanism.
+ * // 1. [if] - Checks if the Content-Type header starts with "text/plain".
+ * // 2. [strings.starts-with] - Checks if the Content-Type header starts with "text/plain".
+ * // 3. [.lambda] - Executes the following block if the condition is true.
+ * // 4. [set-value] - Sets the value of [.has-robots] to true.
+ * // 5. [strings.split] - Splits the content by newline characters.
+ * // 6. [.relevant] - Initializes a boolean flag to false.
+ * // 7. [.has-seen-ainiro] - Initializes a boolean flag to false.
+ * // 8. [for-each] - Iterates over each line in the split content.
+ * // 9. [strings.trim] - Trims whitespace from the current line.
+ * // 10. [if] - Checks if the line does not start with a "#" (comment).
+ * // 11. [strings.split] - Splits the line by ":" to separate directive and value.
+ * // 12. [if] - Checks if there are at least two parts after splitting.
+ * // 13. [.lambda] - Executes the following block if the condition is true.
+ * // 14. [.value] - Holds the value part of the directive.
+ * // 15. [set-value] - Sets the trimmed value part.
+ * // 16. [switch] - Switches based on the directive name.
+ * // 17. [case] - Handles "Crawl-Delay" directive.
+ * // 18. [if] - Checks if the crawl delay is relevant and not empty.
+ * // 19. [.lambda] - Executes the following block if the condition is true.
+ * // 20. [try] - Attempts to set the crawl delay value.
+ * // 21. [set-value] - Sets the crawl delay value after conversion.
+ * // 22. [if] - Checks if the crawl delay is more than 60 seconds.
+ * // 23. [.lambda] - Executes the following block if the condition is true.
+ * // 24. [sockets.signal] - Sends a warning message if the crawl delay is more than 60 seconds.
+ * // 25. [.catch] - Catches exceptions and sends a warning message if the crawl delay is invalid.
+ * // 26. [case] - Handles "User-Agent" directive.
+ * // 27. [switch] - Switches based on the user-agent value.
+ * // 28. [case] - Handles specific user-agents like "AINIRO" and "GPTBot".
+ * // 29. [if] - Checks if the user-agent is "AINIRO".
+ * // 30. [.lambda] - Executes the following block if the condition is true.
+ * // 31. [remove-nodes] - Removes nodes from [.allow] and [.disallow].
+ * // 32. [set-value] - Sets [.has-seen-ainiro] and [.relevant] to true.
+ * // 33. [else] - Executes if the user-agent is not "AINIRO".
+ * // 34. [if] - Checks if [.has-seen-ainiro] is false.
+ * // 35. [.lambda] - Executes the following block if the condition is true.
+ * // 36. [set-value] - Sets [.relevant] to true.
+ * // 37. [case] - Handles "Sitemap" directive.
+ * // 38. [if] - Checks if the sitemap URL starts with "http://" or "https://".
+ * // 39. [.lambda] - Executes the following block if the condition is true.
+ * // 40. [unwrap] - Unwraps and adds the sitemap URL.
+ * // 41. [else] - Executes if the sitemap URL does not start with "http://" or "https://".
+ * // 42. [strings.concat] - Concatenates domain and sitemap value.
+ * // 43. [strings.replace] - Replaces "//" with "/" in the concatenated URL.
+ * // 44. [unwrap] - Unwraps and adds the sitemap URL.
+ * // 45. [case] - Handles "Disallow" directive.
+ * // 46. [if] - Checks if the directive is relevant.
+ * // 47. [.lambda] - Executes the following block if the condition is true.
+ * // 48. [if] - Checks if the disallow URL starts with "http://" or "https://".
+ * // 49. [.lambda] - Executes the following block if the condition is true.
+ * // 50. [unwrap] - Unwraps and adds the disallow URL.
+ * // 51. [else] - Executes if the disallow URL does not start with "http://" or "https://".
+ * // 52. [strings.concat] - Concatenates domain and disallow value.
+ * // 53. [unwrap] - Unwraps and adds the disallow URL.
+ * // 54. [case] - Handles "Allow" directive.
+ * // 55. [if] - Checks if the directive is relevant.
+ * // 56. [.lambda] - Executes the following block if the condition is true.
+ * // 57. [if] - Checks if the allow URL starts with "http://" or "https://".
+ * // 58. [.lambda] - Executes the following block if the condition is true.
+ * // 59. [unwrap] - Unwraps and adds the allow URL.
+ * // 60. [else] - Executes if the allow URL does not start with "http://" or "https://".
+ * // 61. [strings.concat] - Concatenates domain and allow value.
+ * // 62. [unwrap] - Unwraps and adds the allow URL.
+ */
+if
+   or
+      strings.starts-with:x:@http.get/*/headers/*/Content-Type
+         .:text/plain
+      strings.starts-with:x:@http.get/*/headers/*/content-type
+         .:text/plain
+   .lambda
+      set-value:x:@.has-robots
+         .:bool:true
+      strings.split:x:@http.get/*/content
+         .:"\n"
+      .relevant:bool:false
+      .has-seen-ainiro:bool:false
+      for-each:x:@strings.split/*
+         strings.trim:x:@.dp/#
+            .:@"
+	 "
+         if
+            not
+               strings.starts-with:x:@strings.trim
+                  .:#
+            .lambda
+               strings.split:x:@strings.trim
+                  .:":"
+               if
+                  mte
+                     get-count:x:@strings.split/*
+                     .:int:2
+                  .lambda
+                     .value
+                     set-value:x:@.value
+                        strings.join:x:@strings.split/*/[1,100]
+                           .:":"
+                     set-value:x:@strings.split/0
+                        strings.trim:x:@strings.split/0
+                           .:@"
+	 "
+                     set-value:x:@.value
+                        strings.trim:x:@.value
+                           .:@"
+	 "
+                     switch:x:@strings.split/0
+                        case:Crawl-Delay
+                        case:Crawl-delay
+                        case:crawl-delay
+                           set-value:x:@.value
+                              strings.replace-not-of:x:@.value
+                                 .:0123456789
+                                 .:
+                           if
+                              and
+                                 eq:x:@.relevant
+                                    .:bool:true
+                                 neq:x:@.value
+                                    .:
+                              .lambda
+                                 try
+                                    set-value:x:@.crawl-delay
+                                       math.multiply
+                                          .:int:1000
+                                          convert:x:@.value
+                                             type:int
+                                    if
+                                       mt:x:@.crawl-delay
+                                          .:int:60000
+                                       .lambda
+                                          sockets.signal:x:@.arguments/*/feedback-channel
+                                             args
+                                                message:Crawl-Delay was more than 60 seconds, using 60 seconds as our value
+                                                type:warning
+                                          set-value:x:@.crawl-delay
+                                             .:int:60000
+                                 .catch
+                                    sockets.signal:x:@.arguments/*/feedback-channel
+                                       args
+                                          message:Crawl-Delay was not a valid integer value, using 10 seconds as our value
+                                          type:warning
+                                    set-value:x:@.crawl-delay
+                                       .:int:10000
+                        case:User-Agent
+                        case:User-agent
+                        case:user-agent
+                           switch:x:@.value
+                              case:*
+                              case:AINIRO
+                              case:GPTBot
+                                 if
+                                    eq:x:@.value
+                                       .:AINIRO
+                                    .lambda
+                                       remove-nodes:x:@.allow/*
+                                       remove-nodes:x:@.disallow/*
+                                       set-value:x:@.has-seen-ainiro
+                                          .:bool:true
+                                       set-value:x:@.relevant
+                                          .:bool:true
+                                 else
+                                    if
+                                       eq:x:@.has-seen-ainiro
+                                          .:bool:false
+                                       .lambda
+                                          set-value:x:@.relevant
+                                             .:bool:true
+                                    else
+                                       set-value:x:@.relevant
+                                          .:bool:false
+                              default
+                                 set-value:x:@.relevant
+                                    .:bool:false
+                        case:Sitemap
+                        case:sitemap
+                           if
+                              or
+                                 strings.starts-with:x:@.value
+                                    .:"http://"
+                                 strings.starts-with:x:@.value
+                                    .:"https://"
+                              .lambda
+                                 unwrap:x:+/*/*
+                                 add:x:@.sitemap
+                                    .
+                                       .:x:@.value
+                           else
+                              strings.concat
+                                 get-value:x:@.domain
+                                 .:/
+                                 get-value:x:@.value
+                              strings.replace:x:@strings.concat
+                                 .://
+                                 .:/
+                              unwrap:x:+/*/*
+                              add:x:@.sitemap
+                                 .
+                                    .:x:@strings.replace
+                        case:Disallow
+                        case:disallow
+                           if
+                              eq:x:@.relevant
+                                 .:bool:true
+                              .lambda
+                                 if
+                                    or
+                                       strings.starts-with:x:@.value
+                                          .:"http://"
+                                       strings.starts-with:x:@.value
+                                          .:"https://"
+                                    .lambda
+                                       unwrap:x:+/*/*
+                                       add:x:@.disallow
+                                          .
+                                             .:x:@.value
+                                 else
+                                    strings.concat
+                                       get-value:x:@.domain
+                                       get-value:x:@.value
+                                    unwrap:x:+/*/*
+                                    add:x:@.disallow
+                                       .
+                                          .:x:@strings.concat
+                        case:Allow
+                        case:allow
+                           if
+                              eq:x:@.relevant
+                                 .:bool:true
+                              .lambda
+                                 if
+                                    or
+                                       strings.starts-with:x:@.value
+                                          .:"http://"
+                                       strings.starts-with:x:@.value
+                                          .:"https://"
+                                    .lambda
+                                       unwrap:x:+/*/*
+                                       add:x:@.allow
+                                          .
+                                             .:x:@.value
+                                 else
+                                    strings.concat
+                                       get-value:x:@.domain
+                                       get-value:x:@.value
+                                    unwrap:x:+/*/*
+                                    add:x:@.allow
+                                       .
+                                          .:x:@strings.concat

@@ -1,0 +1,48 @@
+
+/*
+ * This Hyperlambda code processes a JSON string, converting it into a lambda object using [json2lambda]. It then checks for the existence and non-null status of a "finish_reason" in the JSON data. If found, it sends a signal with this information. It also checks for non-null and non-empty "content" within the JSON data, appending it to a result node and sending it as a message signal. The code uses [unwrap] to evaluate expressions and [sockets.signal] to communicate session updates.
+ * 
+ * 1. [else] - Executes the block if previous conditions are false.
+ * 2. [json2lambda] - Converts a JSON string to a lambda object.
+ * 3. [if] - Checks conditions for "finish_reason" and executes a block if true.
+ * 4. [and] - Combines multiple conditions.
+ * 5. [exists] - Checks if "finish_reason" exists in the JSON data.
+ * 6. [not-null] - Ensures "finish_reason" is not null.
+ * 7. [.lambda] - Contains actions to execute if conditions are met.
+ * 8. [unwrap] - Evaluates expressions.
+ * 9. [sockets.signal] - Sends a signal with "finish_reason".
+ * 10. [if] - Checks conditions for "content" and executes a block if true.
+ * 11. [not-null] - Ensures "content" is not null.
+ * 12. [neq] - Checks if "content" is not empty.
+ * 13. [.lambda] - Contains actions to execute if conditions are met.
+ * 14. [set-value] - Updates the result node with concatenated content.
+ * 15. [strings.concat] - Concatenates strings.
+ * 16. [get-value] - Retrieves values from nodes.
+ * 17. [unwrap] - Evaluates expressions.
+ * 18. [sockets.signal] - Sends a signal with "content" as a message.
+ */
+else
+   json2lambda:x:@strings.trim
+   if
+      and
+         exists:x:@json2lambda/*/choices/0/*/finish_reason
+         not-null:x:@json2lambda/*/choices/0/*/finish_reason
+      .lambda
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               finish_reason:x:@json2lambda/*/choices/0/*/finish_reason
+   if
+      and
+         not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+         neq:x:@json2lambda/*/choices/0/*/delta/*/content
+            .:
+      .lambda
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               message:x:@json2lambda/*/choices/0/*/delta/*/content

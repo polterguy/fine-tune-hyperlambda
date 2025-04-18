@@ -1,0 +1,29 @@
+
+/*
+ * The code checks if a scalar value is equal to zero, and if true, it executes a SQL query to count entries in the "ml_types" table based on specific conditions. If the result of this query is also zero, it throws an exception indicating the function doesn't exist for the specified type. The code uses nested if conditions to perform these checks and actions. 
+ * 
+ * 1. [if] - Checks if the scalar value is zero.
+ * 2. [eq] - Compares the scalar value to zero.
+ * 3. [.lambda] - Executes if the first condition is true.
+ * 4. [data.scalar] - Executes a SQL query to count entries in the "ml_types" table.
+ * 5. [@type] - Uses an argument for the SQL query.
+ * 6. [@func] - Uses a concatenated string for the SQL query.
+ * 7. [if] - Checks if the result of the SQL query is zero.
+ * 8. [eq] - Compares the result of the SQL query to zero.
+ * 9. [.lambda] - Executes if the second condition is true.
+ * 10. [throw] - Throws an exception with a message and status code.
+ */
+if
+   eq:x:@data.scalar
+      .:long:0
+   .lambda
+      data.scalar:select count(*) from ml_types where type = @type and system_message like @func
+         @type:x:@.arguments/*/type
+         @func:x:@strings.concat/@strings.concat
+      if
+         eq:x:@data.scalar
+            .:long:0
+         .lambda
+            throw:"That function doesn't exist on type"
+               public:bool:true
+               status:int:400

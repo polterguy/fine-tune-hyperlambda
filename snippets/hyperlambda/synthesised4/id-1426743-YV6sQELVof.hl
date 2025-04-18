@@ -1,0 +1,186 @@
+
+/*
+ * This Hyperlambda code is designed to import a CSV file into a database. It starts by logging the initiation of the CSV import process and then processes the file name to create a sanitized table name. The CSV content is converted into a lambda object, and empty columns are removed. Column names are sanitized to ensure they are database-friendly. A new table is created in the database, and columns are added based on the CSV data, with types inferred as either text or numeric. The code handles exceptions by logging errors. After the table and columns are set up, the CSV data is inserted into the database. Finally, it logs the completion of the import process, updates a cache, and sends a success signal to notify that the CSV file was successfully imported. 
+ * 
+ * 1. [fork] - Initiates a separate thread for importing the CSV file.
+ * 2. [log.info] - Logs the start of the CSV import process.
+ * 3. [strings.split] - Splits the file name to process it.
+ * 4. [remove-nodes] - Removes the first node from the split result.
+ * 5. [strings.join] - Joins the split parts with an underscore.
+ * 6. [strings.to-lower] - Converts the table name to lowercase.
+ * 7. [set-value] - Sets the sanitized table name.
+ * 8. [strings.replace-not-of] - Replaces invalid characters in the table name.
+ * 9. [csv2lambda] - Converts the CSV content into a lambda object.
+ * 10. [remove-nodes] - Removes empty columns from the lambda object.
+ * 11. [log.info] - Logs the removal of empty columns.
+ * 12. [for-each] - Iterates over each column to sanitize column names.
+ * 13. [get-name] - Retrieves the current column name.
+ * 14. [set-name] - Sets the sanitized column name.
+ * 15. [strings.to-lower] - Converts the column name to lowercase.
+ * 16. [strings.replace-not-of] - Replaces invalid characters in column names.
+ * 17. [log.info] - Logs the completion of column name sanitization.
+ * 18. [.changes] - Initializes a flag to track changes.
+ * 19. [try] - Attempts to create a new table and columns.
+ * 20. [.pk] - Initializes a primary key name.
+ * 21. [set-value] - Sets the primary key name.
+ * 22. [strings.concat] - Concatenates the table name with "_id" for the primary key.
+ * 23. [execute-file] - Executes a file to create the table.
+ * 24. [set-value] - Updates the changes flag to true.
+ * 25. [log.info] - Logs the creation of the table.
+ * 26. [for-each] - Iterates over columns to determine their types.
+ * 27. [.type] - Initializes the column type as text.
+ * 28. [get-name] - Retrieves the column name.
+ * 29. [.found] - Initializes a flag to track numeric columns.
+ * 30. [for-each] - Iterates over column values to check for numeric data.
+ * 31. [if] - Checks if the column contains non-numeric data.
+ * 32. [not] - Inverts the condition.
+ * 33. [eq] - Compares the column value.
+ * 34. [strings.replace-not-of] - Replaces non-numeric characters in column values.
+ * 35. [set-value] - Updates the found flag if non-numeric data is found.
+ * 36. [if] - Checks if the column is numeric.
+ * 37. [eq] - Compares the found flag.
+ * 38. [set-value] - Sets the column type to numeric if applicable.
+ * 39. [execute-file] - Executes a file to create the column.
+ * 40. [get-count] - Retrieves the number of columns.
+ * 41. [log.info] - Logs the creation of columns.
+ * 42. [.catch] - Catches exceptions and logs errors.
+ * 43. [strings.concat] - Concatenates connection string and database name.
+ * 44. [data.connect] - Connects to the database.
+ * 45. [for-each] - Iterates over rows to insert data.
+ * 46. [remove-nodes] - Removes empty values from rows.
+ * 47. [add] - Adds values to the data.create node.
+ * 48. [data.create] - Inserts data into the database.
+ * 49. [log.info] - Logs the completion of the CSV import.
+ * 50. [strings.concat] - Concatenates cache key components.
+ * 51. [cache.set] - Sets a cache entry.
+ * 52. [sockets.signal] - Sends a success signal to notify completion.
+ */
+fork
+   log.info:Successfully started a thread to import CSV file
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+   .table
+   strings.split:x:@.arguments/*/file/*/name
+      .:.
+   remove-nodes:x:-/0/-
+   strings.join:x:@strings.split/*
+      .:_
+   strings.to-lower:x:-
+   set-value:x:@.table
+      strings.replace-not-of:x:@strings.to-lower
+         .:abcdefghijklmnopqrstuvwxyz0123456789_
+         .:_
+   csv2lambda:x:@.content
+   remove-nodes:x:@csv2lambda/*/*/
+   log.info:Done removing empty columns
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+   for-each:x:@csv2lambda/*/*
+      get-name:x:@.dp/#
+      set-name:x:@.dp/#
+         strings.to-lower:x:@get-name
+      get-name:x:@.dp/#
+      set-name:x:@.dp/#
+         strings.replace-not-of:x:@get-name
+            .:abcdefghijklmnopqrstuvwxyz0123456789_
+            .:_
+   log.info:Done sanitizing column names
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+   .changes:bool:false
+   try
+      .pk
+      set-value:x:@.pk
+         strings.concat
+            get-value:x:@.table
+            .:_id
+      execute-file:/system/sql/ddl/table.post.hl
+         databaseType:x:@.arguments/*/databaseType
+         connectionString:x:@.arguments/*/connectionString
+         databaseName:x:@.arguments/*/databaseName
+         tableName:x:@.table
+         pkName:x:@.pk
+         pkType:auto_increment
+         pkLength:int:10
+         pkDefault:
+      set-value:x:@.changes
+         .:bool:true
+      log.info:Table created
+         databaseType:x:@.arguments/*/databaseType
+         connectionString:x:@.arguments/*/connectionString
+         databaseName:x:@.arguments/*/databaseName
+         tableName:x:@.table
+      for-each:x:@csv2lambda/0/*
+         .type:text
+         get-name:x:@.dp/#
+         .found:bool:false
+         for-each:x:@csv2lambda/*/*/{@get-name}
+            if
+               not
+                  eq
+                     strings.replace-not-of:x:@.dp/#
+                        .:0123456789.
+                        .:
+                     get-value:x:@.dp/#
+               .lambda
+                  set-value:x:@.found
+                     .:bool:true
+         if
+            eq:x:@.found
+               .:bool:false
+            .lambda
+               set-value:x:@.type
+                  .:numeric
+         execute-file:/system/sql/ddl/column.post.hl
+            databaseType:x:@.arguments/*/databaseType
+            connectionString:x:@.arguments/*/connectionString
+            databaseName:x:@.arguments/*/databaseName
+            tableName:x:@.table
+            columnName:x:@get-name
+            columnType:x:@.type
+      get-count:x:@csv2lambda/0/*
+      log.info:Columns created
+         column_count:x:@get-count
+         databaseType:x:@.arguments/*/databaseType
+         connectionString:x:@.arguments/*/connectionString
+         databaseName:x:@.arguments/*/databaseName
+         tableName:x:@.table
+   .catch
+      log.error:x:@.arguments/*/message
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connectionString
+      .:|
+      get-value:x:@.arguments/*/databaseName
+      .:]
+   data.connect:x:@strings.concat
+      type:x:@.arguments/*/databaseType
+      for-each:x:@csv2lambda/*
+         remove-nodes:x:@.dp/#/*/=
+         add:x:./*/data.create/*/values
+            get-nodes:x:@.dp/#/*
+         data.create
+            type:x:@.arguments/*/databaseType
+            table:x:@.table
+            values
+   log.info:Done importing CSV file
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+   strings.concat
+      .:magic.sql.databases.
+      get-value:x:@.arguments/*/databaseType
+      :.
+      get-value:x:@.arguments/*/connectionString
+   cache.set:x:-
+   sockets.signal:magic.backend.message
+      roles:root
+      args
+         message:CSV file was successfully imported. Reload the page to see the changes.
+         type:success

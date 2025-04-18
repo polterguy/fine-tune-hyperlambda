@@ -1,0 +1,61 @@
+
+/*
+ * This Hyperlambda code iterates over input nodes, checks their type, and constructs an argument node with a schema type based on the input type. It also adds a description if it exists and appends the argument node to a parameters buffer. The code uses a [switch] statement to determine the schema type based on the input type, and it handles various data types like integer, number, boolean, and string.
+ * 
+ * 1. [for-each] - Iterates over each input node.
+ * 2. [if] - Checks if the type is not a wildcard.
+ * 3. [.arg] - Creates a new argument node.
+ * 4. [set-value] - Sets the name of the argument node.
+ * 5. [switch] - Determines the schema type based on the input type.
+ * 6. [case] - Handles specific data types like integer, number, and boolean.
+ * 7. [default] - Sets the schema type to string for other cases.
+ * 8. [if] - Checks if a description exists.
+ * 9. [unwrap] - Unwraps the description node.
+ * 10. [insert-after] - Inserts the description after the name node.
+ * 11. [add] - Appends the argument node to a buffer.
+ * 12. [add] - Adds the argument node to the parameters buffer.
+ */
+for-each:x:@.dp/#/*/input/*
+   if
+      neq:x:@.dp/#/*/type
+         .:*
+      .lambda
+         .arg
+            name
+            in:query
+            schema
+               type
+         set-value:x:@.arg/*/name
+            get-value:x:@.dp/#/*/name
+         switch:x:@.dp/#/*/type
+            case:short
+            case:ushort
+            case:int
+            case:uint
+            case:long
+            case:ulong
+               set-value:x:@.arg/*/schema/*/type
+                  .:integer
+            case:float
+            case:double
+            case:decimal
+               set-value:x:@.arg/*/schema/*/type
+                  .:number
+            case:bool
+               set-value:x:@.arg/*/schema/*/type
+                  .:boolean
+            default
+               set-value:x:@.arg/*/schema/*/type
+                  .:string
+         if
+            exists:x:@.dp/#/*/description
+            .lambda
+               unwrap:x:+/*/*
+               insert-after:x:@.arg/*/name
+                  .
+                     description:x:@.dp/#/*/description
+         add:x:+/*/*
+            get-nodes:x:@.arg/*
+         add:x:@.buffer/*/*/*/parameters
+            .
+               .

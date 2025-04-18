@@ -1,0 +1,138 @@
+
+/*
+ * This Hyperlambda code defines a dynamic slot named [magic.ai.functions.invoke] that is responsible for invoking a function based on a given type and invocation string. It performs several validation and processing steps, including trimming the invocation string, checking if it starts with "FUNCTION_INVOCATION", and splitting the invocation string to extract file and JSON data. It connects to a database to verify the existence of the function and its type. The code handles session, user ID, extra, and type arguments, loads and executes a file, logs the invocation success, and yields the result along with JSON and workflow information.
+ * 
+ * 1. [slots.create] - Creates a dynamic slot named [magic.ai.functions.invoke].
+ * 2. [validators.mandatory] - Ensures that the [type] and [invocation] arguments are provided.
+ * 3. [set-value] - Trims the [invocation] argument.
+ * 4. [if] - Checks if the invocation string starts with "FUNCTION_INVOCATION".
+ * 5. [throw] - Throws an error if the invocation string is malformatted.
+ * 6. [.file] - Declares a data node for storing file information.
+ * 7. [strings.split] - Splits the invocation string to extract file and JSON data.
+ * 8. [data.connect] - Connects to a database to verify function and type existence.
+ * 9. [data.scalar] - Executes a database query to check for existing entries.
+ * 10. [.json] - Declares a data node for storing JSON information.
+ * 11. [remove-nodes] - Removes specific nodes from the JSON data.
+ * 12. [add] - Adds nodes to the execution file.
+ * 13. [load-file] - Loads a file based on the extracted file information.
+ * 14. [hyper2lambda] - Converts the loaded file to a lambda object.
+ * 15. [unwrap] - Unwraps nodes for further processing.
+ * 16. [execute-file] - Executes the loaded file.
+ * 17. [log.info] - Logs the success of the function invocation.
+ * 18. [strings.join] - Joins strings to form a workflow identifier.
+ * 19. [yield] - Returns the JSON, workflow, and result information.
+ */
+slots.create:magic.ai.functions.invoke
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/invocation
+   set-value:x:@.arguments/*/invocation
+      strings.trim:x:@.arguments/*/invocation
+   if
+      not
+         strings.starts-with:x:@.arguments/*/invocation
+            .:FUNCTION_INVOCATION
+      .lambda
+         throw:Malformatted function invocation
+            status:int:400
+            public:bool:true
+   .file
+   strings.split:x:@.arguments/*/invocation
+      .:[
+   strings.split:x:@strings.split/1
+      .:]
+   set-value:x:@.file
+      get-value:x:@strings.split/0
+   data.connect:[generic|magic]
+      strings.concat
+         :%FUNCTION_INVOCATION[
+         get-value:x:@.file
+         .:]%
+      strings.concat
+         :"FUNCTION_INVOCATION ==> "
+         get-value:x:@.file
+      data.scalar:select count(*) from ml_training_snippets where type = @type and (meta = @meta or completion like @completion)
+         @type:x:@.arguments/*/type
+         @meta:x:@strings.concat
+         @completion:x:@strings.concat/@strings.concat
+      if
+         eq:x:@data.scalar
+            .:long:0
+         .lambda
+            data.scalar:select count(*) from ml_types where type = @type and system_message like @func
+               @type:x:@.arguments/*/type
+               @func:x:@strings.concat/@strings.concat
+            if
+               eq:x:@data.scalar
+                  .:long:0
+               .lambda
+                  throw:"That function doesn't exist on type"
+                     public:bool:true
+                     status:int:400
+   .json
+   if
+      strings.contains:x:@.arguments/*/invocation
+         .:":"
+      .lambda
+         strings.split:x:@.arguments/*/invocation
+            .:":"
+         remove-nodes:x:@strings.split/0
+         set-value:x:@.json
+            strings.join:x:@strings.split/*
+               .:":"
+         if
+            neq:x:@.json
+               .:
+            .lambda
+               json2lambda:x:@.json
+               remove-nodes:x:@json2lambda/*/_session
+               remove-nodes:x:@json2lambda/*/_user-id
+               remove-nodes:x:@json2lambda/*/_type
+               add:x:../*/execute-file
+                  get-nodes:x:@json2lambda/*
+   load-file:x:@.file
+   hyper2lambda:x:@load-file
+   if
+      exists:x:@hyper2lambda/*/.arguments/*/_session/=string
+      .lambda
+         unwrap:x:+/*/*
+         add:x:../*/execute-file
+            .
+               _session:x:@.arguments/*/session
+   if
+      exists:x:@hyper2lambda/*/.arguments/*/_user-id/=string
+      .lambda
+         unwrap:x:+/*/*
+         add:x:../*/execute-file
+            .
+               _user-id:x:@.arguments/*/user-id
+   if
+      exists:x:@hyper2lambda/*/.arguments/*/_extra/=string
+      .lambda
+         unwrap:x:+/*/*
+         add:x:../*/execute-file
+            .
+               _extra:x:@.arguments/*/extra
+   if
+      exists:x:@hyper2lambda/*/.arguments/*/_type/=string
+      .lambda
+         unwrap:x:+/*/*
+         add:x:../*/execute-file
+            .
+               _type:x:@.arguments/*/type
+   execute-file:x:@.file
+   log.info:Function invocation succeeded
+      type:x:@.arguments/*/type
+      function-file:x:@.file
+   strings.split:x:@.file
+      .:/
+   strings.split:x:@strings.split/0/-
+      .:.
+   remove-nodes:x:@strings.split/0/-
+   strings.join:x:@strings.split/*
+      .:.
+   add:x:./*/yield/*/result
+      get-nodes:x:@execute-file/*
+   yield
+      json:x:@.json
+      workflow:x:@strings.join
+      result

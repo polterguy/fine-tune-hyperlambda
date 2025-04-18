@@ -1,0 +1,59 @@
+
+/*
+ * This Hyperlambda code checks if a cached signal exists and processes it based on certain conditions. If the cached signal exists, it further checks if the "supervised" argument is present, not null, and equals 1 after conversion to an integer. If these conditions are met, it connects to a data source and creates a record in the "ml_requests" table with various attributes. After processing, it unwraps the next sibling node and returns the cached signal result along with additional metadata.
+ * 
+ * 1. [if] - Checks if a cached signal exists.
+ * 2. [exists] - Verifies the presence of a "cached" node in the signal.
+ * 3. [.lambda] - Executes if the cached signal exists.
+ * 4. [if] - Nested condition to check multiple criteria.
+ * 5. [and] - Combines multiple conditions.
+ * 6. [exists] - Checks if the "supervised" argument exists.
+ * 7. [not-null] - Ensures the "supervised" argument is not null.
+ * 8. [eq] - Compares the converted "supervised" argument to 1.
+ * 9. [convert] - Converts the "supervised" argument to an integer.
+ * 10. [.lambda] - Executes if all nested conditions are true.
+ * 11. [data.connect] - Connects to a specified data source.
+ * 12. [data.create] - Creates a new record in the "ml_requests" table.
+ * 13. [table] - Specifies the table name.
+ * 14. [values] - Sets values for the new record.
+ * 15. [type] - Sets the "type" field from arguments.
+ * 16. [prompt] - Sets the "prompt" field from arguments.
+ * 17. [completion] - Sets the "completion" field from the cached signal.
+ * 18. [finish_reason] - Sets the "finish_reason" field to "cached".
+ * 19. [session] - Sets the "session" field from arguments.
+ * 20. [user_id] - Sets the "user_id" field from arguments.
+ * 21. [referrer] - Sets the "referrer" field from arguments.
+ * 22. [unwrap] - Evaluates the next sibling node.
+ * 23. [return] - Returns the cached signal result and metadata.
+ * 24. [result] - Returns the result from the cached signal.
+ * 25. [finish_reason] - Returns the finish reason as "cached".
+ * 26. [stream] - Returns the stream status as false.
+ */
+if
+   exists:x:@signal/*/cached
+   .lambda
+      if
+         and
+            exists:x:@.arguments/*/supervised
+            not-null:x:@.arguments/*/supervised
+            eq
+               convert:x:@.arguments/*/supervised
+                  type:int
+               .:int:1
+         .lambda
+            data.connect:[generic|magic]
+               data.create
+                  table:ml_requests
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@.arguments/*/prompt
+                     completion:x:@signal/*/cached
+                     finish_reason:cached
+                     session:x:@.arguments/*/session
+                     user_id:x:@.arguments/*/user_id
+                     referrer:x:@.arguments/*/referrer
+      unwrap:x:+/*
+      return
+         result:x:@signal/*/cached
+         finish_reason:cached
+         stream:bool:false

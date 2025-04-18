@@ -1,0 +1,62 @@
+
+/*
+ * This Hyperlambda code processes JSON data and sends signals based on specific conditions. It converts JSON to a lambda object using [json2lambda], then checks for the existence and non-null status of a "finish_reason" in the JSON. If found, it sets the "finish_reason" value and sends a signal with this reason. It also checks for non-null "content" in the JSON, concatenates it to a result, and sends a message signal if the result doesn't contain "___". If the result contains "FUNCTION_INVOCATION[" and a waiting signal hasn't been sent, it sends a "function_waiting" signal and marks that the waiting signal has been sent.
+ * 
+ * 1. [json2lambda] - Converts JSON data to a lambda object.
+ * 2. [if] (first instance) - Checks if "finish_reason" exists and is not null.
+ * 3. [set-value] (first instance) - Sets the "finish_reason" value.
+ * 4. [unwrap] (first instance) - Unwraps the node for further processing.
+ * 5. [sockets.signal] (first instance) - Sends a signal with "finish_reason".
+ * 6. [if] (second instance) - Checks if "content" is not null and not empty.
+ * 7. [set-value] (second instance) - Concatenates "content" to the result.
+ * 8. [if] (third instance) - Checks if the result does not contain "___".
+ * 9. [unwrap] (second instance) - Unwraps the node for further processing.
+ * 10. [sockets.signal] (second instance) - Sends a message signal with "content".
+ * 11. [else-if] - Checks if the result contains "FUNCTION_INVOCATION[" and waiting signal hasn't been sent.
+ * 12. [sockets.signal] (third instance) - Sends a "function_waiting" signal.
+ * 13. [set-value] (third instance) - Marks that the waiting signal has been sent.
+ */
+else
+   json2lambda:x:@strings.trim
+   if
+      and
+         exists:x:@json2lambda/*/choices/0/*/finish_reason
+         not-null:x:@json2lambda/*/choices/0/*/finish_reason
+      .lambda
+         set-value:x:@.finish_reason
+            get-value:x:@json2lambda/*/choices/0/*/finish_reason
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               finish_reason:x:@.finish_reason
+   if
+      and
+         not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+         neq:x:@json2lambda/*/choices/0/*/delta/*/content
+            .:
+      .lambda
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+         if
+            not
+               strings.contains:x:@.result
+                  .:___
+            .lambda
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     message:x:@json2lambda/*/choices/0/*/delta/*/content
+         else-if
+            and
+               strings.contains:x:@.result
+                  .:FUNCTION_INVOCATION[
+               neq:x:@.has-sent-waiting
+                  .:bool:true
+            .lambda
+               sockets.signal:x:@.session
+                  args
+                     function_waiting:bool:true
+               set-value:x:@.has-sent-waiting
+                  .:bool:true

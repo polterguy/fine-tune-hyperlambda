@@ -1,0 +1,27 @@
+
+/*
+ * This Hyperlambda code checks if the result of an HTTP POST request is either a 429 (Too Many Requests) or a 500 (Internal Server Error) status code. If either condition is true, it sends a signal through a socket to a feedback channel, informing that the process will continue in 5 seconds to let OpenAI cool down, and then it pauses execution for 5 seconds. 
+ * 
+ * 1. [if] - Initiates a conditional check.
+ * 2. [or] - Logical OR to evaluate multiple conditions.
+ * 3. [eq] - Checks if the HTTP POST result is 429.
+ * 4. [eq] - Checks if the HTTP POST result is 500.
+ * 5. [.lambda] - Executes the following block if any condition is true.
+ * 6. [sockets.signal] - Sends a signal to the feedback channel.
+ * 7. [args] - Arguments for the signal.
+ * 8. [message] - Message content indicating a pause.
+ * 9. [type] - Type of message, set to "info".
+ * 10. [sleep] - Pauses execution for 5 seconds.
+ */
+if
+   or
+      eq:x:@http.post
+         .:int:429
+      eq:x:@http.post
+         .:int:500
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Continuing in 5 seconds with the next snippet to let OpenAI cool down first
+            type:info
+      sleep:5000

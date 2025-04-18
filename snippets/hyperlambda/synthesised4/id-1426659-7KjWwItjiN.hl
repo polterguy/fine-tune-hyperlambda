@@ -1,0 +1,444 @@
+
+/*
+ * This Hyperlambda code processes a node structure, iterating through its content to generate snippets and URLs based on the node types encountered. It handles different HTML elements such as pre, img, a, h1-h6, ul, ol, p, and li, performing specific actions for each. For text nodes, it trims and concatenates text content. For image and anchor tags, it constructs URLs and appends them to a list if they don't already exist. It also handles headers by updating a page-header node and constructs prompts from header content. The code ensures that text content is formatted correctly, removing extra spaces and adjusting punctuation. The resulting snippets are stored in a structured format for further use. 
+ * 
+ * 1. [for-each] - Iterates through each node in the content.
+ * 2. [get-name] - Retrieves the name of the current node.
+ * 3. [switch] - Switches action based on the node name.
+ * 4. [case:pre] - Handles preformatted text nodes.
+ * 5. [if] - Checks for the existence of text content.
+ * 6. [set-value] - Sets the value of a node.
+ * 7. [strings.concat] - Concatenates strings.
+ * 8. [strings.trim] - Trims whitespace from strings.
+ * 9. [unwrap] - Evaluates expressions.
+ * 10. [add] - Adds nodes to a list.
+ * 11. [case:img] - Handles image nodes.
+ * 12. [and] - Combines multiple conditions.
+ * 13. [not-null] - Checks if a value is not null.
+ * 14. [neq] - Checks if values are not equal.
+ * 15. [strings.starts-with] - Checks if a string starts with a specified substring.
+ * 16. [strings.split] - Splits a string.
+ * 17. [get-first-value] - Retrieves the first value from a node set.
+ * 18. [case:a] - Handles anchor nodes.
+ * 19. [strings.trim-end] - Trims whitespace from the end of strings.
+ * 20. [not-exists] - Checks if a node does not exist.
+ * 21. [case:h1] - Handles header nodes.
+ * 22. [strings.replace] - Replaces substrings within a string.
+ * 23. [case:ul] - Handles unordered list nodes.
+ * 24. [case:ol] - Handles ordered list nodes.
+ * 25. [case:p] - Handles paragraph nodes.
+ * 26. [case:li] - Handles list item nodes.
+ * 27. [strings.contains] - Checks if a string contains a specified substring.
+ * 28. [while] - Loops while a condition is true.
+ * 29. [bool] - Boolean type declaration.
+ */
+for-each:x:@.content/**
+   get-name:x:@.dp/#
+   switch:x:@get-name
+      case:pre
+         if
+            exists:x:"@.dp/#/**/\\#text"
+            .lambda
+               if
+                  exists:x:@.snippets/0/-/*/completion
+                  .lambda
+                     set-value:x:@.snippets/0/-/*/completion
+                        strings.concat
+                           get-value:x:@.snippets/0/-/*/completion
+                           .:@"
+
+```
+"
+                           strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                              .:@"  
+	"
+                           .:@"
+```"
+               else
+                  strings.concat
+                     .:@"```
+"
+                     strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                        .:@"  
+	"
+                     .:@"
+```"
+                  unwrap:x:+/*/*
+                  add:x:@.snippets/0/-
+                     .
+                        completion:x:@strings.concat
+      case:img
+         if
+            and
+               exists:x:"@.dp/#/*/\\@src/[0,1]"
+               not-null:x:"@.dp/#/*/\\@src/[0,1]"
+               neq:x:"@.dp/#/*/\\@src/[0,1]"
+                  .:
+            .lambda
+               .url
+               if
+                  and
+                     not
+                        strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                           .:"http://"
+                     not
+                        strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                           .:"https://"
+                  .lambda
+                     if
+                        strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                           .://
+                        .lambda
+                           strings.split:x:@.base
+                              .:"://"
+                           set-value:x:@.url
+                              strings.concat
+                                 get-value:x:@strings.split/0
+                                 .:":"
+                                 get-value:x:"@.dp/#/*/\\@src/[0,1]"
+                     else-if
+                        strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                           .:/
+                        .lambda
+                           set-value:x:@.url
+                              strings.concat
+                                 get-value:x:@.base
+                                 get-value:x:"@.dp/#/*/\\@src/[0,1]"
+                     else
+                        set-value:x:@.url
+                           strings.concat
+                              get-value:x:@.base
+                              .:/
+                              get-value:x:"@.dp/#/*/\\@src/[0,1]"
+               else
+                  set-value:x:@.url
+                     get-value:x:"@.dp/#/*/\\@src/[0,1]"
+               if
+                  exists:x:@.snippets/0/-/*/completion
+                  .lambda
+                     set-value:x:@.snippets/0/-/*/completion
+                        strings.concat
+                           get-value:x:@.snippets/0/-/*/completion
+                           .:@"
+
+!["
+                           get-first-value
+                              get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                              .:"Image "
+                           .:](
+                           get-value:x:@.url
+                           .:)
+               else
+                  strings.concat
+                     .:![
+                     get-first-value
+                        get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                        .:"Image "
+                     .:](
+                     get-value:x:@.url
+                     .:)
+                  unwrap:x:+/*/*
+                  add:x:@.snippets/0/-
+                     .
+                        completion:x:@strings.concat
+      case:a
+         if
+            and
+               exists:x:"@.dp/#/*/\\@href/[0,1]"
+               not-null:x:"@.dp/#/*/\\@href/[0,1]"
+               neq:x:"@.dp/#/*/\\@href/[0,1]"
+                  .:#
+               neq:x:"@.dp/#/*/\\@href/[0,1]"
+                  .:
+               not
+                  strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+                     .:"http://"
+               not
+                  strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+                     .:"https://"
+            .lambda
+               strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+                  .:#
+               strings.trim-end:x:@strings.split/0
+                  .:/
+               .tmp
+               if
+                  strings.starts-with:x:@strings.trim-end
+                     .:/
+                  .lambda
+                     set-value:x:@.tmp
+                        strings.concat
+                           get-value:x:@.base
+                           get-value:x:@strings.trim-end
+               else
+                  set-value:x:@.tmp
+                     strings.concat
+                        get-value:x:@.base
+                        .:/
+                        get-value:x:@strings.trim-end
+               if
+                  not-exists:x:@.url/*/{@strings.concat}
+                  .lambda
+                     unwrap:x:+/*/*
+                     add:x:@.urls
+                        .
+                           .:x:@.tmp
+         else-if
+            and
+               exists:x:"@.dp/#/*/\\@href/[0,1]"
+               not-null:x:"@.dp/#/*/\\@href/[0,1]"
+               neq:x:"@.dp/#/*/\\@href/[0,1]"
+                  .:#
+               neq:x:"@.dp/#/*/\\@href/[0,1]"
+                  .:
+            .lambda
+               strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+                  .:#
+               strings.trim-end:x:@strings.split/0
+                  .:/
+               if
+                  not-exists:x:"@.urls/*/\"{@strings.split/0}\""
+                  .lambda
+                     unwrap:x:+/*/*
+                     add:x:@.urls
+                        .
+                           .:x:@strings.trim-end
+      case:h1
+      case:h2
+      case:h3
+      case:h4
+      case:h5
+      case:h6
+         .prompt:
+         for-each:x:"@.dp/#/**/\\#text"
+            set-value:x:@.prompt
+               strings.concat
+                  get-value:x:@.prompt
+                  strings.trim:x:@.dp/#
+                     .:@"  
+	"
+                  .:" "
+         set-value:x:@.prompt
+            strings.trim:x:@.prompt
+               .:" "
+         switch:x:@get-name
+            case:h1
+               set-value:x:@.page-header/*/h1
+                  get-value:x:@.prompt
+               set-value:x:@.page-header/*/h2
+               set-value:x:@.page-header/*/h3
+               set-value:x:@.page-header/*/h4
+               set-value:x:@.page-header/*/h5
+               set-value:x:@.page-header/*/h6
+            case:h2
+               set-value:x:@.page-header/*/h2
+                  get-value:x:@.prompt
+               set-value:x:@.page-header/*/h3
+               set-value:x:@.page-header/*/h4
+               set-value:x:@.page-header/*/h5
+               set-value:x:@.page-header/*/h6
+            case:h3
+               set-value:x:@.page-header/*/h3
+                  get-value:x:@.prompt
+               set-value:x:@.page-header/*/h4
+               set-value:x:@.page-header/*/h5
+               set-value:x:@.page-header/*/h6
+            case:h4
+               set-value:x:@.page-header/*/h4
+                  get-value:x:@.prompt
+               set-value:x:@.page-header/*/h5
+               set-value:x:@.page-header/*/h6
+            case:h5
+               set-value:x:@.page-header/*/h5
+                  get-value:x:@.prompt
+               set-value:x:@.page-header/*/h6
+            case:h6
+               set-value:x:@.page-header/*/h6
+                  get-value:x:@.prompt
+         set-value:x:@.prompt
+            .:
+         for-each:x:@.page-header/*
+            if
+               and
+                  not-null:x:@.dp/#
+                  neq:x:@.dp/#
+                     .:
+               .lambda
+                  set-value:x:@.prompt
+                     strings.concat
+                        get-value:x:@.dp/#
+                        .:" - "
+                        get-value:x:@.prompt
+         set-value:x:@.prompt
+            strings.replace:x:@.prompt
+               .:"  "
+               .:" "
+         set-value:x:@.prompt
+            strings.trim-end:x:@.prompt
+               .:" -"
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
+               .
+                  prompt:x:@.prompt
+      case:ul
+      case:ol
+         if
+            neq:x:@.completion
+               .:
+            .lambda
+               if
+                  exists:x:@.snippets/0/-/*/completion
+                  .lambda
+                     set-value:x:@.snippets/0/-/*/completion
+                        strings.concat
+                           get-value:x:@.snippets/0/-/*/completion
+                           .:@"
+"
+               else
+                  unwrap:x:+/*/*
+                  add:x:@.snippets/0/-
+                     .
+                        completion:@"
+"
+      case:p
+      case:li
+         if
+            exists:x:@.snippets/*
+            .lambda
+               .completion:
+               for-each:x:"@.dp/#/**/\\#text"
+                  if
+                     and
+                        not-null:x:@.dp/#
+                        neq:x:@.dp/#
+                           .:
+                     .lambda
+                        strings.replace:x:@.dp/#
+                           .:"\r"
+                           .:" "
+                        strings.replace:x:@strings.replace
+                           .:"\n"
+                           .:" "
+                        strings.replace:x:@strings.replace
+                           .:"\t"
+                           .:" "
+                        strings.replace:x:@strings.replace
+                           .:"  "
+                           .:" "
+                        if
+                           and
+                              eq
+                                 get-name:x:@.dp/#/.
+                                 .:a
+                              exists:x:"@.dp/#/./*/\\@href/[0,1]"
+                              not-null:x:"@.dp/#/./*/\\@href/[0,1]"
+                           .lambda
+                              .url
+                              if
+                                 strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                                    .:/
+                                 .lambda
+                                    set-value:x:@.url
+                                       strings.concat
+                                          get-value:x:@.base
+                                          get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+                              else-if
+                                 and
+                                    not
+                                       strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                                          .:"http://"
+                                    not
+                                       strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                                          .:"https://"
+                                 .lambda
+                                    set-value:x:@.url
+                                       strings.concat
+                                          get-value:x:@.base
+                                          .:/
+                                          get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+                              else
+                                 set-value:x:@.url
+                                    get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+                              set-value:x:@.completion
+                                 strings.concat
+                                    get-value:x:@.completion
+                                    .:" "
+                                    .:[
+                                    strings.trim:x:@strings.replace
+                                       .:@"  
+	"
+                                    .:](
+                                    get-value:x:@.url
+                                    .:)
+                                    .:" "
+                        else
+                           set-value:x:@.completion
+                              strings.concat
+                                 get-value:x:@.completion
+                                 strings.trim:x:@strings.replace
+                                    .:@"  
+	"
+                                 .:" "
+               set-value:x:@.completion
+                  strings.trim:x:@.completion
+                     .:@"  
+	"
+               .has-double-space:bool:true
+               while:x:@.has-double-space
+                  if
+                     strings.contains:x:@.completion
+                        .:"  "
+                     .lambda
+                        set-value:x:@.completion
+                           strings.replace:x:@.completion
+                              .:"  "
+                              .:" "
+                  else
+                     set-value:x:@.has-double-space
+                        .:bool:false
+               set-value:x:@.completion
+                  strings.replace:x:@.completion
+                     .:" ."
+                     .:.
+               set-value:x:@.completion
+                  strings.replace:x:@.completion
+                     .:" ,"
+                     .:,
+               switch:x:@get-name
+                  case:li
+                     if
+                        neq:x:@.completion
+                           .:
+                        .lambda
+                           set-value:x:@.completion
+                              strings.concat
+                                 .:@"
+"
+                                 .:"- "
+                                 get-value:x:@.completion
+                  case:p
+                     set-value:x:@.completion
+                        strings.concat
+                           .:@"
+
+"
+                           get-value:x:@.completion
+               if
+                  neq:x:@.completion
+                     .:
+                  .lambda
+                     if
+                        exists:x:@.snippets/0/-/*/completion
+                        .lambda
+                           set-value:x:@.snippets/0/-/*/completion
+                              strings.concat
+                                 get-first-value
+                                    get-value:x:@.snippets/0/-/*/completion
+                                    .:
+                                 get-value:x:@.completion
+                     else
+                        unwrap:x:+/*/*
+                        add:x:@.snippets/0/-
+                           .
+                              completion:x:@.completion

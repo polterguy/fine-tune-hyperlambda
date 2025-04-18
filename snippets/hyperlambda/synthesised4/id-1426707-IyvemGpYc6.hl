@@ -1,0 +1,169 @@
+
+/*
+ * This Hyperlambda code processes a PDF file by saving it, extracting text, and optionally interacting with OpenAI's API for text processing. It handles file existence checks, text extraction, and API communication, ensuring proper error handling and response formatting.
+ * 
+ * 1. [case] - Initiates the case block for PDF processing.
+ * 2. [.filename] - Stores the filename extracted from the arguments.
+ * 3. [set-value] - Sets the value of [.filename] using the file name from the arguments.
+ * 4. [.filepath] - Stores the full file path for saving the PDF.
+ * 5. [strings.concat] - Concatenates strings to form the full file path.
+ * 6. [if] - Checks if the file should not be overwritten and already exists.
+ * 7. [and] - Combines conditions for file existence and overwrite flag.
+ * 8. [eq] - Compares the overwrite flag to false.
+ * 9. [io.file.exists] - Checks if the file already exists at the specified path.
+ * 10. [throw] - Throws an error if the file exists and should not be overwritten.
+ * 11. [io.stream.save-file] - Saves the file stream to the specified file path.
+ * 12. [.tmp-snippets] - Temporary storage for text snippets extracted from the PDF.
+ * 13. [pdf2text] - Extracts text from the PDF file.
+ * 14. [preserve-pages] - Optionally preserves page formatting during text extraction.
+ * 15. [if] - Checks if page preservation is enabled.
+ * 16. [.no] - Initializes a page number counter.
+ * 17. [for-each] - Iterates over each extracted page of text.
+ * 18. [.prompt] - Stores the prompt for each page.
+ * 19. [strings.concat] - Concatenates strings to form the prompt.
+ * 20. [unwrap] - Unwraps nested nodes for processing.
+ * 21. [add] - Adds the processed snippet to temporary storage.
+ * 22. [math.increment] - Increments the page number counter.
+ * 23. [else] - Handles cases where page preservation is not enabled.
+ * 24. [signal] - Sends a signal for additional processing.
+ * 25. [add] - Adds the processed signal to temporary storage.
+ * 26. [.uri] - Stores the URI for downloading the processed PDF.
+ * 27. [set-value] - Sets the value of [.uri] using concatenated strings.
+ * 28. [strings.concat] - Concatenates strings to form the URI.
+ * 29. [if] - Checks if a massage prompt is provided.
+ * 30. [and] - Combines conditions for non-null and non-empty massage prompt.
+ * 31. [not-null] - Checks if the massage prompt is not null.
+ * 32. [neq] - Checks if the massage prompt is not empty.
+ * 33. [.token] - Stores the authorization token for OpenAI API.
+ * 34. [set-value] - Sets the value of [.token] using concatenated strings.
+ * 35. [for-each] - Iterates over each temporary snippet for API processing.
+ * 36. [http.post] - Sends a POST request to OpenAI's API.
+ * 37. [convert] - Converts the response to a boolean.
+ * 38. [headers] - Sets the headers for the API request.
+ * 39. [payload] - Sets the payload for the API request.
+ * 40. [if] - Checks if the API response indicates an error.
+ * 41. [not] - Negates the condition for successful response.
+ * 42. [and] - Combines conditions for response status.
+ * 43. [mte] - Checks if the response status is more than or equal to 200.
+ * 44. [lt] - Checks if the response status is less than 300.
+ * 45. [lambda2hyper] - Converts the response to Hyperlambda format.
+ * 46. [log.error] - Logs an error if the API request fails.
+ * 47. [else] - Handles successful API responses.
+ * 48. [set-value] - Sets the prompt value using the API response.
+ * 49. [unwrap] - Unwraps nested nodes for processing.
+ * 50. [add] - Adds the processed snippet to the final file data.
+ * 51. [.uri] - Adds the URI to the final file data.
+ * 52. [.filename] - Adds the file path to the final file data.
+ * 53. [add] - Adds the final processed file data to the output.
+ */
+case:pdf
+   .filename
+   set-value:x:@.filename
+      get-value:x:@.arguments/*/file/*/name
+   .filepath
+   set-value:x:@.filepath
+      strings.concat
+         .:/etc/system/openai/pdf/
+         get-value:x:@.filename
+   if
+      and
+         eq:x:@.arguments/*/overwrite
+            .:bool:false
+         io.file.exists:x:@.filepath
+      .lambda
+         throw:File already exists
+            status:int:400
+            public:bool:true
+   io.stream.save-file:x:@.filepath
+      get-value:x:@.arguments/*/file/*/stream
+   .tmp-snippets
+   pdf2text:x:@.filepath
+      preserve-pages:x:@.arguments/*/preservePages
+   if
+      eq:x:@.arguments/*/preservePages
+         .:bool:true
+      .lambda
+         .no:int:1
+         for-each:x:@pdf2text/*
+            .prompt
+            set-value:x:@.prompt
+               strings.concat
+                  get-value:x:@.arguments/*/file/*/name
+                  .:" - Page "
+                  get-value:x:@.no
+            unwrap:x:+/*/*/*
+            add:x:@.tmp-snippets
+               .
+                  .
+                     prompt:x:@.prompt
+                     completion:x:@.dp/#
+            math.increment:x:@.no
+   else
+      unwrap:x:+/*
+      signal:magic.ai.massage
+         content:x:@pdf2text
+         massage:x:@.arguments/*/massage
+         prompt:x:@.arguments/*/file/*/name
+         type:x:@.arguments/*/type
+      add:x:@.tmp-snippets
+         get-nodes:x:@signal/*
+   .uri
+   set-value:x:@.uri
+      strings.concat
+         request.scheme
+         .:"://"
+         request.host
+         .:/magic/system/openai/download-pdf?file=
+         strings.url-encode:x:@.filename
+   if
+      and
+         not-null:x:@.arguments/*/massagePrompt
+         neq:x:@.arguments/*/massagePrompt
+            .:
+      .lambda
+         .token
+         set-value:x:@.token
+            strings.concat
+               .:"Bearer "
+               config.get:"magic:openai:key"
+         for-each:x:@.tmp-snippets/*
+            http.post:"https://api.openai.com/v1/chat/completions"
+               convert:bool:true
+               headers
+                  Authorization:x:@.token
+                  Content-Type:application/json
+                  Accept:text/event-stream
+               payload
+                  model:gpt-3.5-turbo
+                  max_tokens:int:1000
+                  temperature:decimal:0.3
+                  messages
+                     .
+                        role:system
+                        content:x:@.arguments/*/massagePrompt
+                     .
+                        role:user
+                        content:x:@.dp/#/*/completion
+            if
+               not
+                  and
+                     mte:x:@http.post
+                        .:int:200
+                     lt:x:@http.post
+                        .:int:300
+               .lambda
+                  lambda2hyper:x:@http.post
+                  log.error:Something went wrong while invoking OpenAI
+                     message:x:@http.post/*/content/*/error/*/message
+                     status:x:@http.post
+                     error:x:@lambda2hyper
+            else
+               set-value:x:@.dp/#/*/prompt
+                  get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+   unwrap:x:+/*/*
+   add:x:@.tmp-snippets/*
+      .
+         uri:x:@.uri
+         filename:x:@.filepath
+   add:x:@.file-data
+      get-nodes:x:@.tmp-snippets/*

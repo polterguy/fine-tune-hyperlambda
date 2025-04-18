@@ -1,0 +1,219 @@
+
+/*
+ * This Hyperlambda code iterates over a list of files, categorizes them based on their extensions, and processes them accordingly. It loads the content of each file, generates metadata, and optionally creates a summary using an external API if certain conditions are met. The results, including metadata and content, are stored in a database for machine learning training. The code also handles ignored files by sending a signal with a message. 
+ * 
+ * 1. [for-each] - Iterates over each file in the list.
+ * 2. [.handle] - Initializes a flag to determine if the file should be processed.
+ * 3. [.file-meta] - Stores metadata about the file.
+ * 4. [strings.split] - Splits the filename to extract the extension.
+ * 5. [switch] - Determines the file type based on its extension.
+ * 6. [case] - Handles specific file extensions and sets metadata.
+ * 7. [if] - Checks conditions for processing the file.
+ * 8. [set-value] - Updates metadata and loads file content.
+ * 9. [http.post] - Sends a request to an external API to generate a summary.
+ * 10. [sockets.signal] - Sends feedback messages.
+ * 11. [data.connect] - Connects to a database to store results.
+ * 12. [data.create] - Inserts processed data into a database table.
+ */
+for-each:x:@io.file.list-recursively/*
+   .handle:bool:false
+   .file-meta:
+   strings.split:x:@.dp/#
+      .:.
+   switch:x:@strings.split/0/-
+      case:cs
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:"File type: VB.NET"
+      case:vb
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:"Programming language: VB.NET"
+      case:py
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:"Programming language: Python"
+      case:rb
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:"Programming language: Ruby"
+      case:js
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:"Programming language: JavaScript"
+      case:ts
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:"Programming language: TypeScript"
+      case:txt
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:Text file
+      case:css
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:CSS file
+      case:html
+      case:htm
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:HTML file
+      case:sass
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:SASS file
+      case:scss
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:SCSS file
+      case:sql
+         set-value:x:@.handle
+            .:bool:true
+         set-value:x:@.file-meta
+            strings.concat
+               get-value:x:@.file-meta
+               .:SQL file
+      case:md
+         if
+            neq:x:@.dp/#
+               .:/etc/system/openai/temp/README.md
+            .lambda
+               set-value:x:@.handle
+                  .:bool:true
+               set-value:x:@.file-meta
+                  strings.concat
+                     get-value:x:@.file-meta
+                     .:Markdown file
+      default
+         strings.concat
+            .:"File: "
+            get-value:x:@.dp/#
+            .:" is ignored"
+         unwrap:x:+/*/*/message
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+   if:x:@.handle
+      set-value:x:@.file-meta
+         strings.concat
+            get-value:x:@.file-meta
+            .:" - Filename: "
+            get-value:x:@.dp/#
+      .content
+      set-value:x:@.content
+         io.file.load:x:@.dp/#
+      .snippets
+      if
+         and
+            exists:x:@.arguments/*/massage
+            neq:x:@.arguments/*/massage
+               .
+            neq:x:@.arguments/*/massage
+               .:
+            lt
+               openai.tokenize:x:@.content
+               .:int:15000
+         .lambda
+            strings.concat
+               .:"Creating summary for file: "
+               get-value:x:@.dp/#
+            unwrap:x:+/*/*/message
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info
+            http.post:"https://api.openai.com/v1/chat/completions"
+               headers
+                  Authorization:x:@.token
+                  Content-Type:application/json
+               payload
+                  model:gpt-3.5-turbo-1106
+                  max_tokens:int:2000
+                  temperature:decimal:0.5
+                  messages
+                     .
+                        role:system
+                        content:x:@.arguments/*/massage
+                     .
+                        role:system
+                        content:x:@.content
+               convert:true
+            if
+               and
+                  mte:x:@http.post
+                     .:int:200
+                  lt:x:@http.post
+                     .:int:300
+               .lambda
+                  unwrap:x:+/*/*/*
+                  add:x:@.snippets
+                     .
+                        .
+                           prompt:x:@http.post/*/content/*/choices/0/*/message/*/content
+                           completion:x:@.content
+            else
+               strings.concat
+                  .:"Could not create summary for file: "
+                  get-value:x:@.dp/#
+               unwrap:x:+/*/*/message
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:x:@strings.concat
+                     type:warning
+               unwrap:x:+/*/*/*
+               add:x:@.snippets
+                  .
+                     .
+                        prompt:x:@.file-meta
+                        completion:x:@.content
+      else
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
+               .
+                  prompt:x:@.file-meta
+                  completion:x:@.content
+      data.connect:[generic|magic]
+         for-each:x:@.snippets/*
+            data.create
+               table:ml_training_snippets
+               values
+                  type:x:@.arguments/*/type
+                  prompt:x:@.dp/#/*/prompt
+                  completion:x:@.dp/#/*/completion
+                  filename:x:@.dp/@.dp/#
+                  cached:int:0

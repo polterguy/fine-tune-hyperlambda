@@ -1,0 +1,126 @@
+
+/*
+ * /*
+ *  * This Hyperlambda code is designed to interact with the OpenAI API to generate chat completions using a specified session and API key. 
+ *  * It performs a POST request to the OpenAI API, processes the response, and handles any errors that occur during the request.
+ *  * 
+ *  * 1. [fork] - Initiates a separate thread of execution for the enclosed operations.
+ *  * 2. [try] - Begins a block of code where exceptions can be caught and handled.
+ *  * 3. [.token] - Declares a data node for storing the authorization token.
+ *  * 4. [set-value] - Sets the value of the [.token] node by concatenating "Bearer " with the API key.
+ *  * 5. [unwrap] - Evaluates the session node from the arguments.
+ *  * 6. [http.post] - Sends a POST request to the OpenAI API for chat completions.
+ *  * 7. [convert] - Specifies that the response should be automatically converted.
+ *  * 8. [.sse] - Declares a data node for handling server-sent events.
+ *  * 9. [if] - Checks if the message argument exists, is not null, and starts with "data:".
+ *  * 10. [strings.substring] - Extracts a substring from the message starting at index 5.
+ *  * 11. [strings.trim] - Trims whitespace from the extracted substring.
+ *  * 12. [if] - Checks if the trimmed string is not empty.
+ *  * 13. [if] - Checks if the trimmed string equals "[DONE]".
+ *  * 14. [sockets.signal] - Signals the session that the process is finished.
+ *  * 15. [else] - Handles cases where the message is not "[DONE]".
+ *  * 16. [json2lambda] - Converts the trimmed JSON string into a lambda object.
+ *  * 17. [if] - Checks if the finish reason exists and is not null.
+ *  * 18. [unwrap] - Evaluates the finish reason.
+ *  * 19. [sockets.signal] - Signals the session with the finish reason.
+ *  * 20. [if] - Checks if the content of the message is not null or empty.
+ *  * 21. [set-value] - Concatenates the current result with the new content.
+ *  * 22. [unwrap] - Evaluates the content.
+ *  * 23. [sockets.signal] - Signals the session with the new message content.
+ *  * 24. [headers] - Sets the HTTP headers for the request, including authorization and content type.
+ *  * 25. [payload] - Specifies the payload for the POST request, including model, max tokens, temperature, stream, and messages.
+ *  * 26. [if] - Checks if the HTTP response status code is not between 200 and 299.
+ *  * 27. [throw] - Throws an exception with the error message from the response.
+ *  * 28. [else] - Logs a success message if the API invocation was successful.
+ *  * 29. [.catch] - Catches exceptions and logs an error message.
+ *  */
+ */
+fork
+   try
+      .token
+      set-value:x:@.token
+         strings.concat
+            .:"Bearer "
+            get-first-value
+               get-value:x:@.arguments/*/api_key
+               config.get:"magic:openai:key"
+      unwrap:x:+/*/.sse/*/.session
+      http.post:"https://api.openai.com/v1/chat/completions"
+         convert:true
+         .sse
+            .session:x:@.arguments/*/session
+            if
+               and
+                  exists:x:@.arguments/*/message
+                  not-null:x:@.arguments/*/message
+                  strings.starts-with:x:@.arguments/*/message
+                     .:"data:"
+               .lambda
+                  strings.substring:x:@.arguments/*/message
+                     .:int:5
+                  strings.trim:x:@strings.substring
+                  if
+                     neq:x:@strings.trim
+                        .:
+                     .lambda
+                        if
+                           eq:x:@strings.trim
+                              .:[DONE]
+                           .lambda
+                              sockets.signal:x:@.session
+                                 args
+                                    finished:bool:true
+                        else
+                           json2lambda:x:@strings.trim
+                           if
+                              and
+                                 exists:x:@json2lambda/*/choices/0/*/finish_reason
+                                 not-null:x:@json2lambda/*/choices/0/*/finish_reason
+                              .lambda
+                                 unwrap:x:+/*/*
+                                 sockets.signal:x:@.session
+                                    args
+                                       finish_reason:x:@json2lambda/*/choices/0/*/finish_reason
+                           if
+                              and
+                                 not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+                                 neq:x:@json2lambda/*/choices/0/*/delta/*/content
+                                    .:
+                              .lambda
+                                 set-value:x:@.result
+                                    strings.concat
+                                       get-value:x:@.result
+                                       get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+                                 unwrap:x:+/*/*
+                                 sockets.signal:x:@.session
+                                    args
+                                       message:x:@json2lambda/*/choices/0/*/delta/*/content
+         headers
+            Authorization:x:@.token
+            Content-Type:application/json
+            Accept:text/event-stream
+         payload
+            model:gpt-4o
+            max_tokens:int:4000
+            temperature:decimal:0.3
+            stream:bool:true
+            messages
+               .
+                  role:system
+                  content:x:@.arguments/*/instruction
+               .
+                  role:system
+                  content:x:@.context
+      if
+         not
+            and
+               mte:x:@http.post
+                  .:int:200
+               lt:x:@http.post
+                  .:int:300
+         .lambda
+            throw:x:@http.post/*/content/*/error/*/message
+      else
+         log.info:Invoking OpenAI was a success
+   .catch
+      log.error:x:@.arguments/*/message

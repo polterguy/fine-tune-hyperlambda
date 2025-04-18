@@ -1,0 +1,41 @@
+
+/*
+ * This Hyperlambda code connects to a database and performs a series of operations to retrieve and process data related to machine learning training snippets. It first checks if there are any snippets with a non-null embedding for a given type. If none are found, it returns a context and snippets. If snippets exist, it reads the vector model associated with the type from the "ml_types" table and sets it to the "embeddings-model" node.
+ * 
+ * 1. [data.connect] - Connects to a database, using a generic or magic connection.
+ * 2. [data.scalar] - Executes a SQL query to count the number of training snippets with a non-null embedding for a specified type.
+ * 3. [@type] - Retrieves the type argument from the input arguments.
+ * 4. [if] - Checks if the count of snippets is zero.
+ * 5. [eq] - Compares the converted scalar result to zero.
+ * 6. [convert] - Converts the scalar result to an integer.
+ * 7. [return] - Returns context and snippets if no snippets are found.
+ * 8. [data.read] - Reads the vector model from the "ml_types" table for the specified type.
+ * 9. [table] - Specifies the table to read from, "ml_types".
+ * 10. [columns] - Specifies the column to retrieve, "vector_model".
+ * 11. [where] - Specifies the condition for the read operation.
+ * 12. [and] - Combines conditions for the read operation.
+ * 13. [type.eq] - Compares the type column to the specified type argument.
+ * 14. [set-value] - Sets the value of the "embeddings-model" node to the retrieved vector model.
+ * 15. [get-value] - Retrieves the vector model value from the data read operation.
+ */
+data.connect:[generic|magic]
+   data.scalar:select count(*) from ml_training_snippets where embedding is not null and type = @type
+      @type:x:@.arguments/*/type
+   if
+      eq
+         convert:x:@data.scalar
+            type:int
+         .:int:0
+      .lambda
+         return
+            context
+            snippets
+   data.read
+      table:ml_types
+      columns
+         vector_model
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   set-value:x:@.embeddings-model
+      get-value:x:@data.read/*/*/vector_model

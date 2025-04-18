@@ -1,0 +1,178 @@
+
+/*
+ * This Hyperlambda code checks if a configuration value is not equal to a specific string and, if true, sets HTTP response headers and attempts to retrieve cached system information. If the cache is not available, it gathers various system metrics such as version, task count, and slot vocabulary, and logs information about user actions and API requests. It also counts endpoints, slots, and dynamic slots, retrieves default database and timezone configurations, and lists module files to calculate lines of code and file counts. The gathered information is then transformed into a Hyperlambda structure and returned. If cached data is available, it is directly returned. 
+ * 
+ * 1. [if] - Checks if a configuration value is not equal to a specific string.
+ * 2. [response.headers.set] - Sets HTTP response headers for caching.
+ * 3. [cache.try-get] - Attempts to retrieve cached system information.
+ * 4. [version] - Retrieves system version information.
+ * 5. [tasks.count] - Counts the number of tasks.
+ * 6. [slots.vocabulary] - Retrieves slot vocabulary information.
+ * 7. [for-each] - Iterates over slot vocabulary signals.
+ * 8. [signal] - Processes each signal.
+ * 9. [add] - Adds nodes to the current structure.
+ * 10. [log.count] - Counts log entries.
+ * 11. [log.capabilities] - Retrieves logging capabilities.
+ * 12. [if] - Checks if timeshift capability is available.
+ * 13. [add] - Adds timeshift log categories and items.
+ * 14. [endpoints.list] - Lists all endpoints.
+ * 15. [.no-endpoints] - Counts the number of endpoints.
+ * 16. [set-value] - Sets values for various metrics.
+ * 17. [add] - Adds last log items to the structure.
+ * 18. [vocabulary] - Retrieves slot vocabulary.
+ * 19. [.no-slots] - Counts the number of slots.
+ * 20. [slots.vocabulary] - Retrieves dynamic slot vocabulary.
+ * 21. [.no-dynamic-slots] - Counts the number of dynamic slots.
+ * 22. [.default-db] - Retrieves default database configuration.
+ * 23. [.default-timezone] - Retrieves default timezone configuration.
+ * 24. [cache.count] - Counts cache items.
+ * 25. [.has-scheduler] - Checks if a scheduler is available.
+ * 26. [if] - Checks scheduler configuration.
+ * 27. [io.folder.list] - Lists module files.
+ * 28. [for-each] - Iterates over module files.
+ * 29. [strings.split] - Splits file paths.
+ * 30. [unwrap] - Unwraps expressions.
+ * 31. [signal] - Loads files recursively.
+ * 32. [.loc] - Initializes line of code counter.
+ * 33. [.files] - Initializes file counter.
+ * 34. [for-each] - Iterates over loaded files.
+ * 35. [if] - Checks if file ends with .hl.
+ * 36. [hyper2lambda] - Parses Hyperlambda files.
+ * 37. [math.increment] - Increments line of code and file counters.
+ * 38. [unwrap] - Unwraps expressions.
+ * 39. [set-name] - Sets module names.
+ * 40. [add] - Adds module information to the structure.
+ * 41. [unwrap] - Unwraps expressions.
+ * 42. [lambda2hyper] - Transforms data into Hyperlambda format.
+ * 43. [return] - Returns the transformed data.
+ * 44. [hyper2lambda] - Parses cached data.
+ * 45. [return-nodes] - Returns cached data nodes.
+ */
+if
+   neq:x:@config.get
+      .:THIS-IS-NOT-A-GOOD-SECRET-PLEASE-CHANGE-IT
+   .lambda
+      response.headers.set
+         Cache-Control:public, max-age=300
+      cache.try-get:system-information
+         expiration:300
+         .lambda
+            version
+            tasks.count
+            slots.vocabulary:magic.system-information.
+            for-each:x:-/*
+               signal:x:@.dp/#
+               add:x:+/*
+                  get-nodes:x:@signal/*
+               add:x:././*/lambda2hyper
+                  .
+            log.count
+            log.capabilities
+            if:x:@log.capabilities/*/can-timeshift
+               add:x:@.lambda/*/lambda2hyper
+                  .
+                     timeshifts
+                        logins
+                           name:Logins
+                           description:Successfully authenticated users
+                           items
+                        access_denied
+                           name:Access denied
+                           description:Access denied requests
+                           items
+                        openai_success
+                           name:OpenAI success
+                           description:Successful OpenAI API requests
+                           items
+                        openai_failure
+                           name:OpenAI failure
+                           description:Failed OpenAI API requests
+                           items
+                        lead_generated
+                           name:Lead
+                           description:Lead generated
+                           items
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/logins/*/items
+                  log.timeshift:User successfully authenticated
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/access_denied/*/items
+                  log.timeshift:Access denied
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/openai_success/*/items
+                  log.timeshift:Invoking OpenAI was a success
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/openai_failure/*/items
+                  log.timeshift:Something went wrong while invoking OpenAI
+               add:x:@.lambda/*/lambda2hyper/*/timeshifts/*/lead_generated/*/items
+                  log.timeshift:Lead was generated
+            endpoints.list
+            .no-endpoints
+            set-value:x:-
+               get-count:x:@endpoints.list/*
+            add:x:@.lambda/*/lambda2hyper/*/last_log_items
+               log.query
+                  max:10
+            vocabulary
+            .no-slots
+            set-value:x:-
+               get-count:x:@vocabulary/*
+            slots.vocabulary
+            .no-dynamic-slots
+            set-value:x:-
+               get-count:x:@slots.vocabulary/*
+            .default-db
+            set-value:x:-
+               config.get:"magic:databases:default"
+            .default-timezone
+            set-value:x:-
+               config.get:"magic:culture:defaultTimeZone"
+            cache.count
+            .has-scheduler:bool:true
+            if
+               eq
+                  config.get:"magic:tasks:scheduler"
+                  .
+               .lambda
+                  set-value:x:@.has-scheduler
+                     .:bool:false
+            io.folder.list:/modules/
+            for-each:x:@io.folder.list/*
+               strings.split:x:@.dp/#
+                  .:/
+               unwrap:x:+/*
+               signal:magic.io.file.load-recursively
+                  .:x:@.dp/#
+               .loc:int:0
+               .files:int:0
+               for-each:x:@signal/*
+                  if
+                     strings.ends-with:x:@.dp/#
+                        .:.hl
+                     .lambda
+                        hyper2lambda:x:@.dp/#/0
+                        math.increment:x:@.loc
+                           get-count:x:@hyper2lambda/**
+                        math.increment:x:@.files
+               unwrap:x:+/+/*/*/*
+               set-name:x:+/*/*
+                  get-value:x:@strings.split/0/-
+               add:x:@.lambda/*/lambda2hyper/*/modules
+                  .
+                     foo
+                        loc:x:@.loc
+                        files:x:@.files
+            unwrap:x:+/*
+            lambda2hyper
+               version:x:@version
+               persisted_tasks:x:@tasks.count
+               has_sockets:x:@.has-sockets
+               has_scheduler:x:@.has-scheduler
+               log_items:x:@log.count
+               cache_items:x:@cache.count
+               endpoints:x:@.no-endpoints
+               slots:x:@.no-slots
+               dynamic_slots:x:@.no-dynamic-slots
+               default_db:x:@.default-db
+               default_timezone:x:@.default-timezone
+               last_log_items
+               modules
+            return:x:@lambda2hyper
+      hyper2lambda:x:@cache.try-get
+      return-nodes:x:@hyper2lambda/*

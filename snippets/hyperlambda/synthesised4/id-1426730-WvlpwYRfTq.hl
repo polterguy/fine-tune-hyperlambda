@@ -1,0 +1,54 @@
+
+/*
+ * This Hyperlambda code snippet checks if a condition is met and then attempts to set a crawl delay value based on another value. If the calculated crawl delay exceeds a certain limit, it adjusts the value and sends a warning message through a feedback channel. If an error occurs during the process, it catches the exception, sends a different warning message, and sets a default crawl delay value.
+ * 
+ * 1. [if] - Checks if both conditions are true.
+ * 2. [and] - Logical AND to combine two conditions.
+ * 3. [eq] - Checks if [.relevant] is true.
+ * 4. [neq] - Checks if [.value] is not null.
+ * 5. [.lambda] - Contains the code to execute if the conditions are true.
+ * 6. [try] - Attempts to execute the code within it.
+ * 7. [set-value] - Sets the [.crawl-delay] value.
+ * 8. [math.multiply] - Multiplies [.value] by 1000.
+ * 9. [convert] - Converts [.value] to an integer.
+ * 10. [if] - Checks if [.crawl-delay] is more than 60,000 milliseconds.
+ * 11. [mt] - Checks if [.crawl-delay] is more than 60,000.
+ * 12. [.lambda] - Contains the code to execute if [.crawl-delay] is too high.
+ * 13. [sockets.signal] - Sends a warning message if [.crawl-delay] is too high.
+ * 14. [args] - Arguments for the warning message.
+ * 15. [set-value] - Adjusts [.crawl-delay] to 60,000 if too high.
+ * 16. [.catch] - Handles exceptions if [.value] is not a valid integer.
+ * 17. [sockets.signal] - Sends a warning message if an exception occurs.
+ * 18. [args] - Arguments for the exception warning message.
+ * 19. [set-value] - Sets [.crawl-delay] to 10,000 if an exception occurs.
+ */
+if
+   and
+      eq:x:@.relevant
+         .:bool:true
+      neq:x:@.value
+         .:
+   .lambda
+      try
+         set-value:x:@.crawl-delay
+            math.multiply
+               .:int:1000
+               convert:x:@.value
+                  type:int
+         if
+            mt:x:@.crawl-delay
+               .:int:60000
+            .lambda
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Crawl-Delay was more than 60 seconds, using 60 seconds as our value
+                     type:warning
+               set-value:x:@.crawl-delay
+                  .:int:60000
+      .catch
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Crawl-Delay was not a valid integer value, using 10 seconds as our value
+               type:warning
+         set-value:x:@.crawl-delay
+            .:int:10000

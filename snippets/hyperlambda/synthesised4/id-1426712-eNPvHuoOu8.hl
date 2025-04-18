@@ -1,0 +1,65 @@
+
+/*
+ * This Hyperlambda code connects to a database and processes a prompt based on certain conditions. It checks if there are any invocations and formats the prompt accordingly. If a function result is present, it appends it to the completion in a JSON format. The code then creates a new entry in the "ml_requests" table with various values such as type, prompt, completion, finish reason, session, user ID, and referrer.
+ * 
+ * 1. [data.connect] - Connects to a database.
+ * 2. [if] - Checks if there are any invocations.
+ * 3. [mt] - Compares the number of invocations to zero.
+ * 4. [set-value] - Sets the value of the prompt based on the condition.
+ * 5. [strings.concat] - Concatenates strings to form the prompt.
+ * 6. [else] - Handles the case where there are no invocations.
+ * 7. [not-null] - Checks if a function result is present.
+ * 8. [strings.concat] - Concatenates strings to form the completion with the function result.
+ * 9. [data.create] - Creates a new entry in the "ml_requests" table with specified values.
+ */
+data.connect:[generic|magic]
+   .prompt
+   if
+      mt:x:@.no-invocation
+         .:int:0
+      .lambda
+         set-value:x:@.prompt
+            strings.concat
+               .:[
+               get-value:x:@.no-invocation
+               .:"] - "
+               get-value:x:@.only-prompt
+   else
+      set-value:x:@.prompt
+         get-value:x:@.only-prompt
+   .tmp-completion
+   if
+      not-null:x:@.function-result
+      .lambda
+         set-value:x:@.tmp-completion
+            strings.concat
+               get-value:x:@.result
+               .:@"
+"
+               .:@"
+"
+               .:@"Result of function invocation:
+"
+               .:@"
+"
+               .:```json
+               .:@"
+"
+               get-value:x:@.function-result
+               .:@"
+"
+               .:```
+         set-value:x:@.function-result
+   else
+      set-value:x:@.tmp-completion
+         get-value:x:@.result
+   data.create
+      table:ml_requests
+      values
+         type:x:@.arguments/*/type
+         prompt:x:@.prompt
+         completion:x:@.tmp-completion
+         finish_reason:x:@.finish_reason
+         session:x:@.arguments/*/session
+         user_id:x:@.arguments/*/user_id
+         referrer:x:@.arguments/*/referrer

@@ -1,0 +1,31 @@
+
+/*
+ * This Hyperlambda code checks if the count of nodes from a data read operation is not equal to zero. If true, it concatenates a message indicating the deletion of old training snippets with the same URL, sends this message as a signal to a feedback channel, and then pauses execution for 10 seconds. 
+ * 
+ * 1. [if] - Begins a conditional statement.
+ * 2. [neq] - Checks if the converted count of nodes is not equal to zero.
+ * 3. [convert] - Converts the count of nodes to an integer type.
+ * 4. [strings.concat] - Concatenates a message about deleting old training snippets.
+ * 5. [unwrap] - Evaluates all expressions in the concatenated message.
+ * 6. [sockets.signal] - Sends a signal with the message to a feedback channel.
+ * 7. [args] - Specifies arguments for the signal.
+ * 8. [message] - Contains the concatenated message to be sent.
+ * 9. [type] - Specifies the type of message as "info".
+ * 10. [sleep] - Pauses execution for 10 seconds.
+ */
+if
+   neq
+      convert:x:@data.read/*/*/count
+         type:int
+      .:int:0
+   .lambda
+      strings.concat
+         .:"Deleting "
+         get-value:x:@data.read/*/*/count
+         .:" old training snippets with the same URL"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      sleep:10

@@ -1,0 +1,40 @@
+
+/*
+ * This Hyperlambda code connects to a database and reads from the "ml_requests" table, selecting the "completion" and "cached" columns where the "prompt" and "type" match the provided arguments. It limits the result to 1, ordering by "created" in descending order. If a result exists and the "cached" value is 1, it returns the "completion" value and a "finish_reason" of "cached". 
+ * 
+ * 1. [data.connect] - Connects to the specified database.
+ * 2. [data.read] - Reads data from the "ml_requests" table.
+ * 3. [columns] - Specifies the columns to select: "completion" and "cached".
+ * 4. [where] - Filters the results based on the "prompt" and "type" arguments.
+ * 5. [limit] - Limits the result set to 1 record.
+ * 6. [order] - Orders the results by the "created" column.
+ * 7. [direction] - Specifies descending order.
+ * 8. [if] - Checks if a result exists and if the "cached" value is 1.
+ * 9. [unwrap] - Forwards evaluates the expressions in the node.
+ * 10. [return] - Returns the "completion" value and a "finish_reason" of "cached".
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_requests
+      columns
+         completion
+         cached
+      where
+         and
+            prompt.eq:x:@.arguments/*/prompt
+            type.eq:x:@.arguments/*/type
+      limit:1
+      order:created
+      direction:desc
+   if
+      and
+         exists:x:@data.read/*/*
+         eq
+            convert:x:@data.read/*/*/cached
+               type:int
+            .:int:1
+      .lambda
+         unwrap:x:+/*
+         return
+            result:x:@data.read/*/*/completion
+            finish_reason:cached

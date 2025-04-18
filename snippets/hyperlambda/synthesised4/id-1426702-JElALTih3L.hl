@@ -1,0 +1,108 @@
+
+/*
+ * This Hyperlambda code creates a task that periodically checks the status of an OpenAI model training session and updates the database accordingly. The task is scheduled to repeat every 30 seconds. It retrieves the task ID, model ID, and type from the arguments and constructs an authorization token for HTTP requests. The task then sends a GET request to the OpenAI API to check the training status. If the status code indicates success (200-299), it checks if the training has succeeded or failed. If succeeded, it logs the success, updates the database with the fine-tuned model, and signals a success message. If failed, it logs an error, deletes the task, and signals an error message. If the status code is not successful, it logs an error with the response details.
+ * 
+ * 1. [tasks.create] - Creates a new task with a specified ID and repetition interval.
+ * 2. [repeats] - Sets the task to repeat every 30 seconds.
+ * 3. [.lambda] - Defines the task's main logic.
+ * 4. [.task-id] - Retrieves the task ID from the lambda arguments.
+ * 5. [.model-id] - Retrieves the model ID from the HTTP POST response content.
+ * 6. [.type] - Retrieves the type from the lambda arguments.
+ * 7. [.token] - Initializes a token for authorization.
+ * 8. [set-value] - Sets the value of the token using a concatenated string.
+ * 9. [strings.concat] - Concatenates strings to form the authorization token and API URL.
+ * 10. [http.get] - Sends a GET request to the OpenAI API to check training status.
+ * 11. [headers] - Sets the authorization header for the HTTP request.
+ * 12. [convert] - Converts the HTTP response to a Hyperlambda object.
+ * 13. [if] - Checks if the HTTP response status code indicates success.
+ * 14. [and] - Combines multiple conditions to check the status code range.
+ * 15. [mte] - Checks if the status code is more than or equal to 200.
+ * 16. [lt] - Checks if the status code is less than 300.
+ * 17. [.lambda] - Executes if the status code indicates success.
+ * 18. [if] - Checks if the training status is "succeeded".
+ * 19. [eq] - Compares the training status to "succeeded".
+ * 20. [log.info] - Logs a success message.
+ * 21. [data.connect] - Connects to the database.
+ * 22. [data.update] - Updates the database with the fine-tuned model and training status.
+ * 23. [table] - Specifies the database table to update.
+ * 24. [values] - Specifies the values to update in the database.
+ * 25. [where] - Specifies the conditions for the database update.
+ * 26. [tasks.delete] - Deletes the task after successful completion.
+ * 27. [sockets.signal] - Sends a success signal message.
+ * 28. [roles] - Specifies the roles for the signal message.
+ * 29. [args] - Specifies the arguments for the signal message.
+ * 30. [else-if] - Checks if the training status is "failed".
+ * 31. [eq] - Compares the training status to "failed".
+ * 32. [log.error] - Logs an error message.
+ * 33. [tasks.delete] - Deletes the task after failure.
+ * 34. [sockets.signal] - Sends an error signal message.
+ * 35. [else] - Executes if the HTTP response status code is not successful.
+ * 36. [lambda2hyper] - Converts the HTTP response to a Hyperlambda object.
+ * 37. [log.error] - Logs an error with the response details.
+ */
+tasks.create:x:@.task-id
+   repeats:30.seconds
+   .lambda
+      .task-id:x:@.lambda/@.task-id
+      .model-id:x:@http.post/*/content/*/id
+      .type:x:@.arguments/*/type
+      .token
+      set-value:x:@.token
+         strings.concat
+            .:"Bearer "
+            config.get:"magic:openai:key"
+      strings.concat
+         .:"https://api.openai.com/v1/fine-tunes/"
+         get-value:x:@.model-id
+      http.get:x:@strings.concat
+         headers
+            Authorization:x:@.token
+         convert:true
+      if
+         and
+            mte:x:@http.get
+               .:int:200
+            lt:x:@http.get
+               .:int:300
+         .lambda
+            if
+               eq:x:@http.get/*/content/*/status
+                  .:succeeded
+               .lambda
+                  log.info:Training of OpenAI model completed successfully
+                  data.connect:[generic|magic]
+                     data.update
+                        table:ml_types
+                        values
+                           model:x:@http.get/*/content/*/fine_tuned_model
+                        where
+                           and
+                              type.eq:x:@.type
+                     data.update
+                        table:ml_training_snippets
+                        values
+                           pushed:int:1
+                        where
+                           and
+                              type.eq:x:@.type
+                  tasks.delete:x:@.task-id
+                  sockets.signal:magic.backend.message
+                     roles:root
+                     args
+                        message:Training of your OpenAI model succeeded!
+                        type:success
+            else-if
+               eq:x:@http.get/*/content/*/status
+                  .:failed
+               .lambda
+                  log.error:Training of OpenAI model FAILED!!
+                  tasks.delete:x:@.task-id
+                  sockets.signal:magic.backend.message
+                     roles:root
+                     args
+                        message:Training of your OpenAI model FAILED!
+                        type:error
+      else
+         lambda2hyper:x:@http.get
+         log.error:Retrieving training session status from OpenAI failed
+            result:x:@lambda2hyper

@@ -1,0 +1,128 @@
+
+/*
+ * This Hyperlambda code snippet is a complex conditional logic structure that evaluates nodes based on their names and existence of certain child nodes. It checks if the node name starts with a dot or if it is "execute" and has specific child nodes, then processes files and generates candidate expressions for nodes. It handles cases where nodes return complex objects and issues warnings if automatic candidate expression creation is not possible. The code uses various conditional checks, string manipulations, and node evaluations to dynamically build and add candidate expressions to a return node. 
+ * 
+ * 1. [if] - Starts the conditional logic structure.
+ * 2. [or] - Combines multiple conditions where either can be true.
+ * 3. [strings.starts-with] - Checks if the node name starts with a dot.
+ * 4. [and] - Combines conditions that must all be true.
+ * 5. [eq] - Checks if the node name is "execute".
+ * 6. [exists] - Checks for the existence of specific child nodes.
+ * 7. [.lambda] - Contains the logic to execute if the condition is true.
+ * 8. [load-file] - Loads a file based on a filename node.
+ * 9. [hyper2lambda] - Converts loaded file content into a lambda structure.
+ * 10. [not-exists] - Checks for non-existence of specific nodes.
+ * 11. [strings.concat] - Concatenates strings to form expressions.
+ * 12. [set-value] - Sets the value of a node.
+ * 13. [for-each] - Iterates over nodes to evaluate conditions.
+ * 14. [unwrap] - Evaluates expressions and unwraps nodes.
+ * 15. [add] - Adds nodes to a specified location.
+ * 16. [get-value] - Retrieves the value of a node.
+ * 17. [get-name] - Retrieves the name of a node.
+ * 18. [not-null] - Checks if a node is not null.
+ * 19. [else] - Executes logic if previous conditions are false.
+ * 20. [complete] - Marks a candidate expression as complete or not.
+ */
+if
+   or
+      strings.starts-with:x:@.node-name
+         .:.
+      and
+         eq:x:@.node-name
+            .:execute
+         exists:x:@.dp/#/*/name
+         exists:x:@.dp/#/*/filename
+   .lambda
+      if
+         eq:x:@.node-name
+            .:execute
+         .lambda
+            load-file:x:@.dp/#/*/filename
+            hyper2lambda:x:@load-file
+            if
+               and
+                  exists:x:@hyper2lambda/**/[yield|return|return-nodes]
+                  not-exists:x:@hyper2lambda/**/[yield|return|return-nodes]/*
+               .lambda
+                  .x
+                  set-value:x:@.x
+                     strings.concat
+                        .:--/execute/=
+                        get-value:x:@.dp/#/*/name
+                        .:/*
+                  if
+                     not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+                     .lambda
+                        unwrap:x:+/*/*/*
+                        add:x:../*/return/*/candidates
+                           .
+                              .
+                                 name:x:@.x
+                                 expression:x:@.x
+                                 complete:bool:false
+            else
+               for-each:x:@hyper2lambda/**/[yield|return|return-nodes]/*
+                  if
+                     exists:x:@.dp/#/*
+                     .lambda
+                        set-value:x:@.warning
+                           .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+                  .x
+                  set-value:x:@.x
+                     strings.concat
+                        .:--/execute/=
+                        get-value:x:@.dp/@.dp/#/*/name
+                        .:/*/
+                        get-name:x:@.dp/#
+                  if
+                     not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+                     .lambda
+                        unwrap:x:+/*/*/*
+                        add:x:../*/return/*/candidates
+                           .
+                              .
+                                 name:x:@.x
+                                 expression:x:@.x
+                                 complete:bool:true
+      else
+         for-each:x:@.dp/#/*
+            if
+               exists:x:@.dp/#/*
+               .lambda
+                  set-value:x:@.warning
+                     .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+            .x
+            set-value:x:@.x
+               strings.concat
+                  .:@
+                  get-value:x:@.node-name
+                  .:/*/
+                  get-name:x:@.dp/#
+            if
+               not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+               .lambda
+                  unwrap:x:+/*/*/*
+                  add:x:../*/return/*/candidates
+                     .
+                        .
+                           name:x:@.x
+                           expression:x:@.x
+                           complete:bool:true
+         if
+            not-null:x:@.dp/#
+            .lambda
+               .x
+               set-value:x:@.x
+                  strings.concat
+                     .:@
+                     get-value:x:@.node-name
+               if
+                  not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+                  .lambda
+                     unwrap:x:+/*/*/*
+                     add:x:../*/return/*/candidates
+                        .
+                           .
+                              name:x:@.x
+                              expression:x:@.x
+                              complete:bool:true

@@ -1,0 +1,92 @@
+
+/*
+ * This Hyperlambda code processes text nodes within a document, extracting and concatenating them into a prompt string. It then categorizes the text based on header tags (h1 to h6) and updates a page-header structure accordingly. The code ensures that the prompt string is formatted correctly by trimming and replacing unnecessary spaces. Finally, it appends the formatted prompt to a snippets collection. The code involves several steps, including iterating over text nodes, switching based on header tags, and manipulating strings to achieve the desired output.
+ * 
+ * 1. [for-each] - Iterates over text nodes within the document.
+ * 2. [set-value] - Sets the value of the prompt node by concatenating trimmed text.
+ * 3. [strings.concat] - Concatenates strings to build the prompt.
+ * 4. [strings.trim] - Trims whitespace from text nodes.
+ * 5. [switch] - Switches based on header tags (h1 to h6) to update the page-header structure.
+ * 6. [case] - Handles different header levels, updating the page-header accordingly.
+ * 7. [get-value] - Retrieves values from nodes.
+ * 8. [get-name] - Retrieves the name of nodes.
+ * 9. [not-null] - Checks if a node value is not null.
+ * 10. [neq] - Checks if a node value is not equal to a specified value.
+ * 11. [strings.replace] - Replaces double spaces with a single space in the prompt.
+ * 12. [strings.trim-end] - Trims trailing characters from the prompt.
+ * 13. [unwrap] - Evaluates expressions within nodes.
+ * 14. [add] - Adds the formatted prompt to the snippets collection.
+ */
+case:h6
+   .prompt:
+   for-each:x:"@.dp/#/**/\\#text"
+      set-value:x:@.prompt
+         strings.concat
+            get-value:x:@.prompt
+            strings.trim:x:@.dp/#
+               .:@"  
+	"
+            .:" "
+   set-value:x:@.prompt
+      strings.trim:x:@.prompt
+         .:" "
+   switch:x:@get-name
+      case:h1
+         set-value:x:@.page-header/*/h1
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h2
+         set-value:x:@.page-header/*/h3
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h2
+         set-value:x:@.page-header/*/h2
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h3
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h3
+         set-value:x:@.page-header/*/h3
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h4
+         set-value:x:@.page-header/*/h4
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h5
+         set-value:x:@.page-header/*/h5
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h6
+      case:h6
+         set-value:x:@.page-header/*/h6
+            get-value:x:@.prompt
+   set-value:x:@.prompt
+      .:
+   for-each:x:@.page-header/*
+      if
+         and
+            not-null:x:@.dp/#
+            neq:x:@.dp/#
+               .:
+         .lambda
+            set-value:x:@.prompt
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:" - "
+                  get-value:x:@.prompt
+   set-value:x:@.prompt
+      strings.replace:x:@.prompt
+         .:"  "
+         .:" "
+   set-value:x:@.prompt
+      strings.trim-end:x:@.prompt
+         .:" -"
+   unwrap:x:+/*/*/*
+   add:x:@.snippets
+      .
+         .
+            prompt:x:@.prompt

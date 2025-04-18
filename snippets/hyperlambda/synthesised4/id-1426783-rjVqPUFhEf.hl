@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code checks if the number of iterations is less than or equal to 1. If true, it logs an error message indicating "Too many function invocations" and sends multiple signals through a socket to the current session. These signals include details about the function error, waiting status, an error with a status code of 500, and a message about the invocation limit. It also signals that the process is finished. The purpose is to handle and communicate an error condition when a function is invoked too many times. 
+ * 
+ * 1. [if] - Checks if the number of iterations is less than or equal to 1.
+ * 2. [lte] - Compares the number of iterations to see if it is less than or equal to 1.
+ * 3. [.lambda] - Contains the actions to perform if the condition is true.
+ * 4. [log.error] - Logs an error message indicating too many function invocations.
+ * 5. [sockets.signal] - Sends a signal through a socket to the current session.
+ * 6. [args] - Contains arguments for the socket signal.
+ * 7. [function_error] - Argument indicating a function error with a message.
+ * 8. [function_waiting] - Argument indicating the waiting status of the function.
+ * 9. [error] - Argument indicating an error with a status code and message.
+ * 10. [status] - Status code for the error signal.
+ * 11. [message] - Message for the error signal.
+ * 12. [finished] - Argument indicating the process is finished.
+ */
+if
+   lte:x:@.iterations
+      .:int:1
+   .lambda
+      log.error:Too many function invocations
+      sockets.signal:x:@.session
+         args
+            function_error:Too many function invocations
+      sockets.signal:x:@.session
+         args
+            function_waiting:bool:false
+      sockets.signal:x:@.session
+         args
+            error:bool:true
+            status:int:500
+            message:Too many function invocations. Configure your type to handle more invocations or change your prompt.
+      sockets.signal:x:@.session
+         args
+            finished:bool:true

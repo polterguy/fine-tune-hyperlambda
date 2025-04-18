@@ -1,0 +1,273 @@
+
+/*
+ * This Hyperlambda code is designed to vectorize machine learning training snippets using OpenAI's API. It retrieves snippets from a database, checks if they can be tokenized within a certain limit, and then sends them to OpenAI for vectorization. If successful, it updates the database with the embeddings. It handles errors and retries for certain HTTP status codes, and signals progress and completion through sockets. Finally, it indexes the embeddings into a vector search system and optionally executes a callback function if provided.
+ * 
+ * 1. [try] - Starts a try block to handle exceptions.
+ * 2. [.token] - Declares a node for storing the API token.
+ * 3. [set-value] - Sets the value of a node.
+ * 4. [config.get] - Retrieves a configuration value.
+ * 5. [.vector-model] - Declares a node for storing the vector model.
+ * 6. [data.connect] - Connects to a database.
+ * 7. [data.read] - Reads data from a database.
+ * 8. [table] - Specifies the database table to read from.
+ * 9. [columns] - Specifies the columns to retrieve.
+ * 10. [where] - Specifies the condition for data retrieval.
+ * 11. [and] - Combines multiple conditions.
+ * 12. [type.eq] - Checks if the type matches the specified value.
+ * 13. [if] - Conditional branching.
+ * 14. [not-null] - Checks if a value is not null.
+ * 15. [neq] - Checks if two values are not equal.
+ * 16. [.lambda] - Declares a lambda function.
+ * 17. [strings.concat] - Concatenates strings.
+ * 18. [.continue] - Declares a node for controlling a loop.
+ * 19. [.failed] - Declares a node for counting failed operations.
+ * 20. [.success] - Declares a node for counting successful operations.
+ * 21. [.id] - Declares a node for storing the current ID.
+ * 22. [while] - Starts a loop that continues while a condition is true.
+ * 23. [.data] - Declares a node for storing data.
+ * 24. [add] - Adds data to a node.
+ * 25. [data.select] - Selects data from a database.
+ * 26. [prompt] - Specifies the prompt column.
+ * 27. [completion] - Specifies the completion column.
+ * 28. [order by] - Orders the data by a specified column.
+ * 29. [limit] - Limits the number of records retrieved.
+ * 30. [for-each] - Iterates over a set of nodes.
+ * 31. [.embedding] - Declares a node for storing embeddings.
+ * 32. [lt] - Checks if a value is less than another value.
+ * 33. [openai.tokenize] - Tokenizes a string using OpenAI.
+ * 34. [unwrap] - Evaluates expressions and returns their values.
+ * 35. [sockets.signal] - Sends a signal through a socket.
+ * 36. [http.post] - Sends an HTTP POST request.
+ * 37. [headers] - Specifies HTTP headers.
+ * 38. [Authorization] - Sets the authorization header.
+ * 39. [Content-Type] - Sets the content type header.
+ * 40. [payload] - Specifies the payload for the HTTP request.
+ * 41. [model] - Specifies the model to use.
+ * 42. [input] - Specifies the input for the model.
+ * 43. [convert] - Converts the response to a specific format.
+ * 44. [not] - Negates a condition.
+ * 45. [mte] - Checks if a value is more than or equal to another value.
+ * 46. [math.increment] - Increments a value.
+ * 47. [lambda2hyper] - Converts a lambda to Hyperlambda.
+ * 48. [log.error] - Logs an error message.
+ * 49. [message] - Specifies the message to log.
+ * 50. [error] - Specifies the error to log.
+ * 51. [eq] - Checks if two values are equal.
+ * 52. [sleep] - Pauses execution for a specified time.
+ * 53. [else] - Specifies an alternative branch.
+ * 54. [log.info] - Logs an informational message.
+ * 55. [get-count] - Retrieves the count of nodes.
+ * 56. [exists] - Checks if a node exists.
+ * 57. [eval] - Evaluates a node's children.
+ * 58. [.more] - Declares a node for controlling another loop.
+ * 59. [sql] - Declares a SQL query.
+ * 60. [data.execute] - Executes a SQL command.
+ */
+try
+   .token
+   set-value:x:@.token
+      config.get:"magic:openai:key"
+   .vector-model
+   data.connect:[generic|magic]
+      data.read
+         table:ml_types
+         columns
+            vector_model
+            api_key
+         where
+            and
+               type.eq:x:@.arguments/*/type
+      set-value:x:@.vector-model
+         get-value:x:@data.read/*/*/vector_model
+      if
+         and
+            not-null:x:@data.read/*/*/api_key
+            neq:x:@data.read/*/*/api_key
+               .:
+         .lambda
+            set-value:x:@.token
+               get-value:x:@data.read/*/*/api_key
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         get-value:x:@.token
+   .continue:bool:true
+   .failed:int:0
+   .success:int:0
+   .id:long:0
+   while:x:@.continue
+      .data
+      data.connect:[generic|magic]
+         add:x:@.data
+            data.select:@"
+select id, prompt, completion
+   from ml_training_snippets
+   where type = @type and id > @id and embedding is null order by id limit 20"
+               type:x:@.arguments/*/type
+               id:x:@.id
+      set-value:x:@.id
+         get-value:x:@.data/0/-/*/id
+      for-each:x:@.data/*
+         if:x:@.continue
+            .embedding
+            set-value:x:@.embedding
+               strings.concat
+                  get-value:x:@.dp/#/*/prompt
+                  .:@"
+"
+                  .:@"
+"
+                  get-value:x:@.dp/#/*/completion
+            if
+               lt
+                  openai.tokenize:x:@.embedding
+                  .:int:8191
+               .lambda
+                  strings.concat
+                     .:"Vectorizing: \""
+                     get-value:x:@.dp/#/*/prompt
+                     .:"\""
+                  unwrap:x:+/*/args/*/message
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:x:@strings.concat
+                        type:info
+                  http.post:"https://api.openai.com/v1/embeddings"
+                     headers
+                        Authorization:x:@.token
+                        Content-Type:application/json
+                     payload
+                        model:x:@.vector-model
+                        input:x:@.embedding
+                     convert:true
+                  if
+                     not
+                        and
+                           mte:x:@http.post
+                              .:int:200
+                           lt:x:@http.post
+                              .:int:300
+                     .lambda
+                        math.increment:x:@.failed
+                        lambda2hyper:x:@http.post
+                        log.error:Something went wrong while invoking OpenAI
+                           message:x:@http.post/*/content/*/error/*/message
+                           error:x:@lambda2hyper
+                        strings.concat
+                           .:"OpenAI failed, could not create vectors for '"
+                           get-value:x:@.dp/#/*/prompt
+                           .:"'"
+                        unwrap:x:+/*/args/*/message
+                        sockets.signal:x:@.arguments/*/feedback-channel
+                           args
+                              message:x:@strings.concat
+                              type:warning
+                        if
+                           or
+                              eq:x:@http.post
+                                 .:int:429
+                              eq:x:@http.post
+                                 .:int:500
+                           .lambda
+                              sockets.signal:x:@.arguments/*/feedback-channel
+                                 args
+                                    message:Continuing in 5 seconds with the next snippet to let OpenAI cool down first
+                                    type:info
+                              sleep:5000
+                        else
+                           sockets.signal:magic.backend.message
+                              roles:root
+                              args
+                                 message:Could not vectorize snippet and it was a non-transitional error, aborting vectorization for type
+                                 type:error
+                           set-value:x:@.continue
+                              .:bool:false
+                  else
+                     .embedding
+                     set-value:x:@.embedding
+                        strings.concat
+                           .:[
+                           strings.join:x:@http.post/*/content/*/data/0/*/embedding/*
+                              .:,
+                           .:]
+                     data.connect:[generic|magic]
+                        data.update
+                           table:ml_training_snippets
+                           values
+                              embedding:x:@.embedding
+                           where
+                              and
+                                 id.eq:x:@.dp/#/*/id
+                     math.increment:x:@.success
+            else
+               log.info:Cannot vectorize snippet, too long
+                  id:x:@.dp/#/*/id
+               math.increment:x:@.failed
+      get-count:x:@.data/*
+      if
+         lt:x:@get-count
+            .:int:20
+         .lambda
+            set-value:x:@.continue
+               .:bool:false
+   sockets.signal:magic.backend.message
+      roles:root
+      args
+         message:Done creating embeddings for your model
+         type:success
+   strings.concat
+      .:"Done vectorising model '"
+      get-value:x:@.arguments/*/type
+      .:"'. We succeeded vectorizing "
+      get-value:x:@.success
+      .:" training snippets and failed with "
+      get-value:x:@.failed
+      .:" snippets"
+   unwrap:x:+/*/args/*/message
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:x:@strings.concat
+         type:info
+   log.info:Done with creating vectors for model
+      type:x:@.arguments/*/type
+      success:x:@.success
+      failed:x:@.failed
+   if
+      mt:x:@.failed
+         .:int:0
+      .lambda
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:One or more training snippets failed to vectorize. You might want to try vectorizing again
+               type:warning
+   else
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:All training snippets was successfully vectorized
+            type:info
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:Indexing embeddings
+         type:info
+   .more:bool:true
+   while:x:@.more
+      .sql:@"
+insert into vss_ml_training_snippets (rowid, embedding_vss)
+   select id as rowid, embedding as embedding_vss
+      from ml_training_snippets ts
+      where ts.embedding is not null and
+         type = @type and
+         not exists (select rowid from vss_ml_training_snippets as vss where ts.id = vss.rowid) limit 500"
+      data.connect:[generic|magic]
+         data.execute:x:@.sql
+            type:x:@.arguments/*/type
+         if
+            lt:x:@data.execute
+               .:int:500
+            .lambda
+               set-value:x:@.more
+                  .:bool:false
+   if
+      exists:x:@.arguments/*/.onafter
+      .lambda
+         eval:x:@.arguments/*/.onafter

@@ -1,0 +1,27 @@
+
+/*
+ * This Hyperlambda code sends a warning signal if a robots.txt file is not found, waits for a short period, constructs a message indicating an attempt to retrieve a sitemap, sends an informational signal with the constructed message, and waits again. 
+ * 
+ * 1. [else] - Executes the following slots if the preceding condition is false.
+ * 2. [sockets.signal] - Sends a signal to a specified feedback channel with a warning message about the missing robots.txt file.
+ * 3. [sleep] - Pauses execution for 100 milliseconds.
+ * 4. [strings.concat] - Concatenates a static message with a value retrieved from a sitemap node.
+ * 5. [unwrap] - Evaluates all expressions within the specified node.
+ * 6. [sockets.signal] - Sends an informational signal to the feedback channel with the concatenated message.
+ * 7. [sleep] - Pauses execution for another 100 milliseconds.
+ */
+else
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:Could not find a robots.txt file for website
+         type:warning
+   sleep:100
+   strings.concat
+      .:"We will try to retrieve sitemap from "
+      get-value:x:@signal/*/sitemap/0
+   unwrap:x:+/**
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:x:@strings.concat
+         type:info
+   sleep:100

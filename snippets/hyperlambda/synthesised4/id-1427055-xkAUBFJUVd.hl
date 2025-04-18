@@ -1,0 +1,74 @@
+
+/*
+ * This Hyperlambda code connects to a SQLite database and performs a SQL query on the "Employees" table with a left join on itself to get hierarchical data. It dynamically constructs the SQL query by manipulating nodes based on provided arguments, including group by, aggregate functions, limits, offsets, and ordering. The result is returned as nodes. The code dynamically builds the SQL query by modifying nodes based on input arguments, allowing for flexible query construction.
+ * 
+ * 1. [data.connect] - Connects to a specified database.
+ * 2. [database-type] - Specifies the database type as SQLite.
+ * 3. [set-name] - Sets the name of a node based on the group column argument.
+ * 4. [insert-before] - Inserts a node before a specified node.
+ * 5. [set-value] - Sets the value of a node based on the aggregate function argument.
+ * 6. [remove-nodes] - Removes nodes based on the group column argument.
+ * 7. [add] - Adds nodes based on limit and offset arguments.
+ * 8. [remove-nodes] - Removes nodes based on limit and offset arguments.
+ * 9. [add] - Adds nodes based on order and direction arguments.
+ * 10. [remove-nodes] - Removes nodes based on order and direction arguments.
+ * 11. [set-name] - Sets the name of a node based on the aggregate function and column arguments.
+ * 12. [remove-nodes] - Removes the first two nodes from arguments.
+ * 13. [add] - Adds nodes to the where clause based on remaining arguments.
+ * 14. [data.read] - Reads data from the database with specified parameters.
+ * 15. [database-type] - Specifies the database type as SQLite.
+ * 16. [table] - Specifies the table to read from.
+ * 17. [join] - Specifies a left join on the Employees table.
+ * 18. [columns] - Specifies the columns to select, including the aggregate function.
+ * 19. [where] - Specifies the where clause.
+ * 20. [group] - Specifies the group by column.
+ * 21. [return-nodes] - Returns the result nodes from the data read operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Employees
+         join:Employees
+            as:ReportsTo
+            type:left
+            on
+               and
+                  Employees.ReportsTo:ReportsTo.EmployeeID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

@@ -1,0 +1,135 @@
+
+/*
+ * This Hyperlambda code iterates over the result set of a PostgreSQL SELECT query, processing each column's metadata to determine its properties such as name, data type, nullability, primary key status, and default value. It uses conditional logic to set these properties and maps PostgreSQL data types to Hyperlambda types. The processed metadata is then added to a temporary node and ultimately appended to the result set of the database connection. The code ensures that each column's metadata is correctly transformed and stored for further use.
+ * 
+ * 1. [for-each] - Iterates over each node in the PostgreSQL SELECT result set.
+ * 2. [unwrap] - Evaluates and processes the current node's children.
+ * 3. [.tmp] - Temporary node to store column metadata.
+ * 4. [if] - Checks if the column is nullable.
+ * 5. [add] - Adds metadata about nullability to the temporary node.
+ * 6. [if] - Checks if the column is a primary key.
+ * 7. [add] - Adds metadata about primary key status to the temporary node.
+ * 8. [if] - Checks if the column has a default value.
+ * 9. [add] - Adds metadata about automatic value generation to the temporary node.
+ * 10. [.type] - Node to store the mapped Hyperlambda data type.
+ * 11. [strings.regex-replace] - Cleans up the data type string by removing size and unsigned specifications.
+ * 12. [switch] - Maps PostgreSQL data types to Hyperlambda types.
+ * 13. [unwrap] - Evaluates and processes the current node's children again.
+ * 14. [add] - Adds the mapped Hyperlambda type to the temporary node.
+ * 15. [add] - Appends the processed metadata to the result set of the database connection.
+ */
+for-each:x:@pgsql.select/*
+   unwrap:x:+/*/*
+   .tmp
+      ""
+         name:x:@.dp/#/*/column_name
+         db:x:@.dp/#/*/data_type
+   if
+      eq
+         get-value:x:@.dp/#/*/is_nullable
+         .:NO
+      .lambda
+         add:x:@.tmp/*
+            .
+               nullable:bool:false
+   else
+      add:x:@.tmp/*
+         .
+            nullable:bool:true
+   if
+      get-value:x:@.dp/#/*/is_pk
+      .lambda
+         add:x:@.tmp/*
+            .
+               primary:bool:true
+   else
+      add:x:@.tmp/*
+         .
+            primary:bool:false
+   if
+      and
+         not
+            eq
+               get-value:x:@.dp/#/*/column_default
+               .:
+         not
+            eq
+               get-value:x:@.dp/#/*/column_default
+               .
+      .lambda
+         add:x:@.tmp/*
+            .
+               automatic:bool:true
+   else
+      add:x:@.tmp/*
+         .
+            automatic:bool:false
+   .type
+   strings.regex-replace:x:@.dp/#/*/data_type
+      .:" \\([0-9,]+\\)"
+      .:
+   strings.regex-replace:x:@strings.regex-replace
+      .:" \\[[0-9,]+\\]"
+      .:
+   strings.replace:x:@strings.regex-replace
+      .:" unsigned"
+      .:
+   strings.replace:x:@strings.replace
+      .:" without time zone"
+      .:
+   strings.replace:x:@strings.replace
+      .:" with time zone"
+      .:
+   switch:x:@strings.replace
+      case:smallserial
+      case:serial
+      case:smallint
+         set-value:x:@.type
+            .:int
+      case:timestamp
+         set-value:x:@.type
+            .:date
+      case:numeric
+      case:decimal
+      case:real
+      case:money
+         set-value:x:@.type
+            .:decimal
+      case:double precision
+         set-value:x:@.type
+            .:double
+      case:integer
+      case:bigint
+      case:bigserial
+      case:interval
+         set-value:x:@.type
+            .:long
+      case:string
+      case:bit
+      case:bit varying
+      case:character
+      case:character varying
+      case:json
+      case:text
+      case:xml
+         set-value:x:@.type
+            .:string
+      case:boolean
+         set-value:x:@.type
+            .:bool
+      default
+         if
+            strings.starts-with:x:@strings.replace
+               .:enum
+            .lambda
+               set-value:x:@.type
+                  .:string
+         else
+            set-value:x:@.type
+               .:string
+   unwrap:x:+/*/*
+   add:x:@.tmp/*
+      .
+         hl:x:@.type
+   add:x:../*/pgsql.connect/*/return-nodes
+      get-nodes:x:@.tmp/*

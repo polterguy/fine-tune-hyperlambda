@@ -1,0 +1,85 @@
+
+/*
+ * This Hyperlambda code creates a new table in a database and adds columns to it based on data from a CSV file. It first constructs a primary key name by concatenating the table name with "_id" and then executes a file to create the table with this primary key. It logs the creation of the table and iterates over each column from the CSV data, determining its type as either "text" or "numeric" based on its content. It then executes another file to add each column to the table and logs the number of columns created. The code ensures that changes are tracked and logged for auditing purposes.
+ * 
+ * 1. [try] - Begins a try block for exception handling.
+ * 2. [.pk] - Declares a node for the primary key.
+ * 3. [set-value:x:@.pk] - Sets the value of the primary key node.
+ * 4. [strings.concat] - Concatenates the table name with "_id" to form the primary key name.
+ * 5. [execute-file:/system/sql/ddl/table.post.hl] - Executes a file to create the table with specified parameters.
+ * 6. [set-value:x:@.changes] - Sets a flag indicating changes were made.
+ * 7. [log.info:Table created] - Logs the creation of the table with relevant details.
+ * 8. [for-each:x:@csv2lambda/0/*] - Iterates over each column from the CSV data.
+ * 9. [.type:text] - Sets the default type of the column to text.
+ * 10. [get-name:x:@.dp/#] - Retrieves the name of the current column.
+ * 11. [.found:bool:false] - Initializes a flag to check if a numeric type is found.
+ * 12. [for-each:x:@csv2lambda/*/*/{@get-name}] - Iterates over each value in the column.
+ * 13. [if] - Checks if the column is numeric.
+ * 14. [not] - Negates the condition to check if the column is not numeric.
+ * 15. [eq] - Compares the processed value to determine its type.
+ * 16. [strings.replace-not-of:x:@.dp/#] - Replaces non-numeric characters to check if the value is numeric.
+ * 17. [set-value:x:@.found] - Sets the found flag to true if a numeric value is detected.
+ * 18. [if] - Checks if no numeric value was found.
+ * 19. [eq:x:@.found] - Compares the found flag to false.
+ * 20. [set-value:x:@.type] - Sets the column type to numeric if no numeric value was found.
+ * 21. [execute-file:/system/sql/ddl/column.post.hl] - Executes a file to add the column to the table.
+ * 22. [get-count:x:@csv2lambda/0/*] - Retrieves the count of columns processed.
+ * 23. [log.info:Columns created] - Logs the number of columns created with relevant details.
+ */
+try
+   .pk
+   set-value:x:@.pk
+      strings.concat
+         get-value:x:@.table
+         .:_id
+   execute-file:/system/sql/ddl/table.post.hl
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+      pkName:x:@.pk
+      pkType:auto_increment
+      pkLength:int:10
+      pkDefault:
+   set-value:x:@.changes
+      .:bool:true
+   log.info:Table created
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+   for-each:x:@csv2lambda/0/*
+      .type:text
+      get-name:x:@.dp/#
+      .found:bool:false
+      for-each:x:@csv2lambda/*/*/{@get-name}
+         if
+            not
+               eq
+                  strings.replace-not-of:x:@.dp/#
+                     .:0123456789.
+                     .:
+                  get-value:x:@.dp/#
+            .lambda
+               set-value:x:@.found
+                  .:bool:true
+      if
+         eq:x:@.found
+            .:bool:false
+         .lambda
+            set-value:x:@.type
+               .:numeric
+      execute-file:/system/sql/ddl/column.post.hl
+         databaseType:x:@.arguments/*/databaseType
+         connectionString:x:@.arguments/*/connectionString
+         databaseName:x:@.arguments/*/databaseName
+         tableName:x:@.table
+         columnName:x:@get-name
+         columnType:x:@.type
+   get-count:x:@csv2lambda/0/*
+   log.info:Columns created
+      column_count:x:@get-count
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table

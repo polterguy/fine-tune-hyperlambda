@@ -1,0 +1,269 @@
+
+/*
+ * This Hyperlambda code is a complex workflow for interacting with an external service, likely an AI model, through HTTP requests. It uses a [while] loop to repeatedly send HTTP POST requests to a specified URL, decrementing the [iterations] counter each time a successful response is received. The response is processed to extract results and handle errors, with conditions to manage streaming and non-streaming scenarios. The code also manages session data, caching it if necessary, and logs information about the process. Additionally, it checks for a supervised mode to log requests and responses in a database, and handles outgoing webhooks by sending signals to specified URLs. The code ensures that all operations are executed within the constraints of the provided arguments and configurations.
+ * 
+ * 1. [while] - Initiates a loop that continues as long as [iterations] is greater than zero.
+ * 2. [set-value] - Initializes or updates various nodes like [.new-prompt], [.result], and [.finish_reason].
+ * 3. [add] - Adds nodes to the HTTP POST payload.
+ * 4. [set-value] - Retrieves configuration values for URL and model.
+ * 5. [http.post] - Sends an HTTP POST request to the specified URL with JSON payload.
+ * 6. [if] - Checks if the HTTP response status code indicates an error.
+ * 7. [lambda2hyper] - Converts the HTTP response to a Hyperlambda object.
+ * 8. [log.error] - Logs an error message if the HTTP request fails.
+ * 9. [throw] - Throws an exception if streaming is not enabled and an error occurs.
+ * 10. [sockets.signal] - Sends a signal with error details if streaming is enabled.
+ * 11. [math.decrement] - Decreases the [iterations] counter if the HTTP request is successful.
+ * 12. [set-value] - Updates [.result] and [.finish_reason] based on the HTTP response.
+ * 13. [strings.trim] - Trims whitespace from the [.result] node.
+ * 14. [if] - Checks if a session exists and is not null.
+ * 15. [add] - Adds the result to the session if it is not null.
+ * 16. [cache.set] - Caches the session data.
+ * 17. [data.connect] - Connects to a data source for logging requests and responses.
+ * 18. [data.create] - Logs the request and response details in a database.
+ * 19. [set-value] - Retrieves the outgoing webhook configuration.
+ * 20. [signal] - Sends a signal to the outgoing webhook URL.
+ * 21. [strings.split] - Splits strings to extract channel, to, and from information.
+ * 22. [eval] - Executes the constructed [exe] node containing the outgoing signal.
+ */
+while
+   mt:x:@.iterations
+      .:int:0
+   .lambda
+      set-value:x:@.new-prompt
+         .:
+      set-value:x:@.result
+         .:
+      set-value:x:@.finish_reason
+         .:
+      .has-sent-waiting:bool:false
+      add:x:./*/http.post/*/payload/*/messages
+         get-nodes:x:@.session/*
+      .url
+      .model
+      set-value:x:@.url
+         config.get:"magic:ollama:url"
+      set-value:x:@.model
+         config.get:"magic:ollama:model"
+      http.post:x:@.url
+         convert:bool:true
+         headers
+            Content-Type:application/json
+         payload
+            stream:x:@.arguments/*/stream
+            model:x:@.model
+            messages
+      if
+         not
+            and
+               mte:x:@http.post
+                  .:int:200
+               lt:x:@http.post
+                  .:int:300
+         .lambda
+            lambda2hyper:x:@http.post
+            log.error:Something went wrong while invoking Ollama
+               message:x:@http.post/*/content/*/error/*/message
+               status:x:@http.post
+               error:x:@lambda2hyper
+            if
+               or
+                  not-exists:x:@.arguments/*/stream
+                  eq:x:@.arguments/*/stream
+                     .:bool:false
+               .lambda
+                  throw:x:@http.post/*/content/*/error/*/message
+                     public:bool:true
+                     status:x:@http.post
+            else
+               unwrap:x:+/*/*
+               sockets.signal:x:@.arguments/*/session
+                  args
+                     error:bool:true
+                     status:x:@http.post
+                     message:x:@http.post/*/content/*/error/*/message
+               set-value:x:@.iterations
+                  .:int:0
+      else
+         log.info:Invoking Ollama was a success
+         math.decrement:x:@.iterations
+      if
+         or
+            not-exists:x:@.arguments/*/stream
+            eq:x:@.arguments/*/stream
+               .:bool:false
+         .lambda
+            set-value:x:@.result
+               get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+            set-value:x:@.finish_reason
+               get-first-value
+                  get-value:x:@http.post/*/content/*/choices/0/*/finish_reason
+                  .:unknown
+            set-value:x:@.iterations
+               .:int:0
+      set-value:x:@.result
+         strings.trim:x:@.result
+      if
+         and
+            exists:x:@.arguments/*/session
+            not-null:x:@.arguments/*/session
+         .lambda
+            if
+               and
+                  not-null:x:@.result
+                  neq:x:@.result
+                     .:
+               .lambda
+                  unwrap:x:+/*/*/*/content
+                  add:x:@.session
+                     .
+                        .
+                           role:assistant
+                           content:x:@.result
+            if
+               and
+                  not-null:x:@.new-prompt
+                  neq:x:@.new-prompt
+                     .:
+               .lambda
+                  unwrap:x:+/*/*/*/content
+                  add:x:@.session
+                     .
+                        .
+                           role:system
+                           content:x:@.new-prompt
+            .cache-session
+            add:x:@.cache-session
+               get-nodes:x:@.session/*
+            .tmp
+            set-value:x:@.tmp
+               get-value:x:@.fixed
+            while
+               mt:x:@.tmp
+                  .:int:0
+               .lambda
+                  remove-nodes:x:@.cache-session/0
+                  math.decrement:x:@.tmp
+            lambda2hyper:x:@.cache-session/*
+            cache.set:x:@.arguments/*/session
+               expiration:x:@.arguments/*/session_timeout
+               value:x:@lambda2hyper
+      if
+         and
+            exists:x:@.arguments/*/supervised
+            not-null:x:@.arguments/*/supervised
+            eq
+               convert:x:@.arguments/*/supervised
+                  type:int
+               .:int:1
+         .lambda
+            data.connect:[generic|magic]
+               .prompt
+               if
+                  mt:x:@.no-invocation
+                     .:int:0
+                  .lambda
+                     set-value:x:@.prompt
+                        strings.concat
+                           .:[
+                           get-value:x:@.no-invocation
+                           .:"] - "
+                           get-value:x:@.only-prompt
+               else
+                  set-value:x:@.prompt
+                     get-value:x:@.only-prompt
+               .tmp-completion
+               if
+                  not-null:x:@.function-result
+                  .lambda
+                     set-value:x:@.tmp-completion
+                        strings.concat
+                           get-value:x:@.result
+                           .:@"
+"
+                           .:@"
+"
+                           .:@"Result of function invocation:
+"
+                           .:@"
+"
+                           .:```json
+                           .:@"
+"
+                           get-value:x:@.function-result
+                           .:@"
+"
+                           .:```
+                     set-value:x:@.function-result
+               else
+                  set-value:x:@.tmp-completion
+                     get-value:x:@.result
+               data.create
+                  table:ml_requests
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@.prompt
+                     completion:x:@.tmp-completion
+                     finish_reason:x:@.finish_reason
+                     session:x:@.arguments/*/session
+                     user_id:x:@.arguments/*/user_id
+                     referrer:x:@.arguments/*/referrer
+      .outgoing
+      set-value:x:@.outgoing
+         get-first-value
+            get-value:x:@.arguments/*/webhook_outgoing
+            config.get:"magic:openai:integrations:outgoing:slot"
+      if
+         and
+            not-null:x:@.outgoing
+            neq:x:@.outgoing
+               .:
+         .lambda
+            .exe
+               .hook-url
+               set-value:x:@.hook-url
+                  get-first-value
+                     get-value:x:@.arguments/*/webhook_outgoing_url
+                     config.get:"magic:openai:integrations:outgoing:url"
+               unwrap:x:./*/signal/*/url
+               signal:x:@.outgoing
+                  url:x:@.hook-url
+            unwrap:x:+/*/*
+            add:x:@.exe/*/signal
+               .
+                  result:x:@.result
+                  session:x:@.arguments/*/session
+            if
+               and
+                  exists:x:@.arguments/*/to
+                  exists:x:@.arguments/*/from
+                  not-null:x:@.arguments/*/to
+                  not-null:x:@.arguments/*/from
+                  strings.contains:x:@.arguments/*/to
+                     .:":"
+                  strings.contains:x:@.arguments/*/from
+                     .:":"
+               .lambda
+                  .channel
+                  .to
+                  .from
+                  strings.split:x:@.arguments/*/to
+                     .:":"
+                  set-value:x:@.channel
+                     get-value:x:@strings.split/0
+                  set-value:x:@.to
+                     get-value:x:@strings.split/1
+                  strings.split:x:@.arguments/*/from
+                     .:":"
+                  set-value:x:@.from
+                     get-value:x:@strings.split/1
+                  unwrap:x:+/*/*
+                  add:x:@.exe/*/signal
+                     .
+                        to:x:@.from
+                        from:x:@.to
+                        channel:x:@.channel
+            else
+               add:x:@.exe/*/signal
+                  get-nodes:x:@.arguments/*/to
+                  get-nodes:x:@.arguments/*/from
+            eval:x:@.exe

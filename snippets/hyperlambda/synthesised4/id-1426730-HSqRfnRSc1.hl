@@ -1,0 +1,45 @@
+
+/*
+ * The given Hyperlambda code snippet is a conditional block that checks if a certain condition is met and then performs operations based on the presence of a URL in a value. If the condition is true, it checks if the value starts with "http://" or "https://", and if so, it adds this value to a disallow list. If the value does not start with these, it concatenates a domain with the value and then adds the result to the disallow list.
+ * 
+ * 1. [case:disallow] - Initiates a case block for disallowing certain values.
+ * 2. [if] - Checks if the [relevant] node is true.
+ * 3. [eq] - Compares the value of [relevant] to true.
+ * 4. [.lambda] - Executes the lambda block if the condition is true.
+ * 5. [or] - Checks if either of the following conditions is true.
+ * 6. [strings.starts-with] - Checks if the [value] node starts with "http://".
+ * 7. [strings.starts-with] - Checks if the [value] node starts with "https://".
+ * 8. [.lambda] - Executes the lambda block if either condition is true.
+ * 9. [unwrap] - Unwraps the value of the next sibling node.
+ * 10. [add] - Adds the [value] to the [disallow] list.
+ * 11. [else] - Executes if the initial condition is false.
+ * 12. [strings.concat] - Concatenates the [domain] and [value] nodes.
+ * 13. [get-value] - Retrieves the value of the [domain] node.
+ * 14. [get-value] - Retrieves the value of the [value] node.
+ * 15. [unwrap] - Unwraps the value of the next sibling node.
+ * 16. [add] - Adds the concatenated result to the [disallow] list.
+ */
+case:disallow
+   if
+      eq:x:@.relevant
+         .:bool:true
+      .lambda
+         if
+            or
+               strings.starts-with:x:@.value
+                  .:"http://"
+               strings.starts-with:x:@.value
+                  .:"https://"
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.disallow
+                  .
+                     .:x:@.value
+         else
+            strings.concat
+               get-value:x:@.domain
+               get-value:x:@.value
+            unwrap:x:+/*/*
+            add:x:@.disallow
+               .
+                  .:x:@strings.concat

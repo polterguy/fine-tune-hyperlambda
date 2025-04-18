@@ -1,0 +1,68 @@
+
+/*
+ * This Hyperlambda code checks if a node named "a" exists and has a non-null "href" attribute. If true, it constructs a URL based on certain conditions: if the "href" starts with "/", it appends it to a base URL; if it doesn't start with "http://" or "https://", it adds a "/" between the base URL and "href"; otherwise, it uses the "href" as is. Finally, it appends a formatted string to a "completion" node, incorporating the constructed URL. 
+ * 
+ * 1. [if] - Checks if certain conditions are met to execute the following lambda.
+ * 2. [and] - Combines multiple conditions that must all be true.
+ * 3. [eq] - Checks if the name of the current node is "a".
+ * 4. [exists] - Checks if the "href" attribute exists.
+ * 5. [not-null] - Checks if the "href" attribute is not null.
+ * 6. [.lambda] - Contains the actions to execute if the conditions are true.
+ * 7. [.url] - Temporary node for constructing the URL.
+ * 8. [if] - Checks if the "href" starts with "/".
+ * 9. [strings.starts-with] - Determines if a string starts with a specific substring.
+ * 10. [set-value] - Sets the value of a node.
+ * 11. [strings.concat] - Concatenates strings to form a URL.
+ * 12. [get-value] - Retrieves the value of a node.
+ * 13. [else-if] - Checks additional conditions if the first "if" is false.
+ * 14. [not] - Negates a condition.
+ * 15. [else] - Executes if none of the previous conditions are true.
+ * 16. [strings.trim] - Trims whitespace from a string.
+ * 17. [strings.replace] - Replaces specific characters in a string.
+ */
+if
+   and
+      eq
+         get-name:x:@.dp/#/.
+         .:a
+      exists:x:"@.dp/#/./*/\\@href/[0,1]"
+      not-null:x:"@.dp/#/./*/\\@href/[0,1]"
+   .lambda
+      .url
+      if
+         strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+            .:/
+         .lambda
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+      else-if
+         and
+            not
+               strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                  .:"http://"
+            not
+               strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                  .:"https://"
+         .lambda
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@.base
+                  .:/
+                  get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+      else
+         set-value:x:@.url
+            get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+      set-value:x:@.completion
+         strings.concat
+            get-value:x:@.completion
+            .:" "
+            .:[
+            strings.trim:x:@strings.replace
+               .:@"  
+	"
+            .:](
+            get-value:x:@.url
+            .:)
+            .:" "

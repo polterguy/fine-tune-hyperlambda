@@ -1,0 +1,61 @@
+
+/*
+ * This Hyperlambda code checks if the content of a JSON message is not null and not equal to an empty string. If true, it appends the content to a result node. It then checks if the result does not contain "___" and sends a signal with the message content. If the result contains "FUNCTION_INVOCATION[" and a "has-sent-waiting" flag is not true, it sends a waiting signal and sets the flag to true.
+ * 
+ * 1. [if] - Checks if the content of the JSON message is not null and not an empty string.
+ * 2. [and] - Combines two conditions to check if both are true.
+ * 3. [not-null] - Checks if the JSON message content is not null.
+ * 4. [neq] - Checks if the JSON message content is not equal to an empty string.
+ * 5. [.lambda] - Executes the following nodes if the conditions are true.
+ * 6. [set-value] - Appends the JSON message content to the result node.
+ * 7. [strings.concat] - Concatenates the current result with the message content.
+ * 8. [get-value] - Retrieves the current value of the result and message content.
+ * 9. [if] - Checks if the result does not contain "___".
+ * 10. [not] - Inverts the condition of the following slot.
+ * 11. [strings.contains] - Checks if the result contains "___".
+ * 12. [.lambda] - Executes the following nodes if the condition is true.
+ * 13. [unwrap] - Evaluates all expressions in the result.
+ * 14. [sockets.signal] - Sends a signal with the message content.
+ * 15. [args] - Specifies the arguments for the signal.
+ * 16. [message] - The message content to be sent in the signal.
+ * 17. [else-if] - Checks additional conditions if the previous if condition is false.
+ * 18. [and] - Combines two conditions to check if both are true.
+ * 19. [strings.contains] - Checks if the result contains "FUNCTION_INVOCATION[".
+ * 20. [neq] - Checks if the "has-sent-waiting" flag is not true.
+ * 21. [.lambda] - Executes the following nodes if the conditions are true.
+ * 22. [sockets.signal] - Sends a waiting signal.
+ * 23. [args] - Specifies the arguments for the signal.
+ * 24. [function_waiting] - Indicates that a function is waiting.
+ * 25. [set-value] - Sets the "has-sent-waiting" flag to true.
+ */
+if
+   and
+      not-null:x:@json2lambda/*/message/*/content
+      neq:x:@json2lambda/*/message/*/content
+         .:
+   .lambda
+      set-value:x:@.result
+         strings.concat
+            get-value:x:@.result
+            get-value:x:@json2lambda/*/message/*/content
+      if
+         not
+            strings.contains:x:@.result
+               .:___
+         .lambda
+            unwrap:x:+/*/*
+            sockets.signal:x:@.session
+               args
+                  message:x:@json2lambda/*/message/*/content
+      else-if
+         and
+            strings.contains:x:@.result
+               .:FUNCTION_INVOCATION[
+            neq:x:@.has-sent-waiting
+               .:bool:true
+         .lambda
+            sockets.signal:x:@.session
+               args
+                  function_waiting:bool:true
+            set-value:x:@.has-sent-waiting
+               .:bool:true

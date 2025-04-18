@@ -1,0 +1,73 @@
+
+/*
+ * This Hyperlambda code is a conditional logic block that processes JSON data converted to a lambda structure using [json2lambda]. It checks for specific conditions and signals a session with relevant data. The code performs the following actions:
+ * 
+ * 1. **[else]** - Executes if previous conditions in the parent block are false.
+ * 2. **[if]** - Checks if the node [done_reason] exists and is not null.
+ * 3. **[and]** - Ensures both conditions are true for the inner block to execute.
+ * 4. **[exists]** - Verifies the existence of the [done_reason] node.
+ * 5. **[not-null]** - Confirms the [done_reason] node is not null.
+ * 6. **[set-value]** - Assigns the value of [done_reason] to [finish_reason].
+ * 7. **[unwrap]** - Evaluates expressions and unwraps the result.
+ * 8. **[sockets.signal]** - Sends a signal with [finish_reason] to the session.
+ * 9. **[if]** - Checks if [content] in [message] is not null or empty.
+ * 10. **[and]** - Ensures both conditions are true for the inner block to execute.
+ * 11. **[not-null]** - Confirms the [content] node is not null.
+ * 12. **[neq]** - Ensures the [content] node is not empty.
+ * 13. **[set-value]** - Concatenates [result] with [content].
+ * 14. **[strings.concat]** - Joins strings together.
+ * 15. **[if]** - Checks if [result] does not contain "___".
+ * 16. **[not]** - Negates the condition.
+ * 17. **[strings.contains]** - Checks if [result] contains a specific substring.
+ * 18. **[unwrap]** - Evaluates expressions and unwraps the result.
+ * 19. **[sockets.signal]** - Sends a signal with [content] to the session.
+ * 20. **[else-if]** - Executes if previous conditions are false and new conditions are true.
+ * 21. **[and]** - Ensures both conditions are true for the inner block to execute.
+ * 22. **[strings.contains]** - Checks if [result] contains "FUNCTION_INVOCATION[".
+ * 23. **[neq]** - Ensures [has-sent-waiting] is not true.
+ * 24. **[sockets.signal]** - Sends a signal indicating a function is waiting.
+ * 25. **[set-value]** - Sets [has-sent-waiting] to true.
+ */
+else
+   if
+      and
+         exists:x:@json2lambda/*/done_reason
+         not-null:x:@json2lambda/*/done_reason
+      .lambda
+         set-value:x:@.finish_reason
+            get-value:x:@json2lambda/*/done_reason
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               finish_reason:x:@.finish_reason
+   if
+      and
+         not-null:x:@json2lambda/*/message/*/content
+         neq:x:@json2lambda/*/message/*/content
+            .:
+      .lambda
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               get-value:x:@json2lambda/*/message/*/content
+         if
+            not
+               strings.contains:x:@.result
+                  .:___
+            .lambda
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     message:x:@json2lambda/*/message/*/content
+         else-if
+            and
+               strings.contains:x:@.result
+                  .:FUNCTION_INVOCATION[
+               neq:x:@.has-sent-waiting
+                  .:bool:true
+            .lambda
+               sockets.signal:x:@.session
+                  args
+                     function_waiting:bool:true
+               set-value:x:@.has-sent-waiting
+                  .:bool:true

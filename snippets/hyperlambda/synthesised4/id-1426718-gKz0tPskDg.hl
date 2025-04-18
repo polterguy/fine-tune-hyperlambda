@@ -1,0 +1,149 @@
+
+/*
+ * This Hyperlambda code processes a file, creates a summary using OpenAI's API if certain conditions are met, and stores the resulting data in a database. It checks if a handle exists, loads file content, and if a massage argument is present and the token count is below 15000, it requests a summary from OpenAI. If successful, it stores the prompt and completion in a snippets collection, otherwise, it logs a warning. Finally, it inserts the snippets into a database table for machine learning training.
+ * 
+ * 1. [if] - Checks if a handle exists.
+ * 2. [set-value] - Updates the file-meta with the filename.
+ * 3. [strings.concat] - Concatenates strings to form the file-meta.
+ * 4. [get-value] - Retrieves the current file-meta value.
+ * 5. [.content] - Declares a content node.
+ * 6. [set-value] - Loads the file content into the content node.
+ * 7. [io.file.load] - Loads the file content.
+ * 8. [.snippets] - Declares a snippets node.
+ * 9. [if] - Checks conditions for creating a summary.
+ * 10. [and] - Combines multiple conditions.
+ * 11. [exists] - Checks if massage argument exists.
+ * 12. [neq] - Checks if massage argument is not empty.
+ * 13. [lt] - Checks if token count is less than 15000.
+ * 14. [openai.tokenize] - Tokenizes the content.
+ * 15. [.lambda] - Executes if conditions are true.
+ * 16. [strings.concat] - Concatenates strings for feedback message.
+ * 17. [unwrap] - Unwraps the message node.
+ * 18. [sockets.signal] - Sends a feedback signal.
+ * 19. [http.post] - Sends a POST request to OpenAI API.
+ * 20. [headers] - Sets HTTP headers.
+ * 21. [Authorization] - Sets authorization header.
+ * 22. [Content-Type] - Sets content type header.
+ * 23. [payload] - Sets the request payload.
+ * 24. [model] - Specifies the OpenAI model.
+ * 25. [max_tokens] - Sets max tokens for response.
+ * 26. [temperature] - Sets temperature for response.
+ * 27. [messages] - Sets messages for the API request.
+ * 28. [role] - Sets role in the message.
+ * 29. [content] - Sets content in the message.
+ * 30. [convert] - Converts response to a usable format.
+ * 31. [if] - Checks if the API response is successful.
+ * 32. [and] - Combines multiple conditions.
+ * 33. [mte] - Checks if response code is 200 or more.
+ * 34. [lt] - Checks if response code is less than 300.
+ * 35. [.lambda] - Executes if response is successful.
+ * 36. [unwrap] - Unwraps the API response.
+ * 37. [add] - Adds a new snippet to the snippets node.
+ * 38. [prompt] - Sets the prompt in the snippet.
+ * 39. [completion] - Sets the completion in the snippet.
+ * 40. [else] - Executes if response is not successful.
+ * 41. [strings.concat] - Concatenates strings for warning message.
+ * 42. [unwrap] - Unwraps the message node.
+ * 43. [sockets.signal] - Sends a warning signal.
+ * 44. [add] - Adds a new snippet with file-meta and content.
+ * 45. [data.connect] - Connects to a database.
+ * 46. [for-each] - Iterates over snippets.
+ * 47. [data.create] - Inserts a snippet into the database.
+ * 48. [table] - Specifies the database table.
+ * 49. [values] - Sets values for the database record.
+ * 50. [type] - Sets the type value.
+ * 51. [prompt] - Sets the prompt value.
+ * 52. [completion] - Sets the completion value.
+ * 53. [filename] - Sets the filename value.
+ * 54. [cached] - Sets the cached value.
+ */
+if:x:@.handle
+   set-value:x:@.file-meta
+      strings.concat
+         get-value:x:@.file-meta
+         .:" - Filename: "
+         get-value:x:@.dp/#
+   .content
+   set-value:x:@.content
+      io.file.load:x:@.dp/#
+   .snippets
+   if
+      and
+         exists:x:@.arguments/*/massage
+         neq:x:@.arguments/*/massage
+            .
+         neq:x:@.arguments/*/massage
+            .:
+         lt
+            openai.tokenize:x:@.content
+            .:int:15000
+      .lambda
+         strings.concat
+            .:"Creating summary for file: "
+            get-value:x:@.dp/#
+         unwrap:x:+/*/*/message
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         http.post:"https://api.openai.com/v1/chat/completions"
+            headers
+               Authorization:x:@.token
+               Content-Type:application/json
+            payload
+               model:gpt-3.5-turbo-1106
+               max_tokens:int:2000
+               temperature:decimal:0.5
+               messages
+                  .
+                     role:system
+                     content:x:@.arguments/*/massage
+                  .
+                     role:system
+                     content:x:@.content
+            convert:true
+         if
+            and
+               mte:x:@http.post
+                  .:int:200
+               lt:x:@http.post
+                  .:int:300
+            .lambda
+               unwrap:x:+/*/*/*
+               add:x:@.snippets
+                  .
+                     .
+                        prompt:x:@http.post/*/content/*/choices/0/*/message/*/content
+                        completion:x:@.content
+         else
+            strings.concat
+               .:"Could not create summary for file: "
+               get-value:x:@.dp/#
+            unwrap:x:+/*/*/message
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:warning
+            unwrap:x:+/*/*/*
+            add:x:@.snippets
+               .
+                  .
+                     prompt:x:@.file-meta
+                     completion:x:@.content
+   else
+      unwrap:x:+/*/*/*
+      add:x:@.snippets
+         .
+            .
+               prompt:x:@.file-meta
+               completion:x:@.content
+   data.connect:[generic|magic]
+      for-each:x:@.snippets/*
+         data.create
+            table:ml_training_snippets
+            values
+               type:x:@.arguments/*/type
+               prompt:x:@.dp/#/*/prompt
+               completion:x:@.dp/#/*/completion
+               filename:x:@.dp/@.dp/#
+               cached:int:0

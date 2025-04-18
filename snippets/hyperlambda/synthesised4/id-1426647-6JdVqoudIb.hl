@@ -1,0 +1,37 @@
+
+/*
+ * This Hyperlambda code iterates through nodes returned by [hyper2lambda] that match [yield], [return], or [return-nodes], and checks if they contain complex objects. If complex objects are found, it sets a warning message. It then constructs an expression string for each node and checks if this expression already exists in the candidates. If not, it adds the expression to the candidates list.
+ * 
+ * 1. [else] - Executes the following code block if the previous conditions were false.
+ * 2. [for-each] - Iterates over nodes returned by [hyper2lambda] that match [yield], [return], or [return-nodes].
+ * 3. [if] - Checks if the current node has complex child nodes.
+ * 4. [set-value] - Sets a warning message if complex objects are found.
+ * 5. [set-value] - Constructs an expression string for the current node.
+ * 6. [if] - Checks if the constructed expression already exists in the candidates list.
+ * 7. [unwrap] - Evaluates the expressions in the current context.
+ * 8. [add] - Adds the new expression to the candidates list if it doesn't already exist.
+ */
+else
+   for-each:x:@hyper2lambda/**/[yield|return|return-nodes]/*
+      if
+         exists:x:@.dp/#/*
+         .lambda
+            set-value:x:@.warning
+               .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+      .x
+      set-value:x:@.x
+         strings.concat
+            .:--/execute/=
+            get-value:x:@.dp/@.dp/#/*/name
+            .:/*/
+            get-name:x:@.dp/#
+      if
+         not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:../*/return/*/candidates
+               .
+                  .
+                     name:x:@.x
+                     expression:x:@.x
+                     complete:bool:true

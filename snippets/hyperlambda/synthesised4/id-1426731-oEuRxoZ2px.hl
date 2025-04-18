@@ -1,0 +1,86 @@
+
+/*
+ * This Hyperlambda code iterates over a sorted list of nodes, applying a series of conditional checks to determine if a node should be added to a return list or ignored. It uses a combination of logical conditions, pattern matching, and URL filtering to evaluate each node. If a node meets all criteria, it is added to the return list and a counter is decremented. If not, an ignored counter is incremented. The process continues until a maximum limit is reached or the list is exhausted. The code ensures that only nodes matching specific conditions are processed further.
+ * 
+ * 1. [while] - Initiates a loop that continues as long as both conditions (max > 0 and a node exists in the sorted list) are true.
+ * 2. [and] - Combines multiple conditions to determine if the loop should continue.
+ * 3. [mt] - Checks if the "max" argument is greater than 0.
+ * 4. [exists] - Checks if there is at least one node in the sorted list.
+ * 5. [.lambda] - Contains the main logic to be executed in each iteration of the loop.
+ * 6. [.allowed] - Initializes a boolean flag to true, indicating whether a node is allowed.
+ * 7. [for-each] - Iterates over the "disallow" list to check patterns against the current node.
+ * 8. [unwrap] - Evaluates the expression to get the pattern for matching.
+ * 9. [invoke] - Calls the "match" function to check if the current node matches the pattern.
+ * 10. [if] - Checks if the "invoke" result is true, indicating a match.
+ * 11. [set-value] - Sets the "allowed" flag to false if a match is found in the "disallow" list.
+ * 12. [for-each] - Iterates over the "allow" list to check patterns against the current node.
+ * 13. [unwrap] - Evaluates the expression to get the pattern for matching.
+ * 14. [invoke] - Calls the "match" function to check if the current node matches the pattern.
+ * 15. [if] - Checks if the "invoke" result is true, indicating a match.
+ * 16. [set-value] - Sets the "allowed" flag to true if a match is found in the "allow" list.
+ * 17. [if] - Checks additional conditions related to URL filtering.
+ * 18. [and] - Combines multiple conditions for URL filtering.
+ * 19. [get-value] - Retrieves the "filter-on-url" argument value.
+ * 20. [exists] - Checks if the "url" argument exists.
+ * 21. [not-null] - Ensures the "url" argument is not null.
+ * 22. [neq] - Ensures the "url" argument is not an empty string.
+ * 23. [not] - Inverts the result of the "strings.starts-with" condition.
+ * 24. [strings.starts-with] - Checks if the current node's URL starts with the specified URL.
+ * 25. [set-value] - Sets the "allowed" flag to false if URL conditions are not met.
+ * 26. [if] - Checks if the "allowed" flag is true.
+ * 27. [add] - Adds the current node to the return list if allowed.
+ * 28. [math.decrement] - Decreases the "max" counter by 1.
+ * 29. [else] - Executes if the "allowed" flag is false.
+ * 30. [math.increment] - Increases the "ignored" counter by 1.
+ * 31. [remove-nodes] - Removes the current node from the sorted list.
+ */
+while
+   and
+      mt:x:@.arguments/*/max
+         .:int:0
+      exists:x:@sort/0
+   .lambda
+      .allowed:bool:true
+      for-each:x:@.arguments/*/disallow/*
+         unwrap:x:+/*
+         invoke:x:@.match
+            url:x:@sort/0
+            pattern:x:@.dp/#
+         if
+            get-value:x:@invoke
+            .lambda
+               set-value:x:@.allowed
+                  .:bool:false
+               for-each:x:@.arguments/*/allow/*
+                  unwrap:x:+/*
+                  invoke:x:@.match
+                     url:x:@sort/0
+                     pattern:x:@.dp/#
+                  if
+                     get-value:x:@invoke
+                     .lambda
+                        set-value:x:@.allowed
+                           .:bool:true
+      if
+         and
+            get-value:x:@.arguments/*/filter-on-url
+            exists:x:@.arguments/*/url
+            not-null:x:@.arguments/*/url
+            neq:x:@.arguments/*/url
+               .:
+            not
+               strings.starts-with:x:@sort/0
+                  get-value:x:@.arguments/*/url
+         .lambda
+            set-value:x:@.allowed
+               .:bool:false
+      if
+         eq:x:@.allowed
+            .:bool:true
+         .lambda
+            add:x:@.return
+               get-nodes:x:@sort/0
+            math.decrement:x:@.arguments/*/max
+      else
+         math.increment:x:@.ignored
+      remove-nodes:x:@sort/0

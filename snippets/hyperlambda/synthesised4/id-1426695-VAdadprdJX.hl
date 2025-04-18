@@ -1,0 +1,102 @@
+
+/*
+ * This code sends a POST request to the OpenAI API to generate chat completions using the GPT-4o model. It streams the response and processes each message, checking for completion signals and content updates. If a message starts with "data:", it processes the data, updating the session with finished status or appending new content to the result. It uses session signaling to communicate updates. The request includes authorization and content-type headers, and the payload specifies model parameters and messages. 
+ * 
+ * 1. [http.post] - Sends a POST request to the specified URL.
+ * 2. [convert] - Converts the response to a specific type.
+ * 3. [.sse] - Handles server-sent events.
+ * 4. [.session] - Retrieves the session from arguments.
+ * 5. [if] - Checks conditions for message processing.
+ * 6. [and] - Logical AND for multiple conditions.
+ * 7. [exists] - Checks if a node exists.
+ * 8. [not-null] - Checks if a node is not null.
+ * 9. [strings.starts-with] - Checks if a string starts with a specific prefix.
+ * 10. [strings.substring] - Extracts a substring from a string.
+ * 11. [strings.trim] - Trims whitespace from a string.
+ * 12. [neq] - Checks if two values are not equal.
+ * 13. [eq] - Checks if two values are equal.
+ * 14. [sockets.signal] - Sends a signal to a session.
+ * 15. [args] - Specifies arguments for a signal.
+ * 16. [json2lambda] - Converts JSON to a lambda object.
+ * 17. [unwrap] - Evaluates expressions in a node.
+ * 18. [set-value] - Sets the value of a node.
+ * 19. [strings.concat] - Concatenates strings.
+ * 20. [headers] - Specifies HTTP headers.
+ * 21. [Authorization] - Sets the authorization token.
+ * 22. [Content-Type] - Sets the content type.
+ * 23. [Accept] - Sets the accepted response type.
+ * 24. [payload] - Specifies the request payload.
+ * 25. [model] - Specifies the model to use.
+ * 26. [max_tokens] - Sets the maximum number of tokens.
+ * 27. [temperature] - Sets the temperature for randomness.
+ * 28. [stream] - Enables streaming of the response.
+ * 29. [messages] - Specifies the messages to send.
+ * 30. [role] - Specifies the role of a message.
+ * 31. [content] - Specifies the content of a message.
+ */
+http.post:"https://api.openai.com/v1/chat/completions"
+   convert:true
+   .sse
+      .session:x:@.arguments/*/session
+      if
+         and
+            exists:x:@.arguments/*/message
+            not-null:x:@.arguments/*/message
+            strings.starts-with:x:@.arguments/*/message
+               .:"data:"
+         .lambda
+            strings.substring:x:@.arguments/*/message
+               .:int:5
+            strings.trim:x:@strings.substring
+            if
+               neq:x:@strings.trim
+                  .:
+               .lambda
+                  if
+                     eq:x:@strings.trim
+                        .:[DONE]
+                     .lambda
+                        sockets.signal:x:@.session
+                           args
+                              finished:bool:true
+                  else
+                     json2lambda:x:@strings.trim
+                     if
+                        and
+                           exists:x:@json2lambda/*/choices/0/*/finish_reason
+                           not-null:x:@json2lambda/*/choices/0/*/finish_reason
+                        .lambda
+                           unwrap:x:+/*/*
+                           sockets.signal:x:@.session
+                              args
+                                 finish_reason:x:@json2lambda/*/choices/0/*/finish_reason
+                     if
+                        and
+                           not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+                           neq:x:@json2lambda/*/choices/0/*/delta/*/content
+                              .:
+                        .lambda
+                           set-value:x:@.result
+                              strings.concat
+                                 get-value:x:@.result
+                                 get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+                           unwrap:x:+/*/*
+                           sockets.signal:x:@.session
+                              args
+                                 message:x:@json2lambda/*/choices/0/*/delta/*/content
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json
+      Accept:text/event-stream
+   payload
+      model:gpt-4o
+      max_tokens:int:4000
+      temperature:decimal:0.3
+      stream:bool:true
+      messages
+         .
+            role:system
+            content:x:@.arguments/*/instruction
+         .
+            role:system
+            content:x:@.context

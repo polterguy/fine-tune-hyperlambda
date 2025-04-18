@@ -1,0 +1,237 @@
+
+/*
+ * This Hyperlambda code is designed to automate the process of preparing, submitting, and monitoring a fine-tuning task for an OpenAI model using training data stored in a database. It retrieves training snippets from a database, formats them, and submits them to OpenAI's API for fine-tuning. The code handles authentication, error checking, and scheduling of tasks to periodically check the status of the training process. Upon completion or failure, it logs the result and updates the database accordingly. The code also sends real-time notifications to the user about the status of the training process.
+ * 
+ * 1. [data.connect] - Connects to a database to read training snippets.
+ * 2. [data.read] - Reads training data from the database with specific conditions.
+ * 3. [for-each] - Iterates over each training snippet to format it.
+ * 4. [set-value] - Sets values for various nodes, including prompts and completions.
+ * 5. [strings.concat] - Concatenates strings to format data and headers.
+ * 6. [unwrap] - Evaluates expressions to extract data.
+ * 7. [add] - Adds nodes to a collection.
+ * 8. [http.post] - Sends a POST request to OpenAI's API to upload training data.
+ * 9. [if] - Checks conditions to handle API response and errors.
+ * 10. [lambda2hyper] - Converts lambda expressions to Hyperlambda for logging.
+ * 11. [log.error] - Logs errors if API calls fail.
+ * 12. [response.status.set] - Sets HTTP response status.
+ * 13. [return] - Returns a message if an error occurs.
+ * 14. [get-value] - Retrieves values from nodes.
+ * 15. [exists] - Checks if a node exists.
+ * 16. [not-null] - Checks if a node is not null.
+ * 17. [http.get] - Sends a GET request to check the status of the training.
+ * 18. [log.info] - Logs informational messages on successful operations.
+ * 19. [tasks.create] - Creates a scheduled task to monitor training status.
+ * 20. [tasks.delete] - Deletes a task upon completion or failure.
+ * 21. [sockets.signal] - Sends real-time notifications to users.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_training_snippets
+      columns
+         prompt
+         completion
+      where
+         and
+            type.eq:x:@.arguments/*/type
+            pushed.eq:int:0
+      limit:-1
+   .snippets
+   for-each:x:@data.read/*
+      .prompt
+      .completion
+      set-value:x:@.prompt
+         strings.concat
+            get-value:x:@.dp/#/*/prompt
+            .:" ->"
+      set-value:x:@.completion
+         strings.concat
+            get-value:x:@.dp/#/*/completion
+            .:" END"
+      unwrap:x:+/*/*/*
+      add:x:@.snippets
+         .
+            .
+               prompt:x:@.prompt
+               completion:x:@.completion
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+   .file-data
+   lambda2json:x:@.snippets/*
+   set-value:x:@.file-data
+      strings.replace:x:@lambda2json
+         .:},{
+         .:"}\n{"
+   set-value:x:@.file-data
+      strings.substring:x:@.file-data
+         .:1
+         math.subtract
+            strings.length:x:@.file-data
+            .:int:2
+   .filename
+   set-value:x:@.filename
+      strings.concat
+         .:"attachment; name=file; filename=\"training-file-"
+         guid.new
+         .:.jsonl
+         .:"\""
+   http.post:"https://api.openai.com/v1/files"
+      headers
+         Authorization:x:@.token
+         Content-Type:multipart/form-data
+      payload
+         entity:application/jsonl
+            headers
+               Content-Disposition:x:@.filename
+            content:x:@.file-data
+         entity:text/plain
+            headers
+               Content-Disposition:form-data; name=purpose
+            content:fine-tune
+      convert:true
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            error:x:@lambda2hyper
+         response.status.set:500
+         return
+            message:Something went wrong as we invoked OpenAI API
+   .id
+   set-value:x:@.id
+      get-value:x:@http.post/*/content/*/id
+   if
+      and
+         exists:x:@.arguments/*/epochs
+         not-null:x:@.arguments/*/epochs
+      .lambda
+         add:x:@data.connect/*/http.post/[1,2]/*/payload
+            get-nodes:x:@.arguments/*/epochs
+   if
+      and
+         exists:x:@.arguments/*/batch_size
+         not-null:x:@.arguments/*/batch_size
+      .lambda
+         add:x:@data.connect/*/http.post/[1,2]/*/payload
+            get-nodes:x:@.arguments/*/batch_size
+   if
+      and
+         exists:x:@.arguments/*/learning_rate_multiplier
+         not-null:x:@.arguments/*/learning_rate_multiplier
+      .lambda
+         add:x:@data.connect/*/http.post/[1,2]/*/payload
+            get-nodes:x:@.arguments/*/learning_rate_multiplier
+   if
+      and
+         exists:x:@.arguments/*/prompt_loss_weight
+         not-null:x:@.arguments/*/prompt_loss_weight
+      .lambda
+         add:x:@data.connect/*/http.post/[1,2]/*/payload
+            get-nodes:x:@.arguments/*/prompt_loss_weight
+   http.post:"https://api.openai.com/v1/fine-tunes"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         training_file:x:@.id
+         model:x:@.arguments/*/model
+         suffix:x:@.arguments/*/type
+      convert:true
+   if
+      neq:x:@http.post
+         .:int:200
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            error:x:@lambda2hyper
+         response.status.set:500
+         return
+            message:Something went wrong as we started our training session
+   get-count:x:@data.read/*
+   log.info:Successfully started training of OpenAI model
+      type:x:@.arguments/*/type
+      snippets:x:@get-count
+      base-model:x:@.arguments/*/model
+      new-model-id:x:@http.post/*/content/*/id
+   .task-id
+   set-value:x:@.task-id
+      strings.concat
+         .:magic.openai.training-session.
+         guid.new
+   unwrap:x:./*/tasks.create/*/*/.task-id
+   unwrap:x:./*/tasks.create/*/*/.model-id
+   unwrap:x:./*/tasks.create/*/*/.type
+   tasks.create:x:@.task-id
+      repeats:30.seconds
+      .lambda
+         .task-id:x:@.lambda/@.task-id
+         .model-id:x:@http.post/*/content/*/id
+         .type:x:@.arguments/*/type
+         .token
+         set-value:x:@.token
+            strings.concat
+               .:"Bearer "
+               config.get:"magic:openai:key"
+         strings.concat
+            .:"https://api.openai.com/v1/fine-tunes/"
+            get-value:x:@.model-id
+         http.get:x:@strings.concat
+            headers
+               Authorization:x:@.token
+            convert:true
+         if
+            and
+               mte:x:@http.get
+                  .:int:200
+               lt:x:@http.get
+                  .:int:300
+            .lambda
+               if
+                  eq:x:@http.get/*/content/*/status
+                     .:succeeded
+                  .lambda
+                     log.info:Training of OpenAI model completed successfully
+                     data.connect:[generic|magic]
+                        data.update
+                           table:ml_types
+                           values
+                              model:x:@http.get/*/content/*/fine_tuned_model
+                           where
+                              and
+                                 type.eq:x:@.type
+                        data.update
+                           table:ml_training_snippets
+                           values
+                              pushed:int:1
+                           where
+                              and
+                                 type.eq:x:@.type
+                     tasks.delete:x:@.task-id
+                     sockets.signal:magic.backend.message
+                        roles:root
+                        args
+                           message:Training of your OpenAI model succeeded!
+                           type:success
+               else-if
+                  eq:x:@http.get/*/content/*/status
+                     .:failed
+                  .lambda
+                     log.error:Training of OpenAI model FAILED!!
+                     tasks.delete:x:@.task-id
+                     sockets.signal:magic.backend.message
+                        roles:root
+                        args
+                           message:Training of your OpenAI model FAILED!
+                           type:error
+         else
+            lambda2hyper:x:@http.get
+            log.error:Retrieving training session status from OpenAI failed
+               result:x:@lambda2hyper

@@ -1,0 +1,54 @@
+
+/*
+ * The code checks if an HTTP POST request did not return a successful status code (between 200 and 299). If the request was unsuccessful, it logs an error with details from the HTTP response and throws an exception if streaming is not enabled. If streaming is enabled, it signals an error to a WebSocket session and resets an iteration counter. 
+ * 
+ * 1. [if] - Starts an if statement to check the HTTP response status.
+ * 2. [not] - Inverts the condition of the nested logical expression.
+ * 3. [and] - Combines two conditions that must both be true.
+ * 4. [mte] - Checks if the HTTP status code is more than or equal to 200.
+ * 5. [lt] - Checks if the HTTP status code is less than 300.
+ * 6. [.lambda] - Contains the code to execute if the condition is true.
+ * 7. [lambda2hyper] - Converts the HTTP response to a Hyperlambda object.
+ * 8. [log.error] - Logs an error message with details from the HTTP response.
+ * 9. [if] - Starts a nested if statement to check streaming conditions.
+ * 10. [or] - Combines two conditions where one must be true.
+ * 11. [not-exists] - Checks if the stream argument does not exist.
+ * 12. [eq] - Checks if the stream argument is false.
+ * 13. [.lambda] - Contains the code to execute if the streaming condition is true.
+ * 14. [throw] - Throws an exception with details from the HTTP response.
+ * 15. [else] - Contains the code to execute if the streaming condition is false.
+ * 16. [unwrap] - Evaluates expressions in the HTTP response.
+ * 17. [sockets.signal] - Sends a signal with error details to a WebSocket session.
+ * 18. [set-value] - Resets the iteration counter to 0.
+ */
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      if
+         or
+            not-exists:x:@.arguments/*/stream
+            eq:x:@.arguments/*/stream
+               .:bool:false
+         .lambda
+            throw:x:@http.post/*/content/*/error/*/message
+               public:bool:true
+               status:x:@http.post
+      else
+         unwrap:x:+/*/*
+         sockets.signal:x:@.arguments/*/session
+            args
+               error:bool:true
+               status:x:@http.post
+               message:x:@http.post/*/content/*/error/*/message
+         set-value:x:@.iterations
+            .:int:0

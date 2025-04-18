@@ -1,0 +1,84 @@
+
+/*
+ * The provided Hyperlambda code iterates through content nodes obtained from an HTTP GET request, checking for specific conditions such as stock status and description presence. If the conditions are met, it constructs a prompt and completion text using markdown conversion and string concatenation. It also checks for additional descriptions and images, appending relevant information to the completion text. Finally, it stores the constructed data into a table named "ml_training_snippets" with associated metadata. 
+ * 
+ * 1. [for-each] - Iterates over each content node from the HTTP GET response.
+ * 2. [if] - Checks conditions for stock status, description presence, and non-emptiness.
+ * 3. [.lambda] - Executes the following slots if conditions are true.
+ * 4. [.prompt] - Placeholder for prompt text.
+ * 5. [.completion] - Placeholder for completion text.
+ * 6. [set-value] - Sets values for prompt and completion using concatenated strings.
+ * 7. [strings.concat] - Concatenates strings and node values.
+ * 8. [html2markdown] - Converts HTML description to Markdown format.
+ * 9. [get-value] - Retrieves values from specified nodes.
+ * 10. [if] - Additional condition checks for short descriptions.
+ * 11. [exists] - Checks if images exist for the product.
+ * 12. [for-each] - Iterates over image nodes if they exist.
+ * 13. [data.create] - Inserts the constructed data into a database table.
+ */
+for-each:x:@http.get/*/content/*
+   if
+      and
+         eq:x:@.dp/#/*/stock_status
+            .:instock
+         not-null:x:@.dp/#/*/description
+         neq:x:@.dp/#/*/description
+            .:
+      .lambda
+         .prompt
+         .completion
+         set-value:x:@.prompt
+            strings.concat
+               html2markdown:x:@.dp/#/*/description
+         set-value:x:@.completion
+            strings.concat
+               .:"Price: "
+               get-value:x:@.dp/#/*/price
+               .:@"
+
+"
+               .:"URL: "
+               get-value:x:@.dp/#/*/permalink
+         if
+            and
+               not-null:x:@.dp/#/*/short_description
+               neq:x:@.dp/#/*/short_description
+                  .:
+            .lambda
+               set-value:x:@.completion
+                  strings.concat
+                     get-value:x:@.completion
+                     .:@"
+
+"
+                     .:"Short description: "
+                     html2markdown:x:@.dp/#/*/short_description
+         if
+            exists:x:@.dp/#/*/images/*
+            .lambda
+               set-value:x:@.completion
+                  strings.concat
+                     get-value:x:@.completion
+                     .:@"
+
+Images of product:"
+               for-each:x:@.dp/#/*/images/*
+                  set-value:x:@.completion
+                     strings.concat
+                        get-value:x:@.completion
+                        .:@"
+
+"
+                        .:![
+                        get-value:x:@.dp/#/*/name
+                        .:](
+                        get-value:x:@.dp/#/*/src
+                        .:)
+         data.create
+            table:ml_training_snippets
+            values
+               type:x:@.arguments/*/type
+               prompt:x:@.prompt
+               completion:x:@.completion
+               uri:x:@.uri
+               meta:woocommerce-import

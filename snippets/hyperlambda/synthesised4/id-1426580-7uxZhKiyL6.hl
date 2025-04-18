@@ -1,0 +1,44 @@
+
+/*
+ * // This Hyperlambda code iterates through a list of files and processes each file ending with a ".sql" extension. It loads the file content and executes it based on the database type. If the execution is successful, it logs a success message; otherwise, it logs an error message along with the exception.
+ * // 1. [for-each] - Iterates over each file in the specified directory.
+ * // 2. [if] - Checks if the current file ends with ".sql".
+ * // 3. [io.file.load] - Loads the content of the current SQL file.
+ * // 4. [try] - Attempts to execute the loaded SQL script.
+ * // 5. [if] - Checks if the database type is "mssql".
+ * // 6. [set-name] - Sets the name of the node for executing the SQL script.
+ * // 7. [data.execute] - Executes the SQL script.
+ * // 8. [strings.concat] - Concatenates strings to create a success message.
+ * // 9. [console.log] - Logs the success message.
+ * // 10. [.catch] - Catches any exceptions during script execution.
+ * // 11. [strings.concat] - Concatenates strings to create a failure message.
+ * // 12. [console.log] - Logs the failure message.
+ * // 13. [console.log] - Logs the exception message.
+ */
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         io.file.load:x:@.dp/#
+         try
+            if
+               eq
+                  get-value:x:@.db-type
+                  .:mssql
+               .lambda
+                  set-name:x:@if/./*/data.execute
+                     .:mssql.execute-batch
+            data.execute:x:@io.file.load
+            strings.concat
+               .:"Script '"
+               get-value:x:@.dp/#
+               .:"' succeeded"
+            console.log:x:@strings.concat
+         .catch
+            strings.concat
+               .:"Script '"
+               get-value:x:@.dp/#
+               .:"' failed"
+            console.log:x:@strings.concat
+            console.log:x:@.arguments/*/message

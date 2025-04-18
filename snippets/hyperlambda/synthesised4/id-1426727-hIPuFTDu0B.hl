@@ -1,0 +1,63 @@
+
+/*
+ * This Hyperlambda code checks if a "found" signal is true, indicating the presence of a robots.txt file. If true, it sends a message to a feedback channel, pauses for 100 milliseconds, and concatenates a message about the number of sitemaps found in the robots.txt file. It sends this message to the feedback channel and pauses again. If a "crawl-delay" is specified, it removes any existing delay nodes, sets a default delay, calculates the delay in seconds, and sends this information to the feedback channel.
+ * 
+ * 1. [if] - Checks if the "found" signal is true.
+ * 2. [eq] - Compares the "found" signal to true.
+ * 3. [.lambda] - Executes the following actions if the condition is true.
+ * 4. [sockets.signal] - Sends a message to the feedback channel.
+ * 5. [args] - Arguments for the signal, including message and type.
+ * 6. [sleep] - Pauses execution for 100 milliseconds.
+ * 7. [strings.concat] - Concatenates a message about the number of sitemaps.
+ * 8. [get-count] - Counts the number of sitemaps in the robots.txt file.
+ * 9. [unwrap] - Evaluates and processes the concatenated message.
+ * 10. [sockets.signal] - Sends the concatenated message to the feedback channel.
+ * 11. [sleep] - Pauses execution for 100 milliseconds.
+ * 12. [if] - Checks if a "crawl-delay" exists.
+ * 13. [exists] - Evaluates if the "crawl-delay" is present.
+ * 14. [.lambda] - Executes the following actions if the "crawl-delay" exists.
+ * 15. [remove-nodes] - Removes existing delay nodes.
+ * 16. [unwrap] - Processes the delay node.
+ * 17. [validators.default] - Sets a default delay value.
+ * 18. [strings.concat] - Concatenates a message about the crawl-delay.
+ * 19. [math.divide] - Converts the crawl-delay to seconds.
+ * 20. [unwrap] - Processes the concatenated crawl-delay message.
+ * 21. [sockets.signal] - Sends the crawl-delay message to the feedback channel.
+ * 22. [args] - Arguments for the signal, including message and type.
+ */
+if
+   eq:x:@signal/*/found
+      .:bool:true
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Site has robots.txt
+            type:info
+      sleep:100
+      strings.concat
+         .:"Found "
+         get-count:x:@signal/*/sitemap/*
+         .:" sitemaps in robots.txt file"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      sleep:100
+      if
+         exists:x:@signal/*/crawl-delay
+         .lambda
+            remove-nodes:x:@.arguments/*/delay
+            unwrap:x:+/*
+            validators.default:x:@.arguments
+               delay:x:@signal/*/crawl-delay
+            strings.concat
+               .:"Robots.txt file contains a Crawl-Delay value of "
+               math.divide:x:@signal/*/crawl-delay
+                  .:int:1000
+               .:" seconds"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info

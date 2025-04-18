@@ -1,0 +1,103 @@
+
+/*
+ * This Hyperlambda code snippet is designed to handle authentication and reCAPTCHA verification. It first checks if the "skip-auth" argument is not present or is set to false. If authentication is required, it verifies the authentication ticket. It then checks if reCAPTCHA verification is needed based on the model's recaptcha value. If reCAPTCHA is required, it verifies the reCAPTCHA response using the provided site key and secret. If the recaptcha value is greater than or equal to zero, it executes a captcha verification process.
+ * 
+ * 1. [if] - Checks if authentication should be skipped.
+ * 2. [or] - Logical OR condition for checking "skip-auth".
+ * 3. [not-exists] - Checks if "skip-auth" argument does not exist.
+ * 4. [eq] - Checks if "skip-auth" is false.
+ * 5. [.lambda] - Executes authentication and reCAPTCHA verification if conditions are met.
+ * 6. [if] - Checks if authentication is required.
+ * 7. [and] - Logical AND condition for authentication check.
+ * 8. [not-null] - Checks if "auth" in the model is not null.
+ * 9. [neq] - Checks if "auth" in the model is not empty.
+ * 10. [auth.ticket.verify] - Verifies the authentication ticket.
+ * 11. [if] - Checks if reCAPTCHA verification is needed.
+ * 12. [and] - Logical AND condition for reCAPTCHA verification.
+ * 13. [eq] - Checks if the authentication ticket is valid.
+ * 14. [mt] - Checks if the recaptcha value is greater than zero.
+ * 15. [convert] - Converts recaptcha value to decimal.
+ * 16. [not-null] - Checks if recaptcha value is not null.
+ * 17. [if] - Checks if reCAPTCHA response is missing.
+ * 18. [or] - Logical OR condition for missing reCAPTCHA response.
+ * 19. [not-exists] - Checks if "recaptcha_response" argument does not exist.
+ * 20. [null] - Checks if "recaptcha_response" is null.
+ * 21. [response.status.set] - Sets response status to 499.
+ * 22. [return] - Returns an error message if no reCAPTCHA is supplied.
+ * 23. [.key] - Retrieves the reCAPTCHA site key from configuration.
+ * 24. [set-value] - Sets the site key value.
+ * 25. [config.get] - Retrieves configuration values.
+ * 26. [.secret] - Retrieves the reCAPTCHA secret from configuration.
+ * 27. [set-value] - Sets the secret value.
+ * 28. [convert] - Converts recaptcha value to decimal.
+ * 29. [validators.recaptcha] - Validates the reCAPTCHA response.
+ * 30. [min] - Sets the minimum reCAPTCHA score.
+ * 31. [site-key] - Sets the site key for reCAPTCHA validation.
+ * 32. [secret] - Sets the secret for reCAPTCHA validation.
+ * 33. [else-if] - Checks if recaptcha value is greater than or equal to zero.
+ * 34. [and] - Logical AND condition for recaptcha value check.
+ * 35. [eq] - Checks if the authentication ticket is valid.
+ * 36. [not] - Negates the less than condition.
+ * 37. [lt] - Checks if recaptcha value is less than zero.
+ * 38. [convert] - Converts recaptcha value to decimal.
+ * 39. [.lambda] - Executes captcha verification if conditions are met.
+ * 40. [execute] - Executes the captcha verification process.
+ * 41. [token] - Passes the reCAPTCHA response token for verification.
+ */
+if
+   or
+      not-exists:x:@.arguments/*/skip-auth
+      eq:x:@.arguments/*/skip-auth
+         .:bool:false
+   .lambda
+      if
+         and
+            not-null:x:@.model/*/auth
+            neq:x:@.model/*/auth
+               .:
+         .lambda
+            auth.ticket.verify:x:@.model/*/auth
+      if
+         and
+            eq
+               auth.ticket.get
+               .
+            mt
+               convert:x:@.model/*/recaptcha
+                  type:decimal
+               .:decimal:0
+            not-null:x:@.model/*/recaptcha
+         .lambda
+            if
+               or
+                  not-exists:x:@.arguments/*/recaptcha_response
+                  null:x:@.arguments/*/recaptcha_response
+               .lambda
+                  response.status.set:499
+                  return
+                     error:No reCAPTCHA supplied
+            .key
+            set-value:x:@.key
+               config.get:"magic:auth:recaptcha:key"
+            .secret
+            set-value:x:@.secret
+               config.get:"magic:auth:recaptcha:secret"
+            convert:x:@.model/*/recaptcha
+               type:decimal
+            validators.recaptcha:x:@.arguments/*/recaptcha_response
+               min:x:@convert
+               site-key:x:@.key
+               secret:x:@.secret
+      else-if
+         and
+            eq
+               auth.ticket.get
+               .
+            not
+               lt
+                  convert:x:@.model/*/recaptcha
+                     type:decimal
+                  .:decimal:0
+         .lambda
+            execute:magic.auth.captcha-verify
+               token:x:@.arguments/*/recaptcha_response

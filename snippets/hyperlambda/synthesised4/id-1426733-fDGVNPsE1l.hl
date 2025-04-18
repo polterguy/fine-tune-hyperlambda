@@ -1,0 +1,127 @@
+
+/*
+ * This Hyperlambda code checks if a completion node exists and is not null. If true, it further checks if the length of the completion string is greater than a specified threshold. If this condition is met, it attempts to signal the ability to create a snippet and reads data from a table. If no matching data is found, it optionally appends a URL to the completion and inserts a new record into the table. If a record with a "Common" prompt exists, it increments a counter. If the prompt is not equal to an existing one, it updates the record's prompt to "Common" and increments another counter. If the completion length is below the threshold, it increments a different counter. 
+ * 
+ * 1. [if] - Checks if completion node exists and is not null.
+ * 2. [and] - Combines conditions for checking existence and non-null status.
+ * 3. [exists] - Checks if completion node exists.
+ * 4. [not-null] - Checks if completion node is not null.
+ * 5. [.lambda] - Executes if both conditions are true.
+ * 6. [if] - Checks if completion length is greater than threshold.
+ * 7. [mt] - Compares completion length with threshold.
+ * 8. [strings.length] - Gets length of completion string.
+ * 9. [get-value] - Retrieves threshold value.
+ * 10. [.lambda] - Executes if length condition is true.
+ * 11. [add] - Adds type node to arguments.
+ * 12. [try-signal] - Attempts to signal snippet creation capability.
+ * 13. [strings.concat] - Concatenates strings for SQL-like operation.
+ * 14. [data.read] - Reads data from ml_training_snippets table.
+ * 15. [table] - Specifies table name.
+ * 16. [columns] - Specifies columns to read.
+ * 17. [where] - Specifies conditions for data retrieval.
+ * 18. [and] - Combines conditions for data retrieval.
+ * 19. [type.eq] - Checks if type matches argument.
+ * 20. [or] - Combines conditions for completion match.
+ * 21. [completion.eq] - Checks if completion matches.
+ * 22. [completion.like] - Checks if completion is similar.
+ * 23. [if] - Checks if no data exists.
+ * 24. [not-exists] - Checks if no data is found.
+ * 25. [.lambda] - Executes if no data exists.
+ * 26. [if] - Checks if URL insertion is allowed.
+ * 27. [set-value] - Sets completion value with URL.
+ * 28. [strings.concat] - Concatenates strings for URL.
+ * 29. [get-value] - Retrieves URL value.
+ * 30. [data.create] - Inserts new data into table.
+ * 31. [values] - Specifies values for insertion.
+ * 32. [else-if] - Checks if prompt is "Common".
+ * 33. [eq] - Checks equality of prompt.
+ * 34. [.lambda] - Executes if prompt is "Common".
+ * 35. [math.increment] - Increments already-exists counter.
+ * 36. [else-if] - Checks if prompt is not equal.
+ * 37. [not] - Negates condition.
+ * 38. [eq] - Checks equality of prompt.
+ * 39. [.lambda] - Executes if prompt is not equal.
+ * 40. [math.increment] - Increments similar counter.
+ * 41. [data.update] - Updates data in table.
+ * 42. [where] - Specifies conditions for update.
+ * 43. [and] - Combines conditions for update.
+ * 44. [id.eq] - Checks if ID matches.
+ * 45. [else] - Executes if length is below threshold.
+ * 46. [math.increment] - Increments below-threshold counter.
+ */
+if
+   and
+      exists:x:@.dp/#/*/completion
+      not-null:x:@.dp/#/*/completion
+   .lambda
+      if
+         mt
+            strings.length:x:@.dp/#/*/completion
+            get-value:x:@.arguments/*/threshold
+         .lambda
+            add:x:+
+               get-nodes:x:@.arguments/*/type
+            try-signal:magic.ai.can-create-snippet
+            strings.concat
+               get-value:x:@.dp/#/*/completion
+               .:@"
+"
+               .:@"
+"
+               .:This information was taken from [this URL](
+               .:%
+            data.read
+               table:ml_training_snippets
+               columns
+                  id
+                  prompt
+                  completion
+                  uri
+               where
+                  and
+                     type.eq:x:@.arguments/*/type
+                     or
+                        completion.eq:x:@.dp/#/*/completion
+                        completion.like:x:@strings.concat
+            if
+               not-exists:x:@data.read/*
+               .lambda
+                  if:x:@.arguments/*/insert_url
+                     set-value:x:@.dp/#/*/completion
+                        strings.concat
+                           get-value:x:@.dp/#/*/completion
+                           .:@"
+"
+                           .:@"
+"
+                           .:This information was taken from [this URL](
+                           get-value:x:@.arguments/*/url
+                           .:)
+                  data.create
+                     table:ml_training_snippets
+                     values
+                        type:x:@.arguments/*/type
+                        uri:x:@.arguments/*/url
+                        prompt:x:@.dp/#/*/prompt
+                        completion:x:@.dp/#/*/completion
+                        meta:AINIRO-Website-Crawler
+            else-if
+               eq:x:@data.read/0/*/prompt
+                  .:Common
+               .lambda
+                  math.increment:x:@.already-exists
+            else-if
+               not
+                  eq:x:@data.read/*/*/prompt
+                     get-value:x:@.dp/#/*/prompt
+               .lambda
+                  math.increment:x:@.similar
+                  data.update
+                     table:ml_training_snippets
+                     values
+                        prompt:Common
+                     where
+                        and
+                           id.eq:x:@data.read/0/*/id
+      else
+         math.increment:x:@.below-threshold

@@ -1,0 +1,82 @@
+
+/*
+ * This Hyperlambda code is designed to process incoming signals and configure webhook URLs based on certain conditions. It first checks if the [incoming] node exists and is not null. If true, it sets a [hook-url] using values from a model or configuration and sends a signal using this URL. It then checks if [to] and [from] arguments exist, are not null, and contain a colon. If these conditions are met, it splits the [to] and [from] values, sets channel, to, and from nodes, and adds them to a signal along with prompt and session arguments. If the conditions are not met, it adds the to, from, prompt, and session nodes directly to the signal. Finally, it evaluates the [exe] node to execute the constructed signal.
+ * 
+ * 1. [if] - Checks if [incoming] exists and is not null.
+ * 2. [not-null] - Ensures [incoming] is not null.
+ * 3. [neq] - Checks if [incoming] is not equal to an empty value.
+ * 4. [.lambda] - Executes if the above conditions are true.
+ * 5. [.exe] - Prepares the execution environment for the signal.
+ * 6. [set-value] - Sets the [hook-url] using model or config values.
+ * 7. [unwrap] - Unwraps the URL from the signal.
+ * 8. [signal] - Sends a signal using the [incoming] node and [hook-url].
+ * 9. [if] - Checks additional conditions for [to] and [from] arguments.
+ * 10. [exists] - Verifies the existence of [to] and [from] arguments.
+ * 11. [not-null] - Ensures [to] and [from] are not null.
+ * 12. [strings.contains] - Checks if [to] and [from] contain a colon.
+ * 13. [.lambda] - Executes if the above conditions are true.
+ * 14. [.channel], [.to], [.from] - Initializes nodes for channel, to, and from.
+ * 15. [strings.split] - Splits [to] and [from] values by colon.
+ * 16. [set-value] - Sets channel, to, and from nodes.
+ * 17. [add] - Adds prompt and session nodes to the signal.
+ * 18. [unwrap] - Unwraps the signal nodes.
+ * 19. [add] - Adds to, from, and channel nodes to the signal.
+ * 20. [else] - Executes if the [if] conditions are false.
+ * 21. [add] - Adds to, from, prompt, and session nodes to the signal.
+ * 22. [eval] - Evaluates the [exe] node to execute the signal.
+ */
+if
+   and
+      not-null:x:@.incoming
+      neq:x:@.incoming
+         .:
+   .lambda
+      .exe
+         .hook-url
+         set-value:x:@.hook-url
+            get-first-value
+               get-value:x:@.model/*/webhook_incoming_url
+               config.get:"magic:openai:integrations:incoming:url"
+         unwrap:x:./*/signal/*/url
+         signal:x:@.incoming
+            url:x:@.hook-url
+      if
+         and
+            exists:x:@.arguments/*/to
+            exists:x:@.arguments/*/from
+            not-null:x:@.arguments/*/to
+            not-null:x:@.arguments/*/from
+            strings.contains:x:@.arguments/*/to
+               .:":"
+            strings.contains:x:@.arguments/*/from
+               .:":"
+         .lambda
+            .channel
+            .to
+            .from
+            strings.split:x:@.arguments/*/to
+               .:":"
+            set-value:x:@.channel
+               get-value:x:@strings.split/0
+            set-value:x:@.to
+               get-value:x:@strings.split/1
+            strings.split:x:@.arguments/*/from
+               .:":"
+            set-value:x:@.from
+               get-value:x:@strings.split/1
+            add:x:@.exe/*/signal
+               get-nodes:x:@.arguments/*/prompt
+               get-nodes:x:@.arguments/*/session
+            unwrap:x:+/*/*
+            add:x:@.exe/*/signal
+               .
+                  to:x:@.to
+                  from:x:@.from
+                  channel:x:@.channel
+      else
+         add:x:@.exe/*/signal
+            get-nodes:x:@.arguments/*/to
+            get-nodes:x:@.arguments/*/from
+            get-nodes:x:@.arguments/*/prompt
+            get-nodes:x:@.arguments/*/session
+      eval:x:@.exe

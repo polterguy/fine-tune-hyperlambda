@@ -1,0 +1,53 @@
+
+/*
+ * This Hyperlambda code iterates over the first child of the [csv2lambda] node, checking each node's name and determining if its value is numeric or text. It sets the type accordingly and executes a SQL DDL script to update the column type in a database. The code ensures that the correct data type is assigned to each column based on its content, facilitating accurate database schema updates. 
+ * 
+ * 1. [for-each] - Iterates over each child node of the first child of [csv2lambda].
+ * 2. [.type] - Initializes a node with the default value "text".
+ * 3. [get-name] - Retrieves the name of the current node.
+ * 4. [.found] - Initializes a node to track if a numeric value is found.
+ * 5. [for-each] - Iterates over all nodes with the same name as the current node.
+ * 6. [if] - Checks if the current node's value is not numeric.
+ * 7. [not] - Inverts the condition to check for non-numeric values.
+ * 8. [eq] - Compares the processed value to the original value.
+ * 9. [strings.replace-not-of] - Replaces non-numeric characters.
+ * 10. [set-value] - Sets [.found] to true if a numeric value is found.
+ * 11. [if] - Checks if no numeric value was found.
+ * 12. [eq] - Compares [.found] to false.
+ * 13. [set-value] - Sets [.type] to "numeric" if no numeric value was found.
+ * 14. [execute-file] - Executes a SQL DDL script to update the database schema.
+ * 15. [databaseType] - Passes the database type to the script.
+ * 16. [connectionString] - Passes the connection string to the script.
+ * 17. [databaseName] - Passes the database name to the script.
+ * 18. [tableName] - Passes the table name to the script.
+ * 19. [columnName] - Passes the column name to the script.
+ * 20. [columnType] - Passes the determined column type to the script.
+ */
+for-each:x:@csv2lambda/0/*
+   .type:text
+   get-name:x:@.dp/#
+   .found:bool:false
+   for-each:x:@csv2lambda/*/*/{@get-name}
+      if
+         not
+            eq
+               strings.replace-not-of:x:@.dp/#
+                  .:0123456789.
+                  .:
+               get-value:x:@.dp/#
+         .lambda
+            set-value:x:@.found
+               .:bool:true
+   if
+      eq:x:@.found
+         .:bool:false
+      .lambda
+         set-value:x:@.type
+            .:numeric
+   execute-file:/system/sql/ddl/column.post.hl
+      databaseType:x:@.arguments/*/databaseType
+      connectionString:x:@.arguments/*/connectionString
+      databaseName:x:@.arguments/*/databaseName
+      tableName:x:@.table
+      columnName:x:@get-name
+      columnType:x:@.type

@@ -1,0 +1,35 @@
+
+/*
+ * The code checks if the HTTP GET request did not return HTML content. If the content is missing, null, empty, or the Content-Type header is missing or not starting with "text/html", it logs an error and returns a 415 status code. 
+ * 
+ * 1. [if] - Begins a conditional statement.
+ * 2. [or] - Logical OR condition to check multiple scenarios.
+ * 3. [not-exists:x:@http.get/*/content] - Checks if the content node does not exist.
+ * 4. [null:x:@http.get/*/content] - Checks if the content node is null.
+ * 5. [eq:x:@http.get/*/content] - Checks if the content node is empty.
+ * 6. [not-exists:x:@http.get/*/headers/*/Content-Type] - Checks if the Content-Type header does not exist.
+ * 7. [not] - Logical NOT condition.
+ * 8. [strings.starts-with:x:@http.get/*/headers/*/Content-Type] - Checks if the Content-Type header does not start with "text/html".
+ * 9. [.lambda] - Executes the following block if any of the above conditions are true.
+ * 10. [lambda2hyper:x:@http.get] - Converts the HTTP GET response to a Hyperlambda object.
+ * 11. [log.error] - Logs an error message.
+ * 12. [content:x:@lambda2hyper] - Includes the converted content in the log.
+ * 13. [url:x:@.arguments/*/url] - Includes the URL in the log.
+ * 14. [return:int:415] - Returns a 415 status code.
+ */
+if
+   or
+      not-exists:x:@http.get/*/content
+      null:x:@http.get/*/content
+      eq:x:@http.get/*/content
+         .:
+      not-exists:x:@http.get/*/headers/*/Content-Type
+      not
+         strings.starts-with:x:@http.get/*/headers/*/Content-Type
+            .:text/html
+   .lambda
+      lambda2hyper:x:@http.get
+      log.error:URL did not return HTML content when crawling for Machine Learning snippets
+         content:x:@lambda2hyper
+         url:x:@.arguments/*/url
+      return:int:415

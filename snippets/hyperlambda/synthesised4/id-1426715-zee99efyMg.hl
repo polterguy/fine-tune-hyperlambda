@@ -1,0 +1,104 @@
+
+/*
+ * This Hyperlambda code connects to a database and attempts to read data from the "ml_types" table based on a specified "type" argument. It retrieves a list of columns related to machine learning configurations. If no records are found for the specified type, it defaults to retrieving records for the "default" type. If neither the specified nor default type is found, it throws an error. The retrieved data is then added to a model node, and the type argument is set to "default" if necessary. 
+ * 
+ * 1. [data.connect] - Opens a connection to the database using a specified connection string and database name.
+ * 2. [data.read] - Reads data from the "ml_types" table.
+ * 3. [table] - Specifies the table to read data from.
+ * 4. [columns] - Lists the columns to retrieve from the table.
+ * 5. [where] - Applies a filter based on the "type" argument.
+ * 6. [if] - Checks if no data was found for the specified type.
+ * 7. [not-exists] - Evaluates whether the data read operation returned no results.
+ * 8. [data.read] - Attempts to read data for the "default" type if the specified type was not found.
+ * 9. [throw] - Throws an error if neither the specified nor default type is found.
+ * 10. [add] - Adds the retrieved data to a model node.
+ * 11. [get-nodes] - Retrieves nodes from the data read operation.
+ * 12. [set-value] - Sets the type argument to "default" if necessary.
+ */
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         model
+         max_tokens
+         max_context_tokens
+         max_request_tokens
+         temperature
+         recaptcha
+         auth
+         supervised
+         cached
+         prefix
+         use_embeddings
+         threshold
+         vector_model
+         contact_us
+         lead_email
+         api_key
+         webhook_incoming
+         webhook_outgoing
+         webhook_incoming_url
+         webhook_outgoing_url
+         system_message
+         initial_questionnaire
+         no_requests
+         max_requests
+         session_timeout
+         search_postfix
+         max_function_invocations
+         max_session_items
+         completion_slot
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         data.read
+            table:ml_types
+            columns
+               model
+               max_tokens
+               max_context_tokens
+               max_request_tokens
+               temperature
+               recaptcha
+               auth
+               supervised
+               cached
+               prefix
+               use_embeddings
+               threshold
+               vector_model
+               contact_us
+               lead_email
+               api_key
+               webhook_incoming
+               webhook_outgoing
+               webhook_incoming_url
+               webhook_outgoing_url
+               system_message
+               initial_questionnaire
+               no_requests
+               max_requests
+               session_timeout
+               search_postfix
+               max_function_invocations
+               max_session_items
+               completion_slot
+            where
+               and
+                  type.eq:default
+         if
+            not-exists:x:@data.read/*
+            .lambda
+               throw:No such type, and no default type was found
+                  status:int:400
+                  public:bool:true
+         add:x:@.model
+            get-nodes:x:@data.read/*/*
+         set-value:x:@.arguments/*/type
+            .:default
+   else
+      add:x:@.model
+         get-nodes:x:@data.read/*/*

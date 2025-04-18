@@ -1,0 +1,63 @@
+
+/*
+ * This Hyperlambda code processes a message if it starts with "data:". It extracts and trims the message, and if it's not empty, it checks if the message is "[DONE]". If so, it signals that the process is finished. Otherwise, it converts the message from JSON to a lambda object and checks for a "finish_reason". If found, it signals this reason. It also checks for content in the message and appends it to a result, signaling the content if present.
+ * 
+ * 1. [if] - Checks if the message exists, is not null, and starts with "data:".
+ * 2. [strings.substring] - Extracts the substring from the message starting at position 5.
+ * 3. [strings.trim] - Trims the extracted substring.
+ * 4. [if] - Checks if the trimmed string is not empty.
+ * 5. [if] - Checks if the trimmed string equals "[DONE]".
+ * 6. [sockets.signal] - Signals that the process is finished.
+ * 7. [else] - Converts the trimmed string from JSON to a lambda object.
+ * 8. [if] - Checks for the existence and non-null "finish_reason" in the lambda object.
+ * 9. [sockets.signal] - Signals the "finish_reason".
+ * 10. [if] - Checks for non-null and non-empty content in the lambda object.
+ * 11. [set-value] - Concatenates the content to the result.
+ * 12. [sockets.signal] - Signals the content.
+ */
+if
+   and
+      exists:x:@.arguments/*/message
+      not-null:x:@.arguments/*/message
+      strings.starts-with:x:@.arguments/*/message
+         .:"data:"
+   .lambda
+      strings.substring:x:@.arguments/*/message
+         .:int:5
+      strings.trim:x:@strings.substring
+      if
+         neq:x:@strings.trim
+            .:
+         .lambda
+            if
+               eq:x:@strings.trim
+                  .:[DONE]
+               .lambda
+                  sockets.signal:x:@.session
+                     args
+                        finished:bool:true
+            else
+               json2lambda:x:@strings.trim
+               if
+                  and
+                     exists:x:@json2lambda/*/choices/0/*/finish_reason
+                     not-null:x:@json2lambda/*/choices/0/*/finish_reason
+                  .lambda
+                     unwrap:x:+/*/*
+                     sockets.signal:x:@.session
+                        args
+                           finish_reason:x:@json2lambda/*/choices/0/*/finish_reason
+               if
+                  and
+                     not-null:x:@json2lambda/*/choices/0/*/delta/*/content
+                     neq:x:@json2lambda/*/choices/0/*/delta/*/content
+                        .:
+                  .lambda
+                     set-value:x:@.result
+                        strings.concat
+                           get-value:x:@.result
+                           get-value:x:@json2lambda/*/choices/0/*/delta/*/content
+                     unwrap:x:+/*/*
+                     sockets.signal:x:@.session
+                        args
+                           message:x:@json2lambda/*/choices/0/*/delta/*/content

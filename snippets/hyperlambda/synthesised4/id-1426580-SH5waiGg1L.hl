@@ -1,0 +1,33 @@
+
+/*
+ * This Hyperlambda code establishes a database connection and executes a batch of SQL commands based on the type of database specified in the [.db-type] node. It uses a [switch] statement to handle different database types: Microsoft SQL Server (mssql), PostgreSQL (pgsql), MySQL (mysql), and SQLite (sqlite). For each case, it connects to the appropriate database and executes SQL commands loaded from a file. The [mssql] case executes a batch of SQL commands, the [pgsql] case creates a new database and then executes SQL commands, and the [mysql] and [sqlite] cases execute SQL commands directly. 
+ * 
+ * 1. [switch] - Determines the database type to connect to based on [.db-type].
+ * 2. [case:mssql] - Handles the Microsoft SQL Server connection and executes a batch of SQL commands.
+ * 3. [mssql.connect] - Connects to a Microsoft SQL Server database.
+ * 4. [mssql.execute-batch] - Executes a batch of SQL commands loaded from a file.
+ * 5. [case:pgsql] - Handles the PostgreSQL connection, creates a new database, and executes SQL commands.
+ * 6. [pgsql.connect] - Connects to a PostgreSQL database.
+ * 7. [pgsql.execute] - Executes SQL commands, including creating a new database.
+ * 8. [case:mysql] - Handles the MySQL connection and executes SQL commands.
+ * 9. [mysql.connect] - Connects to a MySQL database.
+ * 10. [mysql.execute] - Executes SQL commands loaded from a file.
+ * 11. [case:sqlite] - Handles the SQLite connection and executes SQL commands.
+ * 12. [sqlite.connect] - Connects to a SQLite database.
+ * 13. [sqlite.execute] - Executes SQL commands loaded from a file.
+ */
+switch:x:@.db-type
+   case:mssql
+      mssql.connect
+         mssql.execute-batch:x:@io.file.load
+   case:pgsql
+      pgsql.connect:[generic|postgres]
+         pgsql.execute:create database magic
+      pgsql.connect:[generic|magic]
+         pgsql.execute:x:@io.file.load
+   case:mysql
+      mysql.connect
+         mysql.execute:x:@io.file.load
+   case:sqlite
+      sqlite.connect:[generic|magic]
+         sqlite.execute:x:@io.file.load

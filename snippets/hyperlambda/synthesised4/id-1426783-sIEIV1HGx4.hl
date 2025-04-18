@@ -1,0 +1,183 @@
+
+/*
+ * This Hyperlambda code handles function invocations based on a JSON input. It checks if a "done" condition is true and processes invocations if certain conditions are met. The code increments a counter for invocations, checks for specific string patterns in results, and handles errors or success signals through sockets. It uses a loop to process each invocation, logs errors, and signals the session with results or errors. The code ensures the result size is within limits and constructs a new prompt based on the execution outcome.
+ * 
+ * 1. [if] - Checks if the "done" condition in the JSON input is true.
+ * 2. [eq] - Compares the value of "done" to true.
+ * 3. [if] - Checks if the number of invocations is not zero.
+ * 4. [neq] - Compares the invocation count to zero.
+ * 5. [math.increment] - Increments the invocation count.
+ * 6. [if] - Checks if the result contains specific strings.
+ * 7. [and] - Combines conditions for string containment.
+ * 8. [strings.contains] - Checks if the result contains "___".
+ * 9. [strings.contains] - Checks if the result contains "FUNCTION_INVOCATION[".
+ * 10. [if] - Checks if the invocation count is zero.
+ * 11. [eq] - Compares the invocation count to zero.
+ * 12. [math.increment] - Increments the invocation count.
+ * 13. [strings.split] - Splits the result by "___".
+ * 14. [for-each] - Iterates over each split result.
+ * 15. [if] - Checks if the current item contains "FUNCTION_INVOCATION[".
+ * 16. [strings.contains] - Checks for the presence of "FUNCTION_INVOCATION[".
+ * 17. [try] - Attempts to execute a block of code with error handling.
+ * 18. [if] - Checks if iterations are less than or equal to one.
+ * 19. [lte] - Compares iterations to one.
+ * 20. [log.error] - Logs an error message for too many invocations.
+ * 21. [sockets.signal] - Sends a signal with error details.
+ * 22. [else] - Executes if iterations are more than one.
+ * 23. [execute] - Invokes an AI function.
+ * 24. [lambda2json] - Converts the result to JSON format.
+ * 25. [if] - Checks if the tokenized result exceeds max context tokens.
+ * 26. [mt] - Compares token count to max context tokens.
+ * 27. [openai.tokenize] - Tokenizes the JSON result.
+ * 28. [get-value] - Retrieves max context tokens.
+ * 29. [throw] - Throws an error if the result is too large.
+ * 30. [config.get] - Retrieves a success message configuration.
+ * 31. [unwrap] - Evaluates expressions in the success message.
+ * 32. [sockets.signal] - Sends a success signal with result details.
+ * 33. [if] - Checks if the result exists.
+ * 34. [exists] - Checks for the existence of a result.
+ * 35. [set-value] - Sets a new prompt with the result.
+ * 36. [strings.concat] - Concatenates strings for the new prompt.
+ * 37. [else] - Executes if no result exists.
+ * 38. [set-value] - Sets a new prompt for successful invocation.
+ * 39. [.catch] - Handles exceptions during execution.
+ * 40. [log.error] - Logs an error message for failed execution.
+ * 41. [unwrap] - Evaluates expressions in the error message.
+ * 42. [sockets.signal] - Sends an error signal with message details.
+ * 43. [set-value] - Sets a new prompt with the error message.
+ * 44. [strings.concat] - Concatenates strings for the error prompt.
+ * 45. [set-value] - Trims the new prompt.
+ * 46. [strings.trim] - Trims whitespace from the new prompt.
+ * 47. [else] - Executes if no invocation is needed.
+ * 48. [sockets.signal] - Sends a finished signal.
+ * 49. [set-value] - Resets iterations to zero.
+ */
+if
+   eq:x:@json2lambda/*/done
+      .:bool:true
+   .lambda
+      if
+         neq:x:@.no-invocation
+            .:int:0
+         .lambda
+            math.increment:x:@.no-invocation
+      if
+         and
+            strings.contains:x:@.result
+               .:___
+            strings.contains:x:@.result
+               .:FUNCTION_INVOCATION[
+         .lambda
+            if
+               eq:x:@.no-invocation
+                  .:int:0
+               .lambda
+                  math.increment:x:@.no-invocation
+            strings.split:x:@.result
+               .:___
+            for-each:x:@strings.split/*
+               if
+                  strings.contains:x:@.dp/#
+                     .:FUNCTION_INVOCATION[/
+                  .lambda
+                     try
+                        if
+                           lte:x:@.iterations
+                              .:int:1
+                           .lambda
+                              log.error:Too many function invocations
+                              sockets.signal:x:@.session
+                                 args
+                                    function_error:Too many function invocations
+                              sockets.signal:x:@.session
+                                 args
+                                    function_waiting:bool:false
+                              sockets.signal:x:@.session
+                                 args
+                                    error:bool:true
+                                    status:int:500
+                                    message:Too many function invocations. Configure your type to handle more invocations or change your prompt.
+                              sockets.signal:x:@.session
+                                 args
+                                    finished:bool:true
+                        else
+                           execute:magic.ai.functions.invoke
+                              type:x:@.type
+                              session:x:@.session
+                              user-id:x:@.user-id
+                              invocation:x:@.dp/#
+                           lambda2json:x:@execute/*/result/*
+                              format:true
+                           if
+                              mt
+                                 openai.tokenize:x:@lambda2json
+                                 get-value:x:@.arguments/@.arguments/*/max_context_tokens
+                              .lambda
+                                 throw:Result too large, try to limit your result
+                                    status:int:400
+                                    public:bool:true
+                           config.get:"magic:chat:functions:success-message"
+                              .:Success!
+                           unwrap:x:+/*/*
+                           sockets.signal:x:@.session
+                              args
+                                 function_result:x:@config.get
+                                 invocation:x:@execute/*/json
+                                 file:x:@execute/*/workflow
+                           if
+                              exists:x:@execute/*/result/*
+                              .lambda
+                                 set-value:x:@.new-prompt
+                                    strings.concat
+                                       get-value:x:@.new-prompt
+                                       .:"Response from '"
+                                       get-value:x:@execute/*/workflow
+                                       .:@"' was:
+```json
+"
+                                       get-value:x:@lambda2json
+                                       .:@"
+"
+                                       .:```
+                                       .:@"
+"
+                                       .:@"
+"
+                                 set-value:x:@.function-result
+                                    get-value:x:@lambda2json
+                           else
+                              set-value:x:@.new-prompt
+                                 strings.concat
+                                    get-value:x:@.new-prompt
+                                    .:"Invocation of '"
+                                    get-value:x:@execute/*/workflow
+                                    .:"' was a success."
+                                    .:@"
+"
+                                    .:@"
+"
+                     .catch
+                        log.error:Could not execute AI function
+                           message:x:@.arguments/*/message
+                        unwrap:x:+/*/*
+                        sockets.signal:x:@.session
+                           args
+                              function_error:x:@.arguments/*/message
+                        set-value:x:@.new-prompt
+                           strings.concat
+                              get-value:x:@.new-prompt
+                              .:"Invocation failed, exception message was: '"
+                              get-value:x:@.arguments/*/message
+                              .:"'"
+                              .:@"
+"
+                              .:@"
+"
+            set-value:x:@.new-prompt
+               strings.trim:x:@.new-prompt
+      else
+         sockets.signal:x:@.session
+            args
+               finished:bool:true
+         set-value:x:@.iterations
+            .:int:0

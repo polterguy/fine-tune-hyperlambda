@@ -1,0 +1,32 @@
+
+/*
+ * This Hyperlambda code checks if a node named [stream] under [.arguments] does not exist or if its value is false. If either condition is true, it sets the value of [.result] to the content of the first [message] node from an HTTP POST response, sets [.finish_reason] to the first value of [finish_reason] from the same response or "unknown" if not present, and initializes [.iterations] to 0. 
+ * 
+ * 1. [if] - Checks a condition and executes its lambda if true.
+ * 2. [or] - Logical OR to combine conditions.
+ * 3. [not-exists:x:@.arguments/*/stream] - Checks if the [stream] node does not exist.
+ * 4. [eq:x:@.arguments/*/stream] - Checks if the [stream] node's value is false.
+ * 5. [.lambda] - Contains the code to execute if the condition is true.
+ * 6. [set-value:x:@.result] - Sets the [.result] node's value.
+ * 7. [get-value:x:@http.post/*/content/*/choices/0/*/message/*/content] - Retrieves the content of the first [message] node from an HTTP POST response.
+ * 8. [set-value:x:@.finish_reason] - Sets the [.finish_reason] node's value.
+ * 9. [get-first-value] - Retrieves the first value from a node set.
+ * 10. [get-value:x:@http.post/*/content/*/choices/0/*/finish_reason] - Retrieves the [finish_reason] from the HTTP POST response.
+ * 11. [.:unknown] - Default value if [finish_reason] is not found.
+ * 12. [set-value:x:@.iterations] - Sets the [.iterations] node's value.
+ * 13. [.:int:0] - Initializes [.iterations] to 0.
+ */
+if
+   or
+      not-exists:x:@.arguments/*/stream
+      eq:x:@.arguments/*/stream
+         .:bool:false
+   .lambda
+      set-value:x:@.result
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+      set-value:x:@.finish_reason
+         get-first-value
+            get-value:x:@http.post/*/content/*/choices/0/*/finish_reason
+            .:unknown
+      set-value:x:@.iterations
+         .:int:0

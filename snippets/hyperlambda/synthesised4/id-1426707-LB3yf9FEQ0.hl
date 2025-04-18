@@ -1,0 +1,36 @@
+
+/*
+ * This Hyperlambda code snippet checks if the [preservePages] argument is set to true, and if so, it iterates over each page of a PDF document, creating a prompt for each page by concatenating the file name with the page number. It then unwraps the text content of each page, adds it to a temporary snippet collection, and increments the page number counter. The code effectively processes each page of a PDF file individually, preserving the page structure in the output.
+ * 
+ * 1. [if] - Checks if the [preservePages] argument is true.
+ * 2. [eq] - Compares the value of [preservePages] to true.
+ * 3. [.lambda] - Contains the logic to execute if the condition is true.
+ * 4. [.no] - Initializes a page number counter to 1.
+ * 5. [for-each] - Iterates over each page of the PDF document.
+ * 6. [.prompt] - Declares a node to store the prompt for each page.
+ * 7. [set-value] - Sets the value of the [.prompt] node.
+ * 8. [strings.concat] - Concatenates the file name and page number to create a prompt.
+ * 9. [get-value] - Retrieves the file name and page number.
+ * 10. [unwrap] - Unwraps the text content of the current page.
+ * 11. [add] - Adds the prompt and completion to a temporary snippet collection.
+ * 12. [math.increment] - Increments the page number counter.
+ */
+if
+   eq:x:@.arguments/*/preservePages
+      .:bool:true
+   .lambda
+      .no:int:1
+      for-each:x:@pdf2text/*
+         .prompt
+         set-value:x:@.prompt
+            strings.concat
+               get-value:x:@.arguments/*/file/*/name
+               .:" - Page "
+               get-value:x:@.no
+         unwrap:x:+/*/*/*
+         add:x:@.tmp-snippets
+            .
+               .
+                  prompt:x:@.prompt
+                  completion:x:@.dp/#
+         math.increment:x:@.no

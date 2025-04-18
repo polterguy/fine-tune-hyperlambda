@@ -1,0 +1,89 @@
+
+/*
+ * // This Hyperlambda code is designed to create a summary for a file using OpenAI's API, and handle the response accordingly. It first checks if the "massage" argument exists and is not empty, and if the token count of the content is less than 15,000. If these conditions are met, it sends a POST request to the OpenAI API to generate a summary. Depending on the HTTP response status, it either adds the summary to snippets or signals a warning if the summary could not be created. The code uses slots for HTTP requests, string manipulation, and signaling feedback.
+ * // 1. [if] - Checks if conditions for creating a summary are met.
+ * // 2. [and] - Combines multiple conditions to be checked.
+ * // 3. [exists] - Verifies the existence of the "massage" argument.
+ * // 4. [neq] - Checks if the "massage" argument is not empty.
+ * // 5. [lt] - Ensures the token count of the content is less than 15,000.
+ * // 6. [.lambda] - Executes the main logic if conditions are met.
+ * // 7. [strings.concat] - Concatenates strings to create a message.
+ * // 8. [unwrap] - Evaluates expressions to retrieve messages.
+ * // 9. [sockets.signal] - Sends a signal with a message to a feedback channel.
+ * // 10. [http.post] - Sends a POST request to the OpenAI API.
+ * // 11. [headers] - Sets the headers for the HTTP request.
+ * // 12. [payload] - Defines the payload for the HTTP request.
+ * // 13. [convert] - Ensures the response is converted to a lambda object.
+ * // 14. [if] - Checks if the HTTP response status indicates success.
+ * // 15. [mte] - Checks if the response status is 200 or greater.
+ * // 16. [lt] - Checks if the response status is less than 300.
+ * // 17. [.lambda] - Executes logic if the response is successful.
+ * // 18. [add] - Adds the generated summary to snippets.
+ * // 19. [else] - Executes logic if the response is not successful.
+ * // 20. [strings.concat] - Concatenates strings to create a warning message.
+ * // 21. [sockets.signal] - Sends a warning signal to the feedback channel.
+ * // 22. [add] - Adds a fallback snippet if the summary could not be created.
+ */
+if
+   and
+      exists:x:@.arguments/*/massage
+      neq:x:@.arguments/*/massage
+         .
+      neq:x:@.arguments/*/massage
+         .:
+      lt
+         openai.tokenize:x:@.content
+         .:int:15000
+   .lambda
+      strings.concat
+         .:"Creating summary for file: "
+         get-value:x:@.dp/#
+      unwrap:x:+/*/*/message
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      http.post:"https://api.openai.com/v1/chat/completions"
+         headers
+            Authorization:x:@.token
+            Content-Type:application/json
+         payload
+            model:gpt-3.5-turbo-1106
+            max_tokens:int:2000
+            temperature:decimal:0.5
+            messages
+               .
+                  role:system
+                  content:x:@.arguments/*/massage
+               .
+                  role:system
+                  content:x:@.content
+         convert:true
+      if
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:@.snippets
+               .
+                  .
+                     prompt:x:@http.post/*/content/*/choices/0/*/message/*/content
+                     completion:x:@.content
+      else
+         strings.concat
+            .:"Could not create summary for file: "
+            get-value:x:@.dp/#
+         unwrap:x:+/*/*/message
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:warning
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
+               .
+                  prompt:x:@.file-meta
+                  completion:x:@.content

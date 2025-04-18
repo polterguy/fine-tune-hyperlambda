@@ -1,0 +1,33 @@
+
+/*
+ * This code connects to a generic or magic database to select prompts and their maximum completion values from the "ml_requests" table, filtered by a specific user ID, questionnaire, and context. It groups the results by prompt. For each selected record, it unwraps the content and adds it to a session, alternating between roles of assistant and user. The session is constructed with the prompt as the assistant's content and the completion as the user's content.
+ * 
+ * 1. [data.connect] - Connects to the specified database.
+ * 2. [data.select] - Executes a SQL query to retrieve prompts and their maximum completion values.
+ * 3. [user_id] - Filters the SQL query by user ID.
+ * 4. [for-each] - Iterates over each record returned by the SQL query.
+ * 5. [unwrap] - Unwraps the content of the selected record.
+ * 6. [add] - Adds the unwrapped content to the session with a specified role and content.
+ * 7. [role] - Specifies the role (assistant or user) for the session content.
+ * 8. [content] - Specifies the content for the session based on the unwrapped data.
+ */
+data.connect:[generic|magic]
+   data.select:@"
+select prompt, max(completion) as completion
+   from ml_requests
+   where user_id = @user_id and questionnaire = 1 and context = 1
+   group by prompt"
+      user_id:x:@.arguments/*/user_id
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:assistant
+               content:x:@.dp/#/*/prompt
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:user
+               content:x:@.dp/#/*/completion

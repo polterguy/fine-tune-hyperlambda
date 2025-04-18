@@ -1,0 +1,44 @@
+
+/*
+ * // This Hyperlambda code checks if a file path ends with ".sql" and, if so, attempts to load and execute the SQL script. It logs a success message if the execution succeeds, or logs an error message if it fails, including the error message. The code also conditionally sets the execution slot to "mssql.execute-batch" if the database type is "mssql".
+ * // 1. [if] - Checks if the file path ends with ".sql".
+ * // 2. [strings.ends-with] - Determines if the file path ends with ".sql".
+ * // 3. [io.file.load] - Loads the SQL file.
+ * // 4. [try] - Attempts to execute the SQL script.
+ * // 5. [if] - Checks if the database type is "mssql".
+ * // 6. [eq] - Compares the database type to "mssql".
+ * // 7. [set-name] - Sets the execution slot to "mssql.execute-batch" if the condition is true.
+ * // 8. [data.execute] - Executes the loaded SQL script.
+ * // 9. [strings.concat] - Concatenates a success message.
+ * // 10. [console.log] - Logs the success message.
+ * // 11. [.catch] - Handles exceptions if the SQL execution fails.
+ * // 12. [strings.concat] - Concatenates a failure message.
+ * // 13. [console.log] - Logs the failure message.
+ * // 14. [console.log] - Logs the error message from the exception.
+ */
+if
+   strings.ends-with:x:@.dp/#
+      .:.sql
+   .lambda
+      io.file.load:x:@.dp/#
+      try
+         if
+            eq
+               get-value:x:@.db-type
+               .:mssql
+            .lambda
+               set-name:x:@if/./*/data.execute
+                  .:mssql.execute-batch
+         data.execute:x:@io.file.load
+         strings.concat
+            .:"Script '"
+            get-value:x:@.dp/#
+            .:"' succeeded"
+         console.log:x:@strings.concat
+      .catch
+         strings.concat
+            .:"Script '"
+            get-value:x:@.dp/#
+            .:"' failed"
+         console.log:x:@strings.concat
+         console.log:x:@.arguments/*/message

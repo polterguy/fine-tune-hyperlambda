@@ -1,0 +1,77 @@
+
+/*
+ * This Hyperlambda code evaluates a node structure to determine if the HTTP verb is either "get" or "delete". If so, it adds a "parameters" node to a buffer and iterates through input nodes to construct argument nodes based on their type. It sets the schema type for each argument based on its input type, handling various data types like integers, numbers, booleans, and strings. If a description exists for an input, it adds this to the argument node. Finally, it appends the constructed argument nodes to the buffer's parameters.
+ * 
+ * 1. [if] - Checks if the condition is true to execute the following lambda.
+ * 2. [or] - Logical OR to check if any of the conditions are true.
+ * 3. [eq] - Compares the verb value to "get" or "delete".
+ * 4. [.lambda] - Contains the actions to execute if the condition is true.
+ * 5. [add] - Adds a "parameters" node to the buffer.
+ * 6. [for-each] - Iterates over input nodes.
+ * 7. [if] - Checks if the type is not "*".
+ * 8. [.lambda] - Contains actions for each input node.
+ * 9. [.arg] - Creates an argument node structure.
+ * 10. [set-value] - Sets the name and schema type of the argument node.
+ * 11. [switch] - Determines the schema type based on input type.
+ * 12. [case] - Handles different data types like integers, numbers, booleans.
+ * 13. [default] - Sets the schema type to "string" if no case matches.
+ * 14. [if] - Checks if a description exists.
+ * 15. [.lambda] - Adds the description to the argument node.
+ * 16. [unwrap] - Unwraps the description node.
+ * 17. [insert-after] - Inserts the description after the name node.
+ * 18. [add] - Appends the argument node to the buffer's parameters.
+ */
+if
+   or
+      eq:x:@.dp/#/*/verb
+         .:get
+      eq:x:@.dp/#/*/verb
+         .:delete
+   .lambda
+      add:x:@.buffer/*/*
+         .
+            parameters
+      for-each:x:@.dp/#/*/input/*
+         if
+            neq:x:@.dp/#/*/type
+               .:*
+            .lambda
+               .arg
+                  name
+                  in:query
+                  schema
+                     type
+               set-value:x:@.arg/*/name
+                  get-value:x:@.dp/#/*/name
+               switch:x:@.dp/#/*/type
+                  case:short
+                  case:ushort
+                  case:int
+                  case:uint
+                  case:long
+                  case:ulong
+                     set-value:x:@.arg/*/schema/*/type
+                        .:integer
+                  case:float
+                  case:double
+                  case:decimal
+                     set-value:x:@.arg/*/schema/*/type
+                        .:number
+                  case:bool
+                     set-value:x:@.arg/*/schema/*/type
+                        .:boolean
+                  default
+                     set-value:x:@.arg/*/schema/*/type
+                        .:string
+               if
+                  exists:x:@.dp/#/*/description
+                  .lambda
+                     unwrap:x:+/*/*
+                     insert-after:x:@.arg/*/name
+                        .
+                           description:x:@.dp/#/*/description
+               add:x:+/*/*
+                  get-nodes:x:@.arg/*
+               add:x:@.buffer/*/*/*/parameters
+                  .
+                     .

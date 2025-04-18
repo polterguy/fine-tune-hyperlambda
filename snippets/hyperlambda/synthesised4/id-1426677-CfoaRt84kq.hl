@@ -1,0 +1,61 @@
+
+/*
+ * This Hyperlambda code creates a scheduled task that deletes a chatbot 7 days after its creation. It sends a signal to a feedback channel, sleeps for a short duration, calculates the future date for deletion, and constructs a task name. The task is created with a description and due date, and it performs several operations: deleting records from a database, deleting a file, logging the deletion, and finally deleting the task itself. 
+ * 
+ * 1. [if] - Checks if the [.auto_destruct] node is true.
+ * 2. [sockets.signal] - Sends a signal to a feedback channel with a message about creating a scheduled task.
+ * 3. [sleep] - Pauses execution for 100 milliseconds.
+ * 4. [math.add] - Calculates the date 7 days from now.
+ * 5. [strings.concat] - Constructs a task name by concatenating strings.
+ * 6. [unwrap] - Evaluates expressions to retrieve the task and type nodes.
+ * 7. [tasks.create] - Creates a task with a description and due date.
+ * 8. [.lambda] - Defines the operations to be executed by the task.
+ * 9. [.type] - Retrieves the type of the chatbot.
+ * 10. [data.connect] - Connects to a database and executes a SQL delete statement.
+ * 11. [.task] - Retrieves the task name.
+ * 12. [data.delete] - Deletes a record from the database.
+ * 13. [strings.concat] - Constructs a file path for deletion.
+ * 14. [io.file.delete] - Deletes a file at the specified path.
+ * 15. [log.info] - Logs information about the deletion of the chatbot.
+ * 16. [tasks.delete] - Deletes the task after execution.
+ */
+if:x:@.auto_destruct
+   sockets.signal:x:@.feedback-channel
+      args
+         message:Creating scheduled task that deletes chatbot 7 days from now
+         type:info
+   sleep:100
+   math.add
+      date.now
+      time
+         days:7
+   strings.concat
+      .:delete-chatbot-
+      get-value:x:@.type
+   unwrap:x:+/+/*/.lambda/*/.task
+   unwrap:x:+/*/.lambda/*/.type
+   tasks.create:x:@strings.concat
+      description:Deletes demo chatbot 7 days after creating it
+      due:x:@math.add
+      .lambda
+         .type:x:@.type
+         data.connect:[generic|magic]
+            data.execute:@"
+delete from vss_ml_training_snippets
+   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+               type:x:@.type
+         .task:x:@strings.concat
+         data.connect:[generic|magic]
+            data.delete
+               table:ml_types
+               where
+                  and
+                     type.eq:x:@.type
+         strings.concat
+            .:/etc/www/
+            get-value:x:@.type
+            .:.html
+         io.file.delete:x:@strings.concat
+         log.info:Demo chatbot was deleted
+            type:x:@.type
+         tasks.delete:x:@.task

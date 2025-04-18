@@ -1,0 +1,114 @@
+
+/*
+ * This Hyperlambda code snippet retrieves product data from a WooCommerce API, processes it, and stores it in a database for machine learning training. The code iterates through pages of products, fetching data until fewer than 10 products are returned. It constructs a base URL for API requests, and uses authentication headers for access. For each product, it checks if the product is in stock and has a non-empty description. It then converts the description to Markdown, constructs a completion text with price, URL, and optionally short description and images, and stores the data in a database table named "ml_training_snippets" with metadata for further use.
+ * 
+ * 1. [while] - Loops while the condition in [.continue] is true.
+ * 2. [.base-url] - Sets the base URL for API requests.
+ * 3. [if] - Checks if the page number is greater than 0 to modify the base URL.
+ * 4. [set-value] - Updates the base URL with the current page number.
+ * 5. [http.get] - Fetches product data from the API.
+ * 6. [add] - Appends fetched product data to [.products].
+ * 7. [if] - Checks if fewer than 10 products were returned to stop further requests.
+ * 8. [math.increment] - Increments the page number by 10.
+ * 9. [data.connect] - Connects to a database for data processing.
+ * 10. [for-each] - Iterates over each product in the fetched data.
+ * 11. [if] - Checks product conditions (in stock, non-empty description).
+ * 12. [.prompt] - Placeholder for prompt data.
+ * 13. [.completion] - Placeholder for completion data.
+ * 14. [set-value] - Sets the prompt and completion data.
+ * 15. [strings.concat] - Concatenates strings for prompt and completion.
+ * 16. [html2markdown] - Converts HTML descriptions to Markdown.
+ * 17. [data.create] - Inserts processed data into the database table "ml_training_snippets".
+ */
+while:x:@.continue
+   .base-url:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10"
+   if
+      mt:x:@.page
+         .:int:0
+      .lambda
+         set-value:x:@.base-url
+            strings.concat
+               .:"https://project.mis.temple.edu/foodkiosk/wp-json/wc/v3/products?per_page=10&page="
+               get-value:x:@.page
+   http.get:x:@.base-url
+      headers
+         Authorization:x:@.auth
+      convert:bool:true
+   add:x:@.products
+      get-nodes:x:@http.get/*/content/*
+   if
+      lt
+         get-count:x:@http.get/*/content/*
+         .:int:10
+      .lambda
+         set-value:x:@.continue
+            .:bool:false
+   math.increment:x:@.page
+      .:int:10
+   data.connect:[generic|magic]
+      for-each:x:@http.get/*/content/*
+         if
+            and
+               eq:x:@.dp/#/*/stock_status
+                  .:instock
+               not-null:x:@.dp/#/*/description
+               neq:x:@.dp/#/*/description
+                  .:
+            .lambda
+               .prompt
+               .completion
+               set-value:x:@.prompt
+                  strings.concat
+                     html2markdown:x:@.dp/#/*/description
+               set-value:x:@.completion
+                  strings.concat
+                     .:"Price: "
+                     get-value:x:@.dp/#/*/price
+                     .:@"
+
+"
+                     .:"URL: "
+                     get-value:x:@.dp/#/*/permalink
+               if
+                  and
+                     not-null:x:@.dp/#/*/short_description
+                     neq:x:@.dp/#/*/short_description
+                        .:
+                  .lambda
+                     set-value:x:@.completion
+                        strings.concat
+                           get-value:x:@.completion
+                           .:@"
+
+"
+                           .:"Short description: "
+                           html2markdown:x:@.dp/#/*/short_description
+               if
+                  exists:x:@.dp/#/*/images/*
+                  .lambda
+                     set-value:x:@.completion
+                        strings.concat
+                           get-value:x:@.completion
+                           .:@"
+
+Images of product:"
+                     for-each:x:@.dp/#/*/images/*
+                        set-value:x:@.completion
+                           strings.concat
+                              get-value:x:@.completion
+                              .:@"
+
+"
+                              .:![
+                              get-value:x:@.dp/#/*/name
+                              .:](
+                              get-value:x:@.dp/#/*/src
+                              .:)
+               data.create
+                  table:ml_training_snippets
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@.prompt
+                     completion:x:@.completion
+                     uri:x:@.uri
+                     meta:woocommerce-import

@@ -1,0 +1,44 @@
+
+/*
+ * This Hyperlambda code iterates through a list of folders, loads Hyperlambda files, counts lines of code and files, and adds the results to a node structure. It performs the following steps:
+ * 
+ * 1. [for-each] - Iterates over each folder in the list.
+ * 2. [strings.split] - Splits the folder path by '/'.
+ * 3. [unwrap] - Evaluates the next node.
+ * 4. [signal] - Triggers a signal to load files recursively.
+ * 5. [.loc] - Initializes a counter for lines of code.
+ * 6. [.files] - Initializes a counter for files.
+ * 7. [for-each] - Iterates over each loaded file.
+ * 8. [if] - Checks if the file ends with '.hl'.
+ * 9. [hyper2lambda] - Converts the file content to a lambda structure.
+ * 10. [math.increment] - Increments the lines of code counter.
+ * 11. [math.increment] - Increments the files counter.
+ * 12. [unwrap] - Evaluates nested nodes.
+ * 13. [set-name] - Sets the name of a node.
+ * 14. [add] - Adds the results to a node structure.
+ */
+for-each:x:@io.folder.list/*
+   strings.split:x:@.dp/#
+      .:/
+   unwrap:x:+/*
+   signal:magic.io.file.load-recursively
+      .:x:@.dp/#
+   .loc:int:0
+   .files:int:0
+   for-each:x:@signal/*
+      if
+         strings.ends-with:x:@.dp/#
+            .:.hl
+         .lambda
+            hyper2lambda:x:@.dp/#/0
+            math.increment:x:@.loc
+               get-count:x:@hyper2lambda/**
+            math.increment:x:@.files
+   unwrap:x:+/+/*/*/*
+   set-name:x:+/*/*
+      get-value:x:@strings.split/0/-
+   add:x:@.lambda/*/lambda2hyper/*/modules
+      .
+         foo
+            loc:x:@.loc
+            files:x:@.files

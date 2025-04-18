@@ -1,0 +1,57 @@
+
+/*
+ * This Hyperlambda code checks if a node with the value "magic" exists within a specific path in the current node structure. If it doesn't exist, it constructs a file path based on the database type, loads a SQL file from that path, and attempts to create a "Magic" database using different database connections and execution commands depending on the database type (MSSQL, PostgreSQL, MySQL, or SQLite). It logs messages to the console before and after attempting to create the database. 
+ * 
+ * 1. [if] - Initiates a conditional statement.
+ * 2. [not] - Inverts the condition of its child node.
+ * 3. [exists:x:@signal/*/*/=magic] - Checks if a node with the value "magic" exists in the specified path.
+ * 4. [.lambda] - Contains the code to execute if the condition is true.
+ * 5. [strings.concat] - Concatenates strings to form a file path.
+ * 6. [.:/misc/] - Static string part of the file path.
+ * 7. [get-value:x:@.db-type] - Retrieves the database type value.
+ * 8. [.:/magic.sql] - Static string part of the file path.
+ * 9. [io.file.load:x:@strings.concat] - Loads a SQL file from the constructed path.
+ * 10. [console.log:Trying to create Magic database] - Logs a message to the console.
+ * 11. [switch:x:@.db-type] - Switches execution based on the database type.
+ * 12. [case:mssql] - Case for MSSQL database type.
+ * 13. [mssql.connect] - Connects to an MSSQL database.
+ * 14. [mssql.execute-batch:x:@io.file.load] - Executes a batch of SQL commands loaded from the file.
+ * 15. [case:pgsql] - Case for PostgreSQL database type.
+ * 16. [pgsql.connect:[generic|postgres]] - Connects to a PostgreSQL database.
+ * 17. [pgsql.execute:create database magic] - Executes a command to create a "magic" database.
+ * 18. [pgsql.connect:[generic|magic]] - Connects to the newly created PostgreSQL database.
+ * 19. [pgsql.execute:x:@io.file.load] - Executes SQL commands loaded from the file.
+ * 20. [case:mysql] - Case for MySQL database type.
+ * 21. [mysql.connect] - Connects to a MySQL database.
+ * 22. [mysql.execute:x:@io.file.load] - Executes SQL commands loaded from the file.
+ * 23. [case:sqlite] - Case for SQLite database type.
+ * 24. [sqlite.connect:[generic|magic]] - Connects to a SQLite database.
+ * 25. [sqlite.execute:x:@io.file.load] - Executes SQL commands loaded from the file.
+ * 26. [console.log:Magic databases was successfully created] - Logs a success message to the console.
+ */
+if
+   not
+      exists:x:@signal/*/*/=magic
+   .lambda
+      strings.concat
+         .:/misc/
+         get-value:x:@.db-type
+         .:/magic.sql
+      io.file.load:x:@strings.concat
+      console.log:Trying to create Magic database
+      switch:x:@.db-type
+         case:mssql
+            mssql.connect
+               mssql.execute-batch:x:@io.file.load
+         case:pgsql
+            pgsql.connect:[generic|postgres]
+               pgsql.execute:create database magic
+            pgsql.connect:[generic|magic]
+               pgsql.execute:x:@io.file.load
+         case:mysql
+            mysql.connect
+               mysql.execute:x:@io.file.load
+         case:sqlite
+            sqlite.connect:[generic|magic]
+               sqlite.execute:x:@io.file.load
+      console.log:Magic databases was successfully created
