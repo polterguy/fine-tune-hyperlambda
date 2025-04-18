@@ -1,0 +1,21 @@
+
+// Enriches a list of artists from the "Artists" table by fetching their play statistics from an external API, merges the play count into each artist record, and returns the enriched artist data.
+data.connect:streamingdb
+   data.read
+      table:Artists
+      limit:50
+      columns
+         ArtistId
+         StageName
+   for-each:x:@data.read/*
+      http.get:"https://api.streamstats.com/plays"
+         query
+            id:x:@.dp/#/*/ArtistId
+         convert:bool:true
+      add:x:+/*/*
+         get-nodes:x:@http.get/*/content/*
+      add:x:@.dp/#
+         .
+            plays
+   yield
+      enriched:x:@.artists

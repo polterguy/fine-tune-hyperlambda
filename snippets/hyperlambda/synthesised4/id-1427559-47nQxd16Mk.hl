@@ -1,0 +1,20 @@
+
+// Retrieves a list of warehouses from the "logistics" database, including their IDs and locations, and for each warehouse, fetches related shipments by matching the WarehouseId, returning the shipments as a nested result for each warehouse.
+data.connect:logistics
+   data.read
+      table:Warehouse
+      limit:50
+      columns
+         WarehouseId
+         Location
+   include:x:@data.read/*
+      data.read
+         table:Shipment
+         columns
+            ShipmentId
+            DispatchDate
+         where
+            and
+               WarehouseId.eq:x:@.dp/#/*/WarehouseId
+      yield
+         shipments:x:@data.read/*

@@ -1,0 +1,22 @@
+
+// Deletes records from the "Order Details" table in the "northwind" SQLite database using arguments as filter conditions, sends a signal about the deletion with authentication roles, and returns the number of affected rows.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:Order Details
+      where
+         and
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Order Details.delete
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

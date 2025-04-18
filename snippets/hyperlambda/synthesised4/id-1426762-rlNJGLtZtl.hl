@@ -1,0 +1,19 @@
+
+// This Hyperlambda code iterates over the results of a SQLite select query, processes each result to extract table or index names, and for each, constructs and executes a PRAGMA statement to retrieve index information. It then iterates over the returned index info, extracting column names and appending them as child nodes under the appropriate parent node, effectively building a hierarchical structure of tables or indexes and their columns.
+for-each:x:@sqlite.select/*
+   unwrap:x:+/*/*/*
+   add:x:../*/return-nodes
+      .
+         .
+            name:x:@.dp/#/*/name
+            columns
+   strings.concat
+      .:"pragma index_info('"
+      get-value:x:@.dp/#/*/name
+      .:"')"
+   sqlite.select:x:@strings.concat
+   for-each:x:@sqlite.select/*
+      unwrap:x:+/*/*
+      add:x:../*/return-nodes/0/-/*/columns
+         .
+            .:x:@.dp/#/*/name

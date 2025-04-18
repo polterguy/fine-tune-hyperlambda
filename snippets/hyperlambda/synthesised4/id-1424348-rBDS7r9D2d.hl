@@ -1,0 +1,17 @@
+
+// Extracts all URLs from a server log file if it exists, collects them, converts the result to a Hyperlambda string, and logs the extracted URLs.
+if
+   io.file.exists:/var/logs/server.log
+   .lambda
+      io.file.load:/var/logs/server.log
+      .urls
+      strings.matches:x:@io.file.load
+         .:"https?://[\\w\\.-]+(?:\\.[\\w\\.-]+)+(?:[/\\w\\._~:?#[\\]@!$&'()*+,;=-]*)?"
+      for-each:x:@strings.matches/*/match
+         unwrap:x:+/*/*
+         add:x:@.urls
+            .
+               .:x:@.dp/#
+      lambda2hyper:x:@.urls/*
+      log.info:Extracted URLs from file
+         emails:x:@lambda2hyper

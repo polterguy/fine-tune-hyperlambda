@@ -1,0 +1,31 @@
+
+// Updates a record in the "notes" table of a SQLite CRM database using values and conditions from the arguments, returns 404 if no record is found, otherwise signals the update and returns the affected count.
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:notes
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.notes.put
+      args
+      roles:admin,root
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

@@ -1,0 +1,23 @@
+
+// This Hyperlambda code connects to a MySQL database, retrieves all indexes for a specified table, and constructs a node structure representing each non-primary index and its columns. It iterates through the indexes, skips the primary key, and builds a list of index names with their associated columns, returning the result as nodes.
+mysql.connect:x:@.connection
+   strings.concat
+      .:"show indexes from "
+      get-value:x:@.arguments/*/table
+   mysql.select:x:@strings.concat
+   for-each:x:@mysql.select/*
+      if
+         neq:x:@.dp/#/*/Key_name
+            .:PRIMARY
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:@mysql.connect/*/return-nodes
+               .
+                  .
+                     name:x:@.dp/#/*/Key_name
+                     columns
+            unwrap:x:+/*/*
+            add:x:@mysql.connect/*/return-nodes/0/-/*/columns
+               .
+                  .:x:@.dp/#/*/Column_name
+   return-nodes

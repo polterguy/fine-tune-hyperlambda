@@ -1,0 +1,25 @@
+
+// Selects up to 50 customers from the "Customer" table in the "ecommerce" database, returning their CustomerId and Email, and for each customer also fetches their orders from an external API and loads their preferences from a local JSON file, including both "orders" and "preferences" in the result.
+data.connect:ecommerce
+   data.read
+      table:Customer
+      limit:50
+      columns
+         CustomerId
+         Email
+   include:x:@data.read/*
+      http.get:"https://api.example.com/orders"
+         query
+            customerId:x:@.dp/#/*/CustomerId
+         convert:bool:true
+      yield
+         orders:x:@http.get/*/content/*
+   include:x:@data.read/*
+      strings.concat
+         .:/data/preferences/
+         get-value:x:@.dp/#/*/CustomerId
+         .:.json
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         preferences:x:@json2lambda/*

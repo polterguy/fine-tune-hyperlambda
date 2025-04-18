@@ -1,0 +1,25 @@
+
+// Retrieves up to 50 artists from the "Artists" table, then for each artist, fetches their play statistics from an external API and loads additional metadata from a local JSON file, combining all results into the final output.
+data.connect:streamingdb
+   data.read
+      table:Artists
+      limit:50
+      columns
+         ArtistId
+         StageName
+   include:x:@data.read/*
+      http.get:"https://api.streamstats.com/plays"
+         query
+            id:x:@.dp/#/*/ArtistId
+         convert:bool:true
+      yield
+         stats:x:@http.get/*/content
+   include:x:@data.read/*
+      strings.concat
+         .:/metadata/artists/
+         get-value:x:@.dp/#/*/ArtistId
+         .:.json
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         metadata:x:@json2lambda/*

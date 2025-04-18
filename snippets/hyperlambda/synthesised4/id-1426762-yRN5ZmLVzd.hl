@@ -1,0 +1,54 @@
+
+// Creates a dynamic slot that retrieves all indexes for a specified SQLite database table, including their column details, by connecting to the database and querying the SQLite system tables and index information.
+slots.create:magic.db.sqlite.indexes
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
+   .connection:
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   sqlite.connect:x:@.connection
+      strings.concat
+         .:"select * from sqlite_master where type = 'index' and tbl_name='"
+         get-value:x:@.arguments/*/table
+         .:"'"
+      sqlite.select:x:@strings.concat
+      for-each:x:@sqlite.select/*
+         unwrap:x:+/*/*/*
+         add:x:../*/return-nodes
+            .
+               .
+                  name:x:@.dp/#/*/name
+                  columns
+         strings.concat
+            .:"pragma index_info('"
+            get-value:x:@.dp/#/*/name
+            .:"')"
+         sqlite.select:x:@strings.concat
+         for-each:x:@sqlite.select/*
+            unwrap:x:+/*/*
+            add:x:../*/return-nodes/0/-/*/columns
+               .
+                  .:x:@.dp/#/*/name
+   return-nodes

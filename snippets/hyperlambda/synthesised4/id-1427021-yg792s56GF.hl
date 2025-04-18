@@ -1,0 +1,34 @@
+
+// Updates a record in the Categories table of the Northwind database using provided arguments, returns 404 if no record was updated, otherwise sends a signal with updated data and returns the number of affected rows.
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Categories
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Categories.put
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.update
