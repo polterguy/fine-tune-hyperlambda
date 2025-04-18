@@ -1,0 +1,58 @@
+
+/*
+ * This Hyperlambda file defines an endpoint that sends an email using SMTP credentials from configuration.
+ *
+ * 1. [.arguments]
+ *    - [to:string]      → The recipient's email address.
+ *    - [subject:string] → The subject of the email (required).
+ *    - [content:string] → The plain text content of the email body.
+ *    - [name:string]    → The recipient’s display name.
+ *
+ * 2. [validators.mandatory]
+ *    - Ensures that [subject] is provided by the caller.
+ *
+ * 3. [config.get]
+ *    - Dynamically retrieves SMTP configuration values for:
+ *      - 'mail.smtp.host'
+ *      - 'mail.smtp.port'
+ *      - 'mail.smtp.username'
+ *      - 'mail.smtp.password'
+ *
+ * 4. [mail.smtp.send]
+ *    - Constructs and sends the email using the provided arguments and SMTP credentials:
+ *      - [server] node sets up the SMTP host, port, username, and password.
+ *      - [message] node builds the actual email with recipient name/email, subject, and content.
+ *      - The content is sent as plain text using the [entity:text/plain] format.
+ *
+ * 5. [return]
+ *    - Returns a result object with [result:success] to indicate successful transmission.
+ *
+ * This endpoint allows you to securely send emails by referencing SMTP configuration from your server setup,
+ * ensuring both security and flexibility. It supports full customization of the recipient details and message content.
+ */
+.arguments
+   to:string
+   subject:string
+   content:string
+   name:string
+validators.mandatory:x:@.arguments/*/subject
+config.get:"mail.smtp.password"
+config.get:"mail.smtp.username"
+config.get:"mail.smtp.port"
+config.get:"mail.smtp.host"
+mail.smtp.send
+   server
+      host:x:@config.get
+      port:x:@config.get/@config.get
+      username:x:@config.get/@config.get/@config.get
+      password:x:@config.get/@config.get/@config.get/@config.get
+   message
+      to
+         .
+            name:x:@.arguments/*/name
+            email:x:@.arguments/*/to
+      subject:x:@.arguments/*/subject
+      entity:text/plain
+         content:x:@.arguments/*/content
+return
+   result:success
