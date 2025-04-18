@@ -24,6 +24,7 @@ Below are some example prompts you can run through the model after fine tuning i
   - Add these 3 items as static nodes
 * Generate a list of objects being employees
   - Add one item to it
+  - Dynamically add on item to it
   - Wrap it into and endpoint and return all employees
   - Loop through them and remove their names
   - Add departments to each entry from within your existing loop in addition to continuing removing items
@@ -126,3 +127,9 @@ Another
  * into /etc/temp/ before attached into the email.
  */
  ```
+
+
+## Making it stronger
+
+* Examples of arguments
+* Examples of "How to split string and retrieve last entry", "how to split string and return first item", etc

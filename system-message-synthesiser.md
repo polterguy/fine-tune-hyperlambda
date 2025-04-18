@@ -320,5 +320,5 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
  
  I will provide you with some Hyperlambda code. Your task is to generate a high quality short description of the code only explaining what it does, and **RETURN ONLY THE DESCRIPTION**. Respond with a **SHORT** description. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of executing the code.
  
- **IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
+ **IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS, AND DON'T WRAP YOUR DESCRIPTION INSIDE A COMMENT! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
  
