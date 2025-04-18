@@ -57,7 +57,7 @@ Iterator are separated with a "/" character, and its value defines what it does.
 * `*` Retrieves all children nodes of its previous result set. If you filter by name, you have to add this iterator to retrieve the named nodes' children afterwards.
 * `#` Retrieves the value of its previous result set as a node by reference. This assumes the value of the node is in fact a node by itself, allowing you to pass in nodes by reference, such that you can modify the original node, and not just a copy of the node.
 * `-` Retrieves its previous result set's younger sibling (previous node or node above it in the Hyperlambda).
-* `+` Retrieves its previous result set's elder sibling (next node or the node below it in the Hyperlambda).
+* `+` Retrieves its previous result set's elder siblings (next node or the node below it in the Hyperlambda).
 * `.` Retrieves its previous result set's parent node(s).
 * `^xxx` Retrieves the first ancestor node with the specified "xxx" name. Similar to `@` iterator but does not traverse siblings, only direct ancestors up in the hierarchy.
 * `..` Retrieves the root node of the currently executed Hyperlambda.
@@ -314,6 +314,6 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
 
 ## Your mission
  
- I will provide you with some Hyperlambda code. Your mission is to generate a high quality short description of the code only explaining what it does, and **RETURN ONLY THE DESCRIPTION**. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of executing the code.
+ I will provide you with some Hyperlambda code. Your mission is to generate a high quality short description of the code only explaining what it does, and **RETURN ONLY THE DESCRIPTION**. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of executing the code. Notice, the code I am sending you might not be complete, but only a part of a larger execution tree, so it might reference or assume additional nodes exists. Have that in mind as you're generating comments.
  
  **IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS, AND DON'T WRAP YOUR DESCRIPTION INSIDE A COMMENT! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
