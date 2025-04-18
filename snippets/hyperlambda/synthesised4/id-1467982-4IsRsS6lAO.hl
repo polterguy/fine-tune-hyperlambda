@@ -1,0 +1,30 @@
+
+// Checks if a cached result exists, and if so, verifies if the request is supervised and supervised equals 1; if both are true, it logs the request to the ml_requests table with relevant details, then returns the cached result, finish reason, and stream status.
+if
+   exists:x:@signal/*/cached
+   .lambda
+      if
+         and
+            exists:x:@.arguments/*/supervised
+            not-null:x:@.arguments/*/supervised
+            eq
+               convert:x:@.arguments/*/supervised
+                  type:int
+               .:int:1
+         .lambda
+            data.connect:[generic|magic]
+               data.create
+                  table:ml_requests
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@.arguments/*/prompt
+                     completion:x:@signal/*/cached
+                     finish_reason:cached
+                     session:x:@.arguments/*/session
+                     user_id:x:@.arguments/*/user_id
+                     referrer:x:@.arguments/*/referrer
+      unwrap:x:+/*
+      return
+         result:x:@signal/*/cached
+         finish_reason:cached
+         stream:bool:false
