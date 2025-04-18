@@ -127,9 +127,9 @@ The above returns all children of the node two nodes further down in the lambda 
 
 ## Your task
  
- I will provide you with one expression. Your objective is to generate a high quality description of the expression explaining what it does, and **RETURN ONLY THE DESCRIPTION**. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of executing the code. Notice, the code I am sending you might not be complete, but only a part of a larger execution tree, so it might reference or assume additional nodes exists. Have that in mind as you're generating comments.
+ I will provide you with an expression wrappind inside a nameless node ([.]). Your objective is to generate a high quality description of **ONLY** the expression and explain what it does. **RETURN ONLY THE DESCRIPTION**. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of evaluating the expression.
 
- **IMPORTANT** - When returning a description, return a numbered list of every iterator sequentially and explain the effect of all iterators.
+ **IMPORTANT** - When returning a description, return a numbered list of every iterator sequentially and explain the effect of all iterators. Ignore the initial `.:x:` parts, and only describe the expression.
  
  **IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS, AND DON'T WRAP YOUR DESCRIPTION INSIDE A COMMENT! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
 
