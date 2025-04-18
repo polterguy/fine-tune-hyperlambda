@@ -14,7 +14,6 @@
 
 .arguments
    randomize:int
-   delete_duplicates:bool
 
 // Applying default value for [randomize].
 validators.default:x:@.arguments
@@ -47,107 +46,68 @@ for-each:x:@execute/*
             // Transforming file to lambda object.
             hyper2lambda:x:@.dp/#/0
                comments:true
-            remove-nodes:x:-/*/.description
+
+            // Checking if this is validation data.
+            .validation:int:0
             if
-               eq
-                  get-name:x:@hyper2lambda/0
-                  .:..
+               and
+                  eq:x:@.arguments/*/randomize
+                     .:int:1
+                  eq
+                     math.modulo:x:@.no
+                        .:int:8
+                     .:int:0
                .lambda
+                  set-value:x:@.validation
+                     .:int:1
+            else-if
+               strings.contains:x:@.dp/#
+                  .:/validation/
+               .lambda
+                  set-value:x:@.validation
+                     .:int:1
 
-                  .prompt
-                  set-value:x:-
-                     get-value:x:@hyper2lambda/0
-                  remove-nodes:x:@hyper2lambda/0
+            // Checking if this is validation data.
+            .synthesised:int:0
+            if
+               strings.contains:x:@.dp/#
+                  .:/synthesised
+               .lambda
+                  set-value:x:@.synthesised
+                     .:int:1
 
-                  // Creating our code segment
-                  lambda2hyper:x:@hyper2lambda/*
-                     comments:true
+            // Saving above code snippet.
+            data.connect:fine-tune
 
-                  // Checking if the file should be deleted.
-                  if
+               // Verifying that code doesn't already exist in file.
+               .exists:bool:false
+               data.read
+                  table:hyperlambda
+                  where
                      and
-                        eq
-                           get-name:x:@hyper2lambda/0
-                           .:data.read
-                        eq
-                           get-count:x:@hyper2lambda/*
-                           .:int:2
-                        or
-                           eq
-                              get-name:x:@hyper2lambda/1
-                              .:yield
-                           eq
-                              get-name:x:@hyper2lambda/1
-                              .:return-nodes
-                           eq
-                              get-name:x:@hyper2lambda/1
-                              .:return
-                     .lambda
-                     
-                        io.file.delete:x:@.dp/#
+                        prompt.eq:x:@.prompt
+                        code.eq:x:@lambda2hyper
+                  limit:1
+               if
+                  not-exists:x:@data.read/*
+                  .lambda
 
-                  else
+                     // Making sure we avoid double inserts.
+                     data.create
+                        table:hyperlambda
+                        values
+                           prompt:x:@.prompt
+                           code:x:@lambda2hyper
+                           validation:x:@.validation
+                           synthesised:x:@.synthesised
 
-                     // Checking if this is validation data.
-                     .validation:int:0
-                     if
-                        and
-                           eq:x:@.arguments/*/randomize
-                              .:int:1
-                           eq
-                              math.modulo:x:@.no
-                                 .:int:8
-                              .:int:0
-                        .lambda
-                           set-value:x:@.validation
-                              .:int:1
-                     else-if
-                        strings.contains:x:@.dp/#
-                           .:/validation/
-                        .lambda
-                           set-value:x:@.validation
-                              .:int:1
+                     // Counting how many training snippets we're inserting
+                     math.increment:x:@.no
 
-                     // Checking if this is validation data.
-                     .synthesised:int:0
-                     if
-                        strings.contains:x:@.dp/#
-                           .:/synthesised
-                        .lambda
-                           set-value:x:@.synthesised
-                              .:int:1
+               else
 
-                     // Saving above code snippet.
-                     data.connect:fine-tune
-
-                        // Verifying that code doesn't already exist in file.
-                        .exists:bool:false
-                        data.read
-                           table:hyperlambda
-                           where
-                              and
-                                 code.eq:x:@lambda2hyper
-                           limit:1
-                        if
-                           not-exists:x:@data.read/*
-                           .lambda
-
-                              // Making sure we avoid double inserts.
-                              data.create
-                                 table:hyperlambda
-                                 values
-                                    prompt:x:@.prompt
-                                    code:x:@lambda2hyper
-                                    validation:x:@.validation
-                                    synthesised:x:@.synthesised
-
-                              // Counting how many training snippets we're inserting
-                              math.increment:x:@.no
-
-                        else-if:x:@.delete_duplicates
-
-                           // Deleting file since it's a duplicate!
-                           io.file.delete:x:@.dp/#
+                  // Deleting file since it's a duplicate!
+                  io.file.delete:x:@.dp/#
 
             else
 
