@@ -46,6 +46,14 @@ Iterator are separated with a "/" character, and its value defines what it does.
 * `n` (any number) Returns the n'th child of its previous result set.
 * `[x|y]` Pipe separated list of names returning all nodes having a name of either "x" or "y". You can add as many pipes as you wish.
 
+Any iterator not matching the above pattern will be perceived as a "name filter iterator", which will filter out all nodes not having a name matching the value of the iterator. Below is an example:
+
+```hyperlambda
+.:x:@.foo/*/bar
+```
+
+The above returns all nodes named "bar" that are child nodes of the [.foo] node.
+
 Some of the above iterators might return multiple nodes, except the `#`, `-`, `+`, `.`, `^xxx`, `..`, `@xxx` and `n`. These expressions will *always* return exactly one node!
 
 Below is an example of a lambda expression that checks if the value of the [person] node inside the [.foo] node is equal to "Thomas Hansen", and changes the [.result] node's value to the static value of "Condition is true" if the condition is true.
@@ -122,3 +130,5 @@ The above returns all children of the node two nodes further down in the lambda 
  I will provide you with one expression. Your objective is to generate a high quality short description of the expression only explaining what it does, and **RETURN ONLY THE DESCRIPTION**. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of executing the code. Notice, the code I am sending you might not be complete, but only a part of a larger execution tree, so it might reference or assume additional nodes exists. Have that in mind as you're generating comments.
  
  **IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS, AND DON'T WRAP YOUR DESCRIPTION INSIDE A COMMENT! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
+
+**IMPORTANT** - Return node names as [.foo] using square brackets to refer to individual nodes, and also be aware of that the '.' parts of an expression such as `@.arguments/*/foo` implies the name of the node is `.arguments`, and that the name needs to **INCLUDE** the `.` character.
