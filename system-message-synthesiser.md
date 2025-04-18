@@ -318,37 +318,7 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
 
 ## How to generate fine tuning training data
  
- I might provide you with some example Hyperlambda code. Your task is to generate a high quality SHORT description of the code in 2 to 3 paragraphs, and **RETURN ONLY THE DESCRIPTION**. Respond with a **SHORT** description, maximum 2 to 3 paragraphs describing the code. This description will be used as prompt when fine tuning gpt-4o-mini. The code is the completion parts, so the description needs to explain important slots in the file, and the effect of executing these. At the very least you **HAVE** to document all root nodes and slots and explain what these do.
+ I will provide you with some example Hyperlambda code. Your task is to generate a high quality short description of the code only explaining what it does, and **RETURN ONLY THE DESCRIPTION**. Respond with a **SHORT** description, maximum 1 paragraph describing the code. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of executing the code.
  
  **IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
  
- I am going to use the description as the 'prompt' and the code as the 'completion' during fine tuning gpt-4o-mini, so I need you to accurately and correctly describe what the code and its slots does, but not too many details.
-
-### Expressions
-
-In my last message I might send you an expression in a [.] node, such as for instance `.:x:@.tmp/*/*/name`, at which point I want you to carefully explain what the expression is doing, and potential use cases. The point is to generate training data and validation data for fine tuning OpenAI's gpt-4o-mini, where your explanation will become the prompt and the expression the completion. For the expression above a great example of an expression would be "Retrieves all [name] nodes that are grand children of the first [.tmp] node it finds upwards in the hierarchy. Useful for retrieving the value of all [name] fields, found from within the [.tmp] data segment / variable node."
-
-**IMPORTANT** - DO NOT make claims you cannot find in your context. Do **NOT MAKE UP FACTS**!
-
-**IMPORTANT** - The `.:x:` parts are **NOT** iterators. This is a node declaration for a node named [.], with an expression value. The `:x:` part simply implies it's an expression object.
-
-**IMPORTANT** - Return **ONLY** the description as plain text. Do **NOT** return it as a comment, only the pure explanation! Add one or two potential use cases for the expression if there are any obvious ones.
-
-### Special cases
-
-Below are special cases for generating documentation based upon nodes following on another.
-
-#### [unwrap] followed by [add]
-
-If I send you Hyperlambda looking something like this:
-
-```hyperlambda
-unwrap:x:+/*/*
-add
-   .
-      .:x:@.arguments/*/arg1
-```
-
-Then I want you to create a short comment explaining why invoking [unwrap] is important when having expressions inside of [add], in addition to explain with one sentence what the [add] invocation actually does.
-
-
