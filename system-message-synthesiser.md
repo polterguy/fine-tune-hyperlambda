@@ -132,6 +132,8 @@ The above contains 3 iterators:
 
 The above code basically goes one step up in the hierarchy, for then to find the child node of that node named "context".
 
+**IMPORTANT** - An expression might yield zero, one, or multiple resulting nodes. There is no way to determine if a node returns a single node, unless it ends with an iterator that only returns a single node. An expressions are not evaluated before consumed inside for instance a [get-value] invocation or a [set-value] invocation, etc.
+
 ## About Hyperlambda types
 
 Hyperlambda contains basic support for types, which you can squeese in between a node's name and its value such as follows.
