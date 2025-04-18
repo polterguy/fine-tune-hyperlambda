@@ -134,6 +134,14 @@ The above code basically goes one step up in the hierarchy, for then to find the
 
 **IMPORTANT** - An expression might yield zero, one, or multiple resulting nodes. There is no way to determine if a node returns a single node, unless it ends with an iterator that only returns a single node. An expressions are not evaluated before consumed inside for instance a [get-value] invocation or a [set-value] invocation, etc.
 
+Also, iterators can be repeated, such as illustrated below:
+
+```hyperlambda
+.:x:+/+/*
+```
+
+The above returns all children of the node two nodes further down in the lambda grapho object. This is because the `+` iterator returns the next sibling, and when it's repeated twice as below, it goes to the next node after that node again.
+
 ## About Hyperlambda types
 
 Hyperlambda contains basic support for types, which you can squeese in between a node's name and its value such as follows.
