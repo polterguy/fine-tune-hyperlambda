@@ -1,0 +1,62 @@
+
+/*
+ * // This Hyperlambda code checks for the existence and validity of a URL within a given node structure. If the URL exists and is not null, empty, or starting with "http://" or "https://", it processes the URL by splitting and trimming it. Depending on whether the trimmed URL starts with a "/", it concatenates it with a base URL. If the resulting URL does not already exist in a specified node, it adds the processed URL to a collection of URLs.
+ * // 1. [if] - Begins a conditional block that checks multiple conditions.
+ * // 2. [and] - Groups conditions that must all be true for the block to execute.
+ * // 3. [exists] - Checks if a node with a specific expression exists.
+ * // 4. [not-null] - Checks if the node is not null.
+ * // 5. [neq] - Checks if the node is not equal to a specific value.
+ * // 6. [not] - Negates the following condition.
+ * // 7. [strings.starts-with] - Checks if a string starts with a specified prefix.
+ * // 8. [.lambda] - Contains the code to execute if the conditions are met.
+ * // 9. [strings.split] - Splits a string into parts.
+ * // 10. [strings.trim-end] - Trims characters from the end of a string.
+ * // 11. [.tmp] - Temporary storage for intermediate results.
+ * // 12. [if] - Checks if the trimmed string starts with a "/".
+ * // 13. [strings.concat] - Concatenates strings together.
+ * // 14. [else] - Executes if the previous if condition is false.
+ * // 15. [not-exists] - Checks if a node does not exist.
+ * // 16. [unwrap] - Evaluates expressions before the node is reached.
+ * // 17. [add] - Adds a new node to a collection.
+ */
+if
+   and
+      exists:x:"@.dp/#/*/\\@href/[0,1]"
+      not-null:x:"@.dp/#/*/\\@href/[0,1]"
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"http://"
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"https://"
+   .lambda
+      strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      strings.trim-end:x:@strings.split/0
+         .:/
+      .tmp
+      if
+         strings.starts-with:x:@strings.trim-end
+            .:/
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:@strings.trim-end
+      else
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.base
+               .:/
+               get-value:x:@strings.trim-end
+      if
+         not-exists:x:@.url/*/{@strings.concat}
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.urls
+               .
+                  .:x:@.tmp

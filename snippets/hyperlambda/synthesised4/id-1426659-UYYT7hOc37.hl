@@ -1,0 +1,178 @@
+
+/*
+ * This Hyperlambda code processes a list of HTML snippets, extracting and formatting text content from list items (li) and paragraphs (p). It iterates through the text nodes, replacing whitespace characters and handling hyperlinks by constructing full URLs. The formatted text is then concatenated and added to a collection of snippets, ensuring proper formatting with bullet points for list items and line breaks for paragraphs. The code also manages double spaces and punctuation spacing, ensuring a clean output. The final result is stored in a completion node within the snippets collection.
+ * 
+ * 1. [case] - Initiates a conditional block for handling specific node types.
+ * 2. [if] - Checks if there are any snippets to process.
+ * 3. [exists] - Verifies the presence of child nodes under snippets.
+ * 4. [.lambda] - Contains the logic to execute if the condition is true.
+ * 5. [for-each] - Iterates over text nodes within the current snippet.
+ * 6. [if] - Checks conditions for processing text nodes.
+ * 7. [and] - Combines multiple conditions for evaluation.
+ * 8. [not-null] - Ensures the current node is not null.
+ * 9. [neq] - Checks if the current node's value is not empty.
+ * 10. [.lambda] - Contains logic for processing non-empty text nodes.
+ * 11. [strings.replace] - Replaces specific characters in the text.
+ * 12. [if] - Checks conditions for hyperlink processing.
+ * 13. [eq] - Compares node names or values.
+ * 14. [get-name] - Retrieves the name of the current node.
+ * 15. [exists] - Checks for the existence of href attributes.
+ * 16. [not-null] - Ensures the href attribute is not null.
+ * 17. [.lambda] - Contains logic for processing hyperlinks.
+ * 18. [set-value] - Assigns values to nodes.
+ * 19. [strings.concat] - Concatenates strings to form URLs.
+ * 20. [else-if] - Handles alternative hyperlink conditions.
+ * 21. [not] - Negates a condition.
+ * 22. [strings.starts-with] - Checks if a string starts with a specific prefix.
+ * 23. [else] - Handles default hyperlink processing.
+ * 24. [strings.trim] - Trims whitespace from strings.
+ * 25. [.has-double-space] - Boolean flag for double space checking.
+ * 26. [while] - Loops while a condition is true.
+ * 27. [strings.contains] - Checks for the presence of double spaces.
+ * 28. [switch] - Handles different node types for formatting.
+ * 29. [case] - Specifies actions for list items and paragraphs.
+ * 30. [neq] - Checks if the completion node is not empty.
+ * 31. [get-first-value] - Retrieves the first value from a node set.
+ * 32. [unwrap] - Evaluates expressions and unwraps nodes.
+ * 33. [add] - Adds nodes to a collection.
+ */
+case:li
+   if
+      exists:x:@.snippets/*
+      .lambda
+         .completion:
+         for-each:x:"@.dp/#/**/\\#text"
+            if
+               and
+                  not-null:x:@.dp/#
+                  neq:x:@.dp/#
+                     .:
+               .lambda
+                  strings.replace:x:@.dp/#
+                     .:"\r"
+                     .:" "
+                  strings.replace:x:@strings.replace
+                     .:"\n"
+                     .:" "
+                  strings.replace:x:@strings.replace
+                     .:"\t"
+                     .:" "
+                  strings.replace:x:@strings.replace
+                     .:"  "
+                     .:" "
+                  if
+                     and
+                        eq
+                           get-name:x:@.dp/#/.
+                           .:a
+                        exists:x:"@.dp/#/./*/\\@href/[0,1]"
+                        not-null:x:"@.dp/#/./*/\\@href/[0,1]"
+                     .lambda
+                        .url
+                        if
+                           strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                              .:/
+                           .lambda
+                              set-value:x:@.url
+                                 strings.concat
+                                    get-value:x:@.base
+                                    get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+                        else-if
+                           and
+                              not
+                                 strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                                    .:"http://"
+                              not
+                                 strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                                    .:"https://"
+                           .lambda
+                              set-value:x:@.url
+                                 strings.concat
+                                    get-value:x:@.base
+                                    .:/
+                                    get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+                        else
+                           set-value:x:@.url
+                              get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+                        set-value:x:@.completion
+                           strings.concat
+                              get-value:x:@.completion
+                              .:" "
+                              .:[
+                              strings.trim:x:@strings.replace
+                                 .:@"  
+	"
+                              .:](
+                              get-value:x:@.url
+                              .:)
+                              .:" "
+                  else
+                     set-value:x:@.completion
+                        strings.concat
+                           get-value:x:@.completion
+                           strings.trim:x:@strings.replace
+                              .:@"  
+	"
+                           .:" "
+         set-value:x:@.completion
+            strings.trim:x:@.completion
+               .:@"  
+	"
+         .has-double-space:bool:true
+         while:x:@.has-double-space
+            if
+               strings.contains:x:@.completion
+                  .:"  "
+               .lambda
+                  set-value:x:@.completion
+                     strings.replace:x:@.completion
+                        .:"  "
+                        .:" "
+            else
+               set-value:x:@.has-double-space
+                  .:bool:false
+         set-value:x:@.completion
+            strings.replace:x:@.completion
+               .:" ."
+               .:.
+         set-value:x:@.completion
+            strings.replace:x:@.completion
+               .:" ,"
+               .:,
+         switch:x:@get-name
+            case:li
+               if
+                  neq:x:@.completion
+                     .:
+                  .lambda
+                     set-value:x:@.completion
+                        strings.concat
+                           .:@"
+"
+                           .:"- "
+                           get-value:x:@.completion
+            case:p
+               set-value:x:@.completion
+                  strings.concat
+                     .:@"
+
+"
+                     get-value:x:@.completion
+         if
+            neq:x:@.completion
+               .:
+            .lambda
+               if
+                  exists:x:@.snippets/0/-/*/completion
+                  .lambda
+                     set-value:x:@.snippets/0/-/*/completion
+                        strings.concat
+                           get-first-value
+                              get-value:x:@.snippets/0/-/*/completion
+                              .:
+                           get-value:x:@.completion
+               else
+                  unwrap:x:+/*/*
+                  add:x:@.snippets/0/-
+                     .
+                        completion:x:@.completion

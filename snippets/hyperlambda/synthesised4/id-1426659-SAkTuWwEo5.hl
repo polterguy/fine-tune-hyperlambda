@@ -1,0 +1,105 @@
+
+/*
+ * This Hyperlambda code constructs a URL based on a given source path and a base URL, ensuring it is properly formatted. It checks if the source path exists, is not null, and is not empty. If the source path does not start with "http://" or "https://", it prepends the base URL accordingly. If the source path starts with "://", it uses the base URL's protocol. If it starts with "/", it appends it directly to the base URL. Otherwise, it adds a "/" between the base URL and the source path. The resulting URL is stored in [.url]. If a completion snippet exists, it appends an image markdown with the URL and an alt text to the completion. If not, it creates a new completion snippet with the image markdown.
+ * 
+ * 1. [if] - Checks if the source path exists, is not null, and is not empty.
+ * 2. [and] - Combines multiple conditions to be true.
+ * 3. [exists] - Checks if the source path exists.
+ * 4. [not-null] - Checks if the source path is not null.
+ * 5. [neq] - Checks if the source path is not empty.
+ * 6. [.lambda] - Executes the following block if conditions are met.
+ * 7. [.url] - Declares a node to store the constructed URL.
+ * 8. [if] - Checks if the source path does not start with "http://" or "https://".
+ * 9. [not] - Negates the following condition.
+ * 10. [strings.starts-with] - Checks the prefix of the source path.
+ * 11. [.lambda] - Executes the following block if conditions are met.
+ * 12. [if] - Checks if the source path starts with "://".
+ * 13. [strings.split] - Splits the base URL by "://".
+ * 14. [set-value] - Sets the value of [.url] by concatenating parts.
+ * 15. [strings.concat] - Concatenates strings.
+ * 16. [get-value] - Retrieves values from nodes.
+ * 17. [else-if] - Checks if the source path starts with "/".
+ * 18. [else] - Handles the case where the source path does not start with special prefixes.
+ * 19. [set-value] - Sets the value of [.url] by concatenating base URL and source path.
+ * 20. [if] - Checks if a completion snippet exists.
+ * 21. [exists] - Checks for the existence of a completion snippet.
+ * 22. [.lambda] - Executes if a completion snippet exists.
+ * 23. [set-value] - Appends image markdown to the existing completion.
+ * 24. [get-first-value] - Retrieves the first value from a node set.
+ * 25. [else] - Handles the case where no completion snippet exists.
+ * 26. [unwrap] - Evaluates the expression and unwraps the result.
+ * 27. [add] - Adds a new completion snippet with image markdown.
+ */
+if
+   and
+      exists:x:"@.dp/#/*/\\@src/[0,1]"
+      not-null:x:"@.dp/#/*/\\@src/[0,1]"
+      neq:x:"@.dp/#/*/\\@src/[0,1]"
+         .:
+   .lambda
+      .url
+      if
+         and
+            not
+               strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                  .:"http://"
+            not
+               strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                  .:"https://"
+         .lambda
+            if
+               strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                  .://
+               .lambda
+                  strings.split:x:@.base
+                     .:"://"
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@strings.split/0
+                        .:":"
+                        get-value:x:"@.dp/#/*/\\@src/[0,1]"
+            else-if
+               strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                  .:/
+               .lambda
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        get-value:x:"@.dp/#/*/\\@src/[0,1]"
+            else
+               set-value:x:@.url
+                  strings.concat
+                     get-value:x:@.base
+                     .:/
+                     get-value:x:"@.dp/#/*/\\@src/[0,1]"
+      else
+         set-value:x:@.url
+            get-value:x:"@.dp/#/*/\\@src/[0,1]"
+      if
+         exists:x:@.snippets/0/-/*/completion
+         .lambda
+            set-value:x:@.snippets/0/-/*/completion
+               strings.concat
+                  get-value:x:@.snippets/0/-/*/completion
+                  .:@"
+
+!["
+                  get-first-value
+                     get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                     .:"Image "
+                  .:](
+                  get-value:x:@.url
+                  .:)
+      else
+         strings.concat
+            .:![
+            get-first-value
+               get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+               .:"Image "
+            .:](
+            get-value:x:@.url
+            .:)
+         unwrap:x:+/*/*
+         add:x:@.snippets/0/-
+            .
+               completion:x:@strings.concat
