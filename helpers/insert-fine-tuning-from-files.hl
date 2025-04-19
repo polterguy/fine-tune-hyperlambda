@@ -93,57 +93,73 @@ for-each:x:@execute/*
             // Saving above code snippet.
             data.connect:fine-tune
 
-               // Verifying that code doesn't already exist in file.
-               .exists:bool:false
+               // Verifying file is not empty
                data.read
                   table:hyperlambda
                   where
-                     and
-                        prompt.eq:x:@.prompt
-                        code.eq:x:@lambda2hyper
-                  limit:1
+                     or
+                        code.eq
+                        prompt.eq
                if
-                  not-exists:x:@data.read/*
+                  exists:x:@data.read/*
                   .lambda
 
-                     // Making sure we've not go more than maximum 12 snippets with the same completion.
-                     data.read
-                        table:hyperlambda
-                        where
-                           and
-                              code.eq:x:@lambda2hyper
-                     if
-                        and
-                           eq
-                              get-value:x:@.arguments/*/reduce_duplicates
-                              .:bool:true
-                           mt
-                              get-count:x:@data.read/*
-                              .:int:12
-                        .lambda
-
-                           // Deleting file since we've got 12 similar completions!
-                           io.file.delete:x:@.dp/#
-                           math.increment:x:@.deleted
-
-                     else
-
-                        data.create
-                           table:hyperlambda
-                           values
-                              prompt:x:@.prompt
-                              code:x:@lambda2hyper
-                              validation:x:@.validation
-                              synthesised:x:@.synthesised
-
-                        // Counting how many training snippets we're inserting
-                        math.increment:x:@.no
+                     // Deleting file since it's empty in prompt or code!
+                     io.file.delete:x:@.dp/#
+                     math.increment:x:@.deleted
 
                else
 
-                  // Deleting file since it's a duplicate!
-                  io.file.delete:x:@.dp/#
-                  math.increment:x:@.deleted
+                  // Verifying that code doesn't already exist in file.
+                  data.read
+                     table:hyperlambda
+                     where
+                        and
+                           prompt.eq:x:@.prompt
+                           code.eq:x:@lambda2hyper
+                     limit:1
+                  if
+                     not-exists:x:@data.read/*
+                     .lambda
+
+                        // Making sure we've not go more than maximum 12 snippets with the same completion.
+                        data.read
+                           table:hyperlambda
+                           where
+                              and
+                                 code.eq:x:@lambda2hyper
+                        if
+                           and
+                              eq
+                                 get-value:x:@.arguments/*/reduce_duplicates
+                                 .:bool:true
+                              mt
+                                 get-count:x:@data.read/*
+                                 .:int:12
+                           .lambda
+
+                              // Deleting file since we've got 12 similar completions!
+                              io.file.delete:x:@.dp/#
+                              math.increment:x:@.deleted
+
+                        else
+
+                           data.create
+                              table:hyperlambda
+                              values
+                                 prompt:x:@.prompt
+                                 code:x:@lambda2hyper
+                                 validation:x:@.validation
+                                 synthesised:x:@.synthesised
+
+                           // Counting how many training snippets we're inserting
+                           math.increment:x:@.no
+
+                  else
+
+                     // Deleting file since it's a duplicate!
+                     io.file.delete:x:@.dp/#
+                     math.increment:x:@.deleted
 
    .catch
    
