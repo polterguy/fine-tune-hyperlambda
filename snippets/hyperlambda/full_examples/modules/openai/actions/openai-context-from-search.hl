@@ -1,36 +1,13 @@
-
 /*
- * This Hyperlambda endpoint searches DuckDuckGo for the specified [query],
- * extracts contextual snippets from resulting pages, and returns as much
- * relevant content as possible without exceeding the [max_tokens] constraint.
+ * Retrieves external context based on a search [query], constrained by a [max_tokens] limit.
  *
- * 1. [.arguments]
- *    * Accepts:
- *      - [query]: The user's search query (mandatory).
- *      - [max_tokens]: The maximum number of OpenAI-compatible tokens allowed in the returned context (default: 4000).
+ * Validates required arguments using [validators.mandatory] and applies default values via [validators.default].
+ * Executes [magic.http.duckduckgo-and-scrape] to fetch relevant web snippets.
  *
- * 2. [validators.mandatory], [validators.default]
- *    * Enforces that a [query] is present and applies default value for [max_tokens] if missing.
+ * Iteratively builds a [.context] node from snippet prompts and completions,
+ * pruning content until the token limit is reached using [openai.tokenize].
  *
- * 3. [execute:magic.http.duckduckgo-and-scrape]
- *    * Sends the query to DuckDuckGo and automatically scrapes up to 10 URLs returned in search results.
- *    * The result contains HTML converted to training snippets using the [magic.ai.html.extract] mechanism.
- *
- * 4. [.context] building logic
- *    * Iterates through the result snippets from each URL, appending their [prompt] and [completion] fields.
- *    * Stops adding new snippets once the token length of the concatenated context exceeds [max_tokens].
- *    * Ensures tokens are counted using [openai.tokenize].
- *
- * 5. [remove-nodes]
- *    * Efficiently prunes already-used snippets and URLs to avoid duplication and unnecessary processing.
- *
- * 6. [yield]
- *    * Returns the final trimmed context as a single large Markdown-compatible string.
- *
- * Use Cases:
- * * Constructing rich and relevant AI prompt context from real-time search results.
- * * Bootstrapping fine-tuning datasets with curated snippets for large language models.
- * * Enabling lightweight research agents and auto-context fetchers.
+ * Trims and returns the final context using [yield].
  */
 .arguments
    query:string

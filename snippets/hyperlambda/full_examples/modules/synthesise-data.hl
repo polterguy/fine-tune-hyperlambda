@@ -1,62 +1,20 @@
-
 /*
- * Selects raw training records from the fine-tune database, transforms them into annotated prompts,
- * invokes OpenAI to generate synthesized Hyperlambda code, and stores the results on disk for fine-tuning.
+ * Processes a paginated set of fine-tune records to generate file-level Hyperlambda comments using OpenAI.
  *
- * ## Slot Documentation
+ * Requires [limit] and [offset] parameters to determine which database rows to process.
+ * Loads a predefined system message from a markdown file using [io.file.load] and stores it in [.system-message].
  *
- * - [.arguments]
- *   Accepts required [limit] and [offset] parameters to control pagination over the [hyperlambda] table.
- *   Ensures chunked processing of records, helping to scale over large datasets.
+ * Connects to the 'fine-tune' database using [data.connect] and selects relevant [hyperlambda] records.
+ * For each record:
+ *  - Converts [code] to Hyperlambda format with inline comments using [hyper2lambda].
+ *  - Prepends the prompt as a top-level comment using [insert-before].
+ *  - Re-serializes to Hyperlambda using [lambda2hyper].
+ *  - Logs the transformation with [log.info].
+ *  - Retrieves context with [openai-context-from-database].
+ *  - Invokes OpenAI's API via [openai-query] with context, instruction, and transformed code.
+ *  - Generates a filename from the [hyperlambda_id] and saves the AI response using [io.file.save].
  *
- * - [.type]
- *   Declares the endpoint as [public], enabling external access without authentication.
- *
- * - [validators.mandatory]
- *   Ensures both [limit] and [offset] are explicitly provided, preventing unintended full-table scans.
- *
- * - [.system-message]
- *   Loads a default OpenAI system instruction prompt from a Markdown file,
- *   which guides model behavior when generating responses.
- *
- * - [data.connect]
- *   Connects to the `fine-tune` database to query and iterate over unsynthesized records.
- *
- * - [data.select]
- *   Executes a SQL SELECT query to retrieve unsynthesized, non-static entries from the [hyperlambda] table,
- *   filtering only those that already contain `.arguments` in their code. These serve as the base for training examples.
- *
- * - [for-each]
- *   Iterates through the returned result set, processing one record at a time.
- *
- * - [hyper2lambda]
- *   Transforms the raw Hyperlambda [code] into a comment-enhanced version using `.prompt` as a file-level comment header.
- *   This sets the stage for OpenAI to better understand the training context.
- *
- * - [lambda2hyper]
- *   Converts the in-memory node tree back into valid Hyperlambda syntax, preserving comment formatting.
- *   This produces the final prompt sent to OpenAI.
- *
- * - [execute:openai-context-from-database]
- *   Retrieves matching documentation for the query using semantic search,
- *   ensuring OpenAI receives rich and relevant context in its response generation.
- *
- * - [execute:openai-query]
- *   Sends the structured query and context to OpenAI (using GPT-4o) and receives a synthetic code example in response.
- *   The system message sets expectations, tone, and formatting behavior of the assistant.
- *
- * - [io.file.save]
- *   Writes OpenAI’s response to a new file inside `/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised/`,
- *   using the record’s [hyperlambda_id] to uniquely name the output file.
- *
- * - [sleep]
- *   Adds a 5-second delay between requests to avoid hitting OpenAI’s rate limits (e.g., HTTP 429 errors).
- *
- * ## Summary
- * This endpoint implements a pipeline to generate synthetic training examples by blending
- * database-selected prompts with OpenAI-generated completions. It wraps retrieved code and prompt data,
- * enriches it with documentation, and saves the output as fine-tuning material to disk.
- * It is an essential utility for building high-quality supervised datasets for training OpenAI models on Hyperlambda syntax.
+ * Waits 5 seconds between iterations using [sleep] to avoid rate limiting from OpenAI.
  */
 .arguments
    limit:long

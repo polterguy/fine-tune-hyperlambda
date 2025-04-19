@@ -1,34 +1,16 @@
-
 /*
- * This Hyperlambda slot, [magic.crypto.import-key], securely imports a new RSA public key into the system, ensuring it is unique and optionally associates it with a user.
+ * Declares the [magic.crypto.import-key] slot to import a new RSA public key into the system's database.
  *
- * 1. [slots.create]
- *    * Declares the slot [magic.crypto.import-key], making it available for invocation from other parts of the system.
+ * Generates a fingerprint from the provided [content] using [crypto.fingerprint]. If an [enabled] flag is provided,
+ * it overrides the default value of false.
  *
- * 2. [crypto.fingerprint]
- *    * Computes a unique fingerprint of the RSA public key passed in [content], used for validation and indexing.
+ * Connects to the 'magic' database using [data.connect] and checks for existing keys with the same fingerprint using [data.read].
+ * If a match is found, aborts with a [throw].
  *
- * 3. [.enabled]
- *    * Defaults to `false`, but will be overwritten if caller supplies an explicit [enabled] value in the arguments.
+ * If the key is new, it inserts metadata and the key itself into the [crypto_keys] table via [data.create],
+ * along with a default [vocabulary] used for future slot logic.
  *
- * 4. [data.connect]
- *    * Opens a connection to the [magic] database to interact with tables like [crypto_keys] and [users_crypto_keys].
- *
- * 5. [data.read]
- *    * Verifies whether the public key already exists in the [crypto_keys] table using the computed fingerprint.
- *    * If a match is found, a [throw] halts the process, preventing duplicate imports.
- *
- * 6. [data.create]
- *    * If the key is new, it gets inserted into the [crypto_keys] table with its associated metadata (subject, domain, etc.).
- *    * The [vocabulary] column defines which slots this key is permitted to execute when invoking signed HTTP payloads.
- *
- * 7. [exists] and [data.create]
- *    * If a [username] is passed, a relationship is established between the user and the imported key in the [users_crypto_keys] table.
- *
- * Use cases:
- * * Importing third-party public RSA keys for digitally signed request handling.
- * * Controlling slot access and authorization at the key level via a secure vocabulary system.
- * * Associating keys with users for accountability and access tracking in cryptographic operations.
+ * If a [username] is supplied, creates an association between the user and the new key using the [users_crypto_keys] table.
  */
 slots.create:magic.crypto.import-key
 

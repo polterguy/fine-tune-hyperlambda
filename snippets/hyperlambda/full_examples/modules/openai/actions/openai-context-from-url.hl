@@ -1,39 +1,11 @@
-
 /*
- * Creates an HTTP endpoint that scrapes training snippets from the specified [url],
- * then composes a [context] response based on the concatenated [prompt] and [completion]
- * pairs found, limiting total size based on [max_tokens].
+ * Retrieves and processes contextual content from a given [url] with an optional [max_tokens] limit.
  *
- * 1. [.arguments]
- *    * [url]:string - Mandatory. The URL to scrape snippets from.
- *    * [max_tokens]:int - Optional. Token limit for resulting context. Defaults to 4000.
- *    * [throw]:bool - Optional. If true, throws an error if the scrape fails.
-
- * 2. [validators.mandatory], [validators.default]
- *    * Ensures [url] is present, and applies a default for [max_tokens] if missing.
-
- * 3. [execute:magic.http.scrape-url]
- *    * Invokes a slot that scrapes the given [url] and returns training snippets in [prompt]/[completion] pairs.
-
- * 4. [if] and [throw]
- *    * If [throw] is true and no scrape result is found, the code throws a public exception with the HTTP status code from [execute].
-
- * 5. [.context], [while]
- *    * Initializes and appends new training text into [.context] while keeping the token count below [max_tokens].
- *    * It builds [.tmp] using [prompt] + [completion] strings and evaluates token size before adding to [.context].
-
- * 6. [remove-nodes]
- *    * Iteratively removes snippets from [execute] results once processed to avoid re-use.
-
- * 7. [strings.trim]
- *    * Final cleanup to remove leading/trailing whitespace from the generated context string.
-
- * 8. [yield]
- *    * Returns the full composed [context] string as the final output.
-
- * Use cases:
- * * Building dynamic system messages or LLM prompt context from website data.
- * * Ensuring context size respects token boundaries for AI completions.
+ * Uses [validators.mandatory] to ensure a [url] is provided and [validators.default] to apply defaults.
+ * Executes [magic.http.scrape-url] to fetch web data. If [throw] is true and scraping fails, a [throw] is raised.
+ *
+ * Iteratively builds [.context] from scraped prompt/completion pairs while monitoring token limits via [openai.tokenize].
+ * Removes consumed snippets and trims the final result before returning it with [yield].
  */
 .arguments
    url:string

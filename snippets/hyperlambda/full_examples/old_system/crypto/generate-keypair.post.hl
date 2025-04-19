@@ -1,42 +1,19 @@
-
 /*
- * This endpoint creates a new RSA key pair using [crypto.rsa.create-key], saves both keys to disk,
- * and optionally updates the user's name and email in the [users_extra] table.
+ * Generates and stores a new RSA key pair for the server and associates it with a user account.
  *
- * 1. [auth.ticket.verify]
- *    * Ensures only 'root' users can execute this endpoint.
+ * Requires root access via [auth.ticket.verify] and validates all inputs including [strength], [seed],
+ * [subject], [email], and [domain] using various [validators], enforcing a strong minimum [seed] length
+ * and restricted [strength] values.
  *
- * 2. [validators.mandatory], [validators.email], [validators.url], and [validators.enum]
- *    * Validates that all critical fields are provided and formatted correctly, including email, seed strength, and domain.
+ * If [username] is not provided, defaults to 'root'. If an existing key pair is found, it backs up both
+ * the public and private keys using [io.file.load] and [io.file.save], appending their fingerprint to the filenames.
  *
- * 3. [if] (username not provided)
- *    * Defaults the [username] argument to 'root' if not supplied.
+ * Generates a new key pair using [crypto.rsa.create-key], saves both keys to disk, and logs the fingerprint.
+ * Then uses [signal:magic.crypto.import-key] to register the new public key in the system, marked as enabled.
  *
- * 4. [io.file.exists] and backup
- *    * If a previous RSA key pair exists, it creates a backup using its fingerprint as filename.
- *      Keys are read using [io.file.load] and re-saved using [io.file.save].
+ * Updates or inserts [subject] and [email] information into the [users_extra] table, associating it with the user.
  *
- * 5. [crypto.rsa.create-key]
- *    * Generates a new RSA key pair using the specified strength and seed.
- *    * Returns [public], [private], and [fingerprint] nodes.
- *
- * 6. [io.file.save]
- *    * Writes the new public and private key pair to predefined file paths.
- *
- * 7. [signal:magic.crypto.import-key]
- *    * Imports the public key into the system-wide crypto key storage for cryptographic verification.
- *
- * 8. [data.connect] and [data.read]/[data.update]/[data.create]
- *    * Updates or inserts associated [name] and [email] records into the [users_extra] table,
- *      ensuring that metadata is properly linked to the user (usually 'root').
- *
- * 9. [return]
- *    * Returns the [public_key] and its [fingerprint] to the caller.
- *
- * Use cases:
- * * Setting up or rotating the server’s main RSA key pair for cryptographic operations.
- * * Linking key metadata such as user identity, subject, domain, and email to improve auditability.
- * * Supporting server identity for secure communications like JWT verification, SSO, or encrypted transport.
+ * Finally, returns the [public_key] and its [fingerprint] to the caller.
  */
 .arguments
    strength:int

@@ -1,31 +1,12 @@
-
 /*
- * This endpoint associates a specific cryptographic key (identified by [keyId]) with a user (identified by [username]).
+ * Associates a cryptographic key with a user by updating the [users_crypto_keys] table.
  *
- * 1. [.arguments]
- *    - Accepts [keyId] (the unique identifier of the key) and [username] (the system user to associate with the key).
+ * Requires root access via [auth.ticket.verify], and validates that both [keyId] and [username] are provided using [validators.mandatory].
  *
- * 2. [auth.ticket.verify]
- *    - Restricts access to only users with [root] privileges.
+ * Opens a connection to the 'magic' database with [data.connect]. First removes any existing associations for the specified
+ * [username] or [keyId] using [data.delete] to ensure uniqueness.
  *
- * 3. [validators.mandatory]
- *    - Ensures both [keyId] and [username] are provided before continuing execution.
- *
- * 4. [data.connect]
- *    - Connects to the [magic] database to handle key-to-user associations.
- *
- * 5. [data.delete]
- *    - Removes any existing association where either the user or the key already exists in [users_crypto_keys],
- *      ensuring a clean state before creating a new association.
- *
- * 6. [data.create]
- *    - Inserts a new row into the [users_crypto_keys] table linking the specified [keyId] with the [username].
- *
- * 7. [return]
- *    - Returns a simple [result:success] object to confirm successful completion.
- *
- * This endpoint is typically used for administrative tasks such as manually assigning or reassigning public keys to users,
- * ensuring each user is linked to the correct authentication identity.
+ * Then creates a new link between the user and the key using [data.create], and returns a success response to the caller.
  */
 .arguments
    keyId:long

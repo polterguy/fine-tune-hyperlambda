@@ -1,41 +1,20 @@
-
 /*
- * HTTP API endpoint that executes an assumption test based on a Hyperlambda test file.
+ * Executes and validates an HTTP-based assumption test defined in a Hyperlambda file, verifying both response code and content.
  *
- * 1. [auth.ticket.verify]
- *    * Restricts access to users with the 'root' role.
+ * Requires [root_url] and [test_file] as input, with [auth.ticket.verify] restricting access to root users only.
+ * Loads the [test_file] using [io.file.load] and parses it into lambda with [hyper2lambda].
+ * If the test defines a [.lambda] block, it is executed in isolation to validate local logic.
  *
- * 2. [validators.mandatory]
- *    * Ensures both [root_url] and [test_file] arguments are provided.
+ * Otherwise, constructs and executes an HTTP request using data from the test file:
+ *  - Injects authorization headers and optional JSON [payload] if specified.
+ *  - Dynamically constructs the HTTP method and URL using [strings.concat] and executes it.
  *
- * 3. [io.file.load] and [hyper2lambda]
- *    * Loads a test file from disk and converts the raw Hyperlambda string to an executable lambda structure.
+ * Validates that the returned HTTP [status] matches the expected one.
+ * If a [response] is defined in the test, compares actual vs expected response,
+ * optionally parsing as JSON to ignore formatting differences.
  *
- * 4. [exists]
- *    * Detects whether the test is a standalone lambda assumption and runs it directly using [eval],
- *      capturing exceptions with [try]/[.catch].
- *    * If successful, it returns 'success'; otherwise logs error and returns failure result.
- *
- * 5. [request.headers.get]
- *    * Retrieves the Authorization header from the current request to forward in downstream requests.
- *
- * 6. [http.xxx]
- *    * Constructs and sends the request described in the test file by dynamically building the HTTP method
- *      from the [verb] node.
- *    * Adds a JSON [payload] and appropriate headers if present in the assumption file.
- *
- * 7. [eq] on status and response content
- *    * Compares the actual status code and response payload to assumed values from the test.
- *    * If mismatched, logs an error and returns a failure message with expected vs. actual values.
- *
- * 8. JSON normalization logic
- *    * If [produces] is not specified or is [application/json], response and assumed payloads are
- *      passed through [json2lambda] and [lambda2json] to ensure formatting and order are ignored.
- *
- * Use cases:
- * * Automated assumption testing in CI/CD pipelines.
- * * Verifying that endpoints return expected values.
- * * Supporting snapshot-style tests for HTTP APIs.
+ * If any mismatch or error occurs, logs detailed diagnostics using [log.error] and returns a failure response.
+ * Otherwise, returns a success result indicating the test passed.
  */
 .arguments
    root_url:string

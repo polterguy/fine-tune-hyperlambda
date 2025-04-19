@@ -1,38 +1,11 @@
-
 /*
- * The slot [magic.crypto.get-server-public-key] loads and returns the server's public RSA key and its fingerprint.
- * It implements in-memory caching for efficiency, avoiding unnecessary file access and computation on repeated requests.
+ * Declares the [magic.crypto.get-server-public-key] slot to return the server's public cryptographic key along with its fingerprint.
  *
- * 1. [cache.try-get:magic.crypto.get-server-public-key]
- *    * Attempts to retrieve the public key and fingerprint from cache using the key 'magic.crypto.get-server-public-key'.
- *    * If not found, executes the enclosed [.lambda] to fetch and cache the result.
- *    * The result is cached for 300 seconds (5 minutes).
+ * Uses [cache.try-get] to cache the result for 300 seconds to improve performance on repeated invocations.
+ * If the cache is empty, loads the public key from [/etc/system/crypto/keys/public.key] using [io.file.load],
+ * generates a fingerprint with [crypto.fingerprint], and serializes the key and fingerprint into Hyperlambda format via [lambda2hyper].
  *
- * 2. [io.file.load:/etc/system/crypto/keys/public.key]
- *    * Loads the server's public RSA key from the filesystem.
- *    * Used to authenticate or verify cryptographically signed content from the server.
- *
- * 3. [crypto.fingerprint]
- *    * Calculates the fingerprint of the loaded public key.
- *    * Ensures a unique identifier for the key pair.
- *
- * 4. [lambda2hyper]
- *    * Combines the public key and fingerprint into a structured Hyperlambda format suitable for caching.
- *
- * 5. [hyper2lambda]
- *    * Converts the cached (serialized) result back into a lambda object.
- *    * Allows downstream slots to interact with the content in standard lambda node tree format.
- *
- * 6. [add]
- *    * Injects the result from [hyper2lambda] into the current graph, making its nodes available.
- *
- * 7. [return]
- *    * Finalizes the endpoint by returning the public key and fingerprint to the caller.
- *
- * Use Cases:
- * * Verifying digital signatures.
- * * Sending the public key to third parties for secure communications.
- * * Displaying key fingerprint as part of security audits or administrative interfaces.
+ * Converts the cached Hyperlambda back to lambda using [hyper2lambda], then appends and returns the key structure.
  */
 slots.create:magic.crypto.get-server-public-key
 

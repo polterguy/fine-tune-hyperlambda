@@ -1,41 +1,21 @@
-
 /*
- * This Hyperlambda endpoint generates a frontend project using a specified template and deployment parameters.
+ * Generates a frontend CRUD app based on a specified [templateName], API definition, and additional parameters.
  *
- * 1. [auth.ticket.verify]
- *    * Limits execution to users with the 'root' role.
+ * Requires root authorization via [auth.ticket.verify] and validates [apiUrl] using [validators.url].
+ * Logs metadata about the generation request with [log.info].
  *
- * 2. [validators.mandatory] and [validators.url]
- *    * Ensures [apiUrl] is both present and a valid URL.
+ * Dynamically constructs the template generator path and invokes it using [io.file.execute],
+ * passing [endpoints] and additional [args]. Counts lines of code using [math.increment] for logging.
  *
- * 3. [log.info]
- *    * Logs input metadata including template name, API URL, app name, copyright,
- *      and whether deployment is local or a ZIP download.
+ * The generated files are zipped using [io.content.zip-stream]. If [deployLocally] is false,
+ * the ZIP file is returned to the caller with appropriate headers.
  *
- * 4. [strings.concat] + [io.file.execute]
- *    * Resolves the dynamic path to the template's generator file and invokes it,
- *      forwarding additional arguments like [endpoints] and [args] as required.
+ * If deploying locally:
+ *  - Clears and recreates the [/etc/frontend/] directory.
+ *  - Saves and extracts the ZIP.
+ *  - Renames the extracted folder to "src" for consistency.
  *
- * 5. [for-each] + [math.increment]
- *    * Iterates over each generated file and splits its content by newline,
- *      then counts the lines to calculate total lines of code (LOC).
- *
- * 6. [io.content.zip-stream]
- *    * Compresses the generated project into a ZIP file for return or storage.
- *
- * 7. [response.headers.set]
- *    * Sets correct HTTP headers if the caller requests the ZIP file as download.
- *
- * 8. Local deployment branch
- *    * If [deployLocally] is true:
- *       - Deletes and recreates `/etc/frontend/` to ensure a clean state.
- *       - Saves and unzips the project there.
- *       - Moves extracted folder to `/etc/frontend/src` for predictable pathing.
- *
- * Use cases:
- * * Automating CRUD frontend scaffolding based on dynamic API definitions.
- * * Providing developer tooling to generate UI clients on demand.
- * * Streamlining deployment of UI projects either locally or via downloadable bundles.
+ * Returns a success response upon completion using [return].
  */
 .arguments
    templateName:string

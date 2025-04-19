@@ -1,48 +1,13 @@
-
 /*
- * This Hyperlambda snippet creates a dynamic slot named [magic.crypto.get-public-key] that returns a public RSA key and its associated [vocabulary].
+ * Declares the [magic.crypto.get-public-key] slot to retrieve a public cryptographic key from the database using its [fingerprint].
  *
- * 1. [slots.create:magic.crypto.get-public-key]
- *    * Declares a new dynamic slot that will retrieve a public key and its authorized vocabulary from a database, based on a given fingerprint.
+ * Ensures the [fingerprint] argument is provided using [validators.mandatory].
+ * Connects to the 'magic' database with [data.connect] and selects the key's metadata and [vocabulary]
+ * from the [crypto_keys] table.
  *
- * 2. [validators.mandatory]
- *    * Ensures that the [fingerprint] argument is provided before proceeding.
- *
- * 3. [data.connect:magic]
- *    * Opens a database connection using the [magic] named connection string.
- *
- * 4. [data.select]
- *    * Executes a raw SQL query to fetch the following columns from the [crypto_keys] table:
- *      - [id]: The internal identifier of the key record.
- *      - [content] (aliased as [public_key]): The actual public RSA key.
- *      - [domain]: Associated domain of the key.
- *      - [email]: Email address associated with the key.
- *      - [vocabulary]: Whitelisted slots/functions associated with the key.
- *      - [enabled]: Flag indicating if the key is enabled (true or 1).
- *    * Filters the results using the provided [fingerprint] argument.
- *
- * 5. [if not exists:x:./././0/0]
- *    * Checks whether the query returned any result.
- *    * If not, throws a descriptive error indicating the public key was not found.
- *
- * 6. [if not or eq ...]
- *    * Verifies that the key is enabled.
- *    * Accepts both [bool:true] and [long:1] for backward compatibility.
- *    * Throws if the key is disabled.
- *
- * 7. [add] (first)
- *    * Adds fields to the return node from the selected row, including [id], [public_key], [domain], [email], and [enabled].
- *
- * 8. [add] (second)
- *    * Converts the [vocabulary] string into a lambda node using [hyper2lambda], which allows only the whitelisted slots to be executed later.
- *
- * 9. [return] / [vocabulary]
- *    * Ensures the return includes a node named [vocabulary] that contains the lambda representation of the allowed vocabulary for the key.
- *
- * Use cases:
- * * Validating a public key for signed API calls.
- * * Fetching runtime authorization data tied to specific RSA keys.
- * * Enabling dynamic function execution while enforcing strict access controls.
+ * Verifies that the key exists and is enabled. Throws a descriptive error if not found or disabled using [throw].
+ * If valid, returns selected metadata including [id], [public_key], [domain], [email], and [enabled].
+ * Also parses the [vocabulary] field using [hyper2lambda] before including it in the result.
  */
 slots.create:magic.crypto.get-public-key
 
