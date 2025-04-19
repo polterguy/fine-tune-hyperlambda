@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [.arguments] node defines four possible input arguments: [offset], [limit], [order], and [direction], all of which can be supplied to control SQL result paging and sorting.
+ * 2. The [data.connect:hr] slot establishes a database connection to the "hr" database, allowing subsequent data operations to target this data source.
+ * 3. The [add:x:./*/data.read] slot dynamically injects nodes extracted from the input arguments into the [data.read] node, enabling flexible SQL queries based on user-supplied parameters.
+ * 4. Each [get-nodes:x:@.arguments/*/...] slot fetches a specific argument node (if present) and prepares it for inclusion in the [data.read] operation, allowing for conditional query customization.
+ * 5. The [data.read] slot executes a SQL SELECT query against the [employees] table, applying any provided paging or sorting arguments.
+ * 6. The [yield] slot returns a list of employee records, making them available to the caller under the [employees] node.
+ * 
+ * Use cases:
+ * - Retrieve a paginated list of employees from the HR database, specifying the number of records to skip and return.
+ * - Sort employee results by a specified column in either ascending or descending order based on user input.
+ * - Allow clients to request employee data with flexible control over SQL [limit], [offset], [order], and [direction] parameters for dynamic data listing.
+ * - Integrate with an API endpoint that allows consumers to retrieve employee lists, supporting custom sorting and pagination.
+ * - Use as a backend operation for a web dashboard where users can browse, page, and sort employee data interactively.
+ */
+.arguments
+   offset:int
+   limit:int
+   order:string
+   direction:string
+data.connect:hr
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   data.read
+      table:employees
+   yield
+      employees:x:@data.read/*

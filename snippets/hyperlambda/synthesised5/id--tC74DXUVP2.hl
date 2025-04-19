@@ -1,0 +1,36 @@
+
+/*
+ * 1. The [.arguments] node defines the expected filter parameters for querying the [categories] table, including conditions for [.id], [.name], and [.description], supporting both equality and "like" comparisons.
+ * 2. The [auth.ticket.verify] slot ensures that the user is authenticated as a "guest" before proceeding with any database operations.
+ * 3. The [data.connect] slot establishes a connection to a SQLite database, selecting either the "generic" or "cms" database based on the context.
+ * 4. The [add] slot dynamically injects all provided filter arguments from [.arguments] into the [and] node under [where] in the [data.read] operation, enabling flexible query composition based on user input.
+ * 5. The [data.read] slot performs the actual SQL query, selecting the [id], [name], and [description] columns from the [categories] table, applying the dynamically constructed [where] clause for filtering.
+ * 6. The [return-nodes] slot returns all results from the executed [data.read] operation to the caller.
+ * 
+ * Use cases:
+ * - Implementing a dynamic category search API endpoint that filters categories based on user-supplied criteria.
+ * - Building an admin panel where users can search for categories by partial or exact name and description matches.
+ * - Providing a public endpoint where guests can list or filter categories without needing full authentication.
+ * - Constructing a report that allows for flexible filtering of categories in a content management system.
+ */
+.arguments
+   categories.id.eq:long
+   categories.name.like:string
+   categories.name.eq:string
+   categories.description.like:string
+   categories.description.eq:string
+auth.ticket.verify:guest
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:categories
+      columns
+         categories.id
+         categories.name
+         categories.description
+      where
+         and
+   return-nodes:x:@data.read/*

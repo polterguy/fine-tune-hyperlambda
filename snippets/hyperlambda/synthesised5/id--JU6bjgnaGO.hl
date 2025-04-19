@@ -1,0 +1,32 @@
+
+/*
+ * 1. [auth.ticket.verify] is used to validate that the user has "root" access before continuing with the workflow.
+ * 2. [io.folder.list] retrieves a list of all files and folders located in the [/misc/templates/] directory.
+ * 3. [for-each] iterates through each child node (representing a file or folder) returned by [io.folder.list].
+ * 4. [if] checks if the current item's path does NOT end with "/common/" using [strings.ends-with] and [not].
+ * 5. [strings.split] splits the current item's path at each "/" character, producing a list of path segments.
+ * 6. [unwrap] evaluates the children of the result from [strings.split].
+ * 7. [add] inserts the last segment from the split path into a sibling [return-nodes] node, effectively building a list.
+ * 8. [return-nodes] outputs the final list of node segments collected from the matching folder entries.
+ * 
+ * Use cases:
+ * - To generate a list of unique template names (excluding those in a "common" subfolder) from a directory structure.
+ * - To filter and present non-common subdirectories or files to an admin for further processing or display.
+ * - To automate the creation of a menu or selection list based on the available templates, skipping shared/common resources.
+ * - To prepare data for a UI that lets users pick from specific folders/files without exposing shared components.
+ */
+auth.ticket.verify:root
+io.folder.list:/misc/templates/
+for-each:x:-/*
+   if
+      not
+         strings.ends-with:x:@.dp/#
+            .:/common/
+      .lambda
+         strings.split:x:@.dp/#
+            .:/
+         unwrap:x:+/*/*
+         add:x:../*/return-nodes
+            .
+               :x:@strings.split/0/-
+return-nodes

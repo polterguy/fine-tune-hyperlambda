@@ -1,0 +1,22 @@
+
+/*
+ * 1. The [pgsql.connect] slot establishes a connection to the [authdb] PostgreSQL database, ensuring that all subsequent database operations are performed within this context.
+ * 2. The [date.now] slot retrieves the current date and time, which is then used as a reference point for filtering expired sessions.
+ * 3. The [pgsql.delete] slot deletes records from the [sessions] table where the [expires_at] column's value is less than the current date and time (i.e., expired sessions).
+ * 4. The [yield] slot returns a result with a [message] node confirming that expired sessions have been removed.
+ * 
+ * Use cases:
+ * - Automatically cleaning up expired user sessions in an authentication system.
+ * - Periodically running as a maintenance task to ensure the [sessions] table only contains active sessions.
+ * - Integrating into an API endpoint to allow administrators to trigger session purging.
+ * - Keeping the database lean by removing obsolete session records based on expiration.
+ */
+pgsql.connect:authdb
+   date.now
+   pgsql.delete
+      table:sessions
+      where
+         and
+            expires_at.lt:x:@date.now
+yield
+   message:Expired sessions removed

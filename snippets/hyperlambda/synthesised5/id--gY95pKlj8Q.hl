@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [.arguments] node defines a single argument, [path], of type string, restricting the endpoint to only accept this argument.
+ * 2. [validators.mandatory] ensures that the [path] argument is provided, throwing an exception if it is missing.
+ * 3. [auth.ticket.verify] restricts access to users with either "user" or "admin" roles.
+ * 4. [io.folder.list-recursively] retrieves all files and folders within the directory specified by the [path] argument, including subdirectories.
+ * 5. [for-each] loops through each result node from [io.folder.list-recursively], using [if] and [strings.contains] to filter items whose path contains the substring "misc".
+ * 6. For each match, [unwrap] is used to evaluate sibling nodes, and [add] appends the matching file path to the [.hl-files] collection.
+ * 7. [yield] returns all collected file paths under a [files] node to the caller.
+ * 
+ * Use cases:
+ * - Retrieve all files under a given directory and its subfolders that include "misc" in their path, for auditing or reporting purposes.
+ * - Allow authorized users to search for and list .hl files related to miscellaneous resources within a folder structure.
+ * - Enforce access control and argument validation for administrative file discovery tools.
+ * - Collect and return a filtered list of file paths for further processing or display in a management UI.
+ */
+.arguments
+   path:string
+validators.mandatory:x:@.arguments/*/path
+auth.ticket.verify:user,admin
+io.folder.list-recursively:x:@.arguments/*/path
+.hl-files
+for-each:x:@io.folder.list-recursively/*
+   if
+      strings.contains:x:@.dp/#
+         .:misc
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.hl-files
+            .
+               .:x:@.dp/#
+yield
+   files:x:@.hl-files/*

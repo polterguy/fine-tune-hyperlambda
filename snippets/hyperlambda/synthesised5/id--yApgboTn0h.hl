@@ -1,0 +1,46 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot is used to ensure that only users with the "root" role can execute this logic, enforcing security by requiring appropriate authentication.
+ * 2. The [strings.concat] slot is used multiple times to construct dynamic log messages and channel names based on the [channel] argument, allowing for contextualized output and communication.
+ * 3. The [log.info] slot logs the startup of the terminal session, providing traceability and monitoring for terminal operations.
+ * 4. The [system.terminal.create] slot initiates a new terminal session, uniquely identified by the [channel] value and optionally starting in the specified [folder]. This slot also sets up two callback handlers: [.stdOut] for standard output and [.stdErr] for error output.
+ * 5. Within [.stdOut] and [.stdErr], [sockets.signal] is used to send output or error results in real-time to users with the "root" role over a dynamically named channel, ensuring that only privileged users receive these updates.
+ * 6. The [unwrap] slot evaluates expressions to get the result to be relayed, and the output is packaged into the [args] node for the socket message.
+ * 
+ * Use cases:
+ * - Creating secure, real-time, web-based terminal sessions for system administrators, where output is streamed live to authenticated users.
+ * - Remotely monitoring and controlling server environments through an IDE or admin panel, with instant feedback and error reporting.
+ * - Broadcasting terminal session results and errors to specific privileged users, such as for collaborative troubleshooting or audit trails.
+ * - Enabling dynamic multi-user terminal sessions, each uniquely identified by a channel, to allow separate, isolated command environments per user or task.
+ * - Logging and auditing terminal session creation and command execution for compliance or debugging purposes.
+ */
+.arguments
+   channel:string
+   folder:string
+auth.ticket.verify:root
+strings.concat
+   .:"Starting terminal on server on channel '"
+   get-value:x:@.arguments/*/channel
+   .:"'"
+log.info:x:-
+strings.concat
+   .:ide.terminal.out.
+   get-value:x:@.arguments/*/channel
+unwrap:x:+/*/*/.channel
+system.terminal.create:x:@.arguments/*/channel
+   folder:x:@.arguments/*/folder
+   .stdOut
+      .channel:x:@strings.concat
+      unwrap:x:+/*/args/*/result
+      sockets.signal:x:@.channel
+         roles:root
+         args
+            result:x:@.arguments/*/cmd
+   .stdErr
+      .channel:x:@strings.concat
+      unwrap:x:+/*/args/*/result
+      sockets.signal:x:@.channel
+         roles:root
+         args
+            error:bool:true
+            result:x:@.arguments/*/cmd

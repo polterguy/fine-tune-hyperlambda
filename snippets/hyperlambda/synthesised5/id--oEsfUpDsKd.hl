@@ -1,0 +1,32 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot is used to verify that the request is authenticated as "root", ensuring only authorized users can access this endpoint.
+ * 2. [validators.mandatory] checks that the [databaseType] argument has been provided to the endpoint, throwing an exception if it is missing.
+ * 3. [validators.enum] ensures that the [databaseType] argument is one of the allowed values: "mysql", "pgsql", "mssql", or "sqlite". If it is not, an error will be triggered.
+ * 4. [strings.concat] dynamically creates a configuration section key by concatenating the string "magic:databases:" with the value of [databaseType]. This forms the path to the relevant configuration section.
+ * 5. [config.section] retrieves the configuration section using the generated key.
+ * 6. [add] aggregates all child nodes from the retrieved configuration section.
+ * 7. [return] sends the aggregated configuration information back to the caller.
+ * 
+ * Use cases:
+ * - Retrieving specific database connection settings for a requested database type, ensuring only root users can perform this action.
+ * - Validating that only supported database types are queried, preventing misconfiguration or unsupported operations.
+ * - Listing all configuration details for a given database type, useful for administrative dashboards or automated configuration tools.
+ * - Enforcing strict access and argument validation for sensitive configuration retrieval endpoints.
+ */
+.arguments
+   databaseType:string
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/databaseType
+validators.enum:x:@.arguments/*/databaseType
+   .:mysql
+   .:pgsql
+   .:mssql
+   .:sqlite
+strings.concat
+   .:"magic:databases:"
+   get-value:x:@.arguments/*/databaseType
+config.section:x:-
+add:x:+
+   get-nodes:x:@config.section/*
+return

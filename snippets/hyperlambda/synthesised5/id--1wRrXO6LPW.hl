@@ -1,0 +1,22 @@
+
+/*
+ * 1. The [data.connect] slot is used to establish a connection to the "chinook" database, specifying the database type as SQLite.
+ * 2. The [add] slot attaches all argument nodes from [.arguments] as children to any [data.select] nodes found under the current scope, allowing dynamic SQL parameterization.
+ * 3. The [data.select] slot executes a SQL query that retrieves media type names and their associated aggregate track counts from the MediaType and Track tables, filtered by the [filter] parameter, grouped and sorted in descending order by count.
+ * 4. The [return-nodes] slot returns all result rows from the executed query by referencing all children nodes under [data.select].
+ * 
+ * Use cases:
+ * - Building an API endpoint to fetch media types and their usage counts, optionally filtered by a search string.
+ * - Creating a report showing the most common media types in a music database, with the ability to filter by partial media type names.
+ * - Enabling a UI component to display media types and their track counts, dynamically updating results as users change the filter.
+ * - Supporting search analytics or data exploration tasks where groupings and aggregate counts are important.
+ */
+.arguments
+   filter:string
+data.connect:chinook
+   database-type:sqlite
+   add:x:./*/data.select
+      get-nodes:x:@.arguments/*
+   data.select:"\n/*\n * Selects media types and aggregate of counts, and orders by count descending.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect mt.Name, count(mt.MediaTypeId) as Amount \n  from MediaType mt\n    inner join Track t on mt.MediaTypeId = t.MediaTypeId\n  where mt.Name like @filter\n  group by mt.MediaTypeId\n  order by Amount desc;\n"
+      database-type:sqlite
+   return-nodes:x:@data.select/*

@@ -1,0 +1,30 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input, specifying a [name] argument of type string.
+ * 2. [auth.ticket.verify] ensures the user has either "root" or "admin" roles before proceeding.
+ * 3. [data.connect] establishes a connection to the "cms" database using the "generic" connection string and specifies the database type as SQLite.
+ * 4. [add] collects all argument nodes and appends them as children to the [values] node inside the [data.create] operation.
+ * 5. [data.create] inserts a new record into the [menus] table using the gathered values.
+ * 6. [response.status.set] sets the HTTP response status to 201 (Created), indicating a successful resource creation.
+ * 7. [yield] returns the ID of the newly created menu item from the [data.create] result.
+ * 
+ * Use cases:
+ * - Creating a new menu entry in a CMS, where only users with sufficient privileges can perform the action.
+ * - Adding menu items dynamically via an HTTP POST request, ensuring only authenticated admins or root users are allowed.
+ * - Returning the unique identifier of a newly created menu for client-side use after a successful API call.
+ * - Enforcing role-based access when managing application menus.
+ */
+.arguments
+   name:string
+auth.ticket.verify:root,admin
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:menus
+      values
+   response.status.set:201
+   yield
+      id:x:@data.create

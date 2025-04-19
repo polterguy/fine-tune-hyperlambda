@@ -1,0 +1,23 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input for this endpoint, requiring a [channel] argument of type string.
+ * 2. The [auth.ticket.verify] slot is used to authenticate or verify that the current user has "root" level permissions before proceeding.
+ * 3. The [strings.concat] slot builds a log message indicating that a terminal session is being stopped for the specified [channel] argument by concatenating static strings and the value provided in [channel].
+ * 4. The [log.info] slot logs the previously constructed message for audit or debugging purposes.
+ * 5. The [system.terminal.destroy] slot destroys the terminal session associated with the given [channel], effectively terminating the process or session on the server.
+ * 
+ * Use cases:
+ * - Remotely stopping or cleaning up a server-side terminal session for a specific channel after a user disconnects.
+ * - Providing administrators with the ability to end rogue or unused terminal sessions for resource management.
+ * - Ensuring only authorized users (with "root" access) can terminate backend terminal processes.
+ * - Logging terminal session terminations for auditing and traceability.
+ */
+.arguments
+   channel:string
+auth.ticket.verify:root
+strings.concat
+   .:"Stopping terminal on server for channel '"
+   get-value:x:@.arguments/*/channel
+   .:"'"
+log.info:x:-
+system.terminal.destroy:x:@.arguments/*/channel

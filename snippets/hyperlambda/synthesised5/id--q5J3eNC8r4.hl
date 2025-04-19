@@ -1,0 +1,67 @@
+
+/*
+ * 1. [auth.ticket.verify]: Ensures that the user has root-level authentication before proceeding, providing security for the endpoint.
+ * 
+ * 2. [add]: Dynamically appends values from [.arguments] nodes (specifically [ml_training_snippets.completion.like], [ml_training_snippets.prompt.like], and [ml_training_snippets.uri.like]) into the [or] clause of the [where] condition for a data query, enabling flexible filtering in searches.
+ * 
+ * 3. [remove-nodes]: Cleans up [.arguments] by removing the filter nodes that were already added to the search condition, preventing duplicate or redundant data.
+ * 
+ * 4. [if] + [not-exists]: Checks if the [or] clause is empty after setup, and if so, removes the [or] node to prevent invalid or unnecessary SQL conditions.
+ * 
+ * 5. [data.read]: Performs a select query on the [ml_training_snippets] table, retrieving specified columns and applying the constructed [where] filtering logic. The query is set with [limit:-1] to fetch all matching records.
+ * 
+ * 6. [lambda2csv]: Converts the resulting records from the query into CSV format, enabling easy download and data portability.
+ * 
+ * 7. [response.headers.set]: Sets HTTP response headers to indicate CSV content type and suggests a filename for downloading, also exposing necessary headers for client-side access.
+ * 
+ * 8. [return]: Returns the CSV data as the endpoint's response.
+ * 
+ * Use Cases:
+ * - Exporting filtered machine learning training data snippets as a CSV file based on dynamic search criteria provided via API arguments.
+ * - Creating an admin endpoint to allow privileged users to download training datasets for further analysis or backup.
+ * - Automating dataset extraction tasks for integration with external tools, such as data labeling platforms or analytics pipelines.
+ * - Supporting audit or troubleshooting scenarios where exact query parameters and results must be exported and shared among team members.
+ */
+.arguments
+   ml_training_snippets.completion.like:string
+   ml_training_snippets.prompt.like:string
+   ml_training_snippets.uri.like:string
+   ml_training_snippets.type.eq:string
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   add:x:./*/data.read/*/where/*/*/or
+      get-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+      get-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.completion.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.prompt.like
+   remove-nodes:x:@.arguments/*/ml_training_snippets.uri.like
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+   if
+      not-exists:x:@data.connect/*/data.read/*/where/*/and/*/or/*
+      .lambda
+         remove-nodes:x:@data.connect/*/data.read/*/where/*/and/*/or
+   data.read
+      table:ml_training_snippets
+      columns
+         type
+         uri
+         prompt
+         completion
+      where
+         and
+            or
+      limit:-1
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         response.status.set:404
+         return
+            result:No records found
+   lambda2csv:x:@data.read/*
+   response.headers.set
+      Content-Type:text/csv
+      Access-Control-Expose-Headers:Content-Disposition
+      Content-Disposition:"attachment; filename=\"training-snippets.csv\""
+   return:x:@lambda2csv

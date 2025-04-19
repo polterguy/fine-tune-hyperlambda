@@ -1,0 +1,36 @@
+
+/*
+ * 1. The [.arguments] node defines possible filter criteria for the query, each corresponding to a field in the [spice_urls] table, using various SQL comparison operators like [.eq] (equals) and [.like] (pattern matching).
+ * 2. [auth.ticket.verify] enforces that only users with "root" or "admin" roles can execute this logic, providing an access control layer.
+ * 3. [data.connect] initiates a connection to either the [generic] or [scraper] database, specifying that the backend is SQLite.
+ * 4. [add] dynamically injects all relevant argument nodes from [.arguments] into the [and] section of the [where] clause within the [data.read] operation. This allows only the supplied arguments to be used as SQL filters.
+ * 5. [data.read] performs a SELECT COUNT(*) query on the [spice_urls] table, returning the result aliased as [count]. The [where] clause is built from the injected argument filters, and [limit:1] ensures only a single result is returned.
+ * 6. [return-nodes] outputs all children and grandchildren nodes of the [data.read] result, effectively returning the query results in the HTTP response.
+ * 
+ * Use cases:
+ * - Building a secure API endpoint that returns the number of [spice_urls] records matching optional filters, only accessible by admin/root users.
+ * - Implementing a data dashboard widget that displays the total count of URLs matching certain criteria, such as type or partial URL.
+ * - Enabling dynamic filtering based on user-supplied parameters, without hardcoding SQL WHERE conditions.
+ * - Creating a reusable pattern for count queries with flexible filter composition in Hyperlambda-based microservices.
+ */
+.arguments
+   spice_urls.spice_url_id.eq:long
+   spice_urls.url.like:string
+   spice_urls.url.eq:string
+   spice_urls.type.like:string
+   spice_urls.type.eq:string
+auth.ticket.verify:root,admin
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:spice_urls
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

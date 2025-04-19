@@ -1,0 +1,48 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot is called with the "root" argument to ensure that the request is authenticated and authorized as a root user before proceeding.
+ * 2. The [add] slots dynamically inject nodes for [order], [direction], [limit], and [offset] from the [.arguments] node into the [data.read] invocation, allowing for flexible query customization based on incoming arguments.
+ * 3. The [remove-nodes] slots clean up the [.arguments] node by removing [order], [direction], [limit], and [offset] nodes after they've been added to the query, preventing duplicate or conflicting data in downstream logic.
+ * 4. Another [add] slot injects any relevant filter arguments from [.arguments] as where conditions in the [data.read] query under the [and] node, supporting dynamic filtering of results by various questionnaire attributes.
+ * 5. The [data.read] slot queries the "questionnaires" table, returning only the [name], [type], and [action] columns, with where conditions dynamically constructed from the incoming request arguments.
+ * 6. The [return-nodes] slot returns all the nodes resulting from the [data.read] query, providing the final response data.
+ * 
+ * Use cases:
+ * - Fetch a paginated list of questionnaires, allowing clients to specify limit, offset, sorting, and filtering by name or type.
+ * - Support admin tools where an authenticated root user can query questionnaires with advanced filtering, ordering, and pagination.
+ * - Provide an API endpoint for listing questionnaires, where query parameters directly translate to database query options for efficient searching and retrieval.
+ * - Enable dynamic and flexible querying for UI components that display or search through questionnaires with various criteria.
+ */
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   questionnaires.name.like:string
+   questionnaires.name.eq:string
+   questionnaires.type.like:string
+   questionnaires.type.eq:string
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:questionnaires
+      columns
+         questionnaires.name
+         questionnaires.type
+         questionnaires.action
+      where
+         and
+   return-nodes:x:@data.read/*

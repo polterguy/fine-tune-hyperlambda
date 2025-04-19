@@ -1,0 +1,32 @@
+
+/*
+ * 1. The [data.connect] slot initiates a connection to a PostgreSQL database named [customer_db] using the [pgsql] adapter.
+ * 2. The [data.select] slot executes a raw SQL query that selects the [name] and [email] columns from the [customers] table where the [active] column is true, using PostgreSQL syntax.
+ * 3. The [for-each] slot iterates through each record returned by [data.select], operating on each customer record individually.
+ * 4. The [unwrap] slot is used to evaluate the expression and access all descendants of the iterated customer node for further processing.
+ * 5. The [mail.smtp.send] slot sends an email to each customer using their [name] and [email] values, with a preset subject and plain text content.
+ * 
+ * Use Cases:
+ * - Sending personalized reminder emails to all active customers in a PostgreSQL database.
+ * - Automating bulk notifications to users who meet specific criteria (e.g., "active = true").
+ * - Integrating database-driven user lists with outbound email campaigns.
+ * - Regularly reminding customers to engage with a platform or service by querying the latest active users and emailing them.
+ */
+data.connect:[pgsql|customer_db]
+   database-type:pgsql
+   data.select:@"
+select name, email
+   from customers
+   where active = true"
+      database-type:pgsql
+   for-each:x:@data.select/*
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            subject:Important Reminder from YourCompany
+            entity:text/plain
+               content:Hi, this is just a friendly reminder to check your account dashboard.

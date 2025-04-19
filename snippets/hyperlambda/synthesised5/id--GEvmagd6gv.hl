@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters for the endpoint, specifically requiring a [url] and a [type], both as strings.
+ * 2. [auth.ticket.verify] is used to restrict access, ensuring only users with "root" or "admin" roles can execute the code.
+ * 3. [data.connect] connects to a database named "scraper" using the "sqlite" provider, preparing the context for database operations.
+ * 4. [add] is used to dynamically populate the [values] node under [data.create] with all key-value pairs from the input arguments, effectively mapping incoming data to the database insert operation.
+ * 5. [data.create] inserts a new record into the [crawl_urls] table in the sqlite database, using the values gathered from the arguments.
+ * 6. [response.status.set] sets the HTTP response status code to 201, indicating successful creation of a resource.
+ * 7. [yield] returns the inserted record's ID as part of the endpoint response, making it accessible to the client.
+ * 
+ * Use cases:
+ * - Creating and storing new URLs to be crawled, along with their type, in a web scraping system.
+ * - Implementing an admin-only API endpoint for adding crawl targets to a database.
+ * - Building a RESTful resource creation endpoint that returns the database-generated identifier for the new entry.
+ * - Logging submission events where both the URL and its type need to be tracked and persisted.
+ */
+.arguments
+   url:string
+   type:string
+auth.ticket.verify:root,admin
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:crawl_urls
+      values
+   response.status.set:201
+   yield
+      id:x:@data.create

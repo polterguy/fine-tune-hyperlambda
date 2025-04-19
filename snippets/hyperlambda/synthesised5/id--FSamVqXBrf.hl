@@ -1,0 +1,63 @@
+
+/*
+ * 1. The [.arguments] node declares that this endpoint accepts a [query] argument of type string, explicitly controlling what input is allowed.
+ * 2. [validators.mandatory] checks that the [query] argument is present, throwing an exception if it is missing.
+ * 3. [config.get] retrieves the SERP API key from configuration settings, storing it in the [.api-key] node.
+ * 4. The first [if] slot checks if [.api-key] is null or empty, and if so, throws an error to prevent execution without a valid API key.
+ * 5. [strings.concat] constructs a URL for the SERP API by combining the base URL, the API key, and the URL-encoded query.
+ * 6. [http.get] sends a GET request to the constructed URL, expecting a JSON response, and [convert:true] ensures the response is parsed into nodes.
+ * 7. The second [if] checks if the HTTP status code indicates success (between 200 and 299). If not, it logs the error and throws an exception.
+ * 8. [for-each] iterates through up to ten image results in the API response, de-referencing and extracting each result’s title, link, original image URL, and source, and adds these as [result] nodes in the response.
+ * 9. [return-nodes] ensures all accumulated [result] nodes are returned as the final output.
+ * 
+ * Use Cases:
+ * - Building a backend endpoint to fetch Google Images search results based on a user query, returning relevant image details.
+ * - Creating an API that requires a secured API key from configuration and validates input before making external requests.
+ * - Wrapping third-party API responses and exposing only selected fields to downstream clients.
+ * - Handling error cases gracefully by validating configuration and HTTP status codes, improving reliability and debuggability.
+ * - Extracting and transforming search results from an external service into a custom, client-friendly format.
+ */
+.arguments
+   query:string
+validators.mandatory:x:@.arguments/*/query
+.api-key
+set-value:x:@.api-key
+   config.get:"magic:serp-api:api_key"
+if
+   or
+      null:x:@.api-key
+      eq:x:@.api-key
+         .:
+   .lambda
+      throw:Could not find a SERP API key to use for fetching hotels.
+.url
+set-value:x:@.url
+   strings.concat
+      .:"https://serpapi.com/search.json?engine=google_images&api_key="
+      get-value:x:@.api-key
+      .:&q=
+      strings.url-encode:x:@.arguments/*/query
+http.get:x:@.url
+   convert:true
+if
+   not
+      and
+         mte:x:@http.get
+            .:int:200
+         lt:x:@http.get
+            .:int:300
+   .lambda
+      lambda2hyper:x:../*
+      log.info:x:-
+      throw:Something went wrong while invoking SERP API
+for-each:x:@http.get/*/content/*/images_results/*/[0,10]
+   unwrap:x:+/*/*/*
+   add:x:../*/return-nodes/*/result
+      .
+         .
+            title:x:@.dp/#/*/title
+            link:x:@.dp/#/*/link
+            original:x:@.dp/#/*/original
+            source:x:@.dp/#/*/source
+return-nodes
+   result

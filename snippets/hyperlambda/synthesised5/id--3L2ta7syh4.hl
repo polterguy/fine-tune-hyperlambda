@@ -1,0 +1,52 @@
+
+/*
+ * 1. [validators.mandatory] ensures that the [.distinct_column] argument is supplied, preventing further execution if it's missing.
+ * 2. [validators.enum] restricts the value of the [.distinct_column] argument to specific allowed column names, enhancing input validation and security.
+ * 3. [response.headers.set] configures the response to use private caching with a max age of 500 seconds, optimizing API response caching.
+ * 4. [set-name] dynamically constructs a SQL aggregate function (count(distinct ...)) based on the client-supplied distinct column, allowing flexible grouping.
+ * 5. [remove-nodes] cleans up the [.arguments] by removing the [.distinct_column] node so it won't be used in subsequent SQL filtering.
+ * 6. [add] injects any remaining argument nodes as conditions into the [and] node of the [where] clause for SQL filtering.
+ * 7. [data.read] performs a database query on the [city] table, using SQLite, selecting a distinct count based on user input and applying any filter conditions.
+ * 8. [return-nodes] responds with all results from the executed query.
+ * 
+ * Use cases:
+ * - Building a REST API endpoint to count unique values of a column in the [city] table, where the column and filters are client-specified.
+ * - Powering an analytics dashboard widget that reports the number of unique cities or countries, with advanced filtering options.
+ * - Supporting an admin tool where operators can validate data uniqueness or distribution across various attributes of city records.
+ * - Creating a reporting service that limits which columns can be counted for uniqueness, enforcing business rules on data aggregation.
+ */
+.arguments
+   distinct_column:string
+   recaptcha:string
+   city.city_id.eq:long
+   city.city.like:string
+   city.city.eq:string
+   city.country_id.eq:long
+   city.last_update.eq:date
+validators.mandatory:x:@.arguments/*/distinct_column
+validators.enum:x:@.arguments/*/distinct_column
+   .:city.city_id
+   .:city.city
+   .:city.country_id
+   .:city.last_update
+response.headers.set
+   Cache-Control:private, max-age=500
+data.connect:[generic|sakila]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:city
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+   return-nodes:x:@data.read/*/*

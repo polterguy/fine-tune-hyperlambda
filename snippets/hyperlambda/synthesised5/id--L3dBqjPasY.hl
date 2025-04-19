@@ -1,0 +1,44 @@
+
+/*
+ * 1. The [.arguments] node defines the input parameters that the endpoint accepts, including paging ([limit], [offset]), sorting ([order], [direction]), and several filtering options for querying the [cloudlets] table.
+ * 2. [auth.ticket.verify] is used to ensure only users with root privileges can access or execute the endpoint, providing access control.
+ * 3. [data.connect] establishes a connection to the "hub" database using a generic provider, setting up the context for subsequent database operations.
+ * 4. The [add] slots inject the paging and sorting arguments from [.arguments] into the children of the [data.read] node, dynamically building the query configuration.
+ * 5. [remove-nodes] is invoked to remove paging and sorting nodes from [.arguments] after they have been added to [data.read], preventing duplicate or unwanted parameters.
+ * 6. Another [add] slot injects all remaining argument nodes (the various filters) into the [and] block of the [where] clause in [data.read], constructing dynamic filtering logic.
+ * 7. [data.read] retrieves records from the [cloudlets] table, applying all the injected filters, pagination, and sorting.
+ * 8. [return-nodes] returns the result set fetched by [data.read] as the endpoint's output.
+ * 
+ * Use cases:
+ * - Retrieve a paged and filtered list of cloudlets, supporting dynamic filtering by ID, creation date, and name.
+ * - Allow administrators to query cloudlets with flexible sorting and direction options through a secure, authenticated endpoint.
+ * - Enable clients to search for cloudlets whose names match a pattern or are exactly equal to a given string.
+ * - Support advanced filtering scenarios by combining multiple filter criteria provided in the request arguments.
+ */
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   cloudlets.id.eq:long
+   cloudlets.created.eq:date
+   cloudlets.name.like:string
+   cloudlets.name.eq:string
+auth.ticket.verify:root
+data.connect:[generic|hub]
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      table:cloudlets
+      where
+         and
+   return-nodes:x:@data.read/*

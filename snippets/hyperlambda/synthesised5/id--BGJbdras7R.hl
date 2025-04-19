@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [.arguments] node defines the arguments that the endpoint can accept, in this case a single [name] argument of type string.
+ * 2. The [auth.ticket.verify] slot ensures that the caller is authenticated as "root" before proceeding, enforcing access control.
+ * 3. The [strings.concat] slot constructs a file path by concatenating the "/misc/templates/" directory, the provided [name] argument, and the "/generate.hl" suffix.
+ * 4. The [io.file.load] slot loads the contents of the Hyperlambda file at the constructed path.
+ * 5. The [hyper2lambda] slot converts the loaded Hyperlambda file content into a lambda node structure for further manipulation.
+ * 6. The [add] slot appends all [.custom] child nodes found within the converted Hyperlambda structure to the return node set, using [get-nodes] to collect them.
+ * 7. The [return-nodes] slot returns the final result, which consists of all the [.custom] nodes extracted from the loaded file.
+ * 
+ * Use cases:
+ * - Dynamically loading and processing templates based on a user-supplied [name] argument.
+ * - Restricting access to template generation features to authenticated "root" users only.
+ * - Extracting and returning all [.custom] configuration or metadata sections from a specified template file.
+ * - Building a modular system where custom sections inside template files can be programmatically accessed and reused.
+ */
+.arguments
+   name:string
+auth.ticket.verify:root
+strings.concat
+   .:/misc/templates/
+   get-value:x:@.arguments/*/name
+   .:/generate.hl
+io.file.load:x:-
+hyper2lambda:x:@io.file.load
+add:x:../*/return-nodes
+   get-nodes:x:@hyper2lambda/*/.custom/*
+return-nodes

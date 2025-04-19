@@ -1,0 +1,36 @@
+
+/*
+ * 1. The [data.connect] node opens a PostgreSQL database connection to the [billing] database using the [pgsql] adapter.
+ * 2. The [data.select] node executes a SQL query to retrieve the [name] and [email] fields from the [subscriptions] table where the [status] is 'expired'. The [database-type:pgsql] node ensures that the query uses PostgreSQL syntax.
+ * 3. The [for-each] slot iterates through each record returned by [data.select], processing one expired subscription at a time.
+ * 4. The [unwrap] slot flattens the data structure for the current record to make its [name] and [email] fields easier to access.
+ * 5. The [mail.smtp.send] node sends an email to each expired subscriber, constructing the message using their [name] and [email], a fixed sender, a set subject, and a plain text entity containing the renewal notice.
+ * 
+ * Use Cases:
+ * - Automatically notify all users whose subscriptions have expired, prompting them to renew.
+ * - Periodically run this script as a batch job to maintain ongoing communication with lapsed subscribers.
+ * - Integrate with a billing or CRM system to trigger personalized reminder emails when subscription statuses change to expired.
+ * - Adapt the query or message content to support other lifecycle events, such as trial expirations or payment failures.
+ */
+data.connect:[pgsql|billing]
+   database-type:pgsql
+   data.select:@"
+select name, email
+   from subscriptions
+   where status = 'expired'"
+      database-type:pgsql
+   for-each:x:@data.select/*
+      unwrap:x:+/**
+      mail.smtp.send
+         message
+            to
+               .
+                  name:x:@.dp/#/*/name
+                  email:x:@.dp/#/*/email
+            from
+               .
+                  name:Billing Team
+                  email:billing@yourcompany.com
+            subject:Your Subscription Has Expired
+            entity:text/plain
+               content:Hi, your subscription has expired. Please renew to continue using our services.

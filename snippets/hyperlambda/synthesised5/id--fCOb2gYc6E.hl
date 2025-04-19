@@ -1,0 +1,52 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input arguments, including paging ([limit], [offset]), sorting ([order], [direction]), and filter criteria for various fields of the [crawl_urls] table.
+ * 2. The [auth.ticket.verify] slot checks that the user has either "root" or "admin" roles before continuing, ensuring only authorized users can access the data.
+ * 3. The [data.connect] slot establishes a database connection to a generic "scraper" database, explicitly using the SQLite engine.
+ * 4. The [add:x:./*/data.read] statements inject the [order], [direction], [limit], and [offset] arguments into the [data.read] operation, enabling dynamic paging and sorting.
+ * 5. The [remove-nodes] slots remove the paging and sorting arguments from [.arguments] to prevent them being used as filter criteria later.
+ * 6. The [add:x:./*/data.read/*/where/*/and] slot appends any remaining arguments (assumed to be filter conditions) to the [and] node inside the [where] clause of [data.read], constructing dynamic SQL WHERE conditions.
+ * 7. The [data.read] slot queries the [crawl_urls] table, selecting specific columns and using the constructed WHERE clause.
+ * 8. [return-nodes:x:@data.read/*] returns all nodes resulting from the [data.read] query as the endpoint response.
+ * 
+ * Use cases:
+ * - Building a paginated and filterable API endpoint for listing URLs from a scraping service's database.
+ * - Allowing only administrators or root users to access a dynamic search of crawl URLs based on various criteria.
+ * - Implementing a modular backend where query arguments can be extended, reused, or customized simply by modifying the [.arguments] node.
+ * - Efficiently constructing SQL queries with dynamic WHERE, ORDER BY, LIMIT, and OFFSET clauses based on HTTP request parameters.
+ * - Preventing unauthorized access and injection of unintended filters by sanitizing which arguments reach the database layer.
+ */
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   crawl_urls.crawl_url_id.eq:long
+   crawl_urls.url.like:string
+   crawl_urls.url.eq:string
+   crawl_urls.type.like:string
+   crawl_urls.type.eq:string
+auth.ticket.verify:root,admin
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:crawl_urls
+      columns
+         crawl_urls.crawl_url_id
+         crawl_urls.url
+         crawl_urls.type
+      where
+         and
+   return-nodes:x:@data.read/*

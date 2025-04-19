@@ -1,0 +1,36 @@
+
+/*
+ * 1. [slots.create] defines a new dynamic slot named [register-user], which encapsulates the user registration workflow.
+ * 2. [http.post] sends a POST request to "https://api.example.com/users/register" with a JSON payload containing [username], [email], and [password], and expects the response to be converted for easier processing.
+ * 3. [if] checks if the HTTP response status code from [http.post] is greater than or equal to 200 and less than 300, indicating a successful request.
+ * 4. [set-value] updates [.register.status] to reflect whether the registration succeeded or failed based on the HTTP response.
+ * 5. [yield] returns the final registration status as [status].
+ * 
+ * Use cases:
+ * - Automating user registration via a remote API and returning a clear status.
+ * - Integrating new user onboarding in a web application flow with external authentication services.
+ * - Providing feedback to the calling process about the result of a remote registration attempt.
+ * - Encapsulating and reusing user registration logic as a callable slot within other workflows.
+ */
+slots.create:register-user
+   .register.status
+   http.post:"https://api.example.com/users/register"
+      convert:true
+      payload
+         username:alice
+         email:alice@example.com
+         password:Secure123!
+   if
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+      .lambda
+         set-value:x:@.register.status
+            .:Registration successful
+   else
+      set-value:x:@.register.status
+         .:Registration failed
+   yield
+      status:x:@.register.status

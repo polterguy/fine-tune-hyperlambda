@@ -1,0 +1,29 @@
+
+/*
+ * 1. [mysql.connect] establishes a connection to the [crm] MySQL database.
+ * 2. [try] begins a try-catch block to handle any potential exceptions during the transaction.
+ * 3. [mysql.transaction.create] starts a new transaction scope within the database connection.
+ * 4. [mysql.update] performs an update on the [users] table, setting the [status] column to "active" for records that match the specified [where] condition.
+ * 5. The [where] condition uses [and] and [id.eq], comparing the [id] column to the value provided in the [id] argument of [.arguments].
+ * 6. [mysql.transaction.commit] commits the transaction if the update succeeds.
+ * 7. [.catch] provides error handling, logging an error message using [log.error] if any exception occurs, which would also cause the transaction to roll back implicitly.
+ * 
+ * Use cases:
+ * - Activating a user account by updating their status after verifying identity.
+ * - Re-enabling access for a previously deactivated user based on their unique id.
+ * - Batch processing user status updates within a controlled transaction to ensure data integrity.
+ * - Ensuring that user updates are either fully applied or not at all, thanks to transaction handling and rollback on error.
+ */
+mysql.connect:crm
+   try
+      mysql.transaction.create
+         mysql.update
+            table:users
+            values
+               status:active
+            where
+               and
+                  id.eq:x:@.arguments/*/id
+         mysql.transaction.commit
+   .catch
+      log.error:Transaction rolled back due to error

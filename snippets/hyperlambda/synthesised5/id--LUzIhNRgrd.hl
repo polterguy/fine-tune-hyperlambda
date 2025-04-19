@@ -1,0 +1,23 @@
+
+/*
+ * 1. [data.connect] establishes a database connection using the "crm" connection string, granting access to subsequent database operations within its children.
+ * 2. [try] begins a try-catch block, allowing graceful recovery if an error occurs during the transaction.
+ * 3. [data.transaction.create] starts a new database transaction, ensuring all subsequent operations are executed atomically.
+ * 4. [data.execute] runs a SQL DELETE statement to remove users with a "pending" status from the "users" table.
+ * 5. [throw] simulates an error by explicitly raising an exception, which interrupts the transaction flow before the transaction can be committed.
+ * 6. [.catch] handles the simulated failure, ensuring the transaction is rolled back using [data.transaction.rollback], and logs an error via [log.error].
+ * 
+ * Use Cases:
+ * - Safely deleting records from the database with the guarantee that if any error occurs, the deletion is undone.
+ * - Simulating failure scenarios in transaction logic for testing rollback and error handling mechanisms.
+ * - Logging and auditing transaction failures for monitoring or debugging purposes.
+ */
+data.connect:crm
+   try
+      data.transaction.create
+         data.execute:"delete from users where status = 'pending'"
+         throw:Simulated failure
+         data.transaction.commit
+   .catch
+      data.transaction.rollback
+      log.error:Transaction failed and rolled back

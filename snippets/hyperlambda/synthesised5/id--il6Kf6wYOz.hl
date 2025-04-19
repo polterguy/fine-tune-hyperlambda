@@ -1,0 +1,47 @@
+
+/*
+ * 1. The [.arguments] node declares three expected arguments: [crawl_url_id], [url], and [type], specifying their types (long, string, string).
+ * 2. [validators.mandatory] ensures that [crawl_url_id] is provided, enforcing it as a required argument.
+ * 3. [auth.ticket.verify] restricts access, allowing only users with 'root' or 'admin' roles to proceed.
+ * 4. [data.connect] establishes a connection to the [generic|scraper] SQLite database.
+ * 5. [add:x:./*/data.update/*/values] and [add:x:./*/data.update/*/where/*/and] dynamically populate the [values] and [where/and] clauses for the [data.update] operation using nodes from [.arguments].
+ * 6. [data.update] performs an update on the [crawl_urls] table using the supplied values and conditions.
+ * 7. [if] checks if the update affected zero rows, and if so, sets the HTTP status code to 404 and returns a "Record not found" result.
+ * 8. If the update is successful, [response.status.set:202] sets the HTTP status to 202 (Accepted), and [unwrap:x:+/*] and [return] return the number of affected rows.
+ * 
+ * Use cases:
+ * - Updating the [url] or [type] of a specific record in the [crawl_urls] table by providing its [crawl_url_id].
+ * - Ensuring only authorized administrators can modify crawl URL records in the SQLite database.
+ * - Returning a clear 404 error if the specified [crawl_url_id] does not exist, otherwise confirming the update with the number of affected rows.
+ * - Supporting partial updates by only including relevant arguments in the request.
+ */
+.arguments
+   crawl_url_id:long
+   url:string
+   type:string
+validators.mandatory:x:@.arguments/*/crawl_url_id
+auth.ticket.verify:root,admin
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:crawl_urls
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

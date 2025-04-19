@@ -1,0 +1,53 @@
+
+/*
+ * 1. The [.arguments] node declares two required arguments: [username] and [password], both expected as strings.
+ * 2. [validators.mandatory] is used to enforce that both [username] and [password] are provided; otherwise, execution halts with an error.
+ * 3. [data.connect] opens a connection to a database named [usersdb] and reads from the [users] table, fetching the [password_hash] and [roles] columns for the provided [username].
+ * 4. The first [if] block checks if any matching user record exists. If not, it throws an "Invalid username or password" error.
+ * 5. [crypto.password.verify] compares the provided password against the stored hashed password from the database.
+ * 6. The second [if] block throws an error if the password does not match, ensuring login failures are handled securely.
+ * 7. [strings.split] splits the roles string (comma-separated) from the database into a list.
+ * 8. [add] collects the split role nodes under a [roles] node for further processing.
+ * 9. [auth.ticket.create] generates a JWT token using the username and associated roles.
+ * 10. [yield] returns the newly created JWT token as the [token] node to the caller.
+ * 
+ * Use cases:
+ * - Secure user login endpoint for authenticating credentials and issuing JWT tokens.
+ * - Implementing role-based access control by including user roles in the generated token.
+ * - Preventing access when credentials are missing or invalid for enhanced security.
+ * - Integrating this logic with a frontend login form to support authentication workflows.
+ * - Enabling single sign-on or session management features by leveraging the returned JWT token.
+ */
+.arguments
+   username:string
+   password:string
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
+data.connect:usersdb
+   data.read
+      table:users
+      columns
+         password_hash
+         roles
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Invalid username or password
+   crypto.password.verify:x:@.arguments/*/password
+      hash:x:@data.read/*/*/password_hash
+   if
+      not:x:@crypto.password.verify
+      .lambda
+         throw:Invalid username or password
+   strings.split:x:@data.read/*/*/roles
+      separator:,
+   add:x:+/*/roles
+      get-nodes:x:@strings.split/*
+   auth.ticket.create
+      username:x:@.arguments/*/username
+      roles
+   yield
+      token:x:@auth.ticket.create

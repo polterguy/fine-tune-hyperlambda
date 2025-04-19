@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters for this logic: [firstname], [lastname], and [email], all of type string.
+ * 2. The [add] slot locates the [properties] node within the [payload] of a [http.post] operation and inserts all argument nodes from [.arguments] as children of [properties]. This effectively maps the input arguments to the HTTP request payload.
+ * 3. The [http.post] slot sends a POST request to the HubSpot API endpoint for creating contacts, including an [Authorization] header with a Bearer token and specifying the [Content-Type] as JSON. The request body is built dynamically from the input arguments.
+ * 4. The [payload] node contains a [properties] child, which is populated with the argument nodes, forming the request data structure required by the HubSpot API.
+ * 5. The [yield] slot returns a [result] node with the value "OK" to indicate successful execution.
+ * 
+ * Use cases:
+ * - Creating a new contact in HubSpot using user-supplied [firstname], [lastname], and [email] via an HTTP POST request.
+ * - Integrating a signup form backend to automatically send new user information to HubSpot CRM.
+ * - Automating lead creation in a sales workflow by mapping form input directly to the HubSpot contact creation API.
+ * - Facilitating seamless data transfer from a web application to a third-party CRM system using a dynamic Hyperlambda payload structure.
+ */
+.arguments
+   firstname:string
+   lastname:string
+   email:string
+add:x:./*/http.post/*/payload/*/properties
+   get-nodes:x:@.arguments/*
+http.post:"https://api.hubapi.com/crm/v3/objects/contacts"
+   headers
+      Authorization:Bearer YOUR_HUBSPOT_API_TOKEN
+      Content-Type:application/json
+   payload
+      properties
+yield
+   result:OK

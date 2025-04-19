@@ -1,0 +1,30 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot checks whether the current user has either "root" or "admin" roles before allowing further execution, ensuring that only authorized users can proceed.
+ * 2. The [validators.mandatory] slot makes sure the [.arguments] node contains an [actor_id] value before proceeding, preventing execution if this parameter is missing.
+ * 3. The [data.connect] slot initiates a connection to either the "generic" or "sakila" database, specifying SQLite as the database type.
+ * 4. The [add] slot dynamically appends all argument nodes (like [actor_id]) from [.arguments] as conditions under the [and] node within the [where] clause, effectively constructing the deletion criteria based on input arguments.
+ * 5. The [data.delete] slot performs a deletion operation on the [actor] table in the SQLite database, applying all the conditions previously added to the [where]/[and] clause.
+ * 6. The [yield] slot returns the number of affected rows (deleted actors) under an [affected] node, allowing the caller to know how many records were deleted.
+ * 
+ * Use Cases:
+ * - Removing an actor from the "actor" table by specifying their [actor_id], ensuring only admins or root users can delete records.
+ * - Deleting actor records in a SQLite version of the Sakila database via an API endpoint after verifying the user's authorization.
+ * - Implementing a secure administrative panel action for mass-deleting actors based on dynamic criteria provided as arguments.
+ * - Enforcing validation and security checks before executing potentially destructive database operations.
+ */
+.arguments
+   actor_id:long
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/actor_id
+data.connect:[generic|sakila]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:actor
+      where
+         and
+   yield
+      affected:x:@data.delete

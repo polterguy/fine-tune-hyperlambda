@@ -1,0 +1,36 @@
+
+/*
+ * 1. [execute] with the value [magic.io.file.load-recursively] triggers a recursive loading of all files from the specified directory path [.], gathering their content for further processing.
+ * 2. [for-each] iterates over all loaded file nodes from the result of [execute], processing each file individually.
+ * 3. [strings.split] splits each file's path using "/" to break it into its path components, making it easier to manipulate the file name and directory structure.
+ * 4. [remove-nodes] removes the last node (usually the file name) from the split path, isolating the directory path.
+ * 5. [strings.concat] constructs a new file path by joining the directory (from [strings.join]), appending "example-", the current [.no] value, and ".hl" as the new file name.
+ * 6. [io.file.save] saves the file content (from the original file node) into the newly constructed file path.
+ * 7. [io.file.delete] deletes the original file after it’s been saved with the new name.
+ * 8. [math.increment] increases the [.no] counter by 1 for the next iteration, ensuring each new file name has a unique sequential number.
+ * 
+ * Use cases:
+ * - Renaming and moving a batch of Hyperlambda files to a new naming convention with sequential numbers for organization or anonymization.
+ * - Cleaning up a directory by archiving existing files with a new standardized name and removing the originals.
+ * - Preparing a dataset of Hyperlambda files for training or testing by ensuring unique, consistent file names.
+ * - Batch processing and transforming file structures for migration between different systems or environments.
+ */
+execute:magic.io.file.load-recursively
+   .:/etc/hyperlambda-training-material/hyperlambda/
+.no:int:1
+for-each:x:@execute/*
+   strings.split:x:@.dp/#
+      .:/
+   remove-nodes:x:@strings.split/0/-
+   strings.concat
+      .:/
+      strings.join:x:@strings.split/*
+         .:/
+      .:/
+      .:example-
+      get-value:x:@.no
+      .:.hl
+   io.file.save:x:@strings.concat
+      get-value:x:@.dp/#/*
+   io.file.delete:x:@.dp/#
+   math.increment:x:@.no

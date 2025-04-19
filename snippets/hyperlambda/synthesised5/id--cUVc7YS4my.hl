@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [switch] slot uses the value of [.fileType] to determine which block of code to execute, allowing for conditional logic based on file type.
+ * 2. Each [case] node inside [switch] corresponds to a possible value of [.fileType] (e.g., json, xml, csv) and specifies how to set response headers for that file type.
+ * 3. The [response.headers.set] slot within each [case] assigns both the [Content-Type] and [Content-Disposition] headers, customizing the HTTP response to suggest the appropriate file type and filename for downloads.
+ * 4. The [default] branch acts as a fallback, setting the headers to treat the file as a generic binary stream with a default filename if none of the specific cases match.
+ * 
+ * Use cases:
+ * - Dynamically serving files with appropriate MIME types and download names based on user selection or request parameters.
+ * - Implementing export/download endpoints that support multiple formats (JSON, XML, CSV, binary), ensuring correct browser handling.
+ * - Creating a backend API that adapts HTTP headers for file attachments according to the requested export format.
+ * - Providing a fallback for unknown or unsupported file types to prevent errors and ensure a valid file is always returned.
+ */
+.fileType:json
+switch:x:@.fileType
+   case:json
+      response.headers.set
+         Content-Type:application/json
+         Content-Disposition:"attachment; filename=\"file.json\""
+   case:xml
+      response.headers.set
+         Content-Type:application/xml
+         Content-Disposition:"attachment; filename=\"file.xml\""
+   case:csv
+      response.headers.set
+         Content-Type:text/csv
+         Content-Disposition:"attachment; filename=\"file.csv\""
+   default
+      response.headers.set
+         Content-Type:application/octet-stream
+         Content-Disposition:"attachment; filename=\"file.bin\""

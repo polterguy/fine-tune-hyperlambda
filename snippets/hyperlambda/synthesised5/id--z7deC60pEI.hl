@@ -1,0 +1,55 @@
+
+/*
+ * 1. The [validators.mandatory] slots ensure that both [aggregate_function] and [aggregate_column] are present in the input arguments, preventing execution without these required values.
+ * 2. The [validators.enum] slots restrict [aggregate_function] to one of "min", "max", "sum", or "avg", and [aggregate_column] to either "CustomerDemographics.CustomerTypeID" or "CustomerDemographics.CustomerDesc", ensuring only valid SQL aggregate operations and columns are used.
+ * 3. The [set-name] slot dynamically constructs the SQL aggregate expression (e.g., "min(CustomerDemographics.CustomerTypeID)") by concatenating the selected function and column, and assigns it to a temporary [aggregate_functor] node in the [columns] structure for later use in the query.
+ * 4. The [remove-nodes] slot removes the first two argument nodes, keeping only filter-related arguments for the WHERE clause.
+ * 5. The [add] slot injects any additional filtering arguments (e.g., "like" or "eq" conditions) under the AND-clause of the WHERE statement in the SQL query.
+ * 6. The [data.read] slot performs a SQL SELECT query on the "CustomerDemographics" table, selecting only the dynamically generated aggregate result and applying any specified filters, limiting the result to one row.
+ * 7. The [return-nodes] slot outputs the result nodes from the executed query.
+ * 
+ * Use cases:
+ * - Retrieve the minimum CustomerTypeID from [CustomerDemographics] with optional filters on type or description.
+ * - Calculate the average or sum of a specific column, such as CustomerTypeID, with filtering by description using "like" or "equals" conditions.
+ * - Obtain the maximum value from the CustomerDesc field, filtered by matching certain patterns.
+ * - Use as a backend for reporting dashboards requiring aggregate statistics from the [CustomerDemographics] table.
+ * - Enable API endpoints for clients to request aggregate analytics with custom filters on customer demographics.
+ */
+.arguments
+   aggregate_function:string
+   aggregate_column:string
+   CustomerDemographics.CustomerTypeID.like:string
+   CustomerDemographics.CustomerTypeID.eq:string
+   CustomerDemographics.CustomerDesc.like:string
+   CustomerDemographics.CustomerDesc.eq:string
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+validators.enum:x:@.arguments/*/aggregate_column
+   .:CustomerDemographics.CustomerTypeID
+   .:CustomerDemographics.CustomerDesc
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:CustomerDemographics
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

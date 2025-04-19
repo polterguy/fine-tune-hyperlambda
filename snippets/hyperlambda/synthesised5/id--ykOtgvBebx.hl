@@ -1,0 +1,51 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot ensures that only users with roles "root" or "admin" are authorized to execute the endpoint.
+ * 2. [data.connect] establishes a connection to the "scraper" database using the generic provider with SQLite as the backend.
+ * 3. The [add] slots inject pagination and sorting arguments ([order], [direction], [limit], [offset]) from [.arguments] directly into the [data.read] request, dynamically constructing the query.
+ * 4. [remove-nodes] cleans up these specific pagination and sorting nodes from [.arguments] after they are injected, to avoid redundancy or conflicts.
+ * 5. Another [add] slot collects all remaining filter arguments from [.arguments] and appends them as conditions in the [and] node inside the [where] clause of [data.read].
+ * 6. [data.read] fetches records from the [spice_urls] table, selecting the [spice_urls.spice_url_id], [spice_urls.url], and [spice_urls.type] columns, applying any [where] filtering built from the arguments.
+ * 7. [return-nodes] outputs the result nodes from the executed [data.read] operation.
+ * 
+ * Use cases:
+ * - Fetch a paginated and filtered list of URLs from the [spice_urls] table, with support for sorting and complex search criteria, for admin dashboards.
+ * - Dynamically construct queries based on user-supplied search fields, such as finding URLs of a certain type or matching partial strings.
+ * - Securely restrict access to sensitive data by enforcing role-based authentication at the endpoint level.
+ * - Support efficient data browsing in management tools by leveraging offset and limit for pagination.
+ * - Enable flexible API endpoints that adapt to varying combinations of search, sort, and paging parameters without manual query assembly.
+ */
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   spice_urls.spice_url_id.eq:long
+   spice_urls.url.like:string
+   spice_urls.url.eq:string
+   spice_urls.type.like:string
+   spice_urls.type.eq:string
+auth.ticket.verify:root,admin
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:spice_urls
+      columns
+         spice_urls.spice_url_id
+         spice_urls.url
+         spice_urls.type
+      where
+         and
+   return-nodes:x:@data.read/*

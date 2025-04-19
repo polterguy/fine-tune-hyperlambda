@@ -1,0 +1,32 @@
+
+/*
+ * 1. The [.arguments] node defines that this code expects two string arguments: [username] and [password].
+ * 2. [validators.mandatory] ensures both [username] and [password] arguments are provided, throwing an exception if either is missing.
+ * 3. [data.connect] establishes a connection to the "usersdb" database, and [data.read] fetches the [password_hash] column from the "users" table for the user matching the given [username].
+ * 4. [crypto.password.verify] checks if the provided [password] matches the stored [password_hash], returning a boolean result.
+ * 5. [yield] returns the result of the password verification as [verified].
+ * 
+ * Use cases:
+ * - User login: Validates user credentials by comparing input against stored hashed passwords.
+ * - API authentication: Ensures only users with correct usernames and passwords can access protected endpoints.
+ * - Security audits: Provides a secure way to verify passwords without exposing or transmitting raw password hashes.
+ * - Password change screens: Confirms a user's current password before allowing updates to their account.
+ * - Account recovery: Checks credentials during recovery workflows before proceeding with sensitive actions.
+ */
+.arguments
+   username:string
+   password:string
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/password
+data.connect:usersdb
+   data.read
+      table:users
+      columns
+         password_hash
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   crypto.password.verify:x:@.arguments/*/password
+      hash:x:@data.read/*/*/password_hash
+   yield
+      verified:x:@crypto.password.verify

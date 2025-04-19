@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [.arguments] node defines three parameters: [type] (string), [snippets] (accepts any type), and [meta] (string), specifying the required input structure for the endpoint.
+ * 2. [validators.mandatory] ensures that the [type] argument must be supplied, otherwise an exception will be thrown, enforcing input validation.
+ * 3. [data.connect] establishes a database connection using a generic or "magic" provider, abstracting away the database type for downstream operations.
+ * 4. [for-each] iterates over each child node under [snippets], processing each provided snippet individually.
+ * 5. [if] checks if the current snippet contains a [prompt] child node, filtering out snippets that lack this field.
+ * 6. [data.create] inserts a new record into the [ml_training_snippets] table for each valid snippet, assigning values from the arguments and the snippet node itself for [type], [prompt], [completion], and [meta].
+ * 
+ * Use cases:
+ * - Bulk-inserting multiple training data snippets into a machine learning table, each with a prompt and completion, while tagging them with a specific type and meta description.
+ * - Validating that all data entries have the required [type] and only processing snippets that contain a [prompt], ensuring data integrity.
+ * - Abstracting database connections, making the logic agnostic to the underlying database provider for portability.
+ * - Supporting endpoints that receive diverse and dynamic snippet data structures, thanks to the flexible [snippets:*] argument.
+ * - Attaching consistent metadata ([meta]) to all inserted records, useful for later filtering or categorization.
+ */
+.arguments
+   type:string
+   snippets:*
+   meta:string
+validators.mandatory:x:@.arguments/*/type
+data.connect:[generic|magic]
+   for-each:x:@.arguments/*/snippets/*
+      if:x:@.dp/#/*/prompt
+         data.create
+            table:ml_training_snippets
+            values
+               type:x:@.arguments/*/type
+               prompt:x:@.dp/#/*/prompt
+               completion:x:@.dp/#/*/completion
+               meta:x:@.arguments/*/meta

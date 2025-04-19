@@ -1,0 +1,49 @@
+
+/*
+ * 1. The [validators.mandatory] slot is used three times to enforce that the [.arguments] node contains [ticks], [legend], and [values1], ensuring these required parameters are present before proceeding.
+ * 2. The [for-each] loop iterates over each child node in [.arguments], and for every argument whose name starts with "values", it appends a new node to [.bars] containing the comma-separated values from the argument, effectively building a collection of data series for the chart.
+ * 3. The [add] slots are used to populate the [ticks], [legend], and [bars] nodes (inside the [image.chart] node) with the split values from the corresponding arguments, preparing the dataset for chart rendering.
+ * 4. The [image.chart] slot then generates a grouped bar chart using the [bars], [ticks], and [legend] nodes as input, with specified width and height.
+ * 5. [response.headers.set] sets the Content-Type header to "application/octet-stream" to inform the client that the response will be a binary (image) file, and [return] returns the generated chart image as the response.
+ * 
+ * Use Cases:
+ * - Generate a grouped bar chart from a dynamic set of value arguments and return it as a downloadable image.
+ * - Validate that all required chart data parameters ([ticks], [legend], and at least one [valuesX]) are provided before generating the chart.
+ * - Aggregate and transform multiple value series from input into the format required by the chart rendering slot.
+ * - Build an API endpoint for visualizing dataset comparisons by allowing flexible numbers of data series as arguments.
+ * - Enforce strict argument validation while still supporting variable input using the "*" wildcard in the [.arguments] declaration.
+ */
+.arguments:*
+validators.mandatory:x:@.arguments/*/ticks
+validators.mandatory:x:@.arguments/*/legend
+validators.mandatory:x:@.arguments/*/values1
+.bars
+for-each:x:@.arguments/*
+   get-name:x:@.dp/#
+   if
+      strings.starts-with:x:@get-name
+         .:values
+      .lambda
+         add:x:@.bars
+            .
+               .
+         add:x:@.bars/0/-
+            strings.split:x:@.dp/#
+               .:,
+add:x:../*/image.chart/*/ticks
+   strings.split:x:@.arguments/*/ticks
+      .:,
+add:x:../*/image.chart/*/legend
+   strings.split:x:@.arguments/*/legend
+      .:,
+add:x:../*/image.chart/*/bars
+   get-nodes:x:@.bars/*
+image.chart:grouped
+   width:800
+   height:500
+   bars
+   ticks
+   legend
+response.headers.set
+   Content-Type:application/octet-stream
+return:x:@image.chart

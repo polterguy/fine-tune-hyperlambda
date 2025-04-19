@@ -1,0 +1,48 @@
+
+/*
+ * 1. The [validators.mandatory] slot ensures that the [.spice_url_id] argument is provided, enforcing it as a required parameter for the endpoint.
+ * 2. [auth.ticket.verify] checks that the user has an admin authentication ticket, restricting access to authorized users only.
+ * 3. [data.connect] establishes a database connection to the [scraper] database using SQLite as the backend.
+ * 4. The first [add] slot collects all argument nodes except the first one ([url] and [type]) and adds them under the [values] node of the pending [data.update] operation.
+ * 5. The second [add] slot extracts the first argument ([spice_url_id]) and inserts it into the [where]/[and] node, effectively scoping the update to records matching this ID.
+ * 6. [data.update] performs an update on the [spice_urls] table, setting fields from [values] where the [spice_url_id] condition matches.
+ * 7. The [if] slot checks if [data.update] returned 0 (no records updated), and if so, sets HTTP status 404 and returns a "Record not found" message.
+ * 8. If the update was successful, it sets HTTP status 202, unwraps the next sibling nodes, and returns the number of affected records in the [affected] node.
+ * 
+ * Use cases:
+ * - Securely updating a specific URL record's properties in a scraper database, ensuring only authorized admins can perform the action.
+ * - Validating input arguments and failing gracefully with a 404 if the specified record does not exist.
+ * - Returning the number of records affected by an update operation for auditing or client feedback.
+ * - Applying granular updates to database records based on dynamic arguments received via an HTTP endpoint.
+ * - Enforcing that critical identifier fields are always provided and controlling result codes based on update success.
+ */
+.arguments
+   spice_url_id:long
+   url:string
+   type:string
+validators.mandatory:x:@.arguments/*/spice_url_id
+auth.ticket.verify:admin
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:spice_urls
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

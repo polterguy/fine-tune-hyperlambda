@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [http.get] slot is used to send a GET request to "https://meowfacts.herokuapp.com/", with [convert] set to true, so the JSON response is automatically transformed into a lambda object.
+ * 2. The [if] slot checks if the HTTP status code is between 200 (inclusive) and 300 (exclusive) using [mte] (more than or equal) and [lt] (less than) slots, indicating a successful HTTP response.
+ * 3. If the condition passes, [set-value] assigns the first element of the data array from the response to the [.cat-fact] node by extracting it with [get-value].
+ * 4. If the request fails or the status code is outside the expected range, [set-value] sets [.cat-fact] to the static string "Failed to fetch cat fact".
+ * 
+ * Use Cases:
+ * - Displaying a random cat fact in a chatbot or web application.
+ * - Automatically updating a dashboard widget with a new cat fact.
+ * - Providing fallback messaging if the external API is unavailable or returns an error.
+ * - Demonstrating how to consume and process API responses with error handling in Hyperlambda.
+ */
+.cat-fact
+http.get:"https://meowfacts.herokuapp.com/"
+   convert:true
+if
+   and
+      mte:x:@http.get
+         .:int:200
+      lt:x:@http.get
+         .:int:300
+   .lambda
+      set-value:x:@.cat-fact
+         get-value:x:@http.get/*/content/*/data/0
+else
+   set-value:x:@.cat-fact
+      .:Failed to fetch cat fact

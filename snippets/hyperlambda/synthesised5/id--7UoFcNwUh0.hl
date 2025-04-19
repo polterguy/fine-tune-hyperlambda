@@ -1,0 +1,34 @@
+
+/*
+ * 1. The [.arguments] node defines the endpoint's expected input, specifically an [id] parameter of type long.
+ * 2. [auth.ticket.verify] with value "guest" checks if the request is authenticated as a guest user.
+ * 3. [validators.mandatory] ensures that the [id] argument is provided in the request; otherwise, execution will fail.
+ * 4. [data.connect] establishes a connection to a database, using either a generic or "cms" connection string, and explicitly sets the database type to SQLite.
+ * 5. [add] dynamically inserts all argument nodes found under [.arguments] as conditions into the [and] node within the [where] clause of the [data.delete] operation.
+ * 6. [data.delete] specifies a record deletion from the [pages] table in the SQLite database, with filtering based on the dynamically constructed [where] clause.
+ * 7. [unwrap] evaluates and flattens the results of the previous operations for further processing.
+ * 8. [return] outputs a response containing the number of affected rows from the [data.delete] operation, under the [affected] node.
+ * 
+ * Use cases:
+ * - Deleting a page from a CMS by specifying its unique [id].
+ * - Removing content as an authenticated guest, with security and validation enforced.
+ * - Integrating a dynamic deletion endpoint in a multi-database application targeting SQLite.
+ * - Building REST APIs that require argument validation before database operations.
+ * - Automating content management workflows that require on-the-fly construction of SQL [where] conditions based on client input.
+ */
+.arguments
+   id:long
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:pages
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,0 +1,44 @@
+
+/*
+ * 1. [auth.ticket.verify]: Ensures the caller has root-level authentication by verifying the ticket, restricting this operation to privileged users only.
+ * 2. [strings.split]: Splits the value from [.arguments] / [folder] by the "/" character, parsing the folder path into segments.
+ * 3. [if]: Checks two conditions — whether the split path has exactly two segments, and whether the first segment is "modules". This restricts the operation to module-level folders.
+ * 4. [strings.concat]: Concatenates the folder path from [.arguments] with "uninstall.hl", forming the path to a potential uninstall script for the module.
+ * 5. [io.file.exists]: Checks if the "uninstall.hl" file exists in the specified module folder.
+ * 6. [log.info]: Logs an informational message if an uninstall script is about to be executed, including the script path.
+ * 7. [io.file.execute]: Executes the uninstall script if found, allowing for custom module cleanup.
+ * 8. [io.folder.delete]: Deletes the specified folder, effectively removing the module or resource.
+ * 9. [return]: Returns a result node indicating the operation was successful.
+ * 
+ * Use Cases:
+ * - Securely uninstalling a module by running its custom uninstall logic before deleting its folder.
+ * - Ensuring only users with root permissions can remove module folders from a system.
+ * - Automatically logging and executing uninstall scripts during module removal to handle cleanup.
+ * - Validating the folder structure before performing deletion, preventing accidental deletion outside the designated modules directory.
+ */
+.arguments
+   folder:string
+auth.ticket.verify:root
+strings.split:x:@.arguments/*/folder
+   .:/
+if
+   and
+      eq
+         get-count:x:@strings.split/*
+         .:int:2
+      eq
+         get-value:x:@strings.split/0
+         .:modules
+   .lambda
+      strings.concat
+         get-value:x:@.arguments/*/folder
+         .:uninstall.hl
+      if
+         io.file.exists:x:@strings.concat
+         .lambda
+            log.info:Uninstalling module
+               module:x:@strings.concat
+            io.file.execute:x:@strings.concat
+io.folder.delete:x:@.arguments/*/folder
+return
+   result:success

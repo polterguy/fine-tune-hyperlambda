@@ -1,0 +1,44 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input, requiring a [domain] argument of type string.
+ * 2. [strings.concat] constructs a URL for the sitemap by concatenating "https://", the provided [domain], and "/sitemap.xml".
+ * 3. [http.get] fetches the content from the generated sitemap URL, with [convert:true] ensuring the response is parsed into a suitable internal format.
+ * 4. The [.urls] node is prepared to collect URLs extracted from the sitemap.
+ * 5. [if] checks that the HTTP status code from [http.get] is between 200 and 299, indicating a successful request.
+ * 6. If the request is successful, [xml2lambda] parses the sitemap XML content.
+ * 7. [for-each] iterates over all [loc] elements' text nodes within the XML, unwrapping and adding each URL to [.urls].
+ * 8. If the request fails, [throw] raises an error indicating the sitemap could not be retrieved.
+ * 9. [yield] returns all collected URLs as the output.
+ * 
+ * Use cases:
+ * - Retrieve and extract all URLs from a website's sitemap.xml for SEO analysis.
+ * - Validate the accessibility of a domain's sitemap before crawling its contents.
+ * - Integrate into a larger workflow that monitors website changes by periodically fetching and parsing sitemap URLs.
+ * - Build a URL list for automated testing or web archiving purposes.
+ */
+.arguments
+   domain:string
+strings.concat
+   .:"https://"
+   get-value:x:@.arguments/*/domain
+   .:/sitemap.xml
+http.get:x:@strings.concat
+   convert:true
+.urls
+if
+   and
+      mte:x:@http.get
+         .:int:200
+      lt:x:@http.get
+         .:int:300
+   .lambda
+      xml2lambda:x:@http.get/*/content
+      for-each:x:"@xml2lambda/**/loc/*/\\#text"
+         unwrap:x:+/*/*
+         add:x:@.urls
+            .
+               .:x:@.dp/#
+else
+   throw:Failed retrieving sitemap!
+yield
+   urls:x:@.urls/*

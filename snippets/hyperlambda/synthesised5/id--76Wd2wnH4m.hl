@@ -1,0 +1,54 @@
+
+/*
+ * 1. The [slots.create] slot dynamically defines a new slot named [magic.auth.create-user], which automates creating a user with roles and optional extra attributes.
+ * 2. The [if] block checks if the incoming password (from [.arguments] node) is already hashed using [is_hashed]. If true, it sets [.password] directly from the provided value; otherwise, it hashes the password with [crypto.password.hash] before storing.
+ * 3. The [data.connect] slot ensures all subsequent database operations use the "magic" connection.
+ * 4. The [data.create] slot inserts the new user into the [users] table, using the provided username and the processed password.
+ * 5. The [for-each] iterates over each role in [.arguments] and inserts corresponding records into the [users_roles] table to associate roles with the user.
+ * 6. The nested [if] and [for-each] blocks check if there are any extra attributes present in [.arguments]. If so, each extra attribute is inserted into the [users_extra] table with its type and value derived from the input.
+ * 
+ * Use cases:
+ * - Registering a new user, securely hashing their password unless already hashed.
+ * - Assigning multiple roles to a user upon creation.
+ * - Storing additional user metadata (like profile fields or preferences) during signup.
+ * - Supporting both raw and pre-hashed passwords for user migration or external integrations.
+ * - Extending user creation logic with extra attributes without modifying database logic elsewhere.
+ */
+slots.create:magic.auth.create-user
+   .password
+   if
+      get-value:x:@.arguments/*/is_hashed
+      .lambda
+         set-value:x:@.password
+            get-value:x:@.arguments/*/password
+   else
+      set-value:x:@.password
+         crypto.password.hash:x:@.arguments/*/password
+   data.connect:magic
+      data.create
+         table:users
+         values
+            username:x:@.arguments/*/username
+            password:x:@.password
+      for-each:x:@.arguments/*/roles/*
+         data.create
+            table:users_roles
+            values
+               role:x:@.dp/#
+               user:x:@.arguments/*/username
+      if
+         exists:x:@.arguments/*/extra/*
+         .lambda
+            for-each:x:@.arguments/*/extra/*
+               .type
+               .value
+               set-value:x:@.type
+                  get-name:x:@.dp/#
+               set-value:x:@.value
+                  get-value:x:@.dp/#
+               data.create
+                  table:users_extra
+                  values
+                     user:x:@.arguments/*/username
+                     type:x:@.type
+                     value:x:@.value

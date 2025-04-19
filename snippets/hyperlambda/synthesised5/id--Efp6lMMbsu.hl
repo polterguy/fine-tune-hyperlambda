@@ -1,0 +1,28 @@
+
+/*
+ * 1. [validators.mandatory]: Ensures both [username] and [roles] exist under [.arguments], throwing an exception if either is missing.
+ * 2. [strings.split]: Splits the value of [roles] using a comma as the separator, turning a single string of roles into a list.
+ * 3. [add]: Appends the split roles as child nodes under [roles], effectively preparing a structured role list for the next step.
+ * 4. [auth.ticket.create]: Generates a new JWT token using the [username] and the prepared list of roles.
+ * 5. [yield]: Returns the generated token as [token] in the output.
+ * 
+ * Use Cases:
+ * - Creating a JWT token for a user when registering a new account by specifying their username and roles.
+ * - Allowing an admin interface to generate tokens for users with dynamically assigned roles.
+ * - Building an authentication microservice endpoint that issues tokens based on input parameters for integration testing.
+ * - Providing a utility endpoint for developers to quickly obtain tokens for test users with specific roles.
+ */
+.arguments
+   username:string
+   roles:string
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/roles
+strings.split:x:@.arguments/*/roles
+   :,
+add:x:+/*/roles
+   get-nodes:x:@strings.split/*
+auth.ticket.create
+   username:x:@.arguments/*/username
+   roles
+yield
+   token:x:@auth.ticket.create

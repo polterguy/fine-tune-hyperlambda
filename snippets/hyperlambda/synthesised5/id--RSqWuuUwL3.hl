@@ -1,0 +1,32 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input arguments, requiring a [crawl_url_id] parameter of type long.
+ * 2. The [auth.ticket.verify] slot ensures that only users with "root" or "admin" roles can execute the operation, providing an authorization check.
+ * 3. The [validators.mandatory] slot validates that the [crawl_url_id] argument is present under [.arguments], enforcing required input.
+ * 4. The [data.connect] slot connects to the [scraper] database using a [generic] connection, specifying the database type as SQLite.
+ * 5. The [add] slot dynamically inserts all argument nodes (such as [crawl_url_id]) into the [and] clause inside the [where] condition of the [data.delete] operation, allowing for flexible deletion based on input.
+ * 6. The [data.delete] slot constructs and executes a delete SQL statement against the [crawl_urls] table, using the provided [where] clause for filtering.
+ * 7. The [unwrap] slot evaluates the returned nodes from the [data.delete] operation, preparing the final result.
+ * 8. The [return] slot outputs the number of affected rows from the delete operation as [affected].
+ * 
+ * Use cases:
+ * - Securely delete a crawl URL by its ID from the [crawl_urls] table, ensuring only admins or root users can perform this action.
+ * - Validate that a required identifier is provided before executing a database delete operation.
+ * - Dynamically construct the WHERE clause for deletion using provided arguments, supporting extensibility for future criteria.
+ */
+.arguments
+   crawl_url_id:long
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/crawl_url_id
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:crawl_urls
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

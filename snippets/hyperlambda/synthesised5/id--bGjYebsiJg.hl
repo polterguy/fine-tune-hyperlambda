@@ -1,0 +1,36 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters, specifically requiring a [name] of type string and a [description] of type string for the endpoint.
+ * 2. [validators.mandatory:x:@.arguments/*/name] enforces that the [name] argument must be supplied by the client, otherwise execution will halt with an error.
+ * 3. [auth.ticket.verify:root] ensures that only users with the "root" role can execute this operation, providing an access control layer.
+ * 4. [data.connect:[generic|magic]] establishes a database connection, allowing for subsequent data operations like updates.
+ * 5. The first [add:x:./*/data.update/*/values] populates the [values] node for the [data.update] operation with all arguments except the first, mapping them as columns to update in the database.
+ * 6. The second [add:x:./*/data.update/*/where/*/and] takes the first argument (typically [name]) and uses it to construct the [where]/[and] clause for the SQL update, targeting specific records.
+ * 7. [data.update] performs an update on the [roles] table, using the provided values and where clause constructed from arguments.
+ * 8. [response.status.set:202] sets the HTTP response status to 202 (Accepted), indicating the request has been accepted for processing.
+ * 9. [yield] returns the number of affected rows from the update operation in a node named [affected].
+ * 
+ * Use cases:
+ * - Updating the description of a specific role in a user management system, ensuring only administrators can make changes.
+ * - Bulk updating multiple fields of a role record, where the [name] identifies which role to update.
+ * - Providing an auditable, secure endpoint for privileged users to edit metadata about roles in a RBAC (Role-Based Access Control) implementation.
+ * - Enforcing that critical fields are always present and only authorized users can trigger changes, reducing risk of unauthorized data manipulation.
+ */
+.arguments
+   name:string
+   description:string
+validators.mandatory:x:@.arguments/*/name
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      table:roles
+      values
+      where
+         and
+   response.status.set:202
+   yield
+      affected:x:@data.update

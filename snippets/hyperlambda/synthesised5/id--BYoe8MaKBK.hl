@@ -1,0 +1,27 @@
+
+/*
+ * 1. The [.arguments] node declares that the endpoint accepts a single argument named [name], which must be a string. 
+ * 2. The [auth.ticket.verify] slot checks that the calling user has "root" permissions before proceeding.
+ * 3. The [strings.concat] slot constructs a file path by concatenating "/misc/templates/", the value of [name] from the arguments, and "/README.md".
+ * 4. The [io.file.load] slot loads the contents of the file at the constructed path.
+ * 5. The [unwrap] slot evaluates the result of [io.file.load] to ensure the file's contents are available for the response.
+ * 6. The [return-nodes] slot returns a node named [markdown] containing the contents of the loaded file.
+ * 
+ * Use cases:
+ * - Dynamically load and return the README file for a specific template, where the template name is provided by the user.
+ * - Restrict access to template documentation to users with root privileges.
+ * - Build an admin endpoint for browsing markdown documentation files from a specific directory structure. 
+ * - Serve markdown files as API responses for integration into frontend applications or documentation viewers.
+ * - Enforce strong argument typing and authorization before file access to increase endpoint security.
+ */
+.arguments
+   name:string
+auth.ticket.verify:root
+strings.concat
+   .:/misc/templates/
+   get-value:x:@.arguments/*/name
+   .:/README.md
+io.file.load:x:-
+unwrap:x:+/*
+return-nodes
+   markdown:x:@io.file.load

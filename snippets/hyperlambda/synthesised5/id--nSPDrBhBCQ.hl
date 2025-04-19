@@ -1,0 +1,56 @@
+
+/*
+ * 1. [io.file.list] retrieves all files from the [sqlite-chinook/magic.startup/] directory.
+ * 2. [for-each] iterates over each file in the directory, processing them one by one.
+ * 3. [strings.split] splits each file path by the "/" character to isolate different parts of the path.
+ * 4. [if] with [strings.ends-with] checks if the current file's name ends with ".sql", ensuring that only SQL script files are processed.
+ * 5. [strings.concat] constructs a new destination path in [/etc/sqlite/templates/] using the filename component.
+ * 6. [if] with [not] and [io.file.exists] ensures that the file is moved only if it does not already exist in the destination directory.
+ * 7. [io.file.move] moves the SQL script file to the target folder, and [log.info] logs this operation along with the filename.
+ * 8. A second [if] checks if the [chinook.db] database file does not exist in the [/data/] directory.
+ * 9. [io.file.save] creates an empty [chinook.db] file, followed by [log.info] to record its creation.
+ * 10. [io.file.load] reads the [chinook.sql] template script from [/etc/sqlite/templates/].
+ * 11. [sqlite.connect] connects to the [chinook] database, then [sqlite.execute] runs the loaded SQL script to initialize the database.
+ * 12. Another [log.info] logs the successful creation of the database.
+ * 13. [cache.set] updates the relevant cache entry for the SQLite database.
+ * 
+ * Use cases:
+ * - Automatically migrates SQL template files to the correct directory if they are missing, ensuring proper organization.
+ * - Initializes the [chinook] SQLite database from a template if it doesn't exist, supporting automated environment setup.
+ * - Logs all significant operations, making it easy to audit database and file setup steps.
+ * - Prevents overwriting existing files by checking for their existence before moving or saving.
+ * - Useful for deployment automation scripts where databases and required SQL scripts must be in place before application startup.
+ */
+io.file.list:/modules/sqlite-chinook/magic.startup/
+for-each:x:-/*
+   strings.split:x:@.dp/#
+      .:/
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         strings.concat
+            .:/etc/sqlite/templates/
+            get-value:x:@strings.split/0/-
+         if
+            not
+               io.file.exists:x:@strings.concat
+            .lambda
+               io.file.move:x:@.dp/#
+                  .:/etc/sqlite/templates/
+               log.info:SQL script moved into etc folder
+                  filename:x:@.dp/#
+if
+   not
+      io.file.exists:/data/chinook.db
+   .lambda
+      io.file.save:/data/chinook.db
+         .:
+      log.info:Chinook database file created
+         filename:/data/chinook.db
+      io.file.load:/etc/sqlite/templates/chinook.sql
+      sqlite.connect:chinook
+         sqlite.execute:x:@io.file.load
+      log.info:The chinook database was successfully created
+         filename:/etc/sqlite/templates/chinook.sql
+      cache.set:magic.sql.databases.sqlite.generic

@@ -1,0 +1,32 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot is verifying the authentication ticket for the "root" user before executing the rest of the logic, ensuring the caller is authorized.
+ * 2. The [validators.mandatory] slots make sure that both [.type] and [.user] exist under [.arguments], throwing exceptions if either argument is missing.
+ * 3. The [data.connect] slot establishes a database connection to either the "generic" or "magic" data source.
+ * 4. The [add] slot dynamically appends all argument nodes from [.arguments] into the [and] clause of the [where] filter for the subsequent [data.delete] operation.
+ * 5. The [data.delete] slot deletes records from the [users_extra] table where all conditions (based on the provided arguments) match.
+ * 6. The [unwrap] slot executes the node following [data.connect] (i.e., the [data.delete] operation) and returns its result.
+ * 7. The [return] slot outputs the number of affected rows from the [data.delete] operation in an [affected] node.
+ * 
+ * Use cases:
+ * - Implementing an endpoint for administrators to bulk-delete user-related records from the [users_extra] table based on supplied criteria.
+ * - Enforcing strong argument validation and authentication for sensitive database operations.
+ * - Providing an audit-friendly mechanism by only allowing root users to execute deletions with explicit arguments.
+ * - Allowing flexible filtering by dynamically constructing the [where] clause based on incoming HTTP parameters.
+ */
+.arguments
+   type:string
+   user:string
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/user
+data.connect:[generic|magic]
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      table:users_extra
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

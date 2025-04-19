@@ -1,0 +1,21 @@
+
+/*
+ * 1. The [pgsql.connect] slot establishes a connection to the PostgreSQL database named "monitoring".
+ * 2. The [pgsql.execute] slot executes a raw SQL statement that creates a table called "events" if it does not already exist, with columns [id] (auto-increment primary key), [name] (required text), and [timestamp] (timestamp with time zone, defaulting to the current time).
+ * 3. The [yield] slot returns a response with a [message] node confirming the outcome ("Events table created if it didn’t exist").
+ * 
+ * Use cases:
+ * - Initializing the "events" table during application startup to ensure it exists before logging events.
+ * - Automating database schema setup as part of a deployment or migration script.
+ * - Self-healing database logic to recreate missing tables without manual intervention.
+ * - Providing feedback to an API client or admin user that the table setup operation was performed.
+ */
+pgsql.connect:monitoring
+   pgsql.execute:@"
+create table if not exists events (
+  id serial primary key,
+  name text not null,
+  timestamp timestamptz default now()
+)"
+yield
+   message:Events table created if it didn’t exist

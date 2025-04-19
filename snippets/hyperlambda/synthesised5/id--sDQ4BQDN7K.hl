@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [mssql.connect] slot is used to establish a connection to a Microsoft SQL Server database named "appdb". All child slots within this node will have access to this database context for their operations.
+ * 2. The [mssql.create] slot is invoked as a child of [mssql.connect], which inserts a new record into the [users] table. The [values] node specifies the data to be inserted, including [username], [email], and [is_active] columns.
+ * 3. The [return-id] node with a value of boolean true instructs [mssql.create] to return the ID of the newly created user record, if supported by the database.
+ * 4. The [yield] slot returns a response with two nodes: [message], providing a status update, and [new_user_id], which is set to the value returned by [mssql.create] (the newly inserted user's ID).
+ * 
+ * Use cases:
+ * - Creating a new user in the [users] table and immediately retrieving the generated user ID to associate with related records.
+ * - Automating user registration processes in an application that relies on SQL Server as its data store.
+ * - Integrating account creation workflows in APIs that need to return both a status message and the new user's unique identifier for further processing.
+ * - Ensuring database operations are executed within a managed connection context, reducing the risk of connection leaks and related issues.
+ */
+mssql.connect:appdb
+   mssql.create
+      return-id:bool:true
+      table:users
+      values
+         username:johndoe
+         email:john@example.com
+         is_active:bool:true
+   yield
+      message:User created without returning ID
+      new_user_id:x:@mssql.create

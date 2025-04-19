@@ -1,0 +1,34 @@
+
+/*
+ * 1. The [.arguments] node specifies that two string arguments, [role] and [user], are required for this operation.
+ * 2. [auth.ticket.verify] ensures that only users with the [root] role are authorized to execute this logic, enforcing strict access control.
+ * 3. [validators.mandatory] is used twice to validate that both the [role] and [user] arguments are supplied; otherwise, execution will halt with an error.
+ * 4. [data.connect] establishes a connection to either the "generic" or "magic" database, setting up the context for subsequent database operations.
+ * 5. [add] dynamically appends all argument nodes from [.arguments] as conditions to the [and] node inside the [where] clause for the database deletion.
+ * 6. [data.delete] deletes records from the [users_roles] table that match all the conditions specified in the [where]/[and] clause (i.e., matching [role] and [user]).
+ * 7. [unwrap] evaluates all immediate sibling nodes, ensuring the results from the database operation are accessible.
+ * 8. [return] outputs the number of affected rows from the [data.delete] operation using the [affected] node.
+ * 
+ * Use Cases:
+ * - Removing a user's role assignment from the [users_roles] database table by specifying the [role] and [user] to target.
+ * - Enforcing that only superusers (those with the [root] role) can manage role assignments, preventing unauthorized deletions.
+ * - Performing strict validation on required arguments to ensure database integrity.
+ * - Useful in administrative dashboards or APIs for user-role management, where role revocation is needed.
+ * - Can be adapted to similar scenarios requiring secure, validated deletions based on multiple parameters.
+ */
+.arguments
+   role:string
+   user:string
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/role
+validators.mandatory:x:@.arguments/*/user
+data.connect:[generic|magic]
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      table:users_roles
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

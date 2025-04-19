@@ -1,0 +1,52 @@
+
+/*
+ * 1. [auth.ticket.verify] is used to authenticate the request, ensuring the endpoint is accessed by a user with the correct root privileges.
+ * 2. [io.file.list-recursively] is invoked twice to recursively gather all files within the [/modules/] and [/system/] directories, aggregating their results.
+ * 3. [for-each] iterates over every file found in the previous steps, processing each file node individually.
+ * 4. [if] checks two conditions: the filename must end with ".md" and contain "/ts-templates/" in its path, filtering for specific Markdown template files.
+ * 5. [load-file] loads the content of each matched file, and [strings.split] splits the file content by line breaks, separating the first line (prompt) from the remainder (completion).
+ * 6. [strings.trim] is used to remove leading and trailing whitespace from both the extracted prompt and completion.
+ * 7. [remove-nodes] deletes the first line from the split lines, so only the completion remains for joining.
+ * 8. [strings.join] reconstructs the completion text from the remaining lines, and [add] creates a new node in [.result] with [.prompt] and [.completion] children.
+ * 9. [return-nodes] outputs all constructed nodes under [.result].
+ * 
+ * Use cases:
+ * - Aggregating fine-tuning datasets for LLMs by extracting prompts and completions from Markdown files in specific folders.
+ * - Building a training corpus for machine learning by automatically parsing and structuring template files.
+ * - Enabling programmatic review or migration of prompt-completion pairs from documentation into another system.
+ * - Automating dataset preparation for evaluation or QA by filtering and formatting content from a large file repository.
+ */
+.arguments
+   private:bool
+auth.ticket.verify:root
+.result
+io.file.list-recursively:/modules/
+io.file.list-recursively:/system/
+for-each:x:../*/io.file.list-recursively/*
+   if
+      and
+         strings.ends-with:x:@.dp/#
+            .:.md
+         strings.contains:x:@.dp/#
+            .:/ts-templates/
+      .lambda
+         load-file:x:@.dp/#
+         strings.split:x:@load-file
+            .:"\n"
+         .prompt
+         set-value:x:@.prompt
+            strings.trim:x:@strings.split/0
+         .completion
+         remove-nodes:x:@strings.split/0
+         set-value:x:@.completion
+            strings.join:x:@strings.split/*
+               .:"\n"
+         set-value:x:@.completion
+            strings.trim:x:@.completion
+         unwrap:x:+/*/*/*
+         add:x:@.result
+            .
+               .
+                  prompt:x:@.prompt
+                  completion:x:@.completion
+return-nodes:x:@.result/*

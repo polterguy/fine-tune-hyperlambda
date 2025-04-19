@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [.arguments] node declares an input parameter named [category_id] of type long, which will be received by the endpoint.
+ * 2. [validators.mandatory] ensures that the [category_id] argument must be provided; if not, the execution will throw an exception.
+ * 3. [data.connect] establishes a connection to a database, where the specific database is determined by the value of [generic] or [sakila], and explicitly sets the [database-type] to sqlite.
+ * 4. The [add] slot dynamically inserts the argument nodes from [.arguments] as criteria inside the [and] node under the [where] clause of the [data.delete] command, enabling dynamic construction of the SQL WHERE clause based on input.
+ * 5. [data.delete] performs a deletion on the [category] table in the SQLite database, using the WHERE clause (which now includes the [category_id] condition).
+ * 6. [unwrap] executes the next sibling node (the [return] node) so that expressions inside it are evaluated before returning.
+ * 7. [return] outputs the result, returning the number of affected rows from the [data.delete] operation as [affected].
+ * 
+ * Use cases:
+ * - Deleting a category from the [category] table based on a unique [category_id] provided by the client.
+ * - Building dynamic API endpoints for deleting records where the filter criteria can be extended by adding more parameters to [.arguments].
+ * - Enforcing required parameters for data deletion, ensuring data integrity and preventing accidental deletions without proper filters.
+ * - Demonstrating how to work with SQLite databases and parameterized deletion commands within a Hyperlambda HTTP endpoint.
+ */
+.arguments
+   category_id:long
+validators.mandatory:x:@.arguments/*/category_id
+data.connect:[generic|sakila]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:category
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,0 +1,29 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the [accounts] database for the following operations.
+ * 2. [data.transaction.create] initiates a database transaction, ensuring changes can be committed or rolled back as a unit.
+ * 3. [.email] sets a test email value that will be validated and used in the transaction.
+ * 4. [if] checks the validity of the email format by using [not] and [strings.contains] to determine if the email contains an "@" character.
+ * 5. If the email is invalid (does not contain "@"), the inner lambda logs an error message using [log.error] and rolls back the transaction with [data.transaction.rollback], preventing any changes from being saved.
+ * 6. If the email passes validation, [data.execute] inserts the email into the [subscribers] table, using the [@.email] value as a parameter.
+ * 7. [data.transaction.commit] finalizes the transaction, making the insert operation permanent.
+ * 
+ * Use cases:
+ * - Safeguard data integrity by validating user input before writing to the database.
+ * - Prevent invalid email addresses from being stored in the [subscribers] table by rolling back the transaction if the email is malformed.
+ * - Log errors and abort database operations automatically when validation fails, ensuring only valid data is committed.
+ * - Support workflows where a set of database operations must succeed together or not at all, such as in user registration or bulk inserts with validation.
+ */
+data.connect:accounts
+   data.transaction.create
+      .email:test@example
+      if
+         not
+            strings.contains:x:@.email
+               .:@
+         .lambda
+            log.error:Invalid email, rolling back transaction
+            data.transaction.rollback
+      data.execute:insert into subscribers (email) values (@email)
+         @email:x:@.email
+      data.transaction.commit

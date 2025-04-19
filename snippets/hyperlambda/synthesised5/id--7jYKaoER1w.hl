@@ -1,0 +1,48 @@
+
+/*
+ * 1. [for-each]: Iterates over each child node of [new_hires] found under [.company], allowing the following logic to execute for every new hire listed.
+ * 2. [unwrap]: Ensures that the context for the current iteration is expanded, so subsequent slots have access to the correct data for each new hire.
+ * 3. [mail.smtp.send]: Sends an email for each new hire, constructing a personalized welcome message.
+ * 4. [to]: Dynamically sets the recipient’s name and email using the current iteration's [name] and [email] data.
+ * 5. [cc], [bcc]: Adds additional recipients (HR Manager, HR Team as CC; System Archive as BCC) to each outgoing email.
+ * 6. [subject], [entity], [content]: Composes a standard subject line and a plain text body welcoming the new hire, with directions for onboarding.
+ * 
+ * Use cases:
+ * - Automating welcome emails for new employees as soon as they are added to the [.company]/[new_hires] node.
+ * - Ensuring HR stakeholders and archives are always included in onboarding communications without manual intervention.
+ * - Easily scaling to large onboarding batches by simply appending new hire details under [new_hires].
+ * - Maintaining consistent messaging and record-keeping for compliance or audit purposes.
+ */
+.company
+   new_hires
+      .
+         name:Emily Zhang
+         email:emily@acme.com
+      .
+         name:Noah Clarke
+         email:noah@acme.com
+      .
+         name:Liam Davis
+         email:liam@acme.com
+for-each:x:@.company/*/new_hires/*
+   unwrap:x:+/**
+   mail.smtp.send
+      message
+         to
+            .
+               name:x:@.dp/#/*/name
+               email:x:@.dp/#/*/email
+         cc
+            .
+               name:HR Manager
+               email:manager.hr@acme.com
+            .
+               name:HR Team
+               email:hr@acme.com
+         bcc
+            .
+               name:System Archive
+               email:archive@acme.com
+         subject:Welcome to the Company!
+         entity:text/plain
+            content:"We're excited to have you on the team! Please check your onboarding tasks in the portal."
