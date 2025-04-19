@@ -1,0 +1,79 @@
+
+/*
+ * 1. [for-each:x:@signal/*]: Iterates over each child node of [signal], using each as context for the subsequent operations.
+ * 2. [unwrap:x:+/*/*/*]: Evaluates expressions within deeply nested nodes relative to the current [for-each] iteration, ensuring any dynamic values are resolved before use.
+ * 3. [add:x:@for-each/@.dp/#/*/tables]: Dynamically builds a [tables] node structure within the current data context, initializing each table with its name and a [columns] placeholder.
+ * 4. [strings.concat]: Constructs slot names dynamically, such as for generating database operation slot names (e.g., "magic.db.mysql.columns"), based on the [databaseType] and a static suffix.
+ * 5. [signal:x:@strings.concat]: Calls the dynamically created slot to fetch schema-related information (like columns, foreign keys, or indexes) for the current database table, passing in connection and table context.
+ * 6. Nested [for-each] and [add]: Iterates on results from the [signal] slot, populates the [columns], [foreign_keys], and [indexes] nodes for each table, extracting relevant properties for each database object.
+ * 
+ * Use Cases:
+ * - Automatically build a complete in-memory representation of a database schema, including tables, columns, foreign keys, and indexes, by introspecting the database structure.
+ * - Generate structured metadata for code generation or migration scripts, using dynamic slot invocations tailored to the current database type.
+ * - Iteratively and declaratively enrich a data model with detailed schema components, making it suitable for documentation, analysis, or further automation.
+ * - Adapt schema extraction logic for different underlying database engines by changing [databaseType], without altering core workflow logic.
+ * - Prepare a detailed object graph for export, serialization, or feeding into frontend or backend scaffolding tools.
+ */
+for-each:x:@signal/*
+   unwrap:x:+/*/*/*
+   add:x:@for-each/@.dp/#/*/tables
+      .
+         .
+            name:x:@.dp/#/*/table
+            columns
+   strings.concat
+      .:magic.db.
+      get-value:x:@.databaseType
+      .:.columns
+   unwrap:x:+/*
+   signal:x:@strings.concat
+      connection-string:x:@.connection-string
+      database:x:@for-each/@.dp/#/*/name
+      table:x:@.dp/#/*/table
+   for-each:x:@signal/*
+      unwrap:x:+/*/*/*
+      add:x:@for-each/@for-each/@.dp/#/*/tables/0/-/*/columns
+         .
+            .
+               name:x:@.dp/#/*/name
+               db:x:@.dp/#/*/db
+               nullable:x:@.dp/#/*/nullable
+               primary:x:@.dp/#/*/primary
+               automatic:x:@.dp/#/*/automatic
+               hl:x:@.dp/#/*/hl
+   add:x:@for-each/@for-each/@.dp/#/*/tables/0/-
+      .
+         foreign_keys
+   strings.concat
+      .:magic.db.
+      get-value:x:@.databaseType
+      .:.foreign_keys
+   unwrap:x:+/*
+   signal:x:@strings.concat
+      connection-string:x:@.connection-string
+      database:x:@for-each/@for-each/@.dp/#/*/name
+      table:x:@.dp/#/*/table
+   for-each:x:@signal/*
+      add:x:+/*/*
+         get-nodes:x:@.dp/#/*
+      add:x:@for-each/@for-each/@for-each/@.dp/#/*/tables/0/-/*/foreign_keys
+         .
+            .
+   add:x:@for-each/@for-each/@for-each/@.dp/#/*/tables/0/-
+      .
+         indexes
+   strings.concat
+      .:magic.db.
+      get-value:x:@.databaseType
+      .:.indexes
+   unwrap:x:+/*
+   signal:x:@strings.concat
+      connection-string:x:@.connection-string
+      database:x:@for-each/@for-each/@for-each/@.dp/#/*/name
+      table:x:@.dp/#/*/table
+   for-each:x:@signal/*
+      add:x:+/*/*
+         get-nodes:x:@.dp/#/*
+      add:x:@for-each/@for-each/@for-each/@for-each/@.dp/#/*/tables/0/-/*/indexes
+         .
+            .

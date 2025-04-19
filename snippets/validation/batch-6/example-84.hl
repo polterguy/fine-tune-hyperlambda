@@ -1,0 +1,30 @@
+/*
+ * Registers a new student in the [Students] table in the [school] database.
+ * The optional [FullName] argument is dynamically injected during creation if present.
+ *
+ * 🔹 [FullName] is an **implicitly optional** input:
+ * - The [data.create] node does not reference it directly.
+ * - [add] checks whether the field exists in [.arguments], and adds it only if present.
+ * - This prevents errors and allows null or default values to take effect.
+ *
+ * 🔹 [log.info] logs the received full name for transparency and debugging.
+ *
+ * 🔸 This pattern is great for:
+ * 1. Building flexible enrollment APIs.
+ * 2. Supporting draft/incomplete student registrations.
+ * 3. Minimizing strict schema coupling in logic.
+ */
+.arguments
+   FullName:string
+
+log.info:Arguments received
+   FullName:x:@.arguments/*/FullName
+
+data.connect:school
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:Students
+      values
+   yield
+      student_id:x:@data.create

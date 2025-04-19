@@ -1,0 +1,29 @@
+/*
+ * Inserts a new support ticket into the [Tickets] table in the [support] database.
+ * The optional [Subject] is passed via [.arguments] and dynamically added if present.
+ *
+ * 🔹 [Subject] is not explicitly referenced in the insert — making it **implicitly optional**.
+ * - Its presence is checked implicitly by [add].
+ * - If it exists, it's added to [values]; if not, it is ignored without error.
+ *
+ * 🔹 Logging captures the subject field for observability and debugging.
+ *
+ * 🔸 This pattern:
+ * 1. Simplifies insert logic for endpoints with optional or variable fields.
+ * 2. Prevents runtime failures due to missing values.
+ * 3. Supports future extensibility as additional fields can be added dynamically.
+ */
+.arguments
+   Subject:string
+
+log.info:Arguments received
+   Subject:x:@.arguments/*/Subject
+
+data.connect:support
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:Tickets
+      values
+   yield
+      ticket_id:x:@data.create

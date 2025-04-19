@@ -1,0 +1,27 @@
+
+/*
+ * 1. The [switch] slot checks the value of the [.databaseType] node to determine which case branch to execute.
+ * 2. For each supported database type ("mssql", "mysql", "pgsql"), a corresponding [case] node is defined.
+ * 3. Within each [case], the [remove-nodes] slot is used to delete specific database nodes under [@signal/*/*/db] whose value matches system or default databases for that vendor (e.g., "master" for MSSQL, "information_schema" for MySQL, "template1" for PostgreSQL).
+ * 4. This selective removal prevents system or internal databases from being included in further processing or results.
+ * 
+ * Use cases:
+ * - Cleaning a list of databases to only expose user-created databases in a database management UI.
+ * - Filtering out system databases before performing backup or migration operations.
+ * - Preparing a list of databases for display in an application, omitting those reserved for system use.
+ * - Ensuring scripts or automation routines do not affect or display internal databases that should not be modified by users.
+ */
+switch:x:@.databaseType
+   case:mssql
+      remove-nodes:x:@signal/*/*/db/=master
+      remove-nodes:x:@signal/*/*/db/=tempdb
+      remove-nodes:x:@signal/*/*/db/=model
+      remove-nodes:x:@signal/*/*/db/=msdb
+   case:mysql
+      remove-nodes:x:@signal/*/*/db/=information_schema
+      remove-nodes:x:@signal/*/*/db/=mysql
+      remove-nodes:x:@signal/*/*/db/=performance_schema
+      remove-nodes:x:@signal/*/*/db/=sys
+   case:pgsql
+      remove-nodes:x:@signal/*/*/db/=template1
+      remove-nodes:x:@signal/*/*/db/=template0

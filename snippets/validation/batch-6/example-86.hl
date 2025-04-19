@@ -1,0 +1,30 @@
+/*
+ * Creates a new book entry in the [Books] table of the [library] database.
+ * The [Title] is passed via [.arguments] and merged dynamically at runtime.
+ *
+ * 🔹 [Title] is an **implicitly optional** argument:
+ * - It is not explicitly referenced in [data.create].
+ * - It is injected using [add], so if the argument is not provided, it is simply not added.
+ * - This allows flexibility — the insert will still proceed with default or nullable values.
+ *
+ * 🔹 [log.info] captures the incoming title for debugging or audit purposes.
+ *
+ * 🔸 This pattern is ideal for use cases where:
+ * 1. You want optional or partial inserts.
+ * 2. The table allows null/default values for missing fields.
+ * 3. You're building dynamic insert endpoints that vary by use case.
+ */
+.arguments
+   Title:string
+
+log.info:Arguments received
+   Title:x:@.arguments/*/Title
+
+data.connect:library
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:Books
+      values
+   yield
+      book_id:x:@data.create

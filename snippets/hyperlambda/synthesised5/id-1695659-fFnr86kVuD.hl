@@ -1,0 +1,88 @@
+
+/*
+ * 1. The [for-each] slot at the top level iterates through each result node under [.result], beginning the process for each database.
+ * 2. [strings.concat] dynamically builds slot names such as "magic.db.[databaseType].tables", "magic.db.[databaseType].columns", "magic.db.[databaseType].foreign_keys", and "magic.db.[databaseType].indexes" to support multiple database vendors.
+ * 3. [signal] is used to invoke the dynamically constructed database slots, passing parameters like [connection-string], [database], and [table] to retrieve metadata about tables, columns, foreign keys, and indexes.
+ * 4. Nested [for-each] loops process the results of each [signal] call, iterating through tables, columns, foreign keys, and indexes retrieved for each database and table.
+ * 5. [add] is used extensively to build a hierarchical node structure under each database, organizing tables, columns, foreign keys, and indexes as child nodes.
+ * 6. [unwrap] extracts deeply nested results from the [signal] invocations for further processing, ensuring relevant nodes are accessed at each step.
+ * 7. [get-nodes] is used to retrieve all child nodes from the current data node, mainly for foreign keys and indexes.
+ * 
+ * Use cases:
+ * - Auto-generating a complete schema description of multiple databases, including tables, columns, foreign keys, and indexes, for documentation or migration.
+ * - Building a metadata explorer UI that displays detailed database structure for any supported database type.
+ * - Synchronizing or comparing database schemas across environments by extracting and organizing detailed metadata.
+ * - Preparing structured data for code generators that scaffold models, migration scripts, or API endpoints based on live database schemas.
+ */
+for-each:x:@.result/*
+   strings.concat
+      .:magic.db.
+      get-value:x:@.databaseType
+      .:.tables
+   unwrap:x:+/*
+   signal:x:@strings.concat
+      connection-string:x:@.connection-string
+      database:x:@.dp/#/*/name
+   for-each:x:@signal/*
+      unwrap:x:+/*/*/*
+      add:x:@for-each/@.dp/#/*/tables
+         .
+            .
+               name:x:@.dp/#/*/table
+               columns
+      strings.concat
+         .:magic.db.
+         get-value:x:@.databaseType
+         .:.columns
+      unwrap:x:+/*
+      signal:x:@strings.concat
+         connection-string:x:@.connection-string
+         database:x:@for-each/@.dp/#/*/name
+         table:x:@.dp/#/*/table
+      for-each:x:@signal/*
+         unwrap:x:+/*/*/*
+         add:x:@for-each/@for-each/@.dp/#/*/tables/0/-/*/columns
+            .
+               .
+                  name:x:@.dp/#/*/name
+                  db:x:@.dp/#/*/db
+                  nullable:x:@.dp/#/*/nullable
+                  primary:x:@.dp/#/*/primary
+                  automatic:x:@.dp/#/*/automatic
+                  hl:x:@.dp/#/*/hl
+      add:x:@for-each/@for-each/@.dp/#/*/tables/0/-
+         .
+            foreign_keys
+      strings.concat
+         .:magic.db.
+         get-value:x:@.databaseType
+         .:.foreign_keys
+      unwrap:x:+/*
+      signal:x:@strings.concat
+         connection-string:x:@.connection-string
+         database:x:@for-each/@for-each/@.dp/#/*/name
+         table:x:@.dp/#/*/table
+      for-each:x:@signal/*
+         add:x:+/*/*
+            get-nodes:x:@.dp/#/*
+         add:x:@for-each/@for-each/@for-each/@.dp/#/*/tables/0/-/*/foreign_keys
+            .
+               .
+      add:x:@for-each/@for-each/@for-each/@.dp/#/*/tables/0/-
+         .
+            indexes
+      strings.concat
+         .:magic.db.
+         get-value:x:@.databaseType
+         .:.indexes
+      unwrap:x:+/*
+      signal:x:@strings.concat
+         connection-string:x:@.connection-string
+         database:x:@for-each/@for-each/@for-each/@.dp/#/*/name
+         table:x:@.dp/#/*/table
+      for-each:x:@signal/*
+         add:x:+/*/*
+            get-nodes:x:@.dp/#/*
+         add:x:@for-each/@for-each/@for-each/@for-each/@.dp/#/*/tables/0/-/*/indexes
+            .
+               .

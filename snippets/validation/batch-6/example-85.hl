@@ -1,0 +1,40 @@
+/*
+ * Creates a new artist record in the [Artist] table of the [chinook] database.
+ * The artist's [Name] is supplied through [.arguments] and included dynamically during insertion.
+ *
+ * 🔹 The [Name] argument is **implicitly optional**, because it is:
+ * - **Not referenced directly** in the [data.create] invocation.
+ * - Instead, it is injected using [add], which only adds nodes that exist in [.arguments].
+ * - This means if [Name] is omitted, the insert will still succeed — though likely with a null or default value.
+ *
+ * 🔹 [log.info] captures the provided [Name], if any, making the request traceable.
+ *
+ * 🔹 This dynamic injection pattern offers flexibility:
+ * 1. You can reuse the logic for partial or extended inserts.
+ * 2. It reduces hardcoded dependencies on specific argument names.
+ * 3. It avoids runtime errors from missing optional fields — since only existing nodes are merged.
+ *
+ * This design is ideal for lightweight insert endpoints where all input values are optional or context-dependent.
+ */
+.arguments
+   Name:string
+
+// Logging invocation including its arguments.
+log.info:Arguments received
+   Name:x:@.arguments/*/Name
+
+// Connects to the 'chinook' database.
+data.connect:chinook
+
+   // Parametrizes the insert with the arguments.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creates a new artist record.
+   data.create
+      table:Artist
+      values
+
+   // Returns the ID of the newly created artist.
+   yield
+      artist_id:x:@data.create
