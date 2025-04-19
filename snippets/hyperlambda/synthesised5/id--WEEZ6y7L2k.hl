@@ -1,0 +1,22 @@
+
+/*
+ * 1. The [if] slot checks if the [.arguments] node has a [roles] child with at least one child node, using the [exists] slot and the `:x:@.arguments/*/roles/*` expression.
+ * 2. Inside the conditional [.lambda], [set-value] updates the value of the [.roles] node. It does so by joining all the child values under [.arguments]/[roles] into a single comma-separated string using [strings.join].
+ * 3. Finally, [auth.ticket.verify] is called with an expression referencing the [.roles] node, which ensures the authenticated user must belong to at least one of the roles provided.
+ * 
+ * Use cases:
+ * - Dynamically enforce access control based on a list of roles received as input to an API endpoint.
+ * - Allow endpoints to accept multiple roles in a flexible way (array or list), and automatically convert them to the correct format required by [auth.ticket.verify].
+ * - Secure endpoints for multi-role scenarios where the required roles are not hardcoded, but provided by the client.
+ * - Prevent unauthorized access if the user does not belong to any of the specified roles, throwing an exception if verification fails.
+ */
+.arguments
+   roles:*
+.roles
+if
+   exists:x:@.arguments/*/roles/*
+   .lambda
+      set-value:x:@.roles
+         strings.join:x:@.arguments/*/roles/*
+            .:,
+auth.ticket.verify:x:@.roles

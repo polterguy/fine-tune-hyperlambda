@@ -1,0 +1,34 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters for the operation, specifying required fields such as [.address], [.address2], [.district], [.city_id], [.postal_code], [.phone], and [.last_update].
+ * 2. [data.connect] establishes a connection to the "sakila" SQLite database using the "generic" connection string.
+ * 3. [add] collects all child nodes under [.arguments] and appends them as children to the [values] node within the [data.create] operation, ensuring that all input arguments are mapped to the database insert operation.
+ * 4. [data.create] inserts a new record into the "address" table using the SQLite database type, with the values provided from the input arguments.
+ * 5. [response.status.set] sets the HTTP response status to 201, indicating successful creation of a resource.
+ * 6. [yield] returns the ID of the newly created record from the [data.create] operation as the result of the endpoint.
+ * 
+ * Use cases:
+ * - Creating a new address entry in the "sakila" database via an HTTP POST request.
+ * - Building an API endpoint for adding address records while ensuring strong input validation and secure SQL operations.
+ * - Returning the newly created record's identifier to the client after a successful database insert.
+ * - Supporting transactional and repeatable address creation for integration with external systems or front-end applications.
+ */
+.arguments
+   address:string
+   address2:string
+   district:string
+   city_id:long
+   postal_code:string
+   phone:string
+   last_update:date
+data.connect:[generic|sakila]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:address
+      values
+   response.status.set:201
+   yield
+      id:x:@data.create

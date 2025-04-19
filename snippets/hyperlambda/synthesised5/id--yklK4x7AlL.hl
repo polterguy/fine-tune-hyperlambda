@@ -1,0 +1,28 @@
+
+/*
+ * 1. [slots.create] dynamically defines a new slot named [magic.io.file.load-recursively], enabling it to be invoked like a built-in slot.
+ * 2. [eval] executes any arguments passed to the slot, allowing dynamic pre-processing of the input.
+ * 3. [io.file.list-recursively] is called with the first argument, returning a list of all file paths within the specified folder (recursively), with support for showing hidden files if [.hidden-files] is true.
+ * 4. [for-each] iterates over every file path returned by [io.file.list-recursively], using the currently iterated file as [.dp] by reference.
+ * 5. [io.file.load] loads the content of each file specified by the current [.dp] node.
+ * 6. [add] attaches the loaded file content as a child of the corresponding filename node in the result structure.
+ * 7. [set-name] renames the file content node to have an empty name, ensuring consistent output formatting.
+ * 8. [return-nodes] returns all processed file nodes with their respective content, forming the slot's output.
+ * 
+ * Use Cases:
+ * - Bulk download: Retrieve all files and their content from a folder tree for backup or export.
+ * - Template-based generation: Load all template files recursively for use in frontend or code generation tools.
+ * - Migration: Package an entire directory (including hidden files if needed) for migration across servers or environments.
+ * - Inspection: Programmatically scan and inspect the contents of all files within a deeply nested folder structure.
+ */
+slots.create:magic.io.file.load-recursively
+   eval:x:@.arguments
+   io.file.list-recursively:x:@.arguments/0
+      show-hidden:x:@.arguments/*/.hidden-files
+   for-each:x:@io.file.list-recursively/*
+      io.file.load:x:@.dp/#
+      add:x:@.dp/#
+         get-nodes:x:@io.file.load
+      set-name:x:@.dp/#/*
+         .:
+   return-nodes:x:@io.file.list-recursively/*

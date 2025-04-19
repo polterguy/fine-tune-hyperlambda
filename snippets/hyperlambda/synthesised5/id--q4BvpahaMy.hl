@@ -1,0 +1,21 @@
+
+/*
+ * 1. The [.arguments] node declares the required input argument [_session], which is expected to be a string containing the session identifier.
+ * 2. The [data.connect] slot establishes a connection to the [shopping-cart-demo] database using the "generic" data adapter.
+ * 3. The [data.select] slot executes a parameterized SQL query to retrieve item details for the current session. It joins the [items] and [products] tables to return fields such as item ID, quantity, product name, description, image URL, and price, filtering results by the provided session ID.
+ * 4. The [@session] node injects the value of the [_session] argument into the SQL query as a parameter, ensuring secure and dynamic filtering.
+ * 5. The [return] slot outputs all result records from the [data.select] operation as the response.
+ * 
+ * Use cases:
+ * - Fetching and displaying the contents of a user's shopping cart during checkout based on their session.
+ * - Allowing users to review the items in their cart, including product information and quantities, before making a purchase.
+ * - Generating an order summary by retrieving all cart items associated with a particular session.
+ * - Supporting cart persistence across browsing sessions by loading the relevant cart data using the session ID.
+ * - Enabling admins to view or debug the current cart contents for a specific user session.
+ */
+.arguments
+   _session:string
+data.connect:[generic|shopping-cart-demo]
+   data.select:"\nselect i.item_id, i.quantity, p.name, p.description, p.image_url, p.price\n   from items i inner join products p on i.product_id = p.product_id\n   where i.session_id = @session"
+      @session:x:@.arguments/*/_session
+   return:x:@data.select/*

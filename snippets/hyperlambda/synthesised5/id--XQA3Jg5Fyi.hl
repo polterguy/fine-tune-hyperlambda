@@ -1,0 +1,38 @@
+
+/*
+ * 1. The [.arguments] node defines the input for this logic, expecting a [plan] argument of type string.
+ * 2. The [data.connect] slot establishes a connection to the "hub" database using a generic connection string.
+ * 3. The [data.read] slot queries the [plans] table, selecting specific columns: [name], [description], [cpu], [memory], [storage], [price], and [price_reference].
+ * 4. The [where] clause filters the results to only include rows where the [name] column matches the value provided in the [.arguments] node's [plan] child using an equality condition.
+ * 5. The [yield] slot returns the values of each selected column from the first matching row, mapping them as output nodes with the same names.
+ * 
+ * Use cases:
+ * - Retrieving the details of a specific service plan by name for display in a UI or API response.
+ * - Providing information about a plan to validate user selections during a purchase or subscription workflow.
+ * - Supplying detailed plan specifications (CPU, memory, storage, price) to another process for resource allocation.
+ * - Returning metadata about a plan for reporting or analytics purposes.
+ */
+.arguments
+   plan:string
+data.connect:[generic|hub]
+   data.read
+      table:plans
+      columns
+         name
+         description
+         cpu
+         memory
+         storage
+         price
+         price_reference
+      where
+         and
+            name.eq:x:@.arguments/*/plan
+   yield
+      name:x:@data.read/*/*/name
+      description:x:@data.read/*/*/description
+      cpu:x:@data.read/*/*/cpu
+      memory:x:@data.read/*/*/memory
+      storage:x:@data.read/*/*/storage
+      price:x:@data.read/*/*/price
+      price_reference:x:@data.read/*/*/price_reference

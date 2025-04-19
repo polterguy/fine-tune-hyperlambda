@@ -1,0 +1,55 @@
+
+/*
+ * 1. [auth.ticket.verify] checks the user's authentication ticket, ensuring only users with "root" privileges can access the data.
+ * 2. [data.connect] establishes a connection to the "magic" SQLite database using a generic connector.
+ * 3. [add] and [get-nodes] dynamically inject [order], [direction], [limit], and [offset] nodes from [.arguments] into the [data.read] configuration before the database query is executed, allowing flexible sorting and pagination.
+ * 4. [remove-nodes] cleans up the [.arguments] node by removing [order], [direction], [limit], and [offset] nodes after they've been processed, preventing duplication or unintended propagation.
+ * 5. Another [add] inserts any relevant query filter nodes from [.arguments] into the [where]/[and] clause of [data.read], enabling dynamic filtering based on provided arguments.
+ * 6. [data.read] performs a SELECT query on the [questions] table, retrieving specific columns and applying any dynamic filters, sort, or pagination options.
+ * 7. [return-nodes] returns all resulting nodes from the [data.read] operation as the HTTP response.
+ * 
+ * Use cases:
+ * - Retrieving a paginated and sorted list of questions, optionally filtered by question ID, question text, or questionnaire.
+ * - Providing an admin interface for root users to query questions with flexible search and ordering options.
+ * - Implementing a REST API endpoint for fetching question records with dynamic filtering and pagination for dashboard views.
+ * - Enforcing access control so that only authenticated root users can query sensitive question data.
+ * - Supporting advanced search scenarios where users can specify multiple filters and sort criteria in a single API call.
+ */
+.arguments
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   questions.question_id.eq:long
+   questions.question.like:string
+   questions.question.eq:string
+   questions.questionnaire.like:string
+   questions.questionnaire.eq:string
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:questions
+      columns
+         questions.question_id
+         questions.question
+         questions.questionnaire
+         questions.type
+         questions.context
+         questions.name
+      where
+         and
+   return-nodes:x:@data.read/*

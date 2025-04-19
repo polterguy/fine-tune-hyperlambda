@@ -1,0 +1,32 @@
+
+/*
+ * 1. The [.arguments] node declares a required [id] argument of type string for the endpoint, ensuring input is type-checked and only allows the [id] parameter.
+ * 2. The [auth.ticket.verify] slot is invoked with the value "root", enforcing that only users with a "root" ticket or role can access this functionality.
+ * 3. The [validators.mandatory] slot checks if the [id] argument was provided; if not, execution is stopped with an exception.
+ * 4. The [if] block uses [strings.ends-with] to determine if the [id] value ends with an asterisk (*). If it does, the code splits the [id] value on the asterisk, and the first segment (before the asterisk) is used as a filter in [cache.clear] to clear related cache entries.
+ * 5. The [else] block sets a cache entry using [cache.set] with the provided [id] value.
+ * 6. The [return] node sends back a [result] node with the value "success" to indicate the operation completed successfully.
+ * 
+ * Use cases:
+ * - To selectively clear cache entries that match a certain pattern when the [id] ends with "*", e.g., for invalidating a group of cached items.
+ * - To set or update a cache entry for a specific [id] when the [id] does not include a wildcard.
+ * - To provide an authenticated, root-only API endpoint for advanced cache management operations.
+ * - To ensure that only requests supplying a valid [id] argument and a root-level authentication ticket are permitted.
+ * - To automate cache cleanup or population processes via HTTP endpoints, with clear feedback on success.
+ */
+.arguments
+   id:string
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/id
+if
+   strings.ends-with:x:@.arguments/*/id
+      .:*
+   .lambda
+      strings.split:x:@.arguments/*/id
+         .:*
+      cache.clear
+         filter:x:@strings.split/0
+else
+   cache.set:x:@.arguments/*/id
+return
+   result:success

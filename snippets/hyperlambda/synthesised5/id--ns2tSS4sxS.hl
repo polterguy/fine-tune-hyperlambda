@@ -1,0 +1,61 @@
+
+/*
+ * 1. The [.arguments] node declares that the endpoint expects a single argument named [_type] of type string. 
+ * 2. [validators.mandatory] ensures that the [_type] argument must be provided; if not, execution will halt with an error.
+ * 3. [data.connect] with the value [generic|magic] establishes a database connection and executes a [data.select] SQL query, retrieving [prompt] fields from [ml_training_snippets] where [type] matches the [_type] argument and [meta] contains 'FUNCTION_INVOCATION ==> '.
+ * 4. The first [for-each] loop iterates through each result from the [data.select], extracts the [prompt] value, and adds it to a [rag_functions] collection.
+ * 5. [data.read] retrieves the [system_message] column from [ml_types], filtered by [type] equal to the [_type] argument.
+ * 6. [strings.split] splits the [system_message] value into segments using the delimiter "# ".
+ * 7. The second [for-each] loop processes each split segment, filtering for strings containing 'FUNCTION_INVOCATION[/' but not specific excluded substrings.
+ * 8. For each valid segment, it splits the string by newline, trims the first segment, and adds the result to a [system_functions] collection.
+ * 9. Finally, [yield] returns both [rag_functions] and [system_functions] as the endpoint's output.
+ * 
+ * Use cases:
+ * - Aggregating and returning retrieval-augmented generation (RAG) function prompts and system functions for a specific type, useful in machine learning or code generation contexts.
+ * - Exposing an endpoint to dynamically fetch function invocation prompts and relevant system messages for fine-tuning or prompt engineering pipelines.
+ * - Filtering and presenting only relevant function snippets from database metadata, excluding unwanted or system-level entries.
+ * - Enforcing strict API argument validation to prevent misuse or unexpected input.
+ */
+.arguments
+   _type:string
+validators.mandatory:x:@.arguments/*/_type
+data.connect:[generic|magic]
+   data.select:"select prompt from ml_training_snippets where type = @type and meta like '%FUNCTION_INVOCATION ==> %'"
+      @type:x:@.arguments/*/_type
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/yield/*/rag_functions
+         .
+            .:x:@.dp/#/*/prompt
+   data.read
+      table:ml_types
+      columns
+         system_message
+      where
+         and
+            type.eq:x:@.arguments/*/_type
+   strings.split:x:@data.read/*/*/system_message
+      .:"# "
+   for-each:x:@strings.split/*
+      if
+         and
+            strings.contains:x:@.dp/#
+               .:FUNCTION_INVOCATION[/
+            not
+               strings.contains:x:@.dp/#
+                  .:"FUNCTION_INVOCATION[/FOLDER/FILENAME.hl]:"
+            not
+               strings.contains:x:@.dp/#
+                  .:"FUNCTION_INVOCATION[/system/misc/workflows/list-functions.hl]:"
+         .lambda
+            strings.split:x:@.dp/#
+               .:"\n"
+            strings.trim:x:@strings.split/0
+               .:"# \n"
+            unwrap:x:+/*/*
+            add:x:@data.connect/*/yield/*/system_functions
+               .
+                  .:x:@strings.trim
+   yield
+      rag_functions
+      system_functions

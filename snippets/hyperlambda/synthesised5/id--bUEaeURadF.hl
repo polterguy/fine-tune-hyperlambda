@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [.arguments] node defines an input schema with an [id] parameter of type long, indicating that this endpoint expects an [id] argument.
+ * 2. [validators.mandatory] ensures that the [id] parameter is provided in [.arguments]; if it's missing, the request will fail validation.
+ * 3. [auth.ticket.verify] checks that the current user has an "admin" ticket, restricting access to authorized administrators.
+ * 4. [data.connect] establishes a connection to either a "generic" or "cms" database, specifying SQLite as the [database-type].
+ * 5. [add] dynamically appends all argument nodes from [.arguments] as conditions to the [and] node inside the [where] clause of [data.delete]. This means the deletion is filtered by all provided arguments (in this case, just [id]).
+ * 6. [data.delete] issues a SQL DELETE operation on the [media] table using SQLite, with the WHERE clause conditions set up by the previous [add].
+ * 7. [unwrap] executes the immediate sibling nodes, which includes [data.delete], ensuring the operations are run in sequence.
+ * 8. [return] returns the number of affected rows from the delete operation by extracting it from the [data.delete] node.
+ * 
+ * Use cases:
+ * - Securely deleting a media record from the database when given its [id], only if the user is an admin.
+ * - Creating an admin-only API endpoint to remove specific items from the [media] table by their identifier.
+ * - Enforcing strict validation and authorization before performing destructive operations in a CMS or generic database.
+ * - Facilitating audit or feedback by returning the number of records deleted after the operation completes.
+ */
+.arguments
+   id:long
+validators.mandatory:x:@.arguments/*/id
+auth.ticket.verify:admin
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:media
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

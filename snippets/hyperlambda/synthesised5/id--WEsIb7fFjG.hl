@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [.arguments] node defines four optional filter parameters related to the [CustomerDemographics] table, allowing both LIKE and EQUALS conditions on the [CustomerTypeID] and [CustomerDesc] columns.
+ * 2. [data.connect] establishes a connection to the [northwind] SQLite database for subsequent operations.
+ * 3. The [add] slot dynamically inserts argument nodes from [.arguments] as children under the AND condition of the [where] clause within [data.read], enabling flexible filtering based on provided input.
+ * 4. [data.read] performs a SQL SELECT COUNT(*) query against the [CustomerDemographics] table, returning the result as [count] and applying any dynamic filters from the [where/and] clause.
+ * 5. [return-nodes] outputs the results from the [data.read] operation, making the count value available to the caller.
+ * 
+ * Use cases:
+ * - Counting the number of customer demographics records that match a specific [CustomerTypeID] or a partial [CustomerDesc].
+ * - Providing a filtered count for pagination or summary reporting in a Northwind-based web application.
+ * - Verifying if a particular [CustomerDemographics] entry exists by using the equality filters.
+ * - Implementing a search feature where end users can input partial or exact values to see how many matching customer demographic types exist.
+ */
+.arguments
+   CustomerDemographics.CustomerTypeID.like:string
+   CustomerDemographics.CustomerTypeID.eq:string
+   CustomerDemographics.CustomerDesc.like:string
+   CustomerDemographics.CustomerDesc.eq:string
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:CustomerDemographics
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

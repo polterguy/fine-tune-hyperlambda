@@ -1,0 +1,34 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot checks if the user has "root" permissions before proceeding, ensuring only authorized users can access the data.
+ * 2. The [add] slot inserts all nodes from [.arguments] as conditions under the [and] node within the [where] clause of the [data.read] operation, dynamically building search criteria based on supplied arguments.
+ * 3. The [data.connect] slot establishes a connection to a SQLite database named "magic", and acts as a context for subsequent database operations.
+ * 4. The [data.read] slot queries the [questionnaires] table, selecting only a count of records matching the dynamically constructed [where] clause, and limits the result to a single row.
+ * 5. The [return-nodes] slot returns all nodes from the [data.read] result, effectively sending the count of matching [questionnaires] back to the caller.
+ * 
+ * Use cases:
+ * - Count how many questionnaires match a specific name or type, with support for both exact and partial (LIKE) matches depending on provided arguments.
+ * - Restrict access to this counting operation to root users for administrative reporting or auditing purposes.
+ * - Build a paginated or filtered UI where users can see how many questionnaires match certain search filters before retrieving full data sets.
+ * - Allow flexible querying by letting clients specify any combination of name and type filters without changing the core logic.
+ */
+.arguments
+   questionnaires.name.like:string
+   questionnaires.name.eq:string
+   questionnaires.type.like:string
+   questionnaires.type.eq:string
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:questionnaires
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

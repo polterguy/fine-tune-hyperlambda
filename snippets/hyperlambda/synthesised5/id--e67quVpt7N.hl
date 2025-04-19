@@ -1,0 +1,49 @@
+
+/*
+ * 1. The [.arguments] node defines the expected arguments for this endpoint, specifying their names and types, such as [id], [type], [prompt], [completion], [finish_reason], and [cached].
+ * 2. [validators.mandatory] enforces that the [id] argument must be provided in any request, throwing an exception if it is missing.
+ * 3. [auth.ticket.verify] checks that the user holds the "root" authentication ticket, ensuring only authorized users can proceed.
+ * 4. [data.connect] establishes a database connection to the [magic] data source using the [generic] provider.
+ * 5. The first [add] slot collects argument nodes (excluding [id]) and places them into the [values] node for updating fields in the database.
+ * 6. The second [add] slot places the [id] argument into the [where/and] node, ensuring the update targets the correct record by id.
+ * 7. [data.update] performs an UPDATE operation on the [ml_requests] table using the constructed [values] and [where] clauses.
+ * 8. The [if] block checks if the update affected zero rows (i.e., no record was found with the given [id]). If so, it sets the response status to 404 and returns a "Record not found" result.
+ * 9. If the update is successful, [response.status.set] sets the HTTP response status to 202 (Accepted), and [yield] returns the number of affected rows as [affected].
+ * 
+ * Use cases:
+ * - Updating a machine learning request record in the [ml_requests] table by its [id] with new values for [type], [prompt], [completion], [finish_reason], or [cached].
+ * - Returning a 404 error if the specified [id] does not exist in the database, indicating to the client that the update failed due to a missing record.
+ * - Enforcing that only root-level authenticated users can update records, providing an extra security layer.
+ * - Returning a 202 status code to indicate the update request was accepted and processed.
+ * - Validating that the required [id] argument is present before attempting the update, improving input safety.
+ */
+.arguments
+   id:long
+   type:string
+   prompt:string
+   completion:string
+   finish_reason:string
+   cached:int
+validators.mandatory:x:@.arguments/*/id
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      table:ml_requests
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   yield
+      affected:x:@data.update

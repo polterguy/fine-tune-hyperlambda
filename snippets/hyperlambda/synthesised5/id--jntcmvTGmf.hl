@@ -1,0 +1,35 @@
+
+/*
+ * 1. The [validators.mandatory] slot enforces that a [.name] node exists within [.arguments], ensuring this value is always provided.
+ * 2. The [auth.ticket.verify] slot checks that the request is authenticated with a "root" level ticket before any data modification is attempted.
+ * 3. The [add] slot (with two separate usages) dynamically builds the [values] and [where]/[and] nodes for the [data.update] operation by copying nodes from [.arguments], allowing flexible and dynamic updates based on input.
+ * 4. The [data.update] slot constructs and executes an SQL UPDATE statement on the [questionnaires] table in a SQLite database, using the populated [values] and [where] conditions.
+ * 5. The [yield] slot returns the result of [data.update], specifically the [affected] node, indicating the number of records modified.
+ * 
+ * Use cases:
+ * - Update a questionnaire record by passing in the name, type, and action fields, with filtering based on the first argument.
+ * - Allow only root-authenticated users to update questionnaire details in the database.
+ * - Dynamically build update statements for a SQLite database table based on the arguments provided in a request.
+ * - Return the number of database records updated as the endpoint's result.
+ * - Support partial updates where only selected fields are included in the update operation, and the where clause can restrict which record(s) get updated.
+ */
+.arguments
+   name:string
+   type:string
+   action:string
+validators.mandatory:x:@.arguments/*/name
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:questionnaires
+      values
+      where
+         and
+   yield
+      affected:x:@data.update

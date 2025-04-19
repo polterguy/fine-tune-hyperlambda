@@ -1,0 +1,25 @@
+
+/*
+ * 1. [if]: Checks a condition to determine which branch of code to execute.
+ * 2. [not]: Negates the result of its child condition, in this case inverting the result of [io.folder.exists].
+ * 3. [io.folder.exists]: Verifies if the folder [.etc/cache/] exists on disk.
+ * 4. [io.folder.create]: Creates the [.etc/cache/] folder if it does not already exist.
+ * 5. [else]: Executes if the [if] condition is false, i.e., the folder already exists.
+ * 6. [io.file.list]: Retrieves a list of all files within the [.etc/cache/] folder.
+ * 7. [for-each]: Iterates over each file node returned by [io.file.list].
+ * 8. [io.file.delete]: Deletes each file found in the [.etc/cache/] folder, using a reference to the current file node.
+ * 
+ * Use cases:
+ * - Automatically prepare a cache directory at system startup by ensuring its existence and clearing old cache files.
+ * - Reset application cache by removing all files within a specified folder before new cache files are created.
+ * - Maintain a clean working directory for temporary files, ensuring no leftover data from previous operations.
+ */
+if
+   not
+      io.folder.exists:/etc/cache/
+   .lambda
+      io.folder.create:/etc/cache/
+else
+   io.file.list:/etc/cache/
+   for-each:x:@io.file.list/*
+      io.file.delete:x:@.dp/#

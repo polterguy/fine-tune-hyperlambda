@@ -1,0 +1,40 @@
+
+/*
+ * 1. The [.arguments] node declares an argument named [type] of type string, specifying the input required for this logic.
+ * 2. [validators.mandatory] ensures that the [type] argument is present; if not, an exception will be thrown to halt execution.
+ * 3. [data.connect] establishes a database connection, supporting either "generic" or "magic" as connection types.
+ * 4. [data.select] runs a SQL statement to retrieve [conversation_starters] from the [ml_types] table where the [type] matches the argument provided.
+ * 5. [if] checks that the query returns a non-null and non-empty [conversation_starters] value.
+ * 6. [markdown2html] converts the retrieved markdown content to HTML, and [html2lambda] parses this HTML into a lambda structure.
+ * 7. [for-each] iterates over all [#text] nodes found within [li] elements of the parsed HTML.
+ * 8. [unwrap] extracts the value from each [#text] node, and [add] appends each question to a [questions] collection in the [return] node.
+ * 9. [return] outputs the accumulated [questions] as the result.
+ * 
+ * Use cases:
+ * - Extracting and returning a list of conversation starter questions associated with a particular type in a chatbot or FAQ system.
+ * - Dynamically converting markdown-based question lists stored in a database to structured lambda objects suitable for further processing in an API.
+ * - Validating required input arguments for a database-driven endpoint, ensuring robust error handling.
+ * - Transforming content maintained in markdown format into a consumable list format for front-end applications.
+ * - Supporting multiple database connection types for flexible deployment environments.
+ */
+.arguments
+   type:string
+validators.mandatory:x:@.arguments/*/type
+data.connect:[generic|magic]
+   data.select:"\nselect conversation_starters\n\tfrom ml_types\n\twhere type = @type"
+      type:x:@.arguments/*/type
+   if
+      and
+         not-null:x:@data.select/*/*/conversation_starters
+         neq:x:@data.select/*/*/conversation_starters
+            .:
+      .lambda
+         markdown2html:x:@data.select/*/*/conversation_starters
+         html2lambda:x:@markdown2html
+         for-each:x:"@html2lambda/**/li/**/\\#text"
+            unwrap:x:+/*/*
+            add:x:../*/return/*/questions
+               .
+                  .:x:@.dp/#
+return
+   questions

@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [.arguments] node declares that the endpoint expects a [name] argument of type string.  
+ * 2. [auth.ticket.verify] is used to verify that the request has root-level access, enforcing security on the operation.  
+ * 3. [validators.mandatory] ensures that the [name] argument is present; if not, the execution will throw an exception.  
+ * 4. [data.connect] establishes a connection to either the [generic] or [magic] database, preparing for data manipulation.  
+ * 5. The [add] slot within [data.connect] dynamically injects all argument nodes from [.arguments] into the [and] clause under the [where] condition of [data.delete], allowing for flexible filtering based on input arguments.  
+ * 6. [data.delete] is configured to delete records from the [roles] table where the combined conditions (from the [and] clause) match the supplied arguments.
+ * 7. [unwrap] is used to forward evaluate the result nodes, ensuring the returned data is up-to-date and correct.
+ * 8. [return] responds with the number of affected rows by referencing the [affected] node from [data.delete].
+ * 
+ * Use cases:
+ * - Deleting a user role from the [roles] table by specifying the role's [name].
+ * - Bulk deletion of roles if the endpoint is modified to accept more arguments.
+ * - Enforcing strict access control and argument validation for sensitive data operations.
+ * - Implementing an admin-only endpoint for managing role records in an application.
+ */
+.arguments
+   name:string
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/name
+data.connect:[generic|magic]
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      table:roles
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,0 +1,28 @@
+
+/*
+ * 1. [.arguments] defines the required inputs: [id], [description], and [hyperlambda] must be provided as strings.
+ * 2. [auth.ticket.verify] ensures the current user has root permissions before proceeding, enforcing security.
+ * 3. [hyper2lambda] converts the string Hyperlambda code passed in [hyperlambda] to a lambda object for later use.
+ * 4. [add] injects the converted lambda code as the body of the [.lambda] node under the new task definition.
+ * 5. [tasks.create] creates and persists a new task using the provided [id] and [description], and associates the provided lambda logic as the task's behavior.
+ * 6. [return] sends back a result node indicating success.
+ * 
+ * Use cases:
+ * - Programmatically create and register new scheduled tasks by providing dynamic Hyperlambda code.
+ * - Enable privileged users to define or update system automation tasks through an API endpoint.
+ * - Accept and persist user-defined logic as executable tasks for later scheduling or invocation.
+ * - Centralize task creation while enforcing strict access controls and input validation.
+ */
+.arguments
+   id:string
+   description:string
+   hyperlambda:string
+auth.ticket.verify:root
+hyper2lambda:x:@.arguments/*/hyperlambda
+add:x:../*/tasks.create/*/.lambda
+   get-nodes:x:@hyper2lambda/*
+tasks.create:x:@.arguments/*/id
+   description:x:@.arguments/*/description
+   .lambda
+return
+   result:success

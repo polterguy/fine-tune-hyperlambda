@@ -1,0 +1,21 @@
+
+/*
+ * 1. The [.arguments] node signifies the start of an HTTP endpoint, ensuring that incoming arguments can be properly processed by the endpoint.
+ * 2. The [auth.ticket.verify] slot checks if the request is authenticated with either "root" or "admin" privileges, providing access control before proceeding with any database operations.
+ * 3. The [data.connect] slot establishes a connection to the [chinook] database, specifying the database type as SQLite, which ensures the following SQL operations are executed against the correct data source and dialect.
+ * 4. The [data.select] slot executes a raw SQL query that aggregates the number of albums for each artist. It joins the [Album] and [Artist] tables on [ArtistId], groups the results by artist, orders them by the count of albums in descending order, and limits the results to the top 25 artists. The [database-type:sqlite] node is specified again for clarity and compatibility.
+ * 5. The [return-nodes] slot returns all nodes produced by the [data.select] operation, making the result set available as the endpoint's response.
+ * 
+ * Use cases:
+ * - Providing an API endpoint to retrieve the top 25 most prolific artists (by album count) in the Chinook music database for administrative dashboards.
+ * - Enabling data analysts to quickly obtain aggregated artist statistics from the music library for reporting purposes.
+ * - Supporting music application features that display artist rankings based on the number of albums in the database.
+ * - Allowing privileged users (root or admin) to perform rapid data exploration of artist-related data without writing custom SQL queries.
+ */
+.arguments
+auth.ticket.verify:root,admin
+data.connect:chinook
+   database-type:sqlite
+   data.select:"\n/*\n * Script to aggregate records for each artist in chinook database.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect ar.Name, count(*) as count\n  from Album al, Artist ar where al.ArtistId = ar.ArtistId\n  group by al.ArtistId\n  order by count desc\n  limit 25\n"
+      database-type:sqlite
+   return-nodes:x:@data.select/*

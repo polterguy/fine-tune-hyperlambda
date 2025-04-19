@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [try] slot is used to attempt a series of operations, providing exception handling via the [.catch] node if an error occurs.
+ * 2. [io.file.load] attempts to load the contents of the "/var/logs/server.log" file.
+ * 3. [strings.matches] searches the loaded log file content for patterns matching IP addresses using a regular expression.
+ * 4. [for-each] iterates over each [match] node found in the results from [strings.matches].
+ * 5. [unwrap] retrieves the value of each match (the IP address string) from the current [match] node.
+ * 6. [add] appends each extracted IP address to the [.ip-addresses] node, collecting all found IPs.
+ * 7. If the log file does not exist or cannot be loaded, the [.catch] block logs an error with [log.error].
+ * 
+ * Use cases:
+ * - Extracting all IP addresses from a server log for security analysis.
+ * - Collecting unique visitor IPs from log files for reporting.
+ * - Populating a list of suspicious IPs from logs for further investigation.
+ * - Handling missing log files gracefully by logging an error instead of throwing an unhandled exception.
+ */
+.ip-addresses
+try
+   io.file.load:/var/logs/server.log
+   strings.matches:x:@io.file.load
+      .:"\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"
+   for-each:x:@strings.matches/*/match
+      unwrap:x:+/*/*
+      add:x:@.ip-addresses
+         .
+            .:x:@.dp/#
+.catch
+   log.error:Log file not found

@@ -1,0 +1,34 @@
+
+/*
+ * 1. [auth.ticket.verify] with "root" ensures that only users with root privileges can execute the code, enforcing access control.
+ * 2. [io.folder.list] retrieves all folders within the [/modules/] directory, preparing for a search through available module folders.
+ * 3. [for-each] iterates over each folder found, setting up a loop to process each module individually.
+ * 4. [strings.concat] constructs the full path to a [manifest.hl] file by combining the current folder path with the filename.
+ * 5. [if] checks if the [manifest.hl] file exists in the current folder using [io.file.exists].
+ * 6. If the manifest exists, [io.file.load] reads the file, [hyper2lambda] parses its Hyperlambda content into a lambda hierarchy, and [add] merges its parsed nodes into the current execution context.
+ * 7. After processing all folders, [return] outputs the final assembled result.
+ * 
+ * Use cases:
+ * - Aggregating all [manifest.hl] data from every module for centralized processing or overview.
+ * - Validating that all modules in the [/modules/] directory contain a manifest file and reporting their structure.
+ * - Building a list of all available modules and their metadata by parsing their manifest files.
+ * - Dynamically loading and evaluating configuration or initialization code from every module during system startup.
+ */
+.arguments
+auth.ticket.verify:root
+io.folder.list:/modules/
+for-each:x:@io.folder.list/*
+   strings.concat
+      get-value:x:@.dp/#
+      .:manifest.hl
+   if
+      io.file.exists:x:@strings.concat
+      .lambda
+         io.file.load:x:@strings.concat
+         hyper2lambda:x:@io.file.load
+         add:x:+/*/*
+            get-nodes:x:@hyper2lambda/*
+         add:x:../*/return
+            .
+               .
+return

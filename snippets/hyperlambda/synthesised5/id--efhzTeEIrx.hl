@@ -1,0 +1,30 @@
+
+/*
+ * 1. The [.arguments] node defines two required input parameters for the endpoint: [url] and [type], both of type string.
+ * 2. The [auth.ticket.verify] slot ensures that only users with the "root" or "admin" roles are authorized to execute this endpoint.
+ * 3. The [data.connect] slot establishes a connection to a database named "scraper" using the SQLite engine.
+ * 4. The [add] slot collects all argument nodes from [.arguments] and adds them as children under the [values] node within [data.create], dynamically mapping input parameters to database fields.
+ * 5. The [data.create] slot inserts a new record into the [spice_urls] table, using the previously collected [values] as the data to be stored.
+ * 6. The [response.status.set] slot sets the HTTP response status to 201, indicating that a new resource has been successfully created.
+ * 7. The [yield] slot returns the ID of the newly created database record as the response payload.
+ * 
+ * Example use cases:
+ * - Creating a new entry in a URL scraping service by submitting a URL and its type, which is then stored in the [spice_urls] table.
+ * - Allowing only administrators to register new URLs for scraping, enforcing role-based access control.
+ * - Building a secure API endpoint that logs submitted URLs and types for later processing or analysis.
+ */
+.arguments
+   url:string
+   type:string
+auth.ticket.verify:root,admin
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:spice_urls
+      values
+   response.status.set:201
+   yield
+      id:x:@data.create

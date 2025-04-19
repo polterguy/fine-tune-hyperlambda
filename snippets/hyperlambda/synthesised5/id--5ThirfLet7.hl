@@ -1,0 +1,20 @@
+
+/*
+ * 1. The [.result] node is being used to accumulate or store the output of the SQL query.
+ * 2. [data.connect] establishes a connection to the [sales_db] database, and the [database-type] child sets the connection type to MySQL.
+ * 3. [data.select] executes a raw SQL query to fetch the latest 10 records from the [transactions] table, ordering them by [transaction_date] in descending order. The [database-type] node under [data.select] ensures the query is interpreted as MySQL syntax.
+ * 4. [add] merges the records returned by [data.select] into the [.result] node, using [get-nodes:x:@data.select/*] to extract all result nodes from the query.
+ * 
+ * Use cases:
+ * - Fetching the 10 most recent transactions from a MySQL-based sales database for reporting purposes.
+ * - Aggregating data from multiple database queries into a single result node for further processing or API response.
+ * - Ensuring compatibility with MySQL-specific SQL syntax when running direct SQL queries.
+ * - Collecting and returning data in a Hyperlambda workflow where the result needs to be consumed or transformed by subsequent logic.
+ */
+.result
+data.connect:sales_db
+   database-type:mysql
+   data.select:select * from transactions order by transaction_date desc limit 10
+      database-type:mysql
+   add:x:@.result
+      get-nodes:x:@data.select/*

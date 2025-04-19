@@ -1,0 +1,32 @@
+
+/*
+ * 1. [auth.ticket.verify] is used to ensure that the current user has an employee-level authentication ticket before proceeding, enforcing access control on the operation.
+ * 2. [validators.mandatory] checks that the [.arguments] node contains a value for [InvoiceLineId], preventing execution if this critical parameter is missing.
+ * 3. [data.connect] establishes a connection to the database, targeting either a "generic" database or the "chinook" database, and specifies that the database type is SQLite.
+ * 4. [add] dynamically inserts all argument nodes from [.arguments] as children under the [and] node inside the [where] clause of [data.delete], allowing for flexible construction of deletion criteria based on input parameters.
+ * 5. [data.delete] performs the delete operation on the [InvoiceLine] table in the SQLite database, using the conditions dynamically built in the [where] clause.
+ * 6. [unwrap] ensures that the result nodes from the previous operation are fully evaluated and available in the current context.
+ * 7. [return] outputs the number of affected rows from the [data.delete] operation, making the result accessible to the caller.
+ * 
+ * Use cases:
+ * - Deleting a specific invoice line in an accounting or billing application based on its unique identifier.
+ * - Securely removing invoice details by an authenticated employee, ensuring unauthorized users cannot perform deletions.
+ * - Implementing a REST API endpoint for deleting invoice line items, where the operation is parameterized and validated for safety.
+ * - Building dynamic delete operations in a low-code environment, where deletion criteria are determined at runtime from request arguments.
+ */
+.arguments
+   InvoiceLineId:long
+auth.ticket.verify:employee
+validators.mandatory:x:@.arguments/*/InvoiceLineId
+data.connect:[generic|chinook]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:InvoiceLine
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

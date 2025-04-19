@@ -1,0 +1,37 @@
+
+/*
+ * 1. The [.arguments] node declares that the endpoint expects two arguments: [username] (string) and [password] (string).
+ * 2. [validators.mandatory] ensures that the [username] argument is provided; if not, execution will halt with an error.
+ * 3. [auth.ticket.verify] checks if the current user is authenticated as "root" before allowing the operation to proceed.
+ * 4. [data.connect] establishes a connection to either the [generic] or [magic] database provider.
+ * 5. [add:x:./*/data.update/*/values] collects all argument nodes except the first (i.e., from index 1 to 1000, usually [password] and others if present) and prepares them to be used as update values.
+ * 6. [add:x:./*/data.update/*/where/*/and] adds the first argument node (index 0, usually [username]) as a condition to the WHERE clause for the update.
+ * 7. [data.update] performs an SQL UPDATE on the [users] table, updating the specified [values] where the [username] matches.
+ * 8. [response.status.set:202] sets the HTTP response status to 202 (Accepted), indicating the request has been accepted for processing.
+ * 9. [yield] outputs the number of affected rows from the [data.update] operation in an [affected] node.
+ * 
+ * Use cases:
+ * - Update a user's password when provided with a valid username, ensuring only authenticated administrators can perform the operation.
+ * - Create an endpoint for administrators to update user records with custom fields, as long as the username is specified.
+ * - Enforce mandatory input validation for critical arguments to prevent incomplete user updates.
+ * - Generate an HTTP API that responds with the number of updated records for audit or UI feedback.
+ * - Secure update operations by requiring root-level authentication before modifying user data.
+ */
+.arguments
+   username:string
+   password:string
+validators.mandatory:x:@.arguments/*/username
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      table:users
+      values
+      where
+         and
+   response.status.set:202
+   yield
+      affected:x:@data.update

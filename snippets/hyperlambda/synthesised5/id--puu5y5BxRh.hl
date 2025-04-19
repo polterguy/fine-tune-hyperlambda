@@ -1,0 +1,34 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters for this operation, with [GenreId] being required and of type long.
+ * 2. [auth.ticket.verify] is used to ensure the user has either "admin" or "basic" roles before proceeding, enforcing access control.
+ * 3. [validators.mandatory] checks that the [GenreId] argument is provided, throwing an exception if it is missing.
+ * 4. [data.connect] establishes a database connection to either the "generic" or "chinook" database, specifying SQLite as the database type.
+ * 5. [add] dynamically appends all argument nodes (such as [GenreId]) to the [and] node inside the [where] clause of the [data.delete] operation, building the deletion criteria based on provided input.
+ * 6. [data.delete] constructs and executes a SQL DELETE statement on the [Genre] table, with the [where] clause filtering records by the provided arguments.
+ * 7. [unwrap] evaluates the results of the previous operation, ensuring the output nodes are properly processed.
+ * 8. [return] outputs the number of affected rows from the [data.delete] operation.
+ * 
+ * Use cases:
+ * - Securely delete a genre by its [GenreId] from the [Genre] table, allowing only authorized users.
+ * - Validate that required input ([GenreId]) is present before attempting deletion to prevent invalid operations.
+ * - Dynamically build the deletion criteria, allowing for flexible extension if more arguments are added in the future.
+ * - Return feedback to the client on how many records were deleted, supporting UI updates or logging.
+ * - Easily adapt the code for other tables by changing the [table] node and arguments.
+ */
+.arguments
+   GenreId:long
+auth.ticket.verify:admin,basic
+validators.mandatory:x:@.arguments/*/GenreId
+data.connect:[generic|chinook]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:Genre
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

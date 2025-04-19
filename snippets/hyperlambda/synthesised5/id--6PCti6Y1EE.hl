@@ -1,0 +1,38 @@
+
+/*
+ * 1. The [.arguments] node declares an [id] argument of type long, which is required for the operation.
+ * 2. [auth.ticket.verify] checks if the current user is authenticated as "guest" before proceeding.
+ * 3. [validators.mandatory] ensures the presence of the [id] argument in [.arguments].
+ * 4. [data.connect] establishes a connection to the [generic|cms] database using SQLite.
+ * 5. [add] is used to dynamically insert argument nodes into the [and] clause of the [where] node for [data.delete], effectively filtering the delete operation by the provided arguments.
+ * 6. [data.delete] deletes records from the [plugins] table where the [and] condition (populated from arguments) is met.
+ * 7. Another [add] inserts argument nodes into the [args] node of the [sockets.signal] slot, preparing the arguments for the signal.
+ * 8. [sockets.signal] emits the [cms.plugins.delete] event with arguments, potentially notifying other parts of the system about the deletion.
+ * 9. [unwrap] evaluates all resulting nodes for further processing.
+ * 10. [return] outputs the number of affected rows from the [data.delete] operation.
+ * 
+ * Use cases:
+ * - Deleting a plugin from the [plugins] table using its unique [id], and notifying listeners in real time.
+ * - Enforcing proper authorization and mandatory arguments before allowing database modifications.
+ * - Cascading updates or UI refreshes in connected clients by broadcasting the delete event via sockets.
+ */
+.arguments
+   id:long
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:plugins
+      where
+         and
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:cms.plugins.delete
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

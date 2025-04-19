@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters for the operation, specifically requiring an [address_id] of type long.
+ * 2. [validators.mandatory:x:@.arguments/*/address_id] ensures that the [address_id] argument is provided, throwing an exception if it is missing.
+ * 3. [data.connect:[generic|sakila]] establishes a connection to the specified database, with [database-type:sqlite] setting the database type to SQLite.
+ * 4. [add:x:./*/data.delete/*/where/*/and] combined with [get-nodes:x:@.arguments/*] dynamically injects all argument nodes (in this case, [address_id]) as conditions under the [and] node inside the [where] clause of [data.delete]. This effectively builds the WHERE condition for the delete operation based on the supplied arguments.
+ * 5. [data.delete] executes a delete statement on the [address] table in the database, using the constructed WHERE clause to filter which records should be affected.
+ * 6. [unwrap:x:+/*] evaluates the result of the delete operation, ensuring any expressions or nodes are processed and available for the next step.
+ * 7. [return] returns the number of affected rows from the [data.delete] operation, making this value available to the caller as [affected].
+ * 
+ * Use cases:
+ * - Deleting a specific address record in the [address] table by providing its [address_id].
+ * - Creating a secure API endpoint for removing addresses from a SQLite database, enforcing that the address ID is always supplied.
+ * - Dynamically constructing and executing a delete operation based on user-supplied parameters.
+ * - Returning the outcome (number of rows deleted) to inform the client or trigger further actions.
+ */
+.arguments
+   address_id:long
+validators.mandatory:x:@.arguments/*/address_id
+data.connect:[generic|sakila]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:address
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

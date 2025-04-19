@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [.arguments] node specifies that this code expects an input argument named [filter] of type string, which will be used to filter the SQL results.
+ * 
+ * 2. The [data.connect] slot establishes a connection to the "chinook" database, explicitly specifying that the database type is SQLite using the [database-type] node.
+ * 
+ * 3. The [add] slot dynamically constructs and injects nodes for [data.select] by retrieving all children of [.arguments] using `get-nodes:x:@.arguments/*`. This allows the [filter] argument to be included as a parameter in the SQL query.
+ * 
+ * 4. The [data.select] slot executes a parameterized SQL query that retrieves distinct customer details (Email, FirstName, LastName, Genre name) for all customers who have listened to tracks in a genre matching the provided [filter] value. The results are ordered by email and the database type is explicitly set to SQLite.
+ * 
+ * 5. The [return-nodes] slot returns all result nodes from the [data.select] slot, making the query output available to the caller.
+ * 
+ * Use cases:
+ * - Retrieve customer information for those who listen to a specific genre, such as "Rock", by providing a filter like "Rock".
+ * - Filter and display customers in the Chinook database based on any genre name prefix using SQL wildcards, e.g. "Pop%".
+ * - Integrate dynamic argument-driven SQL queries in an API endpoint to support flexible search scenarios.
+ * - Use the structure to implement reporting or analytics features that need to extract customer-genre relationships.
+ * - Adapt the mechanism to support other parameterized queries by changing the SQL and input arguments.
+ */
+.arguments
+   filter:string
+data.connect:chinook
+   database-type:sqlite
+   add:x:./*/data.select
+      get-nodes:x:@.arguments/*
+   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name like @filter\n  order by c.Email\n"
+      database-type:sqlite
+   return-nodes:x:@data.select/*

@@ -1,0 +1,19 @@
+
+/*
+ * 1. The [.arguments] node indicates that this code is designed to be used as the entry point for an HTTP endpoint, ensuring any incoming arguments are properly scoped.
+ * 2. The [data.connect] slot is used to open a connection to the [chinook] database, with the [database-type] explicitly set to SQLite for compatibility.
+ * 3. The [data.select] slot executes a raw SQL query that retrieves unique customer details (email, first name, last name) along with the genre name for all customers who are associated with invoices containing tracks classified under the "Rock" genre. The query uses multiple INNER JOINs to connect the [Customer], [Invoice], [InvoiceLine], [Track], and [Genre] tables, filters the result for the "Rock" genre, and orders the results by email.
+ * 4. The [return-nodes] slot is used to return all child nodes of the [data.select] result, outputting the list of matching customer and genre records as the HTTP response.
+ * 
+ * Use cases:
+ * - Generating a report of all customers who have purchased or listened to rock music tracks in the Chinook sample database.
+ * - Creating a filtered endpoint for a music store admin dashboard to analyze customer preferences for the "Rock" genre.
+ * - Providing a data export feature for marketing purposes, allowing the export of unique emails of rock-listening customers.
+ * - Supporting business intelligence queries to identify market segments most interested in rock music.
+ */
+.arguments
+data.connect:chinook
+   database-type:sqlite
+   data.select:"\n/*\n * Selects details from all customers that are listening to rock.\n * Make sure you select the chinook database before execxuting the script.\n */\nselect distinct c.Email, c.FirstName, c.LastName, g.name\n  from Customer c\n    inner join Invoice i on c.CustomerId = i.CustomerId\n    inner join InvoiceLine ii on i.InvoiceId = ii.InvoiceId\n    inner join Track t ON ii.TrackId = t.TrackId\n    inner join Genre g ON t.GenreId = g.GenreId\n  where g.Name = \"Rock\"\n  order by c.Email\n"
+      database-type:sqlite
+   return-nodes:x:@data.select/*

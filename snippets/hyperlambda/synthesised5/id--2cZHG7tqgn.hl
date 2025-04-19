@@ -1,0 +1,31 @@
+
+/*
+ * 1. [.arguments]: Declares the expected input for the endpoint, specifying that [file] can be of any type and [folder] must be a string.
+ * 2. [.accept]: Sets the accepted content type to multipart/form-data, indicating the endpoint is designed for file uploads.
+ * 3. [auth.ticket.verify]: Ensures that the incoming request is authenticated by verifying a "root" ticket.
+ * 4. [validators.mandatory]: Enforces that [file], [file/*/name], [file/*/stream], and [folder] arguments are all present, throwing an error if any are missing.
+ * 5. [set-value] with [strings.concat]: Constructs a full file path by concatenating the [folder] value and the file's [name], storing the result in [.full-path].
+ * 6. [io.stream.save-file]: Saves the uploaded file's stream to the constructed full path on disk.
+ * 
+ * Use cases:
+ * - Securely handle file uploads by ensuring all required fields are present and the user is authenticated.
+ * - Save uploaded files to a user-specified folder by dynamically building the destination path.
+ * - Validate multipart form data to support robust API endpoints for uploading assets or documents.
+ * - Prevent incomplete uploads by enforcing that both the file stream and file name are provided.
+ */
+.arguments
+   file:*
+   folder:string
+.accept:multipart/form-data
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+validators.mandatory:x:@.arguments/*/folder
+.full-path
+set-value:x:@.full-path
+   strings.concat
+      get-value:x:@.arguments/*/folder
+      get-value:x:@.arguments/*/file/*/name
+io.stream.save-file:x:@.full-path
+   get-value:x:@.arguments/*/file/*/stream

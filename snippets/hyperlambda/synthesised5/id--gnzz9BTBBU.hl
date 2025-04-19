@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [.arguments] node declares the expected input parameters: [.username], [.role], and [.expires], all required for the operation.
+ * 2. The [auth.ticket.verify] slot ensures that only users in the [root] role can execute this logic, providing endpoint-level security.
+ * 3. Multiple [validators.mandatory] slots enforce that [username], [role], and [expires] must be supplied, preventing incomplete requests from proceeding.
+ * 4. The [auth.ticket.create] slot generates a new JWT token using the given [username], [expires] date, and a single [role] extracted from the input.
+ * 5. The [yield] slot returns the generated JWT token under the [ticket] node to the caller.
+ * 
+ * Use cases:
+ * - Issue a custom JWT token with a specific role and expiration date for system administrators.
+ * - Allow root-level users to provision tokens for other users in a controlled way.
+ * - Secure administrative endpoints so only root users can generate tokens.
+ * - Enforce strict input validation for security-sensitive operations.
+ */
+.arguments
+   username:string
+   role:string
+   expires:date
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/username
+validators.mandatory:x:@.arguments/*/role
+validators.mandatory:x:@.arguments/*/expires
+auth.ticket.create
+   username:x:@.arguments/*/username
+   expires:x:@.arguments/*/expires
+   roles
+      .:x:@.arguments/*/role
+yield
+   ticket:x:@auth.ticket.create

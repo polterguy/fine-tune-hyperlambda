@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input for this endpoint, requiring a [name] argument of type string.
+ * 2. [auth.ticket.verify] with the value "root" ensures only authorized users with root-level permissions can execute this operation.
+ * 3. [validators.mandatory] enforces that the [name] argument must be provided in the request.
+ * 4. [data.connect] establishes a connection to either the [generic] or [magic] data source, specifying SQLite as the database type.
+ * 5. [add] dynamically inserts all nodes found in [.arguments] as child nodes under the [and] node inside the [where] clause of [data.delete], forming the deletion criteria.
+ * 6. [data.delete] deletes records from the [questionnaires] table in the SQLite database that match the constructed [where]/[and] condition.
+ * 7. [unwrap] evaluates the results of the deletion operation.
+ * 8. [return] outputs the number of affected rows from the [data.delete] operation.
+ * 
+ * Use cases:
+ * - Securely delete a questionnaire record by specifying its [name] as an input argument.
+ * - Restrict deletion functionality to root-authorized users only, preventing unauthorized data removal.
+ * - Use as an administrative endpoint to bulk-delete questionnaire records matching specific argument-based criteria, such as by name.
+ * - Automate data cleanup tasks in the [questionnaires] table by invoking this endpoint with different names.
+ */
+.arguments
+   name:string
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/name
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:questionnaires
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

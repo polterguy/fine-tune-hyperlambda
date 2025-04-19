@@ -1,0 +1,36 @@
+
+/*
+ * 1. The [.arguments] node explicitly declares the required arguments for the endpoint: [name], [type], and [action], each expected as strings.
+ * 2. [auth.ticket.verify] ensures the provided ticket is valid for the "root" user before proceeding with the rest of the logic, enforcing security.
+ * 3. [validators.regex] validates that the [name] argument matches a specific pattern: only lowercase letters, numbers, underscores, or hyphens, and must be 2 to 20 characters long.
+ * 4. [data.connect] opens a connection to the "magic" database using the "generic" connection string and specifies the SQLite adapter.
+ * 5. [add] dynamically copies all argument nodes from [.arguments] into the [values] node of [data.create], preparing the data for insertion.
+ * 6. [data.create] inserts a new record into the "questionnaires" table with the values taken from the arguments, using SQLite as the database type.
+ * 7. [response.status.set] sets the HTTP response status to 201, indicating successful resource creation.
+ * 8. [return] responds with a [result] node set to "success" to signal the operation completed successfully.
+ * 
+ * Use cases:
+ * - Creating a new questionnaire resource, ensuring the name is properly formatted and the user is authenticated as root.
+ * - Validating and accepting only well-formed questionnaire names, rejecting invalid input before database interaction.
+ * - Automatically mapping incoming HTTP arguments to table columns for streamlined data insertion.
+ * - Enforcing security by requiring root-level authentication before allowing data creation.
+ * - Providing immediate feedback to the API consumer with an appropriate HTTP status and result message.
+ */
+.arguments
+   name:string
+   type:string
+   action:string
+auth.ticket.verify:root
+validators.regex:x:@.arguments/*/name
+   regex:^[a-z0-9_-]{2,20}$
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:questionnaires
+      values
+   response.status.set:201
+   return
+      result:success

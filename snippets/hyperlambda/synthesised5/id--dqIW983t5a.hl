@@ -1,0 +1,46 @@
+
+/*
+ * 1. The [.arguments] node explicitly defines the accepted arguments ([id], [country], [name], [enabled]) and their types for the endpoint, enforcing strong input validation.
+ * 2. The [auth.ticket.verify] slot is used to authenticate and authorize access, requiring root privileges for this operation.
+ * 3. [validators.mandatory] ensures that the [id] argument is present, throwing an error if it is missing.
+ * 4. [data.connect] establishes a connection to the [hub] database using a generic connection string.
+ * 5. The [add] slots dynamically build the [where] and [values] nodes for the [data.update] operation by extracting nodes from [.arguments] based on their position, allowing flexible assignment of filter and update fields.
+ * 6. [data.update] attempts to update the [clusters] table in the database, applying the values and where conditions constructed earlier.
+ * 7. The [if] block checks if [data.update] returned 0 (no records affected); if so, it sets the HTTP status code to 404 and returns a "Record not found" result.
+ * 8. If the update was successful, [response.status.set] sets the HTTP status to 202 (Accepted), and [yield] returns the number of affected records.
+ * 
+ * Use Cases:
+ * - Updating information for a cluster in a database, requiring the user to be authenticated as root.
+ * - Returning a 404 error if the specified cluster does not exist by id.
+ * - Allowing partial updates by including only the fields to change in the request.
+ * - Enforcing strict input types and mandatory fields to prevent invalid data updates.
+ * - Returning the total number of affected rows after a successful update, useful for API clients to confirm operation success.
+ */
+.arguments
+   id:string
+   country:string
+   name:string
+   enabled:bool
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/id
+data.connect:[generic|hub]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   data.update
+      table:clusters
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   yield
+      affected:x:@data.update

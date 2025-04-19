@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [.arguments] node is used to declare input parameters for the execution context, specifically a [username] parameter.
+ * 2. [data.connect] establishes a connection to the [magic] database for the subsequent SQL queries.
+ * 3. [data.scalar] executes a SQL query to count the number of users in the [users] table whose username matches the provided [username] argument, returning this count as a single scalar value.
+ * 4. [if] checks whether the result of [data.scalar] is zero by using the [eq] slot, indicating whether the user does not exist.
+ * 5. If the user does not exist, [return] is called with a [result] node stating "User does not exist".
+ * 6. If the user does exist (the count is not zero), execution continues to the final [return], which sets [result] to "User exists".
+ * 
+ * Use cases:
+ * - Checking if a specific user exists in the database before allowing registration to prevent duplicates.
+ * - Validating user existence before performing operations such as password resets or profile updates.
+ * - Creating an endpoint that can be called by external systems to verify user presence in the [users] table.
+ * - Implementing business logic that depends on whether a username is already taken.
+ */
+.arguments
+   username:string
+data.connect:magic
+   data.scalar:select count(*) from users where username = @username
+      @username:x:@.arguments/*/username
+   if
+      eq:x:@data.scalar
+         .:long:0
+      .lambda
+         return
+            result:User does not exist
+return
+   result:User exists

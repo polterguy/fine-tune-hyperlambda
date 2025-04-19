@@ -1,0 +1,34 @@
+
+/*
+ * 1. The [http.get] slot is used to request weather data from the specified API endpoint, with a header indicating the client expects XML in the response.
+ * 2. The [convert] argument is set to true, so the response content is automatically converted if a suitable converter is registered.
+ * 3. The [switch] slot checks the HTTP status code from the [http.get] response and branches the logic accordingly:
+ *    - If the status code is 200, the [.weather.result] node is updated to indicate the weather data was received in XML format.
+ *    - If the status code is 406, an exception is thrown to indicate the server cannot return XML.
+ *    - For any other status code, [.weather.result] is set to a generic error message.
+ * 4. The [yield] slot returns the content of the [.weather.result] node as the final result.
+ * 
+ * Use Cases:
+ * - Integrating live weather updates into a dashboard, with clear error handling for unsupported formats.
+ * - Building an API endpoint that proxies weather data and returns user-friendly messages or error codes.
+ * - Validating server content negotiation by requesting XML and handling cases where the server rejects the format.
+ * - Automated monitoring scripts that alert when weather data cannot be retrieved or when the server configuration changes.
+ * - Teaching conditional logic and error handling in Hyperlambda using real-world API scenarios.
+ */
+.arguments
+.weather.result
+http.get:"https://api.weather.gov/gridpoints/MPX/107,71/forecast"
+   convert:true
+   headers
+      Accept:application/xml
+switch:x:@http.get
+   case:int:200
+      set-value:x:@.weather.result
+         .:Weather data received in XML format
+   case:int:406
+      throw:406 Not Acceptable – Server cannot return XML
+   default
+      set-value:x:@.weather.result
+         .:Unable to fetch weather data
+yield
+   result:x:@.weather.result

@@ -1,0 +1,43 @@
+
+/*
+ * 1. [for-each]: Iterates through each child node of [.inventory], processing each part node individually and passing it by reference as [.dp].
+ * 2. [if]: Checks if the [status] of the currently iterated part node is "available". If true, executes its [.lambda] block.
+ * 3. [set-value]: If the condition is met, updates the [status] of the current part node to "checked".
+ * 4. [else]: If the first [if] condition fails, this block is executed.
+ * 5. Nested [if]: Within the [else], checks if the [name] of the part is "wheel".
+ * 6. [set-value] (nested): If the part name is "wheel", sets [status] to "urgent restock".
+ * 7. Second [else]: If none of the above conditions are met, sets [status] to "restock" for the part.
+ * 
+ * Use Cases:
+ * - Automatically update the status of available inventory items to "checked" during a stock audit.
+ * - Flag specific parts (e.g., wheels) as "urgent restock" if they are out of stock, enabling prioritized ordering.
+ * - Mark all other out-of-stock parts with a generic "restock" status for regular replenishment planning.
+ * - Useful in warehouse automation where different handling is required for specific parts based on their names and availability.
+ */
+.inventory
+   part1
+      name:engine
+      status:out-of-stock
+   part2
+      name:wheel
+      status:out-of-stock
+   part3
+      name:door
+      status:available
+for-each:x:@.inventory/*
+   if
+      eq:x:@.dp/#/*/status
+         .:available
+      .lambda
+         set-value:x:@.dp/#/*/status
+            .:checked
+   else
+      if
+         eq:x:@.dp/#/*/name
+            .:wheel
+         .lambda
+            set-value:x:@.dp/#/*/status
+               .:urgent restock
+      else
+         set-value:x:@.dp/#/*/status
+            .:restock

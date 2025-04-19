@@ -1,0 +1,57 @@
+
+/*
+ * 1. The [.arguments] node specifies two expected arguments: [file] (accepting any data type, typically a file upload) and [folder] (a string path). The [.accept] node restricts the HTTP content type to multipart/form-data, ensuring the endpoint only processes form file uploads.
+ * 2. The [auth.ticket.verify] slot with value "root" enforces that only authenticated users with root privileges may proceed.
+ * 3. [validators.mandatory] slots ensure that [file], [file/*/name], [file/*/stream], and [folder] are provided, validating the required structure of the upload payload.
+ * 4. [strings.split] extracts the file extension from the uploaded file's name, and an [if] block then checks that the extension is "zip". If not, a 415 error is thrown, enforcing that only ZIP files are accepted.
+ * 5. [io.folder.list] and [for-each] are used to enumerate and delete all existing subfolders, and [io.file.list] together with [for-each] deletes all regular files in the [folder] path, ensuring the folder is emptied before proceeding.
+ * 6. The [strings.concat] and [set-value] slots construct a full path ([.filename]) to save the uploaded file in the specified folder.
+ * 7. [io.stream.save-file] writes the uploaded file stream to disk at the computed filename.
+ * 8. [io.file.unzip] extracts the contents of the uploaded ZIP file to the target folder, and [io.file.delete] removes the original ZIP file after extraction.
+ * 9. [return-nodes] returns a [result] node with value "Success" as the operation's response.
+ * 
+ * Use Cases:
+ * - Securely accepting ZIP file uploads from administrators and extracting their contents into a specified folder, replacing any existing files or folders.
+ * - Automating the deployment of packaged resources, such as website assets or data sets, by clearing the destination and extracting a fresh ZIP upload.
+ * - Providing a controlled import mechanism where only ZIP files are allowed, and the uploaded archive is fully integrated after authorization checks and input validation.
+ * - Enforcing strict file type and structural requirements for uploads to prevent misuse or accidental overwrites with non-ZIP content.
+ */
+.arguments
+   file:*
+   folder:string
+.accept:multipart/form-data
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/file
+validators.mandatory:x:@.arguments/*/file/*/name
+validators.mandatory:x:@.arguments/*/file/*/stream
+validators.mandatory:x:@.arguments/*/folder
+strings.split:x:@.arguments/*/file/*/name
+   .:.
+if
+   not
+      eq
+         get-value:x:@strings.split/0/-
+         .:zip
+   .lambda
+      throw:You can only upload ZIP files
+         public:true
+         status:415
+io.folder.list:x:@.arguments/*/folder
+   display-hidden:true
+for-each:x:-/*
+   io.folder.delete:x:@.dp/#
+io.file.list:x:@.arguments/*/folder
+   display-hidden:true
+for-each:x:-/*
+   io.file.delete:x:@.dp/#
+.filename
+set-value:x:@.filename
+   strings.concat
+      get-value:x:@.arguments/*/folder
+      get-value:x:@.arguments/*/file/*/name
+io.stream.save-file:x:@.filename
+   get-value:x:@.arguments/*/file/*/stream
+io.file.unzip:x:@.filename
+io.file.delete:x:@.filename
+return-nodes
+   result:Success

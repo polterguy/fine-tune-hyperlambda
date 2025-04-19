@@ -1,0 +1,32 @@
+
+/*
+ * 1. [if] checks whether the file [/var/logs/server.log] exists by invoking [io.file.exists].  
+ * 2. If the file exists, [io.file.load] loads its contents.  
+ * 3. [strings.matches] uses a regular expression to extract all URL patterns from the loaded file content.  
+ * 4. [for-each] iterates through each [match] found by the regular expression, and [add] appends each found URL to the [.urls] node after using [unwrap] to get the actual string value.  
+ * 5. [lambda2hyper] serializes all child nodes of [.urls] into a Hyperlambda string, which is then logged using [log.info], with the [emails] parameter containing the serialized URLs.  
+ * 6. If the file does not exist, [log.error] writes an error stating the log file was not found.
+ * 
+ * Use cases:
+ * - Automatically extract and log all URLs from a server log file for review or auditing.
+ * - Quickly identify and serialize all external links accessed or mentioned in server logs for further automated processing.
+ * - Alert administrators if the expected log file is missing, indicating potential system issues.
+ * - Facilitate migration or backup of extracted URLs by serializing them in Hyperlambda format.
+ */
+if
+   io.file.exists:/var/logs/server.log
+   .lambda
+      io.file.load:/var/logs/server.log
+      .urls
+      strings.matches:x:@io.file.load
+         .:"https?://[\\w\\.-]+(?:\\.[\\w\\.-]+)+(?:[/\\w\\._~:?#[\\]@!$&'()*+,;=-]*)?"
+      for-each:x:@strings.matches/*/match
+         unwrap:x:+/*/*
+         add:x:@.urls
+            .
+               .:x:@.dp/#
+      lambda2hyper:x:@.urls/*
+      log.info:Extracted URLs from file
+         emails:x:@lambda2hyper
+else
+   log.error:Log file not found

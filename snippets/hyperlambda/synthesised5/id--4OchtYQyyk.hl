@@ -1,0 +1,47 @@
+
+/*
+ * 1. [slots.create:utilities.history.send-email] defines a new reusable slot for sending a chatbot's request history via email.
+ * 2. [validators.mandatory] ensures the [email] argument is provided, while [validators.email] checks its format for validity.
+ * 3. [log.info] logs that the chatbot log is being sent, including the recipient's email.
+ * 4. [data.connect] establishes a database connection to either a "generic" or "magic" data source.
+ * 5. [data.read] retrieves specific columns from the [ml_requests] table, collecting chatbot prompt/completion data and metadata.
+ * 6. [lambda2csv] converts the fetched database rows into a CSV string.
+ * 7. [mail.smtp.send] constructs and dispatches an email to the specified recipient, attaching the chatbot history both as plain text and as a CSV file named "log.csv".
+ * 
+ * Use Cases:
+ * - Automatically emailing the chatbot conversation logs to an administrator or owner for review or compliance.
+ * - Providing users or support staff with detailed records of chatbot activity in a portable CSV format.
+ * - Scheduling regular reports of chatbot usage to be sent to stakeholders for analytics.
+ * - Enabling quick auditing of chatbot interactions by sending the latest request history on demand.
+ */
+slots.create:utilities.history.send-email
+   validators.mandatory:x:@.arguments/*/email
+   validators.email:x:@.arguments/*/email
+   log.info:Sending chatbot log to cloudlet owner
+      email:x:@.arguments/*/email
+   data.connect:[generic|magic]
+      data.read
+         table:ml_requests
+         columns
+            prompt
+            completion
+            created
+            type
+            finish_reason
+            user_id
+            session
+      lambda2csv:x:@data.read/*
+      mail.smtp.send
+         message
+            to
+               .
+                  email:x:@.arguments/*/email
+                  name:Chatbot Admin
+            subject:Chatbot history log
+            entity:multipart/mixed
+               entity:text/plain
+                  content:Latest AINIRO.IO Chatbot requests
+               entity:text/csv
+                  headers
+                     Content-Disposition:"attachment; filename=\"log.csv\""
+                  content:x:@lambda2csv

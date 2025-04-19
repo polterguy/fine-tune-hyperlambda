@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [if] slot checks if the [.arguments] node contains a [filter] child node, allowing for conditional logic based on whether a filter value is provided.
+ * 2. The [unwrap] and [add] slots dynamically build additional [where]/[or] filter conditions inside the [data.read] node, appending LIKE comparisons against both [first_name] and [last_name] using the supplied [filter] value.
+ * 3. The [data.connect] slot establishes a connection to the [crm] database, and the [data.read] slot queries the [contacts] table with parameters for [limit], [offset], and the dynamically constructed [where]/[or] conditions.
+ * 4. The [return-nodes] slot returns all nodes resulting from the [data.read] operation, effectively outputting the selected contact records.
+ * 
+ * Use cases:
+ * - Implementing a paginated, filterable contact search API where users can search by first or last name.
+ * - Enabling dynamic SQL query generation based on optional user-supplied filter criteria.
+ * - Reusing this pattern to filter and paginate results in other database tables with similar requirements.
+ * - Building endpoints that adapt their query logic depending on which arguments are supplied by the client.
+ */
+.arguments
+   limit:int
+   offset:int
+   filter:string
+if
+   exists:x:@.arguments/*/filter
+   .lambda
+      unwrap:x:+/*/*
+      add:x:../*/data.connect/*/data.read/*/where/*/or
+         .
+            first_name.like:x:@.arguments/*/filter
+            last_name.like:x:@.arguments/*/filter
+data.connect:[generic|crm]
+   data.read
+      table:contacts
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+      where
+         or
+   return-nodes:x:@data.read/*

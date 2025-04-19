@@ -1,0 +1,27 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot checks that the current user has either "root" or "admin" roles, enforcing access control for the operation.
+ * 2. The [validators.mandatory] slot ensures that the [.id] argument inside [.arguments] is provided, throwing an error if it is missing.
+ * 3. The [add] slot dynamically inserts all argument nodes (such as [.id]) as children into the [and] node under the [where] clause of [data.delete], building the deletion criteria.
+ * 4. The [data.delete] slot deletes records from the [menus] table where the conditions in [where]/[and] match the provided arguments.
+ * 5. The [yield] slot returns the number of affected rows from the [data.delete] operation as the response.
+ * 
+ * Use cases:
+ * - Deleting a menu item in a CMS by its unique identifier, only allowed for administrators.
+ * - Removing database records based on dynamic conditions provided as input.
+ * - Securing destructive actions to ensure only authorized users can perform them.
+ * - Returning the number of deleted rows to the client for confirmation or logging.
+ */
+.arguments
+   id:long
+auth.ticket.verify:root,admin
+validators.mandatory:x:@.arguments/*/id
+data.connect:[generic|cms]
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      table:menus
+      where
+         and
+   yield
+      affected:x:@data.delete

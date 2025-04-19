@@ -1,0 +1,23 @@
+
+/*
+ * 1. The [.arguments] node defines two input parameters: [limit] and [offset], both expected to be integers. These are used for paging the results of a database query.
+ * 2. The [auth.ticket.verify] slot checks if the current user has one of the roles: root, admin, or user, enforcing authorization before proceeding.
+ * 3. The [data.connect] slot establishes a connection to the "crm" database, preparing for subsequent data operations.
+ * 4. Inside [data.connect], the [data.read] slot queries the [contacts] table, using the values from [.arguments] for [limit] and [offset] to control paging.
+ * 5. The [return-nodes] slot returns all child nodes of [data.read] as the output, effectively sending the retrieved contacts as the response.
+ * 
+ * Use cases:
+ * - Fetching a specific page of contact records in a CRM application, with support for customizing the number of results and the starting point.
+ * - Ensuring only authenticated users with appropriate roles can access contact data.
+ * - Providing a paged API endpoint for a frontend to display contacts with "next" and "previous" navigation.
+ */
+.arguments
+   limit:int
+   offset:int
+auth.ticket.verify:root, admin, user
+data.connect:crm
+   data.read
+      table:contacts
+      limit:x:@.arguments/*/limit
+      offset:x:@.arguments/*/offset
+   return-nodes:x:@data.read/*

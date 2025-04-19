@@ -1,0 +1,38 @@
+
+/*
+ * 1. The [slots.create] slot is used to define a dynamic slot named [magic.auth.change-password], encapsulating custom password change logic.
+ * 2. [validators.mandatory] ensures the [.arguments] node contains a [password] value, enforcing that password input is provided.
+ * 3. [auth.ticket.get] retrieves the currently authenticated user's identifier from the JWT token.
+ * 4. [if] checks if [auth.ticket.get] produced a null result, indicating the user is not authenticated; if so, it throws a 401 "Access denied" error via [throw].
+ * 5. [set-value] hashes the provided password from [.arguments/*/password] using [crypto.password.hash] and stores it in [.password].
+ * 6. [data.connect] establishes a connection to the "magic" database, specifying "sqlite" as the database type.
+ * 7. [data.update] updates the [users] table, setting the password field to the hashed password for the user whose username matches the currently authenticated user.
+ * 
+ * Use cases:
+ * - Allowing authenticated users to securely change their own password in a web application.
+ * - Enforcing password hashing before storage to prevent clear text passwords in the database.
+ * - Integrating password change functionality with JWT-based authentication systems.
+ * - Providing an API endpoint for user self-service password updates, ensuring authentication and input validation.
+ * - Supporting multi-database backends by making the connection configurable.
+ */
+slots.create:magic.auth.change-password
+   validators.mandatory:x:@.arguments/*/password
+   auth.ticket.get
+   if
+      null:x:@auth.ticket.get
+      .lambda
+         throw:Access denied
+            status:int:401
+            public:bool:true
+   .password
+   set-value:x:@.password
+      crypto.password.hash:x:@.arguments/*/password
+   data.connect:magic
+      database-type:sqlite
+      data.update
+         table:users
+         values
+            password:x:@.password
+         where
+            and
+               username.eq:x:@auth.ticket.get

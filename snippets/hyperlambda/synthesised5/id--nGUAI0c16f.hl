@@ -1,0 +1,30 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters: [city], [country_id], and [last_update], specifying their respective types as string, long, and date.
+ * 2. The [data.connect] slot establishes a connection to the 'sakila' database using the 'generic' connection string and sets the [database-type] to SQLite, making all child operations use this database context.
+ * 3. The [add] slot collects all argument nodes from [.arguments] and appends them as child nodes under the [values] node within the [data.create] operation, ensuring that the input parameters are used as column values for the insert.
+ * 4. The [data.create] slot performs an insert operation into the [city] table, using the values from the previously prepared [values] node and specifying the database type as SQLite.
+ * 5. The [response.status.set] slot sets the HTTP response status to 201, indicating that a new resource has been successfully created.
+ * 6. The [yield] slot returns the ID of the newly created record by extracting it from the [data.create] operation.
+ * 
+ * Use cases:
+ * - Creating a new city record in the Sakila database with the provided city name, country ID, and last update time.
+ * - Implementing an HTTP endpoint for adding cities to a geographical or movie rental database.
+ * - Ensuring that the input parameters are dynamically mapped into the database insert operation, reducing boilerplate and increasing security.
+ * - Returning the unique identifier of the inserted city, which clients can use for further operations or referencing.
+ */
+.arguments
+   city:string
+   country_id:long
+   last_update:date
+data.connect:[generic|sakila]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:city
+      values
+   response.status.set:201
+   yield
+      id:x:@data.create

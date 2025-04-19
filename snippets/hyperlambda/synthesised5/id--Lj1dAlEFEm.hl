@@ -1,0 +1,21 @@
+
+/*
+ * 1. The [.result] node is used to store the final output of the database query.
+ * 2. The [data.connect] slot establishes a connection to the [auth_db] database, explicitly specifying the PostgreSQL database type via [database-type:pgsql].
+ * 3. The [data.select] slot executes a raw SQL query to fetch the [user_id], [username], and [email] from the [user_accounts] table for users where [active] is true, limiting the results to 50 records. The database type is again specified as PostgreSQL.
+ * 4. The [add] slot is used to append the selected user records to the [.result] node.
+ * 5. The [get-nodes] slot retrieves all result nodes from the executed [data.select] query for aggregation into the final output.
+ * 
+ * Potential use cases:
+ * - Retrieve a list of up to 50 active user accounts with basic details for an admin panel or dashboard.
+ * - Export a subset of active users' data for reporting or batch processing.
+ * - Display a paginated list of active users in a web application's user management section.
+ * - Prepare data for further filtering or transformation in subsequent workflow steps.
+ */
+.result
+data.connect:auth_db
+   database-type:pgsql
+   data.select:select user_id, username, email from user_accounts where active=true limit 50
+      database-type:pgsql
+   add:x:@.result
+      get-nodes:x:@data.select/*

@@ -1,0 +1,36 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters for the endpoint: [id], [country], [name], and [enabled], each with an explicit type, ensuring only these values are accepted and type-checked.
+ * 2. [auth.ticket.verify] with the value "root" enforces that only users with root privileges can execute this endpoint, providing a security layer.
+ * 3. [validators.mandatory] is applied to the [id], [country], and [name] arguments, requiring that these fields are present and not null in the request.
+ * 4. [data.connect] establishes a database connection to the "hub" database using the "generic" provider for subsequent data operations.
+ * 5. [add] collects all argument nodes and prepares them as values for insertion into the database by referencing all children of [.arguments].
+ * 6. [data.create] inserts a new record into the "clusters" table, using the prepared [values] node.
+ * 7. [response.status.set] sets the HTTP response status to 201, indicating successful creation.
+ * 8. [return] sends a response containing a [result] node with a value of "success".
+ * 
+ * Use Cases:
+ * - Creating a new cluster record via an HTTP POST or PUT, requiring that the user is an authenticated root user.
+ * - Validating that essential fields ([id], [country], [name]) are always provided when adding a new cluster.
+ * - Ensuring only authorized administrative users can add sensitive resources to the "clusters" table in the "hub" database.
+ * - Providing a standardized API response with a 201 status and a success message upon completion.
+ * - Enforcing strict argument validation and type safety for API consumers.
+ */
+.arguments
+   id:string
+   country:string
+   name:string
+   enabled:bool
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/id
+validators.mandatory:x:@.arguments/*/country
+validators.mandatory:x:@.arguments/*/name
+data.connect:[generic|hub]
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:clusters
+      values
+   response.status.set:201
+   return
+      result:success

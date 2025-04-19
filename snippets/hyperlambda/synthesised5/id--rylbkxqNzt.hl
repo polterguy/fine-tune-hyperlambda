@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [slots.create] node defines a new dynamic slot named [magic.http.get-with-cache], enabling HTTP GET requests with built-in caching.
+ * 2. [validators.mandatory] ensures a [url] argument is provided for every invocation, making the URL parameter required.
+ * 3. [validators.url] checks that the provided [url] value is a syntactically valid URL, preventing malformed requests.
+ * 4. [unwrap] ensures that any dynamic or deferred expressions for [.url] are evaluated before proceeding, supporting flexible argument sources.
+ * 5. [cache.try-get] attempts to retrieve a cached response for the [url] key. If a cached value exists (valid for 300 seconds), it returns it; otherwise, it invokes the attached [.lambda].
+ * 6. Inside [.lambda], an HTTP GET request ([http.get]) is made to the specified [url], sending specific HTTP headers to mimic a browser request. Only the [content] of the HTTP response is returned and cached.
+ * 7. The final [return] ensures the slot always returns the result from [cache.try-get], whether from cache or a new HTTP request.
+ * 
+ * Use cases:
+ * - Efficiently fetch web pages or API responses while minimizing redundant network requests by caching based on URL.
+ * - Implement backend proxy endpoints that return remote content, leveraging caching for improved performance.
+ * - Reduce server load and external API rate limits by serving cached content for repeated requests.
+ * - Support scenarios where the same URL might be queried frequently, such as previewing external resources or periodically polling endpoints.
+ */
+slots.create:magic.http.get-with-cache
+   validators.mandatory:x:@.arguments/*/url
+   validators.url:x:@.arguments/*/url
+   unwrap:x:+/*/.lambda/*/.url
+   cache.try-get:x:@.arguments/*/url
+      expiration:300
+      .lambda
+         .url:x:@.arguments/*/url
+         http.get:x:@.url
+            headers
+               User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36
+               Accept:text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+               Accept-Language:en-GB,en-US;q=0.9,en;q=0.8,no;q=0.7
+         return:x:-/*/content
+   return:x:@cache.try-get

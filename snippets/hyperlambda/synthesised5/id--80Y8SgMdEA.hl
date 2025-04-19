@@ -1,0 +1,46 @@
+
+/*
+ * 1. The [.arguments] node strictly defines the acceptable input parameters for this endpoint: [CategoryID], [CategoryName], [Description], and [Picture], each with an explicit type, ensuring only these arguments are processed and that type conversion occurs automatically.
+ * 2. [validators.mandatory] is used to enforce the presence of [CategoryID] in the incoming request, preventing further execution if this argument is missing.
+ * 3. [data.connect] establishes a database connection to the [northwind] database using the SQLite provider, setting the context for subsequent database operations.
+ * 4. The first [add] slot dynamically collects all argument nodes except [CategoryID] (using `[1,1000]` to skip the first argument) and inserts them under the [values] node inside [data.update], thus preparing the fields to be updated.
+ * 5. The second [add] slot extracts [CategoryID] (using `[0,1]` to obtain only the first argument) and places it under the [and] node within the [where] clause of [data.update], forming the SQL WHERE condition to identify which record to update.
+ * 6. [data.update] performs the SQL UPDATE operation on the [Categories] table, using the constructed [values] and [where] clauses.
+ * 7. [if] checks whether the update affected zero rows (i.e., no matching record found). If so, it returns a 404 status and a "Record not found" message; otherwise, it returns a 202 status with the number of affected rows.
+ * 
+ * Use cases:
+ * - Updating category details in a product management system by specifying a [CategoryID] and new values for [CategoryName], [Description], or [Picture].
+ * - Building an API endpoint for editing category information in the Northwind sample database, ensuring strict argument validation and type safety.
+ * - Handling partial updates, where only a subset of fields (except [CategoryID]) are changed, as the code dynamically collects provided arguments for updating.
+ * - Returning appropriate HTTP status codes to signal success (202) or failure (404: not found), supporting robust error handling in API integration.
+ */
+.arguments
+   CategoryID:long
+   CategoryName:string
+   Description:string
+   Picture:string
+validators.mandatory:x:@.arguments/*/CategoryID
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Categories
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

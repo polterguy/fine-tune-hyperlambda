@@ -1,0 +1,19 @@
+
+/*
+ * 1. The [data.connect] slot establishes a connection to the database named "sakila", making it available for subsequent operations.
+ * 2. The [data.transaction.create] slot starts a new database transaction within the established connection, ensuring any changes can be either committed or rolled back as a single unit.
+ * 3. The [data.execute] slot performs a SQL command to delete all records from the "film_actor" table inside the transaction, but does not return any result set.
+ * 4. A second [data.connect] slot opens a new connection to the "sakila" database, separate from the previous transactional context.
+ * 5. The [data.scalar] slot executes an aggregate query to count the total number of records remaining in the "film_actor" table and returns this count as a single value.
+ * 
+ * Potential use cases:
+ * - Testing transactional rollbacks by intentionally omitting a [data.transaction.commit] to ensure that deletions or changes are not persisted.
+ * - Verifying database behavior where a destructive operation is performed inside a transaction, and then confirming the table’s contents remain unchanged after the transaction scope ends.
+ * - Demonstrating safe data modification practices by showing that unless a transaction is explicitly committed, all changes are automatically rolled back.
+ * - Isolating destructive or experimental operations from live data to prevent accidental data loss.
+ */
+data.connect:sakila
+   data.transaction.create
+      data.execute:delete from film_actor
+data.connect:sakila
+   data.scalar:select count(*) from film_actor

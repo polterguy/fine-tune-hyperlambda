@@ -1,0 +1,30 @@
+
+/*
+ * 1. The [for-each] slot iterates over each child node of [.car-parts], passing each part node by reference into the [.dp] node for further processing.
+ * 2. Inside the loop, [if] checks if the value of the currently iterated part (via `eq:x:@.dp/#`) is "available", and if so, updates its value by appending " - checked" using [set-value] and [strings.concat].
+ * 3. The [else] branch handles parts not available, updating their value by appending " - needs restocking" instead.
+ * 
+ * Use cases:
+ * - Automatically update a list of inventory items to reflect their checked/restocking status.
+ * - Post-process product availability data to give feedback for further action, such as generating a report.
+ * - Tag car parts in a maintenance system with their current state after an inventory audit.
+ * - Quickly review which car parts need to be reordered or are ready for use.
+ */
+.car-parts
+   engine:available
+   wheel:out-of-stock
+   door:available
+for-each:x:@.car-parts/*
+   if
+      eq:x:@.dp/#
+         .:available
+      .lambda
+         set-value:x:@.dp/#
+            strings.concat
+               get-value:x:@.dp/#
+               .:" - checked"
+   else
+      set-value:x:@.dp/#
+         strings.concat
+            get-value:x:@.dp/#
+            .:" - needs restocking"

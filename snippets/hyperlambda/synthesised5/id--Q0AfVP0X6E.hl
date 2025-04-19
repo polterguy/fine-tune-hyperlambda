@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input parameters, specifically requiring a [name] node of type string.
+ * 2. [auth.ticket.verify] is used to ensure the caller has "root" privileges before proceeding.
+ * 3. [validators.mandatory] checks that the [name] argument has been supplied, throwing an error if it is missing.
+ * 4. [data.connect] establishes a connection to a database, using either the "generic" or "hub" connection string.
+ * 5. The [add] slot injects all nodes from [.arguments] as children of the [and] node within the [where] clause of the [data.delete] operation.
+ * 6. [data.delete] specifies the "plans" table and prepares a [where] clause with [and] conditions, which are populated dynamically.
+ * 7. [return] sends a response with a [result] node set to "OK" if the operation completes successfully.
+ * 
+ * Use Cases:
+ * - Securely deleting entries in the [plans] table that match input arguments, only if the user has root access.
+ * - Creating an API endpoint to bulk delete plans based on dynamic criteria provided by the caller.
+ * - Ensuring that the required arguments are present before executing sensitive data operations.
+ * - Allowing flexible deletion conditions by mapping any given argument to the [where] clause for fine-grained control.
+ */
+.arguments
+   name:string
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/name
+data.connect:[generic|hub]
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      table:plans
+      where
+         and
+   return
+      result:OK

@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input argument, specifically an [id] of type long, for the operation.
+ * 2. [auth.ticket.verify] ensures that only authenticated users with the "guest" role can proceed with this operation.
+ * 3. [validators.mandatory] enforces that the [id] argument is present in the incoming request.
+ * 4. [data.connect] establishes a connection to either a "generic" or "cms" SQLite database, preparing for data operations.
+ * 5. [add] dynamically injects all argument nodes as conditions into the [and] clause of the [where] filter under [data.delete]. This means all input arguments will be used as criteria for deletion.
+ * 6. [data.delete] performs a delete operation on the [roles] table, using SQLite, with the dynamically constructed [where] conditions.
+ * 7. [unwrap] evaluates the result of the delete operation.
+ * 8. [return] outputs the number of affected records via the [affected] node, referencing the outcome of [data.delete].
+ * 
+ * Use cases:
+ * - Deleting a role entry by its [id] from the [roles] table, ensuring only guests can perform this operation.
+ * - Enforcing input validation and access control before modifying database records.
+ * - Dynamically constructing SQL delete statements based on incoming arguments for flexible API endpoints.
+ * - Safely reporting how many records were deleted to the API caller.
+ */
+.arguments
+   id:long
+auth.ticket.verify:guest
+validators.mandatory:x:@.arguments/*/id
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:roles
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

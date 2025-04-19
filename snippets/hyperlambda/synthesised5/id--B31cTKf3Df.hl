@@ -1,0 +1,36 @@
+
+/*
+ * 1. The [.arguments] node defines optional filtering parameters for querying the [crawl_urls] table, supporting both exact match ([eq]) and partial match ([like]) comparisons for the [crawl_url_id], [url], and [type] fields.
+ * 2. The [auth.ticket.verify] slot ensures that only users with either the [root] or [admin] role can proceed further, enforcing access control.
+ * 3. The [data.connect] slot establishes a connection to a database (either [generic] or [scraper]), specifying SQLite as the [database-type].
+ * 4. The [add] slot dynamically injects all defined argument nodes from [.arguments] as conditions into the [and] node within the [where] clause of the [data.read] operation, allowing for flexible and extensible query filtering based on the input arguments.
+ * 5. The [data.read] slot performs a SQL query on the [crawl_urls] table, selecting a single column [count(*)] (aliased as [count]) and applying any dynamically constructed [where] conditions, with a result limit of 1.
+ * 6. The [return-nodes] slot returns the entire set of nodes under the [data.read] operation, effectively exposing the query result(s) to the caller.
+ * 
+ * Use cases:
+ * - Counting the number of URLs in the [crawl_urls] table that match specific filter criteria provided as input arguments.
+ * - Enforcing strict access so only privileged users (root or admin) can perform aggregate queries on the [crawl_urls] data set.
+ * - Building a flexible API endpoint for statistical reporting, such as returning the total number of crawl URLs of a specific type or matching a URL pattern.
+ * - Enabling client applications to retrieve counts for dashboard widgets or analytics by specifying various search parameters without changing the underlying Hyperlambda logic.
+ */
+.arguments
+   crawl_urls.crawl_url_id.eq:long
+   crawl_urls.url.like:string
+   crawl_urls.url.eq:string
+   crawl_urls.type.like:string
+   crawl_urls.type.eq:string
+auth.ticket.verify:root,admin
+data.connect:[generic|scraper]
+   database-type:sqlite
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:crawl_urls
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

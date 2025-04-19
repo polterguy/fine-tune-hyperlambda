@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [.arguments] node at the top signals that this code is intended for use as an HTTP endpoint, ensuring incoming arguments are managed properly.
+ * 2. The [auth.ticket.verify] slot checks that the current user has the "root" role. If not, execution stops with an authorization error, securing the endpoint for privileged users only.
+ * 3. [data.connect] establishes a connection to a database, with the database type or connection specified by the value "[generic|hub]", enabling subsequent database operations within this context.
+ * 4. [data.read] performs a read operation on the [plans] table, and the [columns] node specifies a list of columns to select: [name], [description], [cpu], [memory], [storage], [price], [enabled], [max_upload], [max_timeout], [price_reference], and [bandwidth]. Only these fields will be included in the query result.
+ * 5. [return-nodes] with the expression `:x:@data.read/*` returns all child nodes under [data.read], effectively sending the full result set of selected plan records back to the client.
+ * 
+ * Use cases:
+ * - Creating an admin-only API endpoint that lists all available plans with detailed attributes for a cloud or SaaS platform.
+ * - Providing a secure management interface for "root" users to audit or manage service plans.
+ * - Building a dashboard for privileged users to view and possibly edit plan configurations and limits.
+ * - Supplying plan data to a frontend component that needs to show users all available plans and their features, restricted to superuser access.
+ * - Generating downloadable reports of plans, including technical and pricing details, for internal use.
+ */
+.arguments
+auth.ticket.verify:root
+data.connect:[generic|hub]
+   data.read
+      table:plans
+      columns
+         name
+         description
+         cpu
+         memory
+         storage
+         price
+         enabled
+         max_upload
+         max_timeout
+         price_reference
+         bandwidth
+   return-nodes:x:@data.read/*

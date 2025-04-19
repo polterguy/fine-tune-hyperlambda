@@ -1,0 +1,43 @@
+
+/*
+ * 1. The [validators.mandatory] slot ensures that the [.city_id] argument is provided, enforcing input validation.
+ * 2. The [add] slot under [data.connect] dynamically populates the [values] node for the [data.update] operation with relevant argument nodes, allowing flexible update payloads.
+ * 3. Another [add] slot attaches filtering conditions to the [and] node within [where], using argument nodes to construct a robust WHERE clause for the update.
+ * 4. The [data.update] slot attempts to update the [city] table in a SQLite database, using the constructed [values] and [where] nodes.
+ * 5. The [if] slot checks the result of the [data.update] operation; if no records were affected (returned value is 0), it sets the response status to 404 and returns a "Record not found" message.
+ * 6. If the update is successful (at least one record affected), the response status is set to 202, and a [yield] returns the number of affected records.
+ * 
+ * Use Cases:
+ * - Updating city records by city ID in a SQLite-backed API, ensuring proper validation and dynamic argument mapping.
+ * - Building a reusable endpoint for editing location data where only specified fields are changed and missing records are handled gracefully.
+ * - Integrating with front-end applications that expect clear HTTP status codes for success or failure during update operations.
+ * - Automating bulk updates by passing in dynamic sets of parameters, relying on the argument-to-value mapping logic.
+ */
+.arguments
+   city_id:long
+   city:string
+   country_id:long
+validators.mandatory:x:@.arguments/*/city_id
+data.connect:[generic|sakila]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:city
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   yield
+      affected:x:@data.update

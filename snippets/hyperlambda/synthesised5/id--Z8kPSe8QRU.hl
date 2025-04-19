@@ -1,0 +1,47 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot ensures only users with the "root" or "admin" roles can execute this code, enforcing strong access control.
+ * 2. The [data.connect] slot establishes a connection to the "shopping-cart-demo" database, specifying SQLite as the database type.
+ * 3. The [add] slot dynamically injects all filter arguments from [.arguments] as conditions under the [and] node within the [where] clause of [data.read], allowing flexible query filters based on provided parameters.
+ * 4. The [data.read] slot performs a SQL SELECT query on the [items] table, left joining the [products] table (aliased as [product_id]) via the [items.product_id = product_id.product_id] condition.
+ * 5. The [columns] node requests a count of matching records, aliased as [count], ensuring the query returns only the number of found items.
+ * 6. The [where] clause starts with an empty [and] node that is populated by the [add] slot from user-supplied arguments.
+ * 7. The [limit] node restricts the result to a single record.
+ * 8. The [return-nodes] slot returns the results from [data.read] to the caller, making the count accessible to the API consumer.
+ * 
+ * Use cases:
+ * - Quickly obtain the count of cart items matching dynamic search criteria (e.g., by session or product name).
+ * - Allow admin users to audit the number of items in the shopping cart with advanced filtering.
+ * - Provide a backend endpoint for analytics dashboards to show item counts based on various filters.
+ * - Support reporting on shopping cart contents filtered by product or session information.
+ * - Restrict sensitive database access to privileged users while supporting flexible queries.
+ */
+.arguments
+   items.item_id.eq:long
+   items.product_id.eq:long
+   items.quantity.eq:long
+   items.session_id.like:string
+   items.session_id.eq:string
+   product_id.name.eq:string
+   product_id.name.like:string
+auth.ticket.verify:root,admin
+data.connect:[generic|shopping-cart-demo]
+   database-type:sqlite
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:items
+         join:products
+            as:product_id
+            type:left
+            on
+               and
+                  items.product_id:product_id.product_id
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

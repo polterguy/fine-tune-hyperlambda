@@ -1,0 +1,37 @@
+
+/*
+ * 1. The [.arguments] node explicitly declares three arguments ([user], [type], and [value]) as expected string inputs for this endpoint.
+ * 2. The [validators.mandatory] slots ensure that both [type] and [user] arguments must be provided, otherwise the execution will stop with an error.
+ * 3. The [auth.ticket.verify] slot checks if the request is authenticated as "root", enforcing a security requirement before continuing.
+ * 4. The [data.connect] slot establishes a connection to either the [generic] or [magic] database provider.
+ * 5. The first [add] slot collects all argument nodes except the first two ([user] and [type]) and injects them into the [values] node inside the [data.update] command.
+ * 6. The second [add] slot extracts the [user] and [type] arguments and appends them into the [and] node under [where], forming the condition for the update.
+ * 7. The [data.update] slot performs an update operation on the [users_extra] table, using the constructed [values] and [where] conditions.
+ * 8. The [return] slot responds with a [result] node set to "success" to indicate the operation completed.
+ * 
+ * Use cases:
+ * - Updating extra user data while making sure only authenticated "root" users can perform the operation.
+ * - Enforcing the presence of required arguments before making any changes to database records.
+ * - Dynamically constructing SQL update statements based on which arguments (besides [user] and [type]) are supplied, allowing flexible modification of user metadata.
+ * - Supporting scenarios where you want to update specific fields for a user, while always identifying the target row by [user] and [type].
+ * - Providing a secure, validated, and generic endpoint for modifying auxiliary user information in a multi-provider database setup.
+ */
+.arguments
+   user:string
+   type:string
+   value:string
+validators.mandatory:x:@.arguments/*/type
+validators.mandatory:x:@.arguments/*/user
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[2,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,2]
+   data.update
+      table:users_extra
+      values
+      where
+         and
+   return
+      result:success

@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot ensures that the current user has the "root" role before proceeding, enforcing strict access control for this operation.
+ * 2. The [add] slot dynamically appends all nodes from [.arguments] into the [where/and] clause of the [data.read] query, allowing filtering based on the incoming arguments.
+ * 3. The [data.read] slot performs a SQL query on the [users_roles] table, selecting a count of records (aliased as [count]) that match the filter criteria provided by the combined [.arguments], and limits the result to one record.
+ * 4. The [return-nodes] slot returns all nodes from the result set, effectively responding with the output of the database query.
+ * 
+ * Use cases:
+ * - Counting how many user-role assignments exist for a specific user and role, with security restricted to root users.
+ * - Validating if a particular user is associated with a certain role in the system.
+ * - Creating an administrative endpoint to audit or verify user role assignments by providing flexible filtering criteria.
+ * - Integrating into a management dashboard to report on user-role relationships for compliance or security monitoring.
+ */
+.arguments
+   role.eq:string
+   user.eq:string
+auth.ticket.verify:root
+data.connect:[generic|magic]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      table:users_roles
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,34 @@
+
+/*
+ * 1. The [for-each] slot loops through each child node of [.arguments], passing each node by reference as [.dp] for processing.
+ * 2. Inside the loop, [unwrap] and [set-name] are used to navigate and rename nodes, dynamically setting the name of each processed node to match the original argument's name.
+ * 3. The [add] slot appends these processed nodes to the [.bars] node, building a collection of bar data.
+ * 4. After the loop, another [add] combines any existing bar nodes from elsewhere in the execution tree (such as from a previous [image.chart] invocation) into the local [.bars] collection.
+ * 5. [image.chart] is then called, using the [.bars] data to generate a bar chart image with specified width and height.
+ * 6. [response.headers.set] ensures the HTTP response content type is set to "image/png".
+ * 7. Finally, [return] outputs the resulting image chart node as the HTTP response.
+ * 
+ * Use cases:
+ * - Creating a dynamic bar chart from incoming HTTP arguments for data visualization.
+ * - Merging multiple sources of bar data before rendering a chart.
+ * - Generating and returning a PNG chart image in response to user-supplied data via an API.
+ * - Supporting flexible data inputs without strict argument validation by using [.arguments:*].
+ */
+.arguments:*
+.bars
+for-each:x:@.arguments/*
+   unwrap:x:+/+/*/*
+   set-name:x:+/*/*
+      get-name:x:@.dp/#
+   add:x:@.bars
+      .
+         .:x:@.dp/#
+add:x:../*/image.chart/*/bars
+   get-nodes:x:@.bars/*
+image.chart:bars
+   width:800
+   height:500
+   bars
+response.headers.set
+   Content-Type:image/png
+return:x:@image.chart

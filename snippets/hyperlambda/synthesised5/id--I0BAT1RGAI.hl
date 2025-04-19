@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [http.post] slot sends a POST request to "https://user.example.io/meta" with a payload containing an [id] node, whose value is dynamically set from the [.arguments] node. The [convert] argument is set to true, so the response will be automatically transformed into a lambda object if a supported content type is detected.
+ * 2. The [if] slot checks if the HTTP status code returned from the [http.post] request is between 200 (inclusive) and 300 (exclusive), using [mte] (more than or equal) and [lt] (less than) slots. If this condition is true, the code proceeds to its [.lambda] branch.
+ * 3. Inside the [.lambda] branch, the [yield] slot returns the [name] and [email] values from the response's [content] section, extracted using lambda expressions that point to their respective locations within the [http.post] result.
+ * 4. If the HTTP response code does not indicate success, the [return] slot is invoked, returning an [error] node with a message indicating that user metadata could not be retrieved.
+ * 
+ * Use Cases:
+ * - Fetching and returning user profile information (name and email) from a remote service based on a provided user ID.
+ * - Validating HTTP response codes before consuming or returning data to ensure only successful responses are processed.
+ * - Providing a clear error message when remote user data cannot be obtained, enabling robust error handling in API endpoints.
+ * - Dynamically mapping and returning specific fields from an external service in a custom response format.
+ */
+.arguments
+   id:int
+http.post:"https://user.example.io/meta"
+   convert:true
+   payload
+      id:x:@.arguments/*/id
+if
+   and
+      lt:x:@http.post
+         .:int:300
+      mte:x:@http.post
+         .:int:200
+   .lambda
+      yield
+         name:x:@http.post/*/content/*/name
+         email:x:@http.post/*/content/*/email
+return
+   error:Unable to retrieve user metadata

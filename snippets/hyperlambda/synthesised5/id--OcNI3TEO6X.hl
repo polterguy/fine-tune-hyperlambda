@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [auth.ticket.verify] slot ensures that the user has root access before proceeding, enforcing security.
+ * 2. The [io.file.list] slot retrieves all files from the folder specified in the [.arguments] node's [folder] child.
+ * 3. The [if] slot checks whether a [filter] argument exists, determining if file filtering should be applied.
+ * 4. If a [filter] is provided, [for-each] iterates through each file, and [strings.contains] checks if the file name contains the filter value. Matching files are collected using [add] and then returned with [return-nodes].
+ * 5. If no [filter] argument is supplied, all files listed from [io.file.list] are returned directly using [return-nodes].
+ * 
+ * Use cases:
+ * - Listing all files in a given directory for an admin interface.
+ * - Searching for files by partial name match within a folder.
+ * - Creating a file browser with optional search/filter capabilities.
+ * - Restricting file listing access to authorized users only.
+ * - Building an endpoint to support autocomplete or search suggestions for filenames.
+ */
+.arguments
+   folder:string
+   filter:string
+auth.ticket.verify:root
+io.file.list:x:@.arguments/*/folder
+if
+   exists:x:@.arguments/*/filter
+   .lambda
+      for-each:x:@io.file.list/*
+         if
+            strings.contains:x:@.dp/#
+               get-value:x:@.arguments/*/filter
+            .lambda
+               add:x:@for-each/./*/return-nodes
+                  get-nodes:x:@.dp/#
+      return-nodes
+else
+   return-nodes:x:@io.file.list/*

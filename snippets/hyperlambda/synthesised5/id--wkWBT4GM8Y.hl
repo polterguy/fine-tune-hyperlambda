@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [.arguments] node defines an input argument named [databaseType] of type string, declaring what the endpoint accepts.
+ * 2. The [auth.ticket.verify] slot verifies that the caller has a valid ticket with the "root" role, ensuring secure access to the operation.
+ * 3. The [strings.concat] slot builds a path by concatenating "/etc/", the value of [databaseType], and "/templates/".
+ * 4. The [io.file.list] slot lists all files found in the constructed directory path.
+ * 5. The [yield] slot returns the list of files as the [files] node in the endpoint's response.
+ * 
+ * Use cases:
+ * - Securely listing template files for a specific database type in a multi-database application.
+ * - Providing a file browser interface restricted to root users for configuration templates.
+ * - Dynamically exposing available template files based on the database type specified in the request.
+ * - Supporting administrative tasks such as auditing or managing template files per database engine.
+ */
+.arguments
+   databaseType:string
+auth.ticket.verify:root
+strings.concat
+   .:/etc/
+   get-value:x:@.arguments/*/databaseType
+   .:/templates/
+io.file.list:x:@strings.concat
+yield
+   files:x:@io.file.list/*

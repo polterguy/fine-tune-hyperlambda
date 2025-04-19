@@ -1,0 +1,60 @@
+
+/*
+ * 1. The [validators.mandatory] and [validators.enum] slots ensure that the [.distinct_column] parameter is provided and its value is restricted to either [CustomerCustomerDemo.CustomerID] or [CustomerCustomerDemo.CustomerTypeID].
+ * 2. [data.connect] establishes a connection to the Northwind SQLite database.
+ * 3. The [set-name] slot dynamically constructs a column name using the SQL DISTINCT function, based on the provided [.distinct_column] argument, and stores this logic in [distinct_functor].
+ * 4. Various [remove-nodes] slots clean up argument nodes ([order], [direction], [limit], [offset], [distinct_column]) from the input argument list after their values are processed and applied.
+ * 5. The [add] slots inject [limit], [offset], [order], and [direction] nodes into the [data.read] configuration if they were provided as arguments.
+ * 6. Additional [add] and [get-nodes] slots collect filtering arguments from the input and add them to the [where]/[and] clause of the SQL query.
+ * 7. [data.read] executes a read operation on the [CustomerCustomerDemo] table, selecting a single distinct column (as specified), optionally applying limit, offset, ordering, and filtering.
+ * 8. [return-nodes] exposes the result set from the executed query.
+ * 
+ * Use cases:
+ * - Retrieve a unique list of all customer IDs found in the [CustomerCustomerDemo] table, with optional filtering and paging.
+ * - Obtain all distinct customer type IDs while supporting filters, sorting, and pagination for frontend dropdowns or analytics.
+ * - Enforce that only valid columns can be used for distinct selection, preventing injection or invalid SQL.
+ * - Perform advanced searches where users want to see which unique customer types are associated with specific filtering criteria.
+ * - Allow client applications to retrieve paginated and filtered lists of unique values for reporting or lookup purposes.
+ */
+.arguments
+   distinct_column:string
+   limit:long
+   offset:long
+   order:string
+   direction:string
+   CustomerCustomerDemo.CustomerID.like:string
+   CustomerCustomerDemo.CustomerID.eq:string
+   CustomerCustomerDemo.CustomerTypeID.like:string
+   CustomerCustomerDemo.CustomerTypeID.eq:string
+validators.mandatory:x:@.arguments/*/distinct_column
+validators.enum:x:@.arguments/*/distinct_column
+   .:CustomerCustomerDemo.CustomerID
+   .:CustomerCustomerDemo.CustomerTypeID
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:CustomerCustomerDemo
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [http.post] slot is used to send a POST request to "https://billing.example.com/api/v1/invoices" with a payload containing [customer_id], [amount], and [currency], and the [convert] argument set to true for automatic response conversion.
+ * 2. The [if] slot checks if the HTTP response status code is greater than or equal to 200 ([mte]) and less than 300 ([lt]), using [and] to ensure both conditions are met (i.e., the request was successful).
+ * 3. Inside the conditional lambda, [set-value] updates the [.invoice.status] node to indicate that the invoice was created successfully.
+ * 
+ * Use cases:
+ * - Automatically updating [.invoice.status] after creating an invoice through an external billing API.
+ * - Handling API responses and reflecting success or failure in internal workflow nodes.
+ * - Validating HTTP response codes and conditionally executing business logic only when the API call succeeds.
+ * - Integrating third-party billing or payment services and storing the operation result in a workflow.
+ */
+.invoice.status:unknown
+http.post:"https://billing.example.com/api/v1/invoices"
+   convert:true
+   payload
+      customer_id:int:101
+      amount:decimal:299.99
+      currency:NOK
+if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      set-value:x:@.invoice.status
+         .:Invoice created successfully

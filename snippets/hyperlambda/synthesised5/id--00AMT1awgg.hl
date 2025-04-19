@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [.arguments] node defines the expected input arguments for the endpoint, specifying [post_id] as a long, [file_path] as a string, [file_type] as a string, and [created_at] as a date.
+ * 2. The [auth.ticket.verify] slot ensures that only users with the "root" or "admin" role can access this endpoint, enforcing role-based access control.
+ * 3. The [data.connect] slot establishes a database connection using a generic or CMS configuration and specifies SQLite as the database type.
+ * 4. The [add] slot dynamically adds all arguments from [.arguments] into the [values] node, preparing the data for insertion into the database.
+ * 5. The [data.create] slot inserts a new record into the "media" table with the values gathered from the input arguments.
+ * 6. The [response.status.set] slot sets the HTTP response status code to 201, indicating successful resource creation.
+ * 7. The [yield] slot returns the ID of the newly created database record to the client.
+ * 
+ * Use cases:
+ * - Creating a new media entry in a CMS by providing metadata such as post ID, file path, type, and creation date.
+ * - Restricting the creation of media records to only administrators or root users.
+ * - Automating the insertion of uploaded file information into a SQLite-backed CMS.
+ * - Returning the unique ID of the stored media to the client for further processing or reference.
+ */
+.arguments
+   post_id:long
+   file_path:string
+   file_type:string
+   created_at:date
+auth.ticket.verify:root,admin
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:media
+      values
+   response.status.set:201
+   yield
+      id:x:@data.create

@@ -1,0 +1,37 @@
+
+/*
+ * 1. The [set-value] slot is used twice to build the final email content in [.reset-email] by replacing placeholders in the template string with actual values from [.arguments].
+ * 2. The [strings.replace] slot is applied first to substitute `{{user}}` with the value from [.arguments/*/user], and then again to substitute `{{reset_link}}` with the value from [.arguments/*/reset_link].
+ * 3. The [yield] slot outputs the final email content under an [email] node, making it available to subsequent logic or as a result.
+ * 
+ * Use cases:
+ * - Sending a personalized password reset email to users who request it.
+ * - Dynamically generating templated emails with user-specific information (e.g., greeting, links).
+ * - Automating responses that involve merging data into predefined templates, such as notifications or alerts.
+ */
+.arguments
+   user:string
+   reset_link:string
+.email-template:@"
+Hi {{user}},
+
+We received a request to reset your password.
+
+Click the link below to proceed:
+{{reset_link}}
+
+If you didn't request this, please ignore this message.
+
+Thanks,
+Support Team"
+.reset-email
+set-value:x:@.reset-email
+   strings.replace:x:@.email-template
+      .:{{user}}
+      get-value:x:@.arguments/*/user
+set-value:x:@.reset-email
+   strings.replace:x:@.reset-email
+      .:{{reset_link}}
+      get-value:x:@.arguments/*/reset_link
+yield
+   email:x:@.reset-email

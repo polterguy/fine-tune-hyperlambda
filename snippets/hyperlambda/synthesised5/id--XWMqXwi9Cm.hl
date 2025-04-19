@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [.arguments] node declares expected incoming arguments, specifying that [id] must be provided as a string.
+ * 2. [auth.ticket.verify] with "root" ensures the requester has root-level authorization before proceeding.
+ * 3. [validators.mandatory] checks for the existence of the [id] argument and throws an error if it's missing.
+ * 4. [data.connect] establishes a connection to either the [generic] or [hub] database.
+ * 5. The [add] slot dynamically injects all nodes under [.arguments] into the [and] clause of the [where] condition for the [data.delete] operation, allowing flexible filtering based on provided arguments.
+ * 6. [data.delete] targets the [clusters] table, using the dynamic [where] condition built from the arguments.
+ * 7. [unwrap] evaluates the next sibling nodes to ensure any expressions are resolved before returning.
+ * 8. [return] outputs the number of records affected by the delete operation under the [affected] node, sourcing the result from [data.delete].
+ * 
+ * Use cases:
+ * - Securely deleting a cluster record from a multi-tenant database using an authenticated admin or root user, requiring the cluster [id].
+ * - Creating an endpoint to bulk delete clusters if more arguments are added to [.arguments] (e.g., delete by [id] and [region]).
+ * - Enforcing strict API contracts where only specified arguments are accepted and validated before data modification.
+ * - Auditing or reporting how many cluster records were removed by returning the [affected] count post-deletion.
+ */
+.arguments
+   id:string
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/id
+data.connect:[generic|hub]
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      table:clusters
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete
