@@ -1,0 +1,30 @@
+/*
+ * Retrieves all artists from the [Artist] table in the [chinook] database, and for each artist, 
+ * loads their corresponding albums from the [Album] table.
+ *
+ * 🔹 The key element here is the use of [include], which acts as an **implicit loop**:
+ * - It iterates over every result from the outer [data.read] (each artist).
+ * - For each artist, it executes a nested [data.read] on the [Album] table,
+ *   filtered by that specific artist's [ArtistId].
+ *
+ * 🔹 The presence of a [yield] **inside** the [include] block is crucial:
+ * - Without [yield], the albums retrieved for each artist would not be included in the final output.
+ * - [yield] exposes the result of each inner [data.read] execution to the parent artist node.
+ * - The result is a fully joined structure, where each artist node includes an [albums] child node.
+ *
+ * 🔸 This pattern is useful when:
+ * 1. You need to produce nested, parent-child datasets (e.g., artist → albums).
+ * 2. You're building composite API responses or documents with relational structure.
+ * 3. You want to avoid writing multiple top-level queries and merge logic manually.
+ */
+data.connect:chinook
+   data.read
+      table:Artist
+   include:x:@data.read/*
+      data.read
+         table:Album
+         where
+            and
+               ArtistId.eq:x:@.dp/#/*/ArtistId
+      yield
+         albums:x:@data.read/*

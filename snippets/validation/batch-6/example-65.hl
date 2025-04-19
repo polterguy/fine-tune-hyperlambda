@@ -1,0 +1,28 @@
+/*
+ * Retrieves all shipments from the [Shipments] table in the [logistics] database,
+ * and includes their associated packages from the [Packages] table.
+ *
+ * 🔹 [include] serves as a **loop mechanism**:
+ * - Iterates through each shipment.
+ * - For every shipment, runs a [data.read] on [Packages] using [ShipmentId].
+ *
+ * 🔹 The [yield] inside [include] is mandatory:
+ * - It ensures that the packages retrieved are appended to each shipment.
+ * - Without it, the response would include shipments but no nested package info.
+ *
+ * 🔸 Ideal for:
+ * 1. API endpoints that return complex transport data.
+ * 2. Aggregated dashboards showing shipment → package structure.
+ * 3. Exporting relational records in nested formats.
+ */
+data.connect:logistics
+   data.read
+      table:Shipments
+   include:x:@data.read/*
+      data.read
+         table:Packages
+         where
+            and
+               ShipmentId.eq:x:@.dp/#/*/ShipmentId
+      yield
+         packages:x:@data.read/*

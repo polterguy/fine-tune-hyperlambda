@@ -1,0 +1,27 @@
+/*
+ * Queries all authors from the [Authors] table in the [library] database,
+ * and includes all books written by each author from the [Books] table.
+ *
+ * 🔹 The [include] construct loops through each author row:
+ * - Executes a filtered [data.read] on [Books] using [AuthorId].
+ *
+ * 🔹 The [yield] is what binds the inner result to each outer row:
+ * - It places the list of books under each author.
+ * - Omission would make the join logic ineffective.
+ *
+ * 🔸 Practical for:
+ * 1. Catalog UIs showing authors and their publications.
+ * 2. Nested API responses (e.g., `/authors?include=books`).
+ * 3. Exporting bibliography data structures.
+ */
+data.connect:library
+   data.read
+      table:Authors
+   include:x:@data.read/*
+      data.read
+         table:Books
+         where
+            and
+               AuthorId.eq:x:@.dp/#/*/AuthorId
+      yield
+         books:x:@data.read/*

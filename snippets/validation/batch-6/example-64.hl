@@ -1,0 +1,27 @@
+/*
+ * Retrieves all customers from the [Customers] table in the [ecommerce] database,
+ * and includes all related orders from the [Orders] table for each customer.
+ *
+ * 🔹 [include] loops over each customer record:
+ * - Executes a nested [data.read] for each customer, filtering [Orders] by [CustomerId].
+ *
+ * 🔹 The [yield] is essential inside [include]:
+ * - It binds the retrieved orders to the parent customer.
+ * - Without it, the inner query runs but its result is discarded.
+ *
+ * 🔸 Recommended when:
+ * 1. Building customer profiles with order history.
+ * 2. Producing expandable frontend UIs with nested data.
+ * 3. Structuring multi-entity API responses efficiently.
+ */
+data.connect:ecommerce
+   data.read
+      table:Customers
+   include:x:@data.read/*
+      data.read
+         table:Orders
+         where
+            and
+               CustomerId.eq:x:@.dp/#/*/CustomerId
+      yield
+         orders:x:@data.read/*

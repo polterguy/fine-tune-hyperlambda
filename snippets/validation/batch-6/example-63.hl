@@ -1,0 +1,28 @@
+/*
+ * Loads all students from the [Students] table in the [school] database, and for each student,
+ * retrieves their related grade entries from the [Grades] table.
+ *
+ * 🔹 The [include] slot effectively behaves like a **loop**:
+ * - It runs once per student row returned by the outer [data.read].
+ * - For each student, a second [data.read] is performed on [Grades] using that student's [StudentId].
+ *
+ * 🔹 The [yield] inside [include] is **critical**:
+ * - It attaches the result of the inner query (grades) to the corresponding student.
+ * - Without it, the retrieved grades would not be included in the final structure.
+ *
+ * 🔸 Use when:
+ * 1. You need nested relational output (e.g., student → grades).
+ * 2. You're generating a joined data view for reports or APIs.
+ * 3. You want to avoid manually merging data sets after retrieval.
+ */
+data.connect:school
+   data.read
+      table:Students
+   include:x:@data.read/*
+      data.read
+         table:Grades
+         where
+            and
+               StudentId.eq:x:@.dp/#/*/StudentId
+      yield
+         grades:x:@data.read/*
