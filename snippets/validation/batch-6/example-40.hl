@@ -1,0 +1,25 @@
+/*
+ * Fetches video records from the [Videos] table in the [media] database with explicit pagination.
+ *
+ * The [.arguments] block defines two parameters:
+ * - [offset] → Starting index for the result set.
+ * - [limit]  → Maximum number of records to return.
+ *
+ * 🔹 Although not enforced through [validators.mandatory], both [offset] and [limit] are 
+ * **indirectly required** because they are **referenced directly** inside the [data.read] slot.
+ * - This means if the caller omits either argument, the invocation will likely fail.
+ * - There's no fallback logic or dynamic injection using [add] — the [data.read] node explicitly depends on them.
+ *
+ * 🔸 Use this pattern when you want to enforce strict paging logic at the database layer.
+ * However, if flexibility is desired, consider dynamic argument merging via [add] instead.
+ */
+.arguments
+   offset:int
+   limit:int
+data.connect:media
+   data.read
+      table:Videos
+      offset:x:@.arguments/*/offset
+      limit:x:@.arguments/*/limit
+yield
+   videos:x:@data.read/*

@@ -1,0 +1,30 @@
+/*
+ * This Hyperlambda file reads artist records from the [Artist] table in the [chinook] database.
+ *
+ * The [.arguments] collection defines two **optional** parameters:
+ * - [offset] → The starting row for pagination.
+ * - [limit]  → The maximum number of rows to return.
+ *
+ * 🔹 These arguments are **not required** because they are **dynamically injected** into the [data.read] invocation using [add].
+ * - The [data.read] slot itself does **not** reference [offset] or [limit] directly.
+ * - Instead, [add] pulls in whatever arguments are present using [get-nodes].
+ * - If either argument is missing, it simply won't be included — making the parameters truly optional.
+ *
+ * 🔸 This pattern is particularly useful for:
+ * 1. Flexible pagination endpoints that work even without query parameters.
+ * 2. Reusing the same logic for both full-table and paged results.
+ * 3. Reducing boilerplate by avoiding conditional branching based on presence of arguments.
+ *
+ * The [yield] statement returns the final result set under the [artists] node.
+ */
+.arguments
+   offset:int
+   limit:int
+data.connect:chinook
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/limit
+   data.read
+      table:Artist
+yield
+   artists:x:@data.connect/*/data.read/*
