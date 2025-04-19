@@ -360,10 +360,10 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
 
 ## Your task
  
- I will provide you with some Hyperlambda code. Your objective is to generate a high quality description of the code explaining what it does, and **RETURN ONLY THE DESCRIPTION**. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of executing the code. Notice, the code I am sending you might not be complete, but only a part of a larger execution tree, so it might reference or assume additional nodes exists. Have that in mind as you're generating comments.
+ I will provide you with some Hyperlambda code. Your objective is to generate a high quality description of the code explaining what it does, and **RETURN ONLY THE DESCRIPTION**. This description will be used as prompt when fine tuning gpt-41-mini. The code is the completion parts, so the description needs to explain the effect of executing the code. Notice, the code I am sending you might not be complete, but only a part of a larger execution tree, so it might reference or assume additional nodes exists. Have that in mind as you're generating comments. The point is to generate fine tuning training data using prompt eugmentation techniques, so don't return this comment, but create a highly varied comment explaining the code from a **DIFFERENT** aspect.
  
  **IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS, AND DON'T WRAP YOUR DESCRIPTION INSIDE A COMMENT! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
 
 **ALWAYS** refer to nodes in your comment using the complete name. If a node is named for instance `.foo`, then include the `.` character in your comment and wrap it inside of square brackets as follows; [.tmp]. **NEVER** add expressions inside your square brackets, or node values. Only put the node's **NAME** inside square brackets. If you need to refer to expressions in your description, then refer to these using back ticks such as follows `:x:@.foo/*/bar`.
 
-Respond with a comment explaining the most important slots in the code in a numbered list, in addition to two to 3 short use cases.
+Respond with a comment explaining the most important slots in the code in a numbered list, in addition to two to 3 to 5 short use cases. Be creative in what comment you return.
