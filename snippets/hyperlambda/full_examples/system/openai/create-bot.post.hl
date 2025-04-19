@@ -1,70 +1,26 @@
-
 /*
- * This Hyperlambda endpoint creates a new machine learning type for a chatbot by scraping the given [url] and configuring training.
+ * Endpoint that provisions and deploys a fully functional OpenAI-powered chatbot from a website URL.
  *
- * 1. [.arguments]
- *    * The input payload includes:
- *      - [url]: The website to crawl.
- *      - [model]: The OpenAI model to base the chatbot on.
- *      - [flavor]: System prompt template.
- *      - [max]: Max training snippets allowed (default 1250).
- *      - [autocrawl]: Whether to automatically crawl subpages.
- *      - [auto_destruct]: If true, sets up a scheduled task to delete the chatbot in 7 days.
- *      - [feedback-channel]: Used for real-time updates to the user via sockets.
- *      - [vectorize]: Whether to perform OpenAI vectorization of the training data.
- *      - [instruction]: Textual instruction for generating a custom system message.
+ * Starts by securing access with [auth.ticket.verify] to ensure only users with the 'root' role can execute.
+ * Validates and normalizes the input URL, enforces mandatory fields like 'model', and sets default values for
+ * missing optional arguments such as 'max', 'autocrawl', and 'vectorize'.
  *
- * 2. [auth.ticket.verify]
- *    * Ensures the endpoint can only be called by users with the [root] role.
+ * Communicates progress back to the frontend via WebSockets using the 'feedback-channel' argument, allowing
+ * the caller to track the provisioning steps in real time.
  *
- * 3. [if], [strings.starts-with], [strings.trim-end], [strings.to-lower]
- *    * Normalizes and prepares the [url] by prepending "https://" if missing, trimming trailing slashes, and converting to lowercase.
+ * Constructs a unique type name from the URL, and ensures the type does not already exist in the system.
+ * Then inserts the type into the 'ml_types' table, encoding properties like token limits, model, and flavor.
  *
- * 4. [validators.mandatory], [validators.default], [validators.url]
- *    * Ensures required arguments are valid and applies defaults for optional ones.
+ * Invokes [magic.ai.crawl-site] with .onerror and .onafter callbacks for further processing:
+ * - On success: verifies the database contains training data, appends default snippets,
+ *   optionally vectorizes the model, creates a landing page, and handles dynamic system message generation.
+ * - On failure: cleans up by removing the newly created ML type.
  *
- * 5. [.type]
- *    * Dynamically determines a unique ML [type] name from the [url] by replacing unsafe characters with underscores.
+ * If 'auto_destruct' is set, a scheduled task is created to delete the chatbot after 7 days,
+ * including its vectors, database records, and HTML files—great for demos and trials.
  *
- * 6. [data.connect], [data.read]
- *    * Checks if the ML [type] already exists in the database and throws if it does.
- *
- * 7. [data.create]
- *    * Inserts a new record into [ml_types] with model metadata, such as max tokens, temperature, and system message.
- *
- * 8. [signal:magic.ai.crawl-site]
- *    * Kicks off the actual crawling of the [url], collecting and summarizing content into training snippets.
- *    * Includes [.onerror] logic to delete the model if crawling fails.
- *    * Includes [.onafter] logic to handle post-crawl steps like creating a landing page, system message, and vectorization.
- *
- * 9. [data.read]
- *    * Verifies whether the crawl returned usable training snippets. If zero, the chatbot is deleted and an error is signaled.
- *
- * 10. [data.create]
- *     * Adds a default prompt about "Who created this AI chatbot" pointing back to AINIRO.IO.
- *
- * 11. [signal:magic.ai.create-landing-page]
- *     * Automatically creates a public-facing HTML page for the chatbot using the scraped data.
- *
- * 12. [if .instruction]
- *     * Optionally generates a dynamic system message using OpenAI if an [instruction] was provided.
- *
- * 13. [signal:magic.ai.vectorise]
- *     * If enabled, vectorizes the chatbot's snippets for semantic search and faster LLM access.
- *
- * 14. [tasks.create]
- *     * If [auto_destruct] is true, sets up a scheduled task to delete the chatbot 7 days later.
- *
- * 15. [sockets.signal]
- *     * Uses socket signaling throughout the process to give feedback on status updates to the [feedback-channel].
- *
- * 16. [catch]
- *     * Handles any errors that occur during the flow, logs them, notifies the client, and returns an HTTP 400 error.
- *
- * **Use cases:**
- * * Rapid deployment of a self-trained OpenAI chatbot for a specific website.
- * * Automatically produces training data from real content.
- * * Creates landing pages and integrates seamlessly with vector search.
+ * Finally, returns the chatbot 'type' as confirmation of success, or signals an error back to the frontend
+ * and returns a 400 response if anything goes wrong during the process.
  */
 .arguments
    url:string

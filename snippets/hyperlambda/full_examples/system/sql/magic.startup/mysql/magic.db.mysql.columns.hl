@@ -1,51 +1,29 @@
-
 /*
- * This dynamic slot [magic.db.mysql.columns] returns standardized metadata for each column in a given MySQL table.
+ * Dynamic slot for introspecting the column metadata of a given table in a MySQL database,
+ * normalizing it into a structure suitable for automation and dynamic UI generation.
  *
- * 1. [.arguments]
- *    * Accepts the following parameters:
- *      - [connection-string]: Optional. If omitted, the slot defaults to [generic] connection.
- *      - [database]: Required. The target MySQL database name.
- *      - [table]: Required. The name of the table whose column structure you want to retrieve.
+ * Begins with mandatory validation for the [database] and [table] arguments.
+ * Constructs a proper connection string, defaulting to the [generic] database if no specific
+ * [connection-string] is supplied.
  *
- * 2. [validators.mandatory]
- *    * Ensures that [database] and [table] are specified.
+ * Uses a dynamic [DESCRIBE `table`] query to retrieve column information and loops through each
+ * result to map MySQL's metadata into a common schema.
  *
- * 3. [.connection]
- *    * Composes the full connection string from [connection-string] and [database], falling back to [generic] if not provided.
+ * For each column, it assembles:
+ * - [name]: Column name
+ * - [db]: Raw MySQL data type (e.g., `varchar(255)`)
+ * - [nullable]: Whether the column allows NULLs
+ * - [primary]: Whether it is part of the primary key
+ * - [automatic]: Whether the column is auto-generated (e.g., has default or is auto_increment)
+ * - [hl]: Translated Hyperlambda type, based on regex type cleanup and [switch] projection
  *
- * 4. [mysql.connect]
- *    * Establishes a connection to the MySQL database using the assembled connection string.
+ * It includes special handling for:
+ * - Boolean types (`tinyint(1)`, `bool`, `boolean`)
+ * - Removal of length specifiers and 'unsigned' from raw types before mapping
+ * - Recognition of enum types and edge cases as [string]
  *
- * 5. [mysql.select:"describe `table`"]
- *    * Executes a DESCRIBE query to fetch column metadata such as type, nullability, default values, etc.
- *
- * 6. [for-each:x:@mysql.select/*]
- *    * Iterates over each column returned by the DESCRIBE query.
- *
- * 7. [.tmp]
- *    * Holds metadata for a single column including:
- *      - [name]: Name of the column.
- *      - [db]: The database type string (e.g., 'varchar(255)', 'tinyint(1)', etc.).
- *      - [nullable]: Boolean indicating if the column is nullable.
- *      - [primary]: Boolean indicating if the column is part of the primary key.
- *      - [automatic]: Boolean indicating if the column has a default or is auto-incremented.
- *
- * 8. [.type] and [switch]
- *    * Cleans and maps the [db] column type into a Hyperlambda type:
- *      - MySQL types are normalized by removing precision (e.g., 'varchar(255)' -> 'varchar').
- *      - Types are mapped into: [string], [long], [bool], [decimal], [date] based on matching cases.
- *
- * 9. [unwrap] and [add]
- *    * Composes the full column metadata structure for output by attaching the resolved [hl] Hyperlambda type.
- *
- * 10. [return-nodes]
- *     * Returns the complete list of structured column metadata to the caller.
- *
- * **Use cases:**
- * * Great for introspecting MySQL table schemas in dynamic environments.
- * * Useful in admin panels or automation tools to generate forms and APIs.
- * * Assists machine learning pipelines by exposing column structures for model input mapping.
+ * This slot enables building CRUD interfaces, type-safe API generation, or visual modeling tools
+ * by exposing uniform metadata across MySQL schemas.
  */
 slots.create:magic.db.mysql.columns
 

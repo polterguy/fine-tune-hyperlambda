@@ -1,54 +1,33 @@
-
 /*
- * This endpoint returns a standardized description of all columns in a specified SQLite table using [pragma table_info].
+ * Dynamic slot for introspecting and normalizing the column metadata of a SQLite table
+ * into a standard Hyperlambda structure, enabling dynamic schema-driven features.
  *
- * 1. [.arguments]
- *    * Accepts the following parameters:
- *      - [connection-string]: Optional. If omitted, default to [generic].
- *      - [database]: Required. The name of the SQLite database.
- *      - [table]: Required. The table name whose columns should be listed.
+ * Validates the presence of required arguments: [database] and [table].
+ * Builds a connection string using the provided [connection-string] or defaults to [generic].
  *
- * 2. [validators.mandatory]
- *    * Ensures both [database] and [table] are provided.
+ * Uses [PRAGMA table_info('<table>')] to retrieve metadata about the table's columns.
+ * For each column, it constructs a return structure containing:
+ * - [name]: Column name
+ * - [db]: SQLite data type (raw format)
+ * - [nullable]: Boolean flag indicating if NULL values are allowed
+ * - [primary]: Boolean flag indicating if the column is part of the primary key
+ * - [automatic]: Boolean indicating whether the column is auto-generated
  *
- * 3. [.connection]
- *    * Constructs the connection string using either the explicit [connection-string] and [database],
- *      or defaults to [generic|database].
+ * Since SQLite doesn't indicate [AUTOINCREMENT] in PRAGMA results, it conditionally queries
+ * [sqlite_master] for table SQL definitions to detect if any primary key [INTEGER] column uses AUTOINCREMENT.
  *
- * 4. [sqlite.connect]
- *    * Opens the database connection using the previously composed connection string.
+ * Then maps the SQLite types to Hyperlambda-compatible types:
+ * - Integer types → [long]
+ * - Real, float, double → [double]
+ * - Decimal and numeric → [decimal]
+ * - Date and time-related types → [date]
+ * - Character, text, and blob types → [string]
+ * - Booleans → [bool]
+ * - All unrecognized or edge-case types default to [string]
  *
- * 5. [sqlite.select]
- *    * Executes a PRAGMA SQL statement to retrieve metadata about the columns in the specified table.
- *
- * 6. [for-each]
- *    * Iterates over each column returned from the query and builds a new structure with consistent metadata.
- *
- * 7. [.tmp]
- *    * A temporary buffer representing a single column with the following metadata:
- *      - [name]: Column name.
- *      - [db]: Original database type.
- *      - [nullable]: True/false based on [notnull] column value.
- *      - [primary]: True/false if part of the primary key.
- *      - [automatic]: True if column is auto-incremented or has a default value.
- *      - [hl]: Mapped Hyperlambda type (e.g., [int], [bool], [string], etc).
- *
- * 8. [strings.regex-replace], [strings.replace], [switch]
- *    * Cleans and standardizes the SQLite type string and maps it to a Hyperlambda [hl] type using [switch].
- *
- * 9. [sqlite.select]
- *    * This detects if the primary key column is set as AUTOINCREMENT by inspecting the table DDL stored in SQLite’s system table.
- *
- * 10. [add]
- *     * Adds each fully composed column description to the final return result.
- *
- * 11. [return-nodes]
- *     * Returns the list of normalized column metadata to the API caller.
- *
- * **Use cases:**
- * * Useful for visual schema introspection in UIs or admin tools.
- * * Assists frontend apps in generating CRUD forms dynamically.
- * * Allows model builders to reason over available fields when training on tabular data.
+ * The result includes an [hl] node per column reflecting the projected Hyperlambda type,
+ * and is returned as structured metadata via [return-nodes], useful for CRUD scaffolding,
+ * introspection-based automation, or low-code application generation.
  */
 slots.create:magic.db.sqlite.columns
 

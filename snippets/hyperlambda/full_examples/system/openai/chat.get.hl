@@ -1,43 +1,22 @@
-
 /*
- * This Hyperlambda endpoint serves as a dynamic OpenAI chat handler using GPT models.
+ * This endpoint coordinates the full request lifecycle for an AI chat or completion call.
  *
- * 1. [.arguments]
- *    * Declares input arguments such as [prompt], [type], [session], [stream], etc.
- *    * If [stream] is true, response tokens are streamed to the specified [session].
+ * First, it adds all input arguments to the signal scope and executes all registered
+ * interceptor slots within the [magic.openai.chat-interceptor.] namespace by invoking
+ * [magic.misc.execute-slots], enabling dynamic request filtering or transformation.
  *
- * 2. [execute:magic.misc.execute-slots]
- *    * Invokes interceptor slots found under the namespace [magic.openai.chat-interceptor.].
- *    * Useful for logging, filtering, preprocessing, etc.
+ * Then it invokes [magic.ai.endpoint-common] to handle shared logic across AI endpoints.
+ * Inside the [.callback], it performs several key operations:
  *
- * 3. [signal:magic.ai.endpoint-common]
- *    * Handles common logic for chat endpoints (e.g., spam filtering, lead email detection).
- *    * Includes logic to detect if the prompt contains an email address.
- *    * If email detection logic is satisfied and contact_us + lead_email are configured,
- *      then [magic.ai.send-lead-email] is triggered to forward user intent.
+ * - Detects if the prompt contains an email and routes it to [magic.ai.send-lead-email]
+ *   if lead contact info is available, treating it as a lead form submission.
+ * - Extracts the referrer either from arguments or the HTTP header.
+ * - Loads max token limits from config using [config.get].
+ * - Determines which slot to invoke based on the 'model' prefix and ensures the
+ *   appropriate arguments and referrer are passed to either [magic.ai.chat]
+ *   or [magic.ai.completion], supporting both OpenAI-style chat and completion endpoints.
  *
- * 4. [referrer] logic
- *    * Tries to retrieve referrer either from [arguments.referrer] or HTTP [Referer] header.
- *    * Passes it into the downstream AI model.
- *
- * 5. Conditional Model Routing
- *    * Based on the model's name prefix (e.g., [gpt], [o1-], [o3-]) the appropriate
- *      chat slot is invoked.
- *    * If the model starts with one of the mentioned prefixes, the slot declared in
- *      [completion_slot] is invoked (usually [magic.ai.chat]).
- *    * If not, the generic [magic.ai.completion] slot is used.
- *
- * 6. Optional [max_tokens] override
- *    * Supports dynamic override via configuration setting [magic:openai:max_tokens].
- *    * If set, it gets injected into the invoked slot as [model_size].
- *
- * 7. Output
- *    * Returns the final result from whichever slot was triggered based on model type.
- *
- * Use cases:
- * * A generic HTTP entrypoint for OpenAI-based GPT chatbots.
- * * Can be used for both synchronous and streamed token responses.
- * * Flexible and extensible via pluggable interceptor and completion slots.
+ * Finally, the result of the invoked AI slot is returned back to the caller.
  */
 .arguments
    prompt:string

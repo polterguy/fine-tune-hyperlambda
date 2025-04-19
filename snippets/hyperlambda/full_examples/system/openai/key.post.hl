@@ -1,38 +1,17 @@
-
 /*
- * Allows a root user to configure the OpenAI API integration by setting a new API key.
+ * Updates the system configuration to set a new OpenAI API key.
  *
- * This endpoint securely updates the OpenAI API key stored in the system configuration,
- * replacing any previously defined key. It enforces authentication and key format validation,
- * and ensures the configuration is properly updated and persisted.
+ * First, access is secured by requiring the user to have the 'root' role using [auth.ticket.verify].
+ * Then the script validates the [key] argument to ensure it's a non-empty string of reasonable length (20–500 chars).
  *
- * INPUT PARAMETERS:
- * - [key:string]: The new OpenAI API key. Must be a valid string between 20 and 500 characters.
+ * The configuration file is loaded with [config.load], then transformed into a Hyperlambda node tree using [json2lambda].
+ * Any existing [openai.key] entries under [magic] are removed to avoid duplicates or conflicts.
  *
- * EXECUTION FLOW:
+ * The new API key is injected under the [magic.openai.key] path, replacing any previous value.
+ * The updated configuration is then converted back to JSON using [lambda2json] and saved using [config.save].
  *
- * 1. **Authorization & Validation**:
- *    - Requires the user to be authenticated with [root] privileges via [auth.ticket.verify:root].
- *    - Ensures the [key] argument is present using [validators.mandatory].
- *    - Validates the key length using [validators.string] with a minimum of 20 and a maximum of 500 characters.
- *
- * 2. **Configuration Loading & Modification**:
- *    - Loads the current system configuration using [config.load] and converts it to lambda format with [json2lambda].
- *    - Removes any previously configured OpenAI key under the node path [magic.openai.key] using [remove-nodes].
- *    - Inserts the new key into the configuration at the same location using [add].
- *
- * 3. **Persistence**:
- *    - Converts the updated configuration back to JSON format using [lambda2json].
- *    - Saves the updated configuration using [config.save].
- *
- * 4. **Response**:
- *    - Returns a simple `{ result: success }` to indicate that the new key has been stored successfully.
- *
- * This endpoint is critical for initial setup or secure rotation of OpenAI credentials, and should be
- * protected via strict access control. It ensures that the backend will use the updated key
- * for all subsequent OpenAI API interactions.
+ * Finally, a success message is returned to the caller, confirming the new key was saved properly.
  */
-
 .arguments
    key:string
 

@@ -1,27 +1,16 @@
-
 /*
- * This HTTP POST endpoint forwards OpenAI chat requests to its GET-based equivalent [chat.get.hl],
- * allowing for consistent chat behavior regardless of HTTP method.
+ * Serves as a lightweight router for retrieving dynamic responses from a predefined
+ * Hyperlambda endpoint file.
  *
- * 1. [.arguments]
- *    * Declares all expected input fields such as [prompt], [type], [stream], [session], etc.
- *    * These arguments are forwarded to the GET version of the chat handler.
+ * Accepts a variety of input arguments such as 'prompt', 'type', 'chat', and others,
+ * which are forwarded directly to the internal logic contained in [/system/openai/chat.get.hl].
+ * This allows for clean separation between the routing logic and actual implementation details.
  *
- * 2. [add:x:+]
- *    * Prepares the full argument set dynamically by copying all [arguments/*] into the current execution context.
- *    * This ensures the downstream file receives the complete context without needing explicit parameter mapping.
+ * The contents of the [.arguments] node are passed along to the [execute-file] slot,
+ * ensuring all input parameters are available to the underlying file logic.
  *
- * 3. [execute-file:/system/openai/chat.get.hl]
- *    * Executes the GET-based chat handler.
- *    * This centralizes the actual chat logic in a single Hyperlambda file and reduces duplication.
- *
- * 4. [return-nodes:x:-/*]
- *    * Forwards the result returned from the GET-based chat logic directly to the HTTP response.
- *
- * Use cases:
- * * Provides POST-based invocation to match frontend expectations or allow for larger payloads.
- * * Useful in scenarios where the HTTP GET version is used internally or cached, and POST is public.
- * * Supports streaming or synchronous token delivery via [stream] and [session].
+ * The results from the file are then returned to the client using [return-nodes],
+ * effectively making this wrapper endpoint a simple forwarder to deeper, modular functionality.
  */
 .arguments
    prompt:string

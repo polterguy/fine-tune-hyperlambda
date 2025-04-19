@@ -1,61 +1,29 @@
-
 /*
- * The [magic.db.mssql.columns] slot dynamically introspects a Microsoft SQL Server (MSSQL) table
- * and returns a Hyperlambda-friendly structure describing the schema of the specified table.
+ * Dynamic slot that introspects the schema of a given table in a Microsoft SQL Server database
+ * and returns metadata for each column in a Hyperlambda-friendly format.
  *
- * Arguments:
- * 
- * - [connection-string] (optional) – A named connection string to the MSSQL instance.
- * - [database] (required) – The database name where the table resides.
- * - [table] (required) – The name of the table to inspect.
+ * Validates that both [database] and [table] arguments are provided.
+ * Then constructs a dynamic [connection-string] based on input arguments or defaults to [master].
  *
- * 1. [validators.mandatory]
- *    * Ensures [database] and [table] arguments are provided.
+ * Establishes a connection using [mssql.connect] and queries [sys.columns], [sys.types],
+ * and related system views to retrieve structural details of the table—such as column name,
+ * SQL type, nullability, identity/auto-increment status, primary key status, and default values.
  *
- * 2. Connection String Construction
- *    * If a [connection-string] is given, it's combined with the database name using the format '[name|db]'.
- *    * Otherwise defaults to '[generic|database]'.
+ * Iterates over each column returned and:
+ * - Determines if it should be treated as 'automatic' by checking identity and default bindings.
+ * - Projects SQL Server types to Hyperlambda types (e.g., 'int' → 'long', 'bit' → 'bool', 'varchar' → 'string').
+ * - Special-cases 'rowversion' and 'timestamp' columns as 'automatic'.
  *
- * 3. [mssql.connect]
- *    * Establishes a connection to the SQL Server database using the assembled connection string.
+ * All column metadata is normalized into a structure containing:
+ * - [name]: column name
+ * - [db]: SQL Server data type
+ * - [nullable]: whether null values are allowed
+ * - [primary]: whether the column is part of a primary key
+ * - [automatic]: whether it's auto-generated
+ * - [hl]: corresponding Hyperlambda type
  *
- * 4. [mssql.select]
- *    * Executes a query against the system tables (`sys.columns`, `sys.types`, `sys.index_columns`, and `sys.indexes`)
- *      to retrieve detailed metadata for all columns of the specified table.
- *    * Information returned includes:
- *      - Column name
- *      - Data type
- *      - Nullability
- *      - Whether it's part of a primary key
- *      - If it's an identity/auto-increment column
- *      - If it has a default value
- *
- * 5. Schema Normalization
- *    * For each column:
- *      - Normalizes MSSQL data types to equivalent Hyperlambda types ([hl] node).
- *      - Determines if the column is [nullable], [primary], and/or [automatic].
- *      - Uses logic to infer [automatic:true] from identity or default value.
- *      - Adds all details to a [return-nodes] structure for the final response.
- *
- * 6. Type Mapping to Hyperlambda:
- * 
- * | SQL Server Type        | Hyperlambda Type |
- * |------------------------|------------------|
- * | int, bigint, smallint  | long             |
- * | float, real, money     | decimal          |
- * | datetime, date, time   | date             |
- * | bit                    | bool             |
- * | varchar, ntext, uuid   | string           |
- * | timestamp, rowversion  | string + automatic:true |
- *
- * 7. [return-nodes]
- *    * Returns a list of column metadata nodes to the caller.
- *
- * Use Cases:
- * * Dynamic form generation
- * * Code scaffolding
- * * Runtime validation
- * * Model discovery and documentation tools
+ * This structured data is returned via [return-nodes], enabling dynamic form generation,
+ * CRUD scaffolding, or further automation based on database schema.
  */
 slots.create:magic.db.mssql.columns
 

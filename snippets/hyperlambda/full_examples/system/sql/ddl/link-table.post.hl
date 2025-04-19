@@ -1,34 +1,21 @@
-
 /*
- * This Hyperlambda HTTP endpoint dynamically creates a many-to-many link table in a SQL database.
- * 
- * 1. [.arguments]
- *    - Accepts the database type, connection string, database name, and the link table schema including PK columns from [table1] and [table2].
- *    - Supports an optional [generate] argument to return the DDL SQL without executing it.
+ * Dynamically generates and optionally executes a SQL DDL statement to create a many-to-many mapping table
+ * between two existing tables in a relational database.
  *
- * 2. [auth.ticket.verify]
- *    - Ensures only users with [root] privileges can invoke this endpoint.
+ * The endpoint begins by securing access using [auth.ticket.verify] and performing input validation to ensure
+ * all required arguments are provided and conform to expected formats. It supports MySQL, SQLite, PostgreSQL, and MSSQL.
  *
- * 3. [validators.mandatory], [validators.enum]
- *    - Validates that essential inputs like [databaseType], [connectionString], and [args] are present and legal.
+ * The SQL DDL is constructed dynamically by:
+ * - Looping over the primary keys of both [table1] and [table2], inserting columns into a new join table.
+ * - Appending foreign key constraints if the target database is not MySQL, or preparing them separately for MySQL.
+ * - Building a composite primary key using all provided columns from both tables.
  *
- * 4. [.sql], [.pk], [.fk], [.first]
- *    - Constructs the SQL DDL string by:
- *      - Declaring each primary key column from both tables.
- *      - Including optional foreign key references (if not MySQL).
- *      - Composing a [primary key(...)] constraint combining all PKs.
+ * If the [generate] flag is set to true, it returns the generated SQL string to the client without executing it.
+ * Otherwise, it establishes a connection to the target database using [data.connect], and executes the generated SQL
+ * to physically create the table in the database.
  *
- * 5. [generate]
- *    - If [generate] is true, returns the composed SQL to the client without executing it.
- *
- * 6. [data.connect], [data.execute]
- *    - Executes the generated SQL to create the link table in the target database.
- *    - Clears any cached metadata for the given connection to refresh schema state.
- *
- * 7. [return]
- *    - Returns a success response with the raw SQL statement for audit or debugging purposes.
- *
- * This endpoint is ideal for auto-generating normalized relational schemas when defining join/link tables in dynamic database modeling tools.
+ * After execution, it clears the relevant entry in the database connection cache to reflect schema changes immediately.
+ * Finally, it returns both the SQL used and a success result to the client.
  */
 .arguments
    databaseType:string

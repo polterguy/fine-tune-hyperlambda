@@ -1,38 +1,19 @@
-
 /*
- * This Hyperlambda endpoint computes an aggregate (min, max, sum, or avg) over a column in the [CustomerDemographics] table of the [northwind] SQLite database.
- * Filtering is optionally supported for [CustomerTypeID] and [CustomerDesc] fields.
+ * Dynamically performs an aggregate operation (min, max, sum, avg) on a specified column
+ * from the [CustomerDemographics] table in the 'northwind' SQLite database.
  *
- * 1. [.arguments]
- *    * Declares the expected input arguments for the endpoint.
- *    * Includes [aggregate_function], [aggregate_column], and optional filtering fields.
-
- * 2. [validators.mandatory]
- *    * Ensures that [aggregate_function] and [aggregate_column] are supplied.
-
- * 3. [validators.enum]
- *    * Restricts [aggregate_function] to one of [min], [max], [sum], or [avg].
- *    * Ensures [aggregate_column] is a valid column from the [CustomerDemographics] table.
-
- * 4. [data.connect]
- *    * Opens a connection to the [northwind] database using the [generic] connection string.
- *    * Declares the database type as [sqlite].
-
- * 5. [set-name]
- *    * Dynamically creates the SQL aggregate function expression (e.g., `avg(CustomerDemographics.CustomerTypeID)`) and stores it in a node named [aggregate_functor].
-
- * 6. [remove-nodes]
- *    * Removes the original aggregate-related arguments to simplify node structure before passing to [data.read].
-
- * 7. [add]
- *    * Appends all remaining arguments (filter conditions) into the [where] clause of [data.read].
-
- * 8. [data.read]
- *    * Executes a SQL read query on the [CustomerDemographics] table with optional filtering.
- *    * Selects the computed [aggregate_functor] result using the alias [result].
-
- * 9. [return-nodes]
- *    * Returns the result from the SQL read operation to the HTTP caller.
+ * Validates that both [aggregate_function] and [aggregate_column] arguments are present and legal.
+ * Acceptable aggregate functions are limited to [min], [max], [sum], and [avg], and valid columns
+ * are restricted to [CustomerTypeID] and [CustomerDesc] for safety and structure.
+ *
+ * Constructs a dynamic SQL expression (e.g., avg(CustomerDemographics.CustomerTypeID)) and applies
+ * optional filters based on remaining arguments like 'like' and 'eq' conditions for supported fields.
+ *
+ * Uses [data.connect] to access the database and [data.read] with a [limit:1] clause to return
+ * the aggregate result efficiently, labeling the output column as [result].
+ *
+ * This flexible yet safe pattern enables users to perform controlled aggregate queries through
+ * dynamic parameterization, making it ideal for dashboards or reporting tools with configurable metrics.
  */
 .arguments
 

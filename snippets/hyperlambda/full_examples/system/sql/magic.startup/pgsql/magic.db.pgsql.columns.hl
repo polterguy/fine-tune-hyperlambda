@@ -1,58 +1,35 @@
-
 /*
- * This Hyperlambda slot dynamically lists all columns in a PostgreSQL table.
+ * Dynamic slot that inspects the schema of a given PostgreSQL table and maps the metadata
+ * into a normalized, Hyperlambda-compatible format for further automation or frontend generation.
  *
- * 1. [slots.create:magic.db.pgsql.columns]
- *    * Declares a dynamic slot named [magic.db.pgsql.columns].
-
- * 2. [validators.mandatory:x:@.arguments/*/database], [validators.mandatory:x:@.arguments/*/table]
- *    * Validates that the [database] and [table] arguments are provided.
-
- * 3. [.connection]
- *    * Constructs the database connection string dynamically using either a custom [connection-string]
- *      argument or defaults to the [generic] connection string with the specified [database].
-
- * 4. [pgsql.connect:x:@.connection]
- *    * Establishes a connection to the PostgreSQL database using the constructed connection string.
-
- * 5. [pgsql.select]
- *    * Executes a raw SQL query against the [information_schema.columns] and [key_column_usage] tables to
- *      retrieve metadata for each column of the specified [table], including:
- *       - [column_name]
- *       - [is_nullable]
- *       - [data_type]
- *       - [column_default]
- *       - [is_pk] (if the column is part of the primary key)
-
- * 6. [for-each]
- *    * Iterates over the returned column rows to normalize and structure the metadata into a common format.
-
- * 7. [.tmp]
- *    * Constructs a new node with the following metadata for each column:
- *       - [name]: Column name
- *       - [db]: Database-specific column type
- *       - [nullable]: Whether the column is nullable
- *       - [primary]: Whether the column is part of the primary key
- *       - [automatic]: Whether the column has a default value
- *       - [hl]: Mapped Hyperlambda type, such as [int], [bool], [date], etc.
-
- * 8. [strings.regex-replace], [strings.replace]
- *    * Normalizes PostgreSQL-specific data types by removing suffixes such as [unsigned], time zone descriptors, etc.
-
- * 9. [switch:x:@strings.replace]
- *    * Maps PostgreSQL column types to corresponding Hyperlambda types using a switch-case pattern.
-
- * 10. [add]
- *     * Adds the processed metadata for each column into the final return list.
-
- * 11. [return-nodes]
- *     * Returns the list of columns and their normalized metadata to the caller.
+ * After validating required arguments ([database], [table]), it builds a connection string using
+ * the specified [connection-string] or defaults to the [generic] connection.
  *
+ * A parameterized SQL query is executed on PostgreSQL's [information_schema] to retrieve:
+ * - [column_name], [data_type], [is_nullable], [column_default]
+ * - A computed [is_pk] flag for identifying primary key columns
  *
- * **Use cases:**
- * * Used in data modeling tools or admin panels to introspect PostgreSQL table schemas.
- * * Automatically generate forms, filters, or CRUD endpoints based on column metadata.
- * * Ideal for integrations where database introspection is necessary for scaffolding frontend/backend code.
+ * For each column, the result is transformed into:
+ * - [name]: column name
+ * - [db]: PostgreSQL data type
+ * - [nullable]: whether null values are allowed
+ * - [primary]: whether it's a primary key
+ * - [automatic]: true if it has a default value
+ *
+ * The raw PostgreSQL types are sanitized using regex and string operations, then mapped
+ * into Hyperlambda types via a [switch] construct:
+ * - Integer types → [int] or [long]
+ * - Booleans → [bool]
+ * - Strings, enums, and text formats → [string]
+ * - Timestamps → [date]
+ * - Decimal and money types → [decimal]
+ * - Doubles and precision types → [double]
+ *
+ * The result is appended with an [hl] node indicating the Hyperlambda-compatible type,
+ * and added to the return payload via [return-nodes].
+ *
+ * This allows for dynamic schema discovery, CRUD scaffolding, and consistent metadata handling
+ * across various backend services or low-code/no-code interfaces.
  */
 slots.create:magic.db.pgsql.columns
 

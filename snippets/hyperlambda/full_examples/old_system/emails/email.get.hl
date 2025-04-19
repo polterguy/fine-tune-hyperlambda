@@ -1,36 +1,16 @@
-
 /*
- * This Hyperlambda snippet defines an HTTP API endpoint that returns the root user's email address.
+ * Ensures that only users with the 'root' role can access this endpoint,
+ * by verifying the JWT token of the currently authenticated user.
+ * This enforces strict role-based access control for high-privilege operations.
  *
- * 1. [auth.ticket.verify:root]
- *    * Ensures that only users with the [root] role can access the endpoint.
-
- * 2. [signal:magic.crypto.get-server-public-key]
- *    * Retrieves the server’s public key, which includes its [fingerprint].
- *    * This key was generated when the system was first set up, and is used to look up root credentials.
-
- * 3. [data.connect:[generic|magic]]
- *    * Opens a connection to the [magic] database using the [generic] connection string.
-
- * 4. [data.read]
- *    * Performs a SELECT operation from the [crypto_keys] table.
- *    * Filters records to those where the [fingerprint] matches the server's public key.
- *    * Returns the [email] and [subject] columns.
-
- * 5. [unwrap:x:+/*]
- *    * Moves the returned data to the root level so it can be returned properly.
-
- * 6. [return]
- *    * Returns two values to the caller:
- *       - [email]: The root user's registered email.
- *       - [name]: The [subject] of the cryptographic key, typically the full name of the admin.
- *
- *
- * Use cases:
- * * Used for displaying the server admin email in settings or profile sections.
- * * Useful for validating ownership or verifying root setup.
- * * Can be extended for auditing or notification purposes where contact info is required.
+ * Retrieves the server's public key using [signal:magic.crypto.get-server-public-key],
+ * then queries the 'crypto_keys' table to find the key declaration matching
+ * the fingerprint of this public key. From the resulting row, extracts and returns
+ * the associated 'email' and 'subject' fields to the caller, which are stored only during
+ * the initial system setup phase. This makes the public key the indirect identifier
+ * for accessing these setup details.
  */
+.arguments
 
 // Ensures user is authorized to access endpoint.
 auth.ticket.verify:root
