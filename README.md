@@ -68,6 +68,8 @@ Below are some example prompts you can run through the model after fine tuning i
   - Make email mandatory
   - Make sure email is a valid email address
   - Return result of data.create as [result]
+  - Make all arguments optional
+  - Make all inserted values optional
 * Generate an API endpoint allowing me to select users from employees database, with optional filtering for name, email, and phone
   - Add paging
   - Make paging optional
