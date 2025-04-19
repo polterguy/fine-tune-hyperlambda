@@ -1,0 +1,38 @@
+/*
+ * Retrieves artist records from the [Artist] table in the [chinook] database with optional pagination support.
+ *
+ * The [.arguments] block defines two potential pagination parameters:
+ * - [offset:int] → Number of records to skip.
+ * - [limit:int]  → Maximum number of records to return.
+ *
+ * 🔹 Pagination is **only applied if BOTH arguments are provided**:
+ * - An [if] condition checks for the existence of both [offset] and [limit].
+ * - Only when both are present, [add] injects them into the [data.read] operation.
+ *
+ * 🔹 This means:
+ * - Supplying only one of the two arguments (e.g., just [limit] or just [offset]) will result in **no pagination at all**.
+ * - This prevents partially applied paging, which could lead to ambiguous or unintended data results.
+ *
+ * 🔸 Why this pattern is effective:
+ * 1. It ensures clean pagination logic by enforcing the presence of both controls.
+ * 2. Avoids broken or inconsistent result sets from incomplete input.
+ * 3. Supports default full-fetch behavior if paging is not explicitly requested.
+ */
+.arguments
+   offset:int
+   limit:int
+data.connect:chinook
+   if
+      and
+         exists:x:@.arguments/*/offset
+         exists:x:@.arguments/*/limit
+      .lambda
+         add:x:@data.connect/*/data.read
+            get-nodes:x:@.arguments/*/limit
+            get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Artist
+      where
+         and
+   yield
+      users:x:@data.read/*

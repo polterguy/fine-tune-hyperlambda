@@ -1,0 +1,33 @@
+/*
+ * Retrieves audio track records from the [Tracks] table in the [media] database.
+ * Supports optional paging only if both [offset] and [limit] are provided.
+ *
+ * 🔹 The [if] block ensures:
+ * - Pagination is applied **only when both** paging arguments are included.
+ * - Prevents malformed or partially limited queries.
+ *
+ * 🔹 [add] dynamically merges pagination inputs into the [data.read] operation.
+ *
+ * 🔸 This structure is ideal when:
+ * 1. You want full control over paging behavior.
+ * 2. Clients should opt in to pagination intentionally.
+ * 3. The fallback result should be a full unpaginated list.
+ */
+.arguments
+   offset:int
+   limit:int
+data.connect:media
+   if
+      and
+         exists:x:@.arguments/*/offset
+         exists:x:@.arguments/*/limit
+      .lambda
+         add:x:@data.connect/*/data.read
+            get-nodes:x:@.arguments/*/limit
+            get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Tracks
+      where
+         and
+   yield
+      tracks:x:@data.read/*

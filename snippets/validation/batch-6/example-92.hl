@@ -1,0 +1,34 @@
+/*
+ * Returns invoice records from the [Invoices] table in the [sales] database with optional paging.
+ *
+ * [.arguments] accepts two inputs:
+ * - [offset:int] → How many invoices to skip.
+ * - [limit:int]  → How many invoices to return.
+ *
+ * 🔹 Pagination is **conditionally applied**:
+ * - Both arguments must exist.
+ * - Only then are they injected into [data.read] using [add].
+ *
+ * 🔸 This approach:
+ * 1. Prevents unexpected behavior caused by partial pagination input.
+ * 2. Keeps the query unpaginated if no arguments are passed.
+ * 3. Makes the logic modular and safe across varying client inputs.
+ */
+.arguments
+   offset:int
+   limit:int
+data.connect:sales
+   if
+      and
+         exists:x:@.arguments/*/offset
+         exists:x:@.arguments/*/limit
+      .lambda
+         add:x:@data.connect/*/data.read
+            get-nodes:x:@.arguments/*/limit
+            get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Invoices
+      where
+         and
+   yield
+      invoices:x:@data.read/*

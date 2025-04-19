@@ -1,0 +1,35 @@
+/*
+ * Retrieves book records from the [Books] table in the [library] database, with optional pagination.
+ *
+ * The [.arguments] section supports:
+ * - [offset:int] → Number of books to skip.
+ * - [limit:int]  → Maximum number of books to return.
+ *
+ * 🔹 Pagination is conditionally applied:
+ * - The [if] block checks if **both** [offset] and [limit] are provided.
+ * - If both exist, [add] dynamically injects them into [data.read].
+ * - If either is missing, the query runs without pagination.
+ *
+ * 🔸 Why this is important:
+ * 1. Prevents partial paging that may produce inconsistent behavior.
+ * 2. Makes pagination truly optional without risking invalid input.
+ * 3. Allows full result sets if no paging is requested.
+ */
+.arguments
+   offset:int
+   limit:int
+data.connect:library
+   if
+      and
+         exists:x:@.arguments/*/offset
+         exists:x:@.arguments/*/limit
+      .lambda
+         add:x:@data.connect/*/data.read
+            get-nodes:x:@.arguments/*/limit
+            get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Books
+      where
+         and
+   yield
+      books:x:@data.read/*
