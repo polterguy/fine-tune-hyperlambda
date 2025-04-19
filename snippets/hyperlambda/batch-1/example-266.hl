@@ -1,41 +1,20 @@
-
 /*
- * Creates a Hyperlambda endpoint that returns all filtered training snippets from the 'ml_training_snippets' table
- * in the 'magic' SQLite database as a downloadable CSV file. Only users with the 'root' role are authorized.
+ * Dynamically retrieves filtered machine learning training snippets from the 'magic' database and returns the results as a downloadable CSV file.
  *
- * ### Arguments
- * - [.arguments] includes optional filters:
- *   - [ml_training_snippets.completion.like]: Partial match on the 'completion' column.
- *   - [ml_training_snippets.prompt.like]: Partial match on the 'prompt' column.
- *   - [ml_training_snippets.uri.like]: Partial match on the 'uri' column.
- *   - [ml_training_snippets.type.eq]: Exact match on the 'type' column.
+ * 1. Accepts optional filtering criteria through [.arguments], targeting partial matches on [completion], [prompt], and [uri], and an exact match on [type].
+ * 2. Verifies the caller's authorization with [auth.ticket.verify], requiring 'root' access to proceed.
+ * 3. Connects to the 'magic' database using the '[generic]' connection string with [data.connect].
+ * 4. Builds a dynamic [data.read] query:
+ *    - Combines the 'like' conditions under a logical [or] clause.
+ *    - Adds the 'eq' condition for [type] as a separate [and] clause.
+ *    - Ensures the [or] clause is only included if it has any operands.
+ * 5. Executes [data.read] with a specified list of columns and unlimited results via [limit:-1].
+ * 6. If no records match the filter, returns an HTTP 404 response.
+ * 7. If results exist, converts the dataset to CSV format using [lambda2csv].
+ * 8. Sets HTTP headers to indicate a downloadable CSV file with proper MIME type and filename.
+ * 9. Returns the CSV content as the HTTP response payload.
  *
- * ### Authorization
- * - [auth.ticket.verify] ensures only 'root' users can execute the endpoint.
- *
- * ### Filtering Setup
- * - [add] injects all "like" filters into an [or] clause within the [where] condition.
- * - [remove-nodes] removes the "like" filters from the general arguments after injecting them into the [or] clause.
- * - Remaining filters are injected as part of the outer [and] clause.
- * - An [if] statement checks if the [or] clause has any child nodes. If not, it's removed to avoid invalid SQL.
- *
- * ### Database Read
- * - [data.read] selects [type], [uri], [prompt], and [completion] from the 'ml_training_snippets' table,
- *   applying all active filters with no record limit.
- *
- * ### Fallback
- * - [if] checks if no records are returned.
- *   - If none are found, it sets the HTTP response status to 404 and returns a message.
- *
- * ### CSV Conversion & Response
- * - [lambda2csv] converts the result into CSV format.
- * - [response.headers.set] sets headers for CSV file download:
- *   - [Content-Type] as text/csv
- *   - [Content-Disposition] for download with filename `training-snippets.csv`
- * - [return] streams the CSV content back to the caller.
- *
- * This endpoint is designed for exporting ML training snippets in a flexible, filterable, and downloadable format,
- * supporting secure access and proper CSV file handling in Hyperlambda.
+ * This endpoint is ideal for advanced admin-level export tooling, allowing filtered data extraction in a universally supported format.
  */
 .arguments
    ml_training_snippets.completion.like:string
