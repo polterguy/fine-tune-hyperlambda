@@ -82,6 +82,8 @@ for-each:x:@execute/*
                            prompt.eq:x:@.prompt
                            code.eq:x:@lambda2hyper
                      limit:1
+
+                  // Checking if we've the exact prompt/completion combination already in database.
                   if
                      exists:x:@data.read/*
                      .lambda
@@ -93,20 +95,22 @@ for-each:x:@execute/*
                   else
 
                      /*
-                      * If user wants to reduce duplicate we need to make sure we've not go more
-                      * than maximum 12 snippets with the same completion.
+                      * Making sure we've not go more than maximum 5 snippets with the same completion.
+                      *
+                      * This avoids over training LLM resulting in memorisation.
                       */
                      data.read
                         table:hyperlambda
-                        count(*)
-                           as:count
+                        columns
+                           count(*)
+                              as:count
                         where
                            and
                               code.eq:x:@lambda2hyper
                      if
                         mte
                            get-value:x:@data.read/*/*/count
-                           .:long:5
+                           .:long:4
                         .lambda
 
                            // Deleting file since we've got 12 similar completions!
