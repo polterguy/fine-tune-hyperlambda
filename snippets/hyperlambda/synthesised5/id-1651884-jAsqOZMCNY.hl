@@ -1,0 +1,142 @@
+
+// This code connects to a database and checks if a specified machine learning type exists; if not, it throws an error. It then counts and, if necessary, deletes old training snippets with the same type and URL, providing feedback via a socket signal if deletions occur. For each snippet provided, it checks for a valid completion above a length threshold, avoids duplicates, optionally appends source URL information, and inserts new records into the database. If similar completions exist, it updates their prompt to "Common" and increments counters, sending feedback if any prompts were updated.
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         id
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         throw:Machine learning type does not exist.
+            type:x:@.arguments/*/type
+   data.read
+      table:ml_training_snippets
+      columns
+         count(*)
+            as:count
+      where
+         and
+            type.eq:x:@.arguments/*/type
+            uri.eq:x:@.arguments/*/url
+            meta.eq:AINIRO-Website-Crawler
+   if
+      neq
+         convert:x:@data.read/*/*/count
+            type:int
+         .:int:0
+      .lambda
+         strings.concat
+            .:"Deleting "
+            get-value:x:@data.read/*/*/count
+            .:" old training snippets with the same URL"
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         sleep:10
+   data.execute:"\n   delete from vss_ml_training_snippets\n      where rowid in (select id as rowid from ml_training_snippets where type = @type and uri = @url)"
+      @type:x:@.arguments/*/type
+      @url:x:@.arguments/*/url
+   data.delete
+      table:ml_training_snippets
+      where
+         and
+            type.eq:x:@.arguments/*/type
+            uri.eq:x:@.arguments/*/url
+            meta.eq:AINIRO-Website-Crawler
+   .similar:int:0
+   for-each:x:@.snippets/*
+      if
+         and
+            exists:x:@.dp/#/*/completion
+            not-null:x:@.dp/#/*/completion
+         .lambda
+            if
+               mt
+                  strings.length:x:@.dp/#/*/completion
+                  get-value:x:@.arguments/*/threshold
+               .lambda
+                  add:x:+
+                     get-nodes:x:@.arguments/*/type
+                  try-signal:magic.ai.can-create-snippet
+                  strings.concat
+                     get-value:x:@.dp/#/*/completion
+                     .:@"
+"
+                     .:@"
+"
+                     .:This information was taken from [this URL](
+                     .:%
+                  data.read
+                     table:ml_training_snippets
+                     columns
+                        id
+                        prompt
+                        completion
+                        uri
+                     where
+                        and
+                           type.eq:x:@.arguments/*/type
+                           or
+                              completion.eq:x:@.dp/#/*/completion
+                              completion.like:x:@strings.concat
+                  if
+                     not-exists:x:@data.read/*
+                     .lambda
+                        if:x:@.arguments/*/insert_url
+                           set-value:x:@.dp/#/*/completion
+                              strings.concat
+                                 get-value:x:@.dp/#/*/completion
+                                 .:@"
+"
+                                 .:@"
+"
+                                 .:This information was taken from [this URL](
+                                 get-value:x:@.arguments/*/url
+                                 .:)
+                        data.create
+                           table:ml_training_snippets
+                           values
+                              type:x:@.arguments/*/type
+                              uri:x:@.arguments/*/url
+                              prompt:x:@.dp/#/*/prompt
+                              completion:x:@.dp/#/*/completion
+                              meta:AINIRO-Website-Crawler
+                  else-if
+                     eq:x:@data.read/0/*/prompt
+                        .:Common
+                     .lambda
+                        math.increment:x:@.already-exists
+                  else-if
+                     not
+                        eq:x:@data.read/*/*/prompt
+                           get-value:x:@.dp/#/*/prompt
+                     .lambda
+                        math.increment:x:@.similar
+                        data.update
+                           table:ml_training_snippets
+                           values
+                              prompt:Common
+                           where
+                              and
+                                 id.eq:x:@data.read/0/*/id
+            else
+               math.increment:x:@.below-threshold
+   if
+      neq:x:@.similar
+         .:int:0
+      .lambda
+         strings.concat
+            get-value:x:@.similar
+            .:" snippets with similar completion exists, updating prompt to 'Common'"
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         sleep:10

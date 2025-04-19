@@ -1,0 +1,74 @@
+
+// Checks if the current node's value is not null or empty, then replaces carriage returns, newlines, tabs, and double spaces with single spaces. If the node is an <a> element with a non-null href, it constructs a URL based on its base and href value, handling relative and absolute paths, and appends a formatted link to the completion string. Otherwise, it trims and appends the cleaned text content to the completion string.
+if
+   and
+      not-null:x:@.dp/#
+      neq:x:@.dp/#
+         .:
+   .lambda
+      strings.replace:x:@.dp/#
+         .:"\r"
+         .:" "
+      strings.replace:x:@strings.replace
+         .:"\n"
+         .:" "
+      strings.replace:x:@strings.replace
+         .:"\t"
+         .:" "
+      strings.replace:x:@strings.replace
+         .:"  "
+         .:" "
+      if
+         and
+            eq
+               get-name:x:@.dp/#/.
+               .:a
+            exists:x:"@.dp/#/./*/\\@href/[0,1]"
+            not-null:x:"@.dp/#/./*/\\@href/[0,1]"
+         .lambda
+            .url
+            if
+               strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                  .:/
+               .lambda
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+            else-if
+               and
+                  not
+                     strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                        .:"http://"
+                  not
+                     strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                        .:"https://"
+               .lambda
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        .:/
+                        get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+            else
+               set-value:x:@.url
+                  get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+            set-value:x:@.completion
+               strings.concat
+                  get-value:x:@.completion
+                  .:" "
+                  .:[
+                  strings.trim:x:@strings.replace
+                     .:@"  
+	"
+                  .:](
+                  get-value:x:@.url
+                  .:)
+                  .:" "
+      else
+         set-value:x:@.completion
+            strings.concat
+               get-value:x:@.completion
+               strings.trim:x:@strings.replace
+                  .:@"  
+	"
+               .:" "

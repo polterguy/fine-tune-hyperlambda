@@ -1,0 +1,18 @@
+
+// Connects to the "magic" database, selects distinct prompts and their maximum completion values for a specific user from the "ml_requests" table, then iterates through each result to add corresponding assistant and user message objects to a session node, setting the assistant's content to the prompt and the user's content to the completion.
+data.connect:[generic|magic]
+   data.select:"\nselect prompt, max(completion) as completion\n   from ml_requests\n   where user_id = @user_id and questionnaire = 1 and context = 1\n   group by prompt"
+      user_id:x:@.arguments/*/user_id
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:assistant
+               content:x:@.dp/#/*/prompt
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:user
+               content:x:@.dp/#/*/completion

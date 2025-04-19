@@ -1,0 +1,90 @@
+
+// If no valid sitemaps are found, this code initializes URL and done lists, sends warning and info signals to a feedback channel, and then enters a loop that continues while there are URLs left and the done count is below a maximum. Inside the loop, it signals a scraping process for the first URL, moves processed URLs to the done list, removes them from the URL list, and adds new URLs if they meet certain criteria. It sends progress updates to the feedback channel, waits between iterations to avoid server overload, and after finishing, logs completion, sends a final message, and optionally executes a post-processing callback if provided.
+else
+   .urls
+   .done
+   unwrap:x:+/*/*
+   add:x:@.urls
+      .
+         .:x:@.arguments/*/url
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:Could not find any valid sitemaps
+         type:warning
+   sleep:100
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:Trying to crawl site even though we did not find a valid sitemap
+         type:info
+   sleep:100
+   while
+      and
+         exists:x:@.urls/*
+         lt
+            get-count:x:@.done/*
+            get-value:x:@.arguments/*/max
+      .lambda
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:------------------------------------------------------------------------------------------------------------------------
+               type:info
+         sleep:100
+         unwrap:x:+/*
+         signal:magic.ai.url.scrape
+            url:x:@.urls/0
+            type:x:@.arguments/*/type
+            images:bool:true
+            code:bool:true
+            lists:bool:true
+            main:bool:true
+            empty-completion:bool:false
+            threshold:x:@.arguments/*/threshold
+            summarize:x:@.arguments/*/summarize
+            feedback-channel:x:@.arguments/*/feedback-channel
+         add:x:@.done
+            get-nodes:x:@.urls/0
+         remove-nodes:x:@.urls/0
+         for-each:x:@signal/*
+            if
+               and
+                  not-exists:x:"@.done/*/\"={@.dp/#}\""
+                  not-exists:x:"@.urls/*/\"={@.dp/#}\""
+                  strings.starts-with:x:@.dp/#
+                     get-value:x:@.arguments/*/url
+               .lambda
+                  add:x:@.urls
+                     get-nodes:x:@.dp/#
+         strings.concat
+            .:"Waiting for "
+            math.divide:x:@.arguments/*/delay
+               .:int:1000
+            .:" seconds to avoid exhausting web server"
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         sleep:100
+         sleep:x:@.arguments/*/delay
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:------------------------------------------------------------------------------------------------------------------------
+         type:info
+   sleep:100
+   strings.concat
+      .:"Done scraping "
+      get-count:x:@.done/*
+      .:" URLs"
+   unwrap:x:+/**
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:x:@strings.concat
+         type:info
+   sleep:100
+   log.info:OpenAI training data successfully created
+      url:x:@.arguments/*/url
+      type:x:@.arguments/*/type
+   if
+      exists:x:@.arguments/*/.onafter
+      .lambda
+         eval:x:@.arguments/*/.onafter

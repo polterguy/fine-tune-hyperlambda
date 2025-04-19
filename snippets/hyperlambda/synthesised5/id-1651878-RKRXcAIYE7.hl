@@ -1,0 +1,19 @@
+
+// Checks if a "crawl-delay" value exists in the "signal" node, and if so, removes any existing "delay" argument, sets a default "delay" from "crawl-delay", creates an informational message about the crawl delay in seconds, and sends this message to a feedback channel via socket signaling.
+if
+   exists:x:@signal/*/crawl-delay
+   .lambda
+      remove-nodes:x:@.arguments/*/delay
+      unwrap:x:+/*
+      validators.default:x:@.arguments
+         delay:x:@signal/*/crawl-delay
+      strings.concat
+         .:"Robots.txt file contains a Crawl-Delay value of "
+         math.divide:x:@signal/*/crawl-delay
+            .:int:1000
+         .:" seconds"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info

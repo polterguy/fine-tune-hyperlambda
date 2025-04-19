@@ -1,0 +1,69 @@
+
+/*
+ * Handles two cases for processing the "@href" attribute of a data node:  
+ * - In the first case, if "@href" exists, is not null or empty, and does not start with "http://" or "https://", it trims any trailing slash, concatenates it with a base URL (adding a slash if needed), and adds the result to a ".urls" collection if it doesn't already exist there.  
+ * - In the second case, if "@href" exists and is not null or empty (but may start with "http://" or "https://"), it trims any trailing slash and adds it to ".urls" if not already present.  
+ * Both cases prevent duplicates and ensure URLs are properly formatted before adding.
+ */
+case:a
+   if
+      and
+         exists:x:"@.dp/#/*/\\@href/[0,1]"
+         not-null:x:"@.dp/#/*/\\@href/[0,1]"
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:
+         not
+            strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+               .:"http://"
+         not
+            strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+               .:"https://"
+      .lambda
+         strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         strings.trim-end:x:@strings.split/0
+            .:/
+         .tmp
+         if
+            strings.starts-with:x:@strings.trim-end
+               .:/
+            .lambda
+               set-value:x:@.tmp
+                  strings.concat
+                     get-value:x:@.base
+                     get-value:x:@strings.trim-end
+         else
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.base
+                  .:/
+                  get-value:x:@strings.trim-end
+         if
+            not-exists:x:@.url/*/{@strings.concat}
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.urls
+                  .
+                     .:x:@.tmp
+   else-if
+      and
+         exists:x:"@.dp/#/*/\\@href/[0,1]"
+         not-null:x:"@.dp/#/*/\\@href/[0,1]"
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:
+      .lambda
+         strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         strings.trim-end:x:@strings.split/0
+            .:/
+         if
+            not-exists:x:"@.urls/*/\"{@strings.split/0}\""
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.urls
+                  .
+                     .:x:@strings.trim-end

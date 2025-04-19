@@ -1,0 +1,78 @@
+
+// Continuously attempts to summarize a text snippet using OpenAI's chat completions API, handling errors and feedback: If the API call fails with a 400 status, it logs an error, sends a warning signal, and stops further attempts; if successful (status 200–299), it updates the summary and prompt, sends a success signal, and stops; for other errors, it logs the issue, signals a warning, waits, and decrements the retry counter. Any exceptions also decrement the retry counter. The loop continues while the retry counter is greater than zero.
+while
+   mt:x:@.no
+      .:int:0
+   .lambda
+      try
+         unwrap:x:+/**
+         http.post:"https://api.openai.com/v1/chat/completions"
+            headers
+               Authorization:x:@.token
+               Content-Type:application/json
+            payload
+               model:x:@.model
+               max_tokens:x:@.max-size
+               temperature:decimal:0.3
+               messages
+                  .
+                     role:system
+                     content:Create a summary of the following information
+                  .
+                     role:user
+                     content:x:@.dp/#/*/completion
+            convert:true
+         if
+            eq:x:@http.post
+               .:int:400
+            .lambda
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Could not summarize snippet, check your log for details
+                     type:warning
+               sleep:100
+               lambda2hyper:x:@http.post
+               log.error:Something went wrong while invoking OpenAI
+                  message:x:@http.post/*/content/*/error/*/message
+                  status:x:@http.post
+                  error:x:@lambda2hyper
+               set-value:x:@.no
+                  .:int:0
+         else-if
+            and
+               mte:x:@http.post
+                  .:int:200
+               lt:x:@http.post
+                  .:int:300
+            .lambda
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Successfully created summary of snippet
+                     type:info
+               sleep:100
+               set-value:x:@.dp/#/*/completion
+                  strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+                     .:@"
+	 "
+               set-value:x:@.dp/#/*/prompt
+                  strings.concat
+                     .:"Summary; "
+                     strings.substring:x:@.dp/#/*/prompt
+                        .:int:0
+                        .:int:150
+               set-value:x:@.no
+                  .:int:0
+         else
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+                  type:warning
+            sleep:3000
+            lambda2hyper:x:@http.post
+            log.error:Something went wrong while invoking OpenAI
+               message:x:@http.post/*/content/*/error/*/message
+               status:x:@http.post
+               error:x:@lambda2hyper
+            math.decrement:x:@.no
+      .catch
+         math.decrement:x:@.no

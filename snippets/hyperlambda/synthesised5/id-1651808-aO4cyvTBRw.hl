@@ -1,0 +1,43 @@
+
+// Checks if the current node has a non-empty "href" attribute that does not start with "http://" or "https://", then constructs an absolute URL by combining a base URL with the relative path, trims trailing slashes, and adds the result to a list of URLs if it does not already exist.
+if
+   and
+      exists:x:"@.dp/#/*/\\@href/[0,1]"
+      not-null:x:"@.dp/#/*/\\@href/[0,1]"
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"http://"
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"https://"
+   .lambda
+      strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      strings.trim-end:x:@strings.split/0
+         .:/
+      .tmp
+      if
+         strings.starts-with:x:@strings.trim-end
+            .:/
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:@strings.trim-end
+      else
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.base
+               .:/
+               get-value:x:@strings.trim-end
+      if
+         not-exists:x:@.url/*/{@strings.concat}
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.urls
+               .
+                  .:x:@.tmp

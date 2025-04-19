@@ -1,0 +1,17 @@
+
+// Connects to a database, converts an embedding array to bytes, calculates a threshold by subtracting the provided value from 1, constructs a SQL query to select similar training snippets based on type and embedding similarity, executes the query with the calculated parameters, and appends the resulting records to the [.scan] node.
+data.connect:[generic|magic]
+   floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+   math.subtract
+      .:float:1
+      get-value:x:@.arguments/*/threshold
+   strings.concat
+      .:"\nselect vss.distance, vss.rowid as id, ts.prompt, ts.completion, ts.uri, ts.cached\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and\n      vss_search(vss.embedding_vss, @embedding) and\n      vss.distance < @threshold"
+      get-value:x:@.tail
+      .:" limit 20"
+   data.select:x:@strings.concat
+      embedding:x:@floatArray2bytes
+      type:x:@.arguments/*/type
+      threshold:x:@math.subtract
+   add:x:@.scan
+      get-nodes:x:@data.select/*

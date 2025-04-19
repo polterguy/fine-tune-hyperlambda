@@ -1,0 +1,25 @@
+
+// Creates a scheduled task that, after a calculated due date, deletes demo chatbot data of a specified type from two database tables, removes an associated HTML file, logs the deletion, and then deletes itself as a task.
+tasks.create:x:@strings.concat
+   description:Deletes demo chatbot 7 days after creating it
+   due:x:@math.add
+   .lambda
+      .type:x:@.type
+      data.connect:[generic|magic]
+         data.execute:"\ndelete from vss_ml_training_snippets\n   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+            type:x:@.type
+      .task:x:@strings.concat
+      data.connect:[generic|magic]
+         data.delete
+            table:ml_types
+            where
+               and
+                  type.eq:x:@.type
+      strings.concat
+         .:/etc/www/
+         get-value:x:@.type
+         .:.html
+      io.file.delete:x:@strings.concat
+      log.info:Demo chatbot was deleted
+         type:x:@.type
+      tasks.delete:x:@.task

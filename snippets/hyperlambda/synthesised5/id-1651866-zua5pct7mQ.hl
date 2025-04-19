@@ -1,0 +1,50 @@
+
+// Checks if no data has been read; if so, it queries the "ml_types" table for a row where "type" equals "default" and selects a set of columns. If still no data is found, it throws a 400 error indicating no such type or default type exists. Otherwise, it adds the retrieved model data to the current model node and sets the "type" argument to "default".
+if
+   not-exists:x:@data.read/*
+   .lambda
+      data.read
+         table:ml_types
+         columns
+            model
+            max_tokens
+            max_context_tokens
+            max_request_tokens
+            temperature
+            recaptcha
+            auth
+            supervised
+            cached
+            prefix
+            use_embeddings
+            threshold
+            vector_model
+            contact_us
+            lead_email
+            api_key
+            webhook_incoming
+            webhook_outgoing
+            webhook_incoming_url
+            webhook_outgoing_url
+            system_message
+            initial_questionnaire
+            no_requests
+            max_requests
+            session_timeout
+            search_postfix
+            max_function_invocations
+            max_session_items
+            completion_slot
+         where
+            and
+               type.eq:default
+      if
+         not-exists:x:@data.read/*
+         .lambda
+            throw:No such type, and no default type was found
+               status:int:400
+               public:bool:true
+      add:x:@.model
+         get-nodes:x:@data.read/*/*
+      set-value:x:@.arguments/*/type
+         .:default
