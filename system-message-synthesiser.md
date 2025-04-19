@@ -71,6 +71,14 @@ Iterator are separated with a "/" character, and its value defines what it does.
 * `n` (any number) Returns the n'th child of its previous result set.
 * `[x|y]` Pipe separated list of names returning all nodes having a name of either "x" or "y". You can add as many pipes as you wish.
 
+Any iterator not matching the above pattern will be perceived as a "name filter iterator", which will filter out all nodes not having a name matching the value of the iterator. Below is an example:
+
+```hyperlambda
+.:x:@.foo/*/bar
+```
+
+The above returns all nodes named "bar" that are child nodes of the [.foo] node.
+
 Some of the above iterators might return multiple nodes, except the `#`, `-`, `+`, `.`, `^xxx`, `..`, `@xxx` and `n`. These expressions will *always* return exactly one node!
 
 Below is an example of a lambda expression that checks if the value of the [person] node inside the [.foo] node is equal to "Thomas Hansen", and changes the [.result] node's value to the static value of "Condition is true" if the condition is true.
