@@ -1,0 +1,37 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the [northwind] database using the [generic] connection string and specifies the database type as SQLite.
+ * 2. [add] with the expression `:x:./*/data.delete/*/where/*/and` adds all nodes from [.arguments] as conditions to the [and] node inside the [where] clause of [data.delete].
+ * 3. [data.delete] deletes records from the [Order Details] table in the SQLite database, using the dynamically constructed [where] clause.
+ * 4. [add] with the expression `:x:./*/sockets.signal/*/args` adds all nodes from [.arguments] as arguments to the [args] node of [sockets.signal].
+ * 5. [add] with the expression `:x:./*/sockets.signal` adds all nodes from [auth.ticket.verify] as children to [sockets.signal].
+ * 6. [set-name] renames the [auth.ticket.verify] node under [sockets.signal] to [roles].
+ * 7. [sockets.signal] emits a signal named [northwind.Order Details.delete] with the prepared [args].
+ * 8. [unwrap] evaluates all expressions in the next sibling nodes.
+ * 9. [return] returns a node named [affected] with the result from [data.delete], indicating how many records were deleted.
+ * 
+ * Use cases:
+ * - Deleting specific records from the [Order Details] table in the [northwind] SQLite database based on dynamic arguments.
+ * - Emitting a real-time signal to notify clients or services when records are deleted, including authorization information.
+ * - Returning the number of affected rows to the caller after the delete operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:Order Details
+      where
+         and
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Order Details.delete
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

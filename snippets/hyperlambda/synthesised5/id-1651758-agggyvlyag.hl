@@ -1,0 +1,23 @@
+
+/*
+ * 1. The [data.connect] slot establishes a database connection using either the "generic" or "magic" adapter, allowing subsequent database operations to be executed within this context.
+ * 2. The [add] slot dynamically adds all nodes referenced by `:x:@.arguments/*` as children to the [and] node inside the [where] clause of the [data.delete] operation, effectively building the delete condition based on provided arguments.
+ * 3. The [data.delete] slot constructs and executes a SQL DELETE statement on the [ml_requests] table, using the dynamically constructed [where] clause to specify which records to delete.
+ * 4. The [unwrap] slot evaluates all expressions in the immediate children of the current node, ensuring any referenced expressions are resolved before proceeding.
+ * 5. The [return] slot returns the number of affected rows from the [data.delete] operation by referencing the [affected] node.
+ * 
+ * Use cases:
+ * - Deleting records from the [ml_requests] table based on dynamic filter criteria provided as arguments.
+ * - Creating a reusable endpoint for deleting machine learning request records, where the delete conditions are determined at runtime.
+ * - Implementing an API endpoint that accepts various filter parameters and deletes matching records in a database, returning the number of deleted rows.
+ */
+data.connect:[generic|magic]
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      table:ml_requests
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

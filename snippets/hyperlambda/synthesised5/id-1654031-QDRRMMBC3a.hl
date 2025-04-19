@@ -1,0 +1,60 @@
+
+/*
+ * 1. [if] checks if [.auto_destruct] exists and is truthy before proceeding, acting as a conditional guard for the entire workflow.
+ * 2. [sockets.signal] sends a message to the feedback channel, notifying that a scheduled task will be created to delete a chatbot in 7 days. The message and type are provided as arguments.
+ * 3. [sleep] pauses execution for 100 milliseconds, likely to ensure message delivery or sequencing.
+ * 4. [math.add] calculates a date 7 days in the future by adding 7 days to the current date/time ([date.now] and [time] with [days:7]).
+ * 5. [strings.concat] constructs a unique task name by concatenating "delete-chatbot-" with the value of [.type].
+ * 6. [unwrap] is used to extract values from sibling nodes, specifically the task name and type, for later use in the task definition.
+ * 7. [tasks.create] creates a new scheduled task with the generated name, a description, and a due date set to 7 days in the future. The task's lambda defines the deletion logic:
+ *    - Sets [.type] to the current type value.
+ *    - Connects to a database and executes a SQL statement to delete training snippets of the given type.
+ *    - Sets [.task] to the task name.
+ *    - Connects to the database again to delete the corresponding type from the [ml_types] table.
+ *    - Deletes an HTML file associated with the chatbot type from the web directory.
+ *    - Logs an informational message indicating the chatbot was deleted.
+ *    - Deletes the scheduled task itself using [tasks.delete] to ensure it does not run again.
+ * 
+ * Use cases:
+ * - Automatically schedule the deletion of a demo chatbot and all its related data and files 7 days after creation, ensuring cleanup of temporary resources.
+ * - Provide users with feedback that a chatbot will be deleted in the future, giving them time to act if needed.
+ * - Implement self-destructing demo environments or resources for security, compliance, or cost-saving purposes.
+ */
+if:x:@.auto_destruct
+   sockets.signal:x:@.feedback-channel
+      args
+         message:Creating scheduled task that deletes chatbot 7 days from now
+         type:info
+   sleep:100
+   math.add
+      date.now
+      time
+         days:7
+   strings.concat
+      .:delete-chatbot-
+      get-value:x:@.type
+   unwrap:x:+/+/*/.lambda/*/.task
+   unwrap:x:+/*/.lambda/*/.type
+   tasks.create:x:@strings.concat
+      description:Deletes demo chatbot 7 days after creating it
+      due:x:@math.add
+      .lambda
+         .type:x:@.type
+         data.connect:[generic|magic]
+            data.execute:"\ndelete from vss_ml_training_snippets\n   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+               type:x:@.type
+         .task:x:@strings.concat
+         data.connect:[generic|magic]
+            data.delete
+               table:ml_types
+               where
+                  and
+                     type.eq:x:@.type
+         strings.concat
+            .:/etc/www/
+            get-value:x:@.type
+            .:.html
+         io.file.delete:x:@strings.concat
+         log.info:Demo chatbot was deleted
+            type:x:@.type
+         tasks.delete:x:@.task

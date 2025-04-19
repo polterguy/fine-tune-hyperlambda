@@ -1,0 +1,25 @@
+
+/*
+ * 1. The [data.connect] slot opens a connection to the database specified by the connection string "generic" and the database name "magic". All child nodes will have access to this database connection.
+ * 2. The [database-type] node specifies that the database type to use is SQLite for both the connection and the subsequent [data.create] operation.
+ * 3. The [add] slot collects all argument nodes from [.arguments] and adds them as child nodes under the [values] node within the [data.create] operation. This prepares the data that will be inserted into the database.
+ * 4. The [data.create] slot inserts a new record into the [questionnaires] table using the values gathered from the arguments. The operation is executed on the SQLite database.
+ * 5. The [response.status.set] slot sets the HTTP response status code to 201, indicating that a new resource has been successfully created.
+ * 6. The [return] slot returns a result node with the value "success" to indicate the operation completed successfully.
+ * 
+ * Use cases:
+ * - Creating a new questionnaire record in the [questionnaires] table using data provided in the HTTP request.
+ * - Handling HTTP POST requests to add new entries to a SQLite-backed database, returning a 201 Created status on success.
+ * - Accepting dynamic fields for the [questionnaires] table by mapping all incoming arguments directly to database columns.
+ */
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:questionnaires
+      values
+   response.status.set:201
+   return
+      result:success

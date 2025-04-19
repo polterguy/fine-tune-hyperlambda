@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [for-each] slot iterates over each child node of [mysql.select], passing each node by reference as [.dp].
+ * 2. Inside the loop, an [if] condition checks if the value of the [Key_name] child node of the current [.dp] node is not equal to "PRIMARY".
+ * 3. If the condition is true, [unwrap:x:+/*/*/*] is used to evaluate the next sibling's descendants, preparing the context for further operations.
+ * 4. [add:x:@mysql.connect/*/return-nodes] appends a new node structure (with [name] and [columns] children) to the [return-nodes] node under [mysql.connect]. The [name] node gets its value from the current [Key_name].
+ * 5. [unwrap:x:+/*/*] evaluates the next sibling's descendants again, adjusting the context for column addition.
+ * 6. [add:x:@mysql.connect/*/return-nodes/0/-/*/columns] appends a new node (with its value set to the current [Column_name]) to the [columns] child node of the last-added [return-nodes] node.
+ * 
+ * Use cases:
+ * - Transforming MySQL index metadata into a custom node structure, excluding primary keys.
+ * - Dynamically building a list of non-primary indexes and their columns for database introspection or documentation purposes.
+ * - Aggregating and restructuring SQL query results for further processing or API responses.
+ */
+for-each:x:@mysql.select/*
+   if
+      neq:x:@.dp/#/*/Key_name
+         .:PRIMARY
+      .lambda
+         unwrap:x:+/*/*/*
+         add:x:@mysql.connect/*/return-nodes
+            .
+               .
+                  name:x:@.dp/#/*/Key_name
+                  columns
+         unwrap:x:+/*/*
+         add:x:@mysql.connect/*/return-nodes/0/-/*/columns
+            .
+               .:x:@.dp/#/*/Column_name

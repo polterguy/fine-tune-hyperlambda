@@ -1,0 +1,25 @@
+
+/*
+ * 1. The [data.connect] slot establishes a database connection to either the "generic" or "chinook" database, specifying the database type as SQLite using the [database-type] node.
+ * 2. The [add] slot dynamically adds all argument nodes from [.arguments] as children to the [and] node inside the [where] clause of [data.delete]. This allows for flexible construction of the delete condition based on provided arguments.
+ * 3. The [data.delete] slot performs a delete operation on the [Artist] table in the SQLite database, using the dynamically constructed [where] clause for filtering which records to delete.
+ * 4. The [unwrap] slot evaluates and executes the results of the previous sibling node, ensuring that all expressions are processed and side effects (like the deletion) are realized.
+ * 5. The [return] slot returns the number of affected rows from the [data.delete] operation by referencing its result.
+ * 
+ * Use cases:
+ * - Deleting one or more artists from the [Artist] table in the SQLite database based on dynamic filter criteria provided as arguments.
+ * - Creating a reusable endpoint for bulk deletion of artists where the filter conditions are determined at runtime.
+ * - Integrating this logic into an API to allow clients to delete artists by specifying various fields (such as name or ID) as arguments.
+ */
+data.connect:[generic|chinook]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:Artist
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

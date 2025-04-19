@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [data.connect] slot opens a connection to the database specified by the "generic" connection string and the "crm" database. All child nodes will have access to this database connection.
+ * 2. The [add] slot with the expression `:x:./*/data.create/*/values` collects all argument nodes from [.arguments] and adds them as children to the [values] node inside [data.create], preparing the data for insertion.
+ * 3. The [data.create] slot inserts a new record into the [documents] table in the SQLite database, using the values collected from the arguments.
+ * 4. The [response.status.set] slot sets the HTTP response status code to 201, indicating successful creation of a resource.
+ * 5. The second [add] slot with the expression `:x:./*/sockets.signal/*/args` collects all argument nodes from [.arguments] and adds them as children to the [args] node inside [sockets.signal], preparing the arguments for the socket signal.
+ * 6. The [sockets.signal] slot emits a "crm.documents.post" signal, passing the arguments and restricting the signal to users with "admin" or "root" roles.
+ * 7. The [yield] slot returns the ID of the newly created document from the [data.create] operation.
+ * 
+ * Use cases:
+ * - Creating a new document record in the [documents] table of the "crm" database and notifying connected clients via a socket signal.
+ * - Building an HTTP POST endpoint for document creation that returns the new document's ID and broadcasts the creation event to administrators.
+ * - Implementing real-time updates in an admin dashboard when new documents are added to the CRM system.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:documents
+      values
+   response.status.set:201
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.documents.post
+      args
+      roles:admin,root
+   yield
+      id:x:@data.create

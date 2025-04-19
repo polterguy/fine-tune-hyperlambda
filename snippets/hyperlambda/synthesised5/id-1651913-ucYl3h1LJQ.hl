@@ -1,0 +1,42 @@
+
+/*
+ * 1. [sqlite.connect] establishes a connection to the SQLite database using the connection information found in the [.connection] node.
+ * 2. [strings.concat] constructs a SQL query string to retrieve all indexes for the table specified in [.arguments] under the [table] node.
+ * 3. [sqlite.select] executes the constructed SQL query to fetch index metadata from the SQLite system table.
+ * 4. [for-each] iterates over each index returned by the previous [sqlite.select], processing each index individually.
+ * 5. [unwrap] evaluates and flattens the node structure for easier access to the index details.
+ * 6. [add] creates a new node under [return-nodes] for each index, including its name and a placeholder for its columns.
+ * 7. [strings.concat] constructs a PRAGMA query to retrieve column information for each index.
+ * 8. [sqlite.select] executes the PRAGMA query to get the columns associated with the current index.
+ * 9. [for-each] iterates over each column in the current index.
+ * 10. [unwrap] evaluates and flattens the node structure for each column.
+ * 11. [add] appends the column name to the [columns] node of the corresponding index in [return-nodes].
+ * 
+ * Use cases:
+ * - Retrieve a list of all indexes and their columns for a specified table in a SQLite database.
+ * - Generate metadata about table indexes for use in database documentation or schema analysis tools.
+ * - Dynamically inspect and display index structure for database administration or migration purposes.
+ */
+sqlite.connect:x:@.connection
+   strings.concat
+      .:"select * from sqlite_master where type = 'index' and tbl_name='"
+      get-value:x:@.arguments/*/table
+      .:"'"
+   sqlite.select:x:@strings.concat
+   for-each:x:@sqlite.select/*
+      unwrap:x:+/*/*/*
+      add:x:../*/return-nodes
+         .
+            .
+               name:x:@.dp/#/*/name
+               columns
+      strings.concat
+         .:"pragma index_info('"
+         get-value:x:@.dp/#/*/name
+         .:"')"
+      sqlite.select:x:@strings.concat
+      for-each:x:@sqlite.select/*
+         unwrap:x:+/*/*
+         add:x:../*/return-nodes/0/-/*/columns
+            .
+               .:x:@.dp/#/*/name

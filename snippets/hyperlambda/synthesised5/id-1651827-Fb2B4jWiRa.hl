@@ -1,0 +1,22 @@
+
+/*
+ * 1. The [try] slot is used to execute its child nodes and catch any exceptions that may occur, allowing for error handling in the workflow.
+ * 2. The [execute] slot calls the [magic.ai.create-system-message] slot, passing in [url], [template], and [instruction] arguments sourced from the [.arguments] node. This slot evaluates any expressions before passing them as arguments.
+ * 3. The [unwrap] slot retrieves the value of the [message] node from the result of the previous [execute] invocation, using the expression `:x:+/*/*/message` to navigate to the correct node.
+ * 4. The [sockets.signal] slot sends a message to a specified [channel], targeting users with the [root] role. The message sent is the value obtained from the [execute] result, specifically the [message] node.
+ * 
+ * Use cases:
+ * - Creating a system message using AI, then broadcasting the generated message to a specific channel for users with the [root] role.
+ * - Handling potential errors in the AI message creation process to ensure robust communication in real-time applications.
+ * - Dynamically generating and sending notifications or system instructions to privileged users based on input parameters.
+ */
+try
+   execute:magic.ai.create-system-message
+      url:x:@.arguments/*/url
+      template:x:@.arguments/*/template
+      instruction:x:@.arguments/*/instruction
+   unwrap:x:+/*/*/message
+   sockets.signal:x:@.arguments/*/channel
+      roles:root
+      args
+         message:x:@execute

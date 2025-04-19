@@ -1,0 +1,22 @@
+
+/*
+ * 1. [for-each] iterates over all child nodes of [data.read], passing each node by reference as [.dp].
+ * 2. [http.get] performs an HTTP GET request to "https://api.streamstats.com/plays" for each [.dp] node, using the [ArtistId] value from the current node as a query parameter. The [convert] argument ensures the response is converted to a boolean type.
+ * 3. [add:x:+/*/*] adds all child nodes under the [content] node of the [http.get] response to the current node in the iteration.
+ * 4. [add:x:@.dp/#] adds a new [plays] node to the original [.dp] node, indicating the play count or related data.
+ * 
+ * Use cases:
+ * - Enriching a list of artist data nodes with real-time play statistics from an external API.
+ * - Synchronizing local artist records with up-to-date streaming data.
+ * - Augmenting each artist node with additional information fetched from a remote service.
+ */
+for-each:x:@data.read/*
+   http.get:"https://api.streamstats.com/plays"
+      query
+         id:x:@.dp/#/*/ArtistId
+      convert:bool:true
+   add:x:+/*/*
+      get-nodes:x:@http.get/*/content/*
+   add:x:@.dp/#
+      .
+         plays

@@ -1,0 +1,22 @@
+
+/*
+ * 1. The [include] slot iterates through each child node of [tasks.list], executing its children for each node, passing the current node as [.dp].
+ * 2. For each node, [tasks.get] is invoked using the [id] child node of the current [.dp] node, with [schedules] set to true, retrieving detailed information about the task and its schedules.
+ * 3. The [add] slot with `x:+/*` inserts all schedule nodes found under the [schedules] node of the [tasks.get] result into the return node of the current task.
+ * 4. The [add] slot with `x:./*/return/*/schedules` inserts an empty node into the [schedules] node under [return], ensuring the structure exists even if there are no schedules.
+ * 5. The [return] slot returns the [schedules] node, which now contains all schedules for each task.
+ * 
+ * Use cases:
+ * - Aggregating all schedules for a list of tasks, returning a unified structure with all schedules.
+ * - Ensuring that each task in a list has a [schedules] node in the output, even if no schedules exist.
+ * - Dynamically building a schedules summary for reporting or administrative interfaces.
+ */
+include:x:@tasks.list/*
+   tasks.get:x:@.dp/#/*/id
+      schedules:true
+   add:x:+/*
+      get-nodes:x:@tasks.get/*/schedules/*
+   add:x:./*/return/*/schedules
+      .
+   return
+      schedules

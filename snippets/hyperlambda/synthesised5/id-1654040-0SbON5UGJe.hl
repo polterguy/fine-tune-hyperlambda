@@ -1,0 +1,61 @@
+
+/*
+ * 1. The [if] slot checks if there are no child nodes under [data.read]. If this condition is true, it executes the following logic.
+ * 2. The [data.read] slot queries the "ml_types" table, selecting a specified set of columns. It applies a [where] clause to filter for rows where the "type" column equals "default".
+ * 3. The inner [if] slot checks again if there are still no child nodes under [data.read] after the query. If so, it throws an exception with the message "No such type, and no default type was found", sets the HTTP status to 400, and marks the error as public.
+ * 4. The [add] slot appends all child nodes of the [model] node found in [data.read] to the current [.model] node.
+ * 5. The [set-value] slot sets the value of the [type] node under [.arguments] to "default".
+ * 
+ * Use cases:
+ * - Ensuring that a default configuration or type exists in the "ml_types" table before proceeding with further logic.
+ * - Handling cases where a specific type is not found by falling back to a default type and updating the arguments accordingly.
+ * - Providing clear error feedback to the client when neither a specific nor a default type is available.
+ */
+if
+   not-exists:x:@data.read/*
+   .lambda
+      data.read
+         table:ml_types
+         columns
+            model
+            max_tokens
+            max_context_tokens
+            max_request_tokens
+            temperature
+            recaptcha
+            auth
+            supervised
+            cached
+            prefix
+            use_embeddings
+            threshold
+            vector_model
+            contact_us
+            lead_email
+            api_key
+            webhook_incoming
+            webhook_outgoing
+            webhook_incoming_url
+            webhook_outgoing_url
+            system_message
+            initial_questionnaire
+            no_requests
+            max_requests
+            session_timeout
+            search_postfix
+            max_function_invocations
+            max_session_items
+            completion_slot
+         where
+            and
+               type.eq:default
+      if
+         not-exists:x:@data.read/*
+         .lambda
+            throw:No such type, and no default type was found
+               status:int:400
+               public:bool:true
+      add:x:@.model
+         get-nodes:x:@data.read/*/*
+      set-value:x:@.arguments/*/type
+         .:default

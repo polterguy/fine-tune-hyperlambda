@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [data.connect] slot establishes a connection to the database named "magic", making it possible to execute subsequent database operations within this context.
+ * 2. The [data.execute] slot executes a raw SQL statement to insert a new record into the [crypto_invocations] table, specifying the columns [crypto_key], [request_id], [request], [request_raw], and [response].
+ * 3. The SQL statement uses parameterized values (@crypto_key, @request_id, etc.) to prevent SQL injection and to safely insert dynamic data.
+ * 4. The parameter values for the SQL statement are provided as child nodes, where each parameter is assigned a value from different sources:
+ *    - [@crypto_key] gets its value from [.arguments] node's [crypto-key] child.
+ *    - [@request_id] gets its value from the [convert] node.
+ *    - [@request] gets its value from [.arguments] node's [request] child.
+ *    - [@request_raw] gets its value from [.arguments] node's [request-raw] child.
+ *    - [@response] gets its value from [.arguments] node's [response] child.
+ * 
+ * Use cases:
+ * - Logging and persisting cryptographic operation requests and responses for auditing or troubleshooting.
+ * - Storing API request and response payloads related to cryptographic functions for later analysis.
+ * - Implementing a secure, traceable record of cryptographic service invocations in a multi-user or enterprise environment.
+ */
+data.connect:magic
+   data.execute:insert into crypto_invocations (crypto_key, request_id, request, request_raw, response) values (@crypto_key, @request_id, @request, @request_raw, @response)
+      @crypto_key:x:@.arguments/*/crypto-key
+      @request_id:x:@convert
+      @request:x:@.arguments/*/request
+      @request_raw:x:@.arguments/*/request-raw
+      @response:x:@.arguments/*/response

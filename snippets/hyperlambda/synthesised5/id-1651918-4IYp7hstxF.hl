@@ -1,0 +1,66 @@
+
+/*
+ * 1. [slots.create] defines a new dynamic slot named [magic.db.mysql.indexes] that retrieves all indexes for a specified MySQL table.
+ * 2. [validators.mandatory] ensures that both [.database] and [.table] arguments are provided before proceeding.
+ * 3. The code determines the correct connection string for the MySQL database. If a custom [connection-string] is provided, it constructs the connection string using the provided values; otherwise, it defaults to "[generic|database]".
+ * 4. [mysql.connect] opens a connection to the specified MySQL database using the constructed connection string.
+ * 5. It builds and executes a "SHOW INDEXES FROM [table]" SQL statement to retrieve index information for the given table.
+ * 6. [for-each] iterates over each index entry returned by the query, filtering out the "PRIMARY" index.
+ * 7. For each non-primary index, it creates a result structure containing the index name ([name]) and an array of columns ([columns]) associated with that index.
+ * 8. [unwrap] and [add] are used to build and append the index and column information to the result set.
+ * 9. [return-nodes] returns the constructed list of indexes and their columns.
+ * 
+ * Use cases:
+ * - Retrieve all non-primary indexes and their columns for a specific MySQL table to display in a database management UI.
+ * - Generate migration scripts or documentation by programmatically extracting index information from a database schema.
+ * - Validate or audit database indexes as part of automated deployment or quality assurance processes.
+ */
+slots.create:magic.db.mysql.indexes
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
+   .connection:[information_schema]
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   mysql.connect:x:@.connection
+      strings.concat
+         .:"show indexes from "
+         get-value:x:@.arguments/*/table
+      mysql.select:x:@strings.concat
+      for-each:x:@mysql.select/*
+         if
+            neq:x:@.dp/#/*/Key_name
+               .:PRIMARY
+            .lambda
+               unwrap:x:+/*/*/*
+               add:x:@mysql.connect/*/return-nodes
+                  .
+                     .
+                        name:x:@.dp/#/*/Key_name
+                        columns
+               unwrap:x:+/*/*
+               add:x:@mysql.connect/*/return-nodes/0/-/*/columns
+                  .
+                     .:x:@.dp/#/*/Column_name
+      return-nodes

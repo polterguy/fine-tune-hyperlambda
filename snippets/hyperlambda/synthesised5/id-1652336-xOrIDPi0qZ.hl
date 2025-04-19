@@ -1,0 +1,47 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the CRM database using the SQLite adapter, making the database available for subsequent operations.
+ * 2. [add:x:./*/data.update/*/values] collects argument nodes from [arguments] (excluding the first node) and adds them as children to the [values] node under [data.update]. This dynamically builds the set of fields to update.
+ * 3. [add:x:./*/data.update/*/where/*/and] adds the first argument node from [arguments] as a condition under the [and] node in the [where] clause of [data.update], specifying which record(s) to update.
+ * 4. [data.update] performs an update operation on the [notes] table using the constructed [values] and [where] clauses, updating the specified record(s).
+ * 5. [if] checks if the result of [data.update] is 0, indicating no records were updated. If true, it sets the HTTP response status to 404 and returns a "Record not found" message.
+ * 6. If records were updated, [response.status.set:202] sets the HTTP status to 202 (Accepted).
+ * 7. [add:x:./*/sockets.signal/*/args] adds all argument nodes to the [args] node under [sockets.signal], preparing the arguments for the signal.
+ * 8. [sockets.signal:crm.notes.put] emits a real-time signal named "crm.notes.put" with the provided arguments, restricted to users with "admin" or "root" roles.
+ * 9. [unwrap:x:+/*] evaluates the next sibling node, ensuring any expressions are executed.
+ * 10. [return] returns the number of affected rows from [data.update] as [affected].
+ * 
+ * Use cases:
+ * - Updating a note in the CRM system and notifying administrators in real time about the change.
+ * - Returning a 404 error if the specified note does not exist or was not updated.
+ * - Supporting dynamic updates to the [notes] table by mapping incoming arguments to both update values and where conditions.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:notes
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.notes.put
+      args
+      roles:admin,root
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

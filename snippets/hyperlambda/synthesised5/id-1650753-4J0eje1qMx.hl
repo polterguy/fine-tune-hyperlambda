@@ -1,0 +1,25 @@
+
+/*
+ * 1. The [data.connect] slot establishes a connection to the database named "financial", making subsequent data operations execute in that context.
+ * 2. The first [add] slot appends any nodes matching [comments.name.eq] found in [.arguments] under [where/and] of all [data.read] nodes, dynamically injecting filter conditions into the query.
+ * 3. The second [add] slot appends [limit] and [offset] nodes from [.arguments] directly to all [data.read] nodes, enabling dynamic paging based on input arguments.
+ * 4. The [data.read] slot constructs a query against the [line_items] table, with a [where/and] clause that will be populated by the previously injected conditions.
+ * 5. The [yield] slot returns the result of the [data.read] operation, exposing the selected records to the caller.
+ * 
+ * Use cases:
+ * - Dynamically filter financial line items by comment name and return paged results based on user-supplied limit and offset.
+ * - Create a reusable endpoint for querying [line_items] with flexible filtering and paging, driven entirely by input arguments.
+ * - Integrate into a reporting tool that allows users to search and page through financial line items using comment-based filters.
+ */
+data.connect:financial
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/comments.name.eq
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:line_items
+      where
+         and
+   yield
+      result:x:@data.read/*

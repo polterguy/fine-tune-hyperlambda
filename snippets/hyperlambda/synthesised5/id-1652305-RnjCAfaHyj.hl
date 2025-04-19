@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [data.connect] slot opens a connection to the database specified by the connection string "generic" and the database "crm".
+ * 2. The [add] slot with the expression `:x:./*/data.create/*/values` collects all argument nodes from [.arguments] and adds them as children to the [values] node under [data.create]. This prepares the data to be inserted into the database.
+ * 3. The [data.create] slot inserts a new record into the [contacts] table of the SQLite database, using the values previously gathered from [.arguments].
+ * 4. The [response.status.set] slot sets the HTTP response status code to 201, indicating successful creation of a resource.
+ * 5. The [add] slot with the expression `:x:./*/sockets.signal/*/args` again gathers all argument nodes from [.arguments] and adds them to the [args] node under [sockets.signal]. This prepares the arguments for a socket signal.
+ * 6. The [sockets.signal] slot emits a signal named "crm.contacts.post" with the [args] node containing the arguments, and restricts this signal to users with the "admin" or "root" roles.
+ * 7. The [yield] slot returns the [id] of the newly created contact, which is retrieved from the result of the [data.create] operation.
+ * 
+ * Use cases:
+ * - Creating a new contact in the CRM system via an HTTP POST endpoint, returning the new contact's ID.
+ * - Notifying connected clients (with admin or root roles) in real time about the creation of a new contact using sockets.
+ * - Ensuring that all input arguments are both inserted into the database and included in the socket notification for further processing or UI updates.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:contacts
+      values
+   response.status.set:201
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.contacts.post
+      args
+      roles:admin,root
+   yield
+      id:x:@data.create

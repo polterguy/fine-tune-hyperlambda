@@ -1,0 +1,32 @@
+
+/*
+ * 1. [data.connect] establishes a database connection using the "generic" connection string and targets the "crm" database. The [database-type] child node specifies that SQLite is the database engine.
+ * 2. [add] with the expression `:x:./*/data.delete/*/where/*/and` injects all nodes from [.arguments] as children of the [and] node inside the [where] clause of [data.delete]. This dynamically builds the delete condition based on incoming arguments.
+ * 3. [data.delete] deletes records from the [leads] table in the SQLite database, using the dynamically constructed [where] clause.
+ * 4. Another [add] with the expression `:x:./*/sockets.signal/*/args` injects all nodes from [.arguments] as children of the [args] node inside [sockets.signal], ensuring that the same arguments are passed to the socket signal.
+ * 5. [sockets.signal] emits a "crm.leads.delete" event, passing along the [args] and restricting the signal to users with the "admin" or "root" roles.
+ * 6. [unwrap] evaluates the results of the next sibling nodes, ensuring any expressions are resolved.
+ * 7. [return] returns the number of affected rows from the [data.delete] operation by referencing its result.
+ * 
+ * Use cases:
+ * - Deleting one or more leads from the [leads] table based on dynamic filter criteria provided in the request arguments.
+ * - Notifying other parts of the system in real-time (e.g., UI updates or logging) that leads have been deleted, restricted to privileged users.
+ * - Returning the number of deleted records to the client after the operation completes.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:leads
+      where
+         and
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.leads.delete
+      args
+      roles:admin,root
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

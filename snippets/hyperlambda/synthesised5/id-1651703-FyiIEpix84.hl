@@ -1,0 +1,33 @@
+
+/*
+ * 1. The [slots.create] slot defines a new dynamic slot named [magic.crypto.get-server-public-key], making it available for invocation elsewhere in your application.
+ * 2. The [cache.try-get] slot attempts to retrieve a cached value using the key [magic.crypto.get-server-public-key]. If the value is not found in the cache, it executes its [.lambda] child to generate the value, caches it for 300 seconds (5 minutes), and then returns it.
+ * 3. Inside the [.lambda] node, [io.file.load] loads the contents of the server's public key file from the path "/etc/system/crypto/keys/public.key".
+ * 4. The [crypto.fingerprint] slot computes the fingerprint of the loaded public key.
+ * 5. [unwrap:x:+/*] retrieves both the loaded key and its fingerprint nodes.
+ * 6. [lambda2hyper] constructs a new node structure with [key] and [fingerprint] nodes, holding the public key and its fingerprint, respectively.
+ * 7. [return:x:@lambda2hyper] returns this structured result from the [.lambda] block, which is then cached.
+ * 8. [hyper2lambda:x:@cache.try-get] converts the cached or newly generated Hyperlambda string back into a lambda object.
+ * 9. [add:x:+ get-nodes:x:@hyper2lambda/*] merges the resulting nodes into the current execution context.
+ * 10. [return] returns the final result to the caller, which includes the public key and its fingerprint.
+ * 
+ * Use cases:
+ * - Efficiently retrieve and cache the server's public RSA key and its fingerprint for repeated cryptographic operations, reducing file I/O overhead.
+ * - Expose an endpoint that provides the server's public key and fingerprint to clients for secure communication setup.
+ * - Ensure that expensive or slow operations (like file reads and fingerprint calculations) are only performed once per cache interval, improving application performance.
+ */
+slots.create:magic.crypto.get-server-public-key
+   cache.try-get:magic.crypto.get-server-public-key
+      expiration:300
+      .lambda
+         io.file.load:/etc/system/crypto/keys/public.key
+         crypto.fingerprint:x:@io.file.load
+         unwrap:x:+/*
+         lambda2hyper
+            key:x:@io.file.load
+            fingerprint:x:@crypto.fingerprint
+         return:x:@lambda2hyper
+   hyper2lambda:x:@cache.try-get
+   add:x:+
+      get-nodes:x:@hyper2lambda/*
+   return

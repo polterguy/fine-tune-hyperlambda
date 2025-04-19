@@ -1,0 +1,34 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the [streamingdb] database, setting the context for subsequent database operations.
+ * 2. [data.read] queries the [Artists] table, selecting up to 50 records and retrieving the [ArtistId] and [StageName] columns.
+ * 3. [for-each] iterates over each artist record returned by [data.read].
+ * 4. [http.get] sends an HTTP GET request to "https://api.streamstats.com/plays" for each artist, passing the [ArtistId] as a query parameter. The [convert] argument ensures the response is parsed into a lambda node structure.
+ * 5. [add:x:+/*/*] merges the nodes from the HTTP response's [content] section into the current artist node, enriching the artist data with additional information from the API.
+ * 6. [add:x:@.dp/#] adds a new [plays] node to the current artist node, potentially to store the number of plays or related statistics.
+ * 7. [yield] outputs the final enriched artist data under the [enriched] node, referencing the processed [artists] collection.
+ * 
+ * Use cases:
+ * - Enriching artist records from a database with real-time play statistics from an external API.
+ * - Building a data pipeline that combines local database information with external service data for analytics or reporting.
+ * - Creating an API endpoint that returns artist data along with up-to-date streaming statistics for frontend applications.
+ */
+data.connect:streamingdb
+   data.read
+      table:Artists
+      limit:50
+      columns
+         ArtistId
+         StageName
+   for-each:x:@data.read/*
+      http.get:"https://api.streamstats.com/plays"
+         query
+            id:x:@.dp/#/*/ArtistId
+         convert:bool:true
+      add:x:+/*/*
+         get-nodes:x:@http.get/*/content/*
+      add:x:@.dp/#
+         .
+            plays
+   yield
+      enriched:x:@.artists

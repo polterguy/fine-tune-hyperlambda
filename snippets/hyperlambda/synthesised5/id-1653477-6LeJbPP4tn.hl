@@ -1,0 +1,46 @@
+
+/*
+ * 1. [data.connect] opens a connection to the "crm" database using the "generic" connection string and specifies the database type as SQLite.
+ * 2. [add:x:./*/data.update/*/values] and [add:x:./*/data.update/*/where/*/and] dynamically populate the [values] and [where]/[and] nodes for the [data.update] operation using arguments from [.arguments], allowing flexible updates based on input.
+ * 3. [data.update] performs an update on the [tasks] table in the SQLite database, using the dynamically constructed [values] and [where] conditions.
+ * 4. [if] checks if the update affected zero records (i.e., no matching record was found), and if so, sets the HTTP response status to 404 and returns a "Record not found" message.
+ * 5. If records were updated, [response.status.set:202] sets the HTTP response status to 202 (Accepted).
+ * 6. [add:x:./*/sockets.signal/*/args] prepares the arguments for a socket signal by copying all input arguments.
+ * 7. [sockets.signal:crm.tasks.put] emits a socket signal named "crm.tasks.put" with the prepared arguments, restricted to users with "admin" or "root" roles.
+ * 8. [unwrap:x:+/*] evaluates and flattens the results of the subsequent sibling nodes.
+ * 9. [return] returns the number of affected records from the update operation.
+ * 
+ * Use cases:
+ * - Updating a task in the [tasks] table based on dynamic input, and notifying administrators in real-time via socket signal.
+ * - Handling cases where the requested task to update does not exist, returning a 404 status and an appropriate message.
+ * - Supporting flexible and reusable update logic for the [tasks] table, driven by input arguments for both values and conditions.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:tasks
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.tasks.put
+      args
+      roles:admin,root
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

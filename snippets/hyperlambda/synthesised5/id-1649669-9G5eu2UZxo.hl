@@ -1,0 +1,25 @@
+
+/*
+ * 1. The [switch] slot evaluates the value of the [http.get] node and branches execution based on its value.
+ * 2. The [case] slots handle specific HTTP status codes:
+ *    - [case:int:200]: If the status code is 200, it sets the value of [.profile.result] to the value of the [name] node found in the content of the [http.get] response.
+ *    - [case:int:401]: If the status code is 401, it throws an exception with the message "401 Unauthorized – Invalid or missing token".
+ *    - [case:int:404]: If the status code is 404, it throws an exception with the message "404 Not Found – User profile endpoint does not exist".
+ * 3. The [default] slot handles any other status code by setting the value of [.profile.result] to "Unexpected error occurred".
+ * 
+ * Use cases:
+ * - Handling different HTTP response codes after attempting to fetch a user profile, providing clear error messages or extracting profile data as appropriate.
+ * - Returning a specific error to the client if authentication fails or the endpoint is missing.
+ * - Ensuring that unexpected errors are caught and reported in a user-friendly way.
+ */
+switch:x:@http.get
+   case:int:200
+      set-value:x:@.profile.result
+         get-value:x:@http.get/*/content/*/name
+   case:int:401
+      throw:401 Unauthorized – Invalid or missing token
+   case:int:404
+      throw:404 Not Found – User profile endpoint does not exist
+   default
+      set-value:x:@.profile.result
+         .:Unexpected error occurred

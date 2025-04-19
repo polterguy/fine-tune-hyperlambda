@@ -1,0 +1,32 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the [HR] database.
+ * 2. [data.read] queries the [employees] table, selecting only the [birth_day] column for the employee whose [username] matches the value provided in [.arguments] under [username].
+ * 3. [if] checks if the result of subtracting the employee's [birth_date] from the current date ([date.now]) is greater than 18 years, calculated as 18 times 365 days.
+ * 4. If the condition is true (i.e., the employee is older than 18 years), the [return] slot returns a [result] node with a boolean value of true.
+ * 
+ * Use cases:
+ * - To verify if a specific employee is over 18 years old based on their username.
+ * - To enforce age-based access control or eligibility checks in HR-related workflows.
+ * - To validate employee age before allowing certain HR actions, such as contract generation or benefit assignment.
+ */
+data.connect:HR
+   data.read
+      table:employees
+      columns
+         birth_day
+      where
+         and
+            username.eq:x:@.arguments/*/username
+   if
+      mt
+         math.subtract
+            date.now
+            get-value:x:@data.read/*/*/birth_date
+         math.multiply
+            time
+               days:365
+            .:int:18
+      .lambda
+         return
+            result:bool:true

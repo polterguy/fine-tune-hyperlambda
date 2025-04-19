@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [if] slot checks if the value of the [Key_name] node inside the current [.dp] reference node is not equal to "PRIMARY" using the [neq] slot.
+ * 2. If the condition is true, the [.lambda] block is executed:
+ *    - The [unwrap] slot with the expression `:x:+/*/*/*` evaluates and retrieves nodes relative to the current position.
+ *    - The [add] slot with the expression `:x:@mysql.connect/*/return-nodes` adds a new node structure containing a [name] node (with value from [Key_name]) and an empty [columns] node to the target location.
+ *    - Another [unwrap] slot with `:x:+/*/*` evaluates and retrieves nodes relative to the new context.
+ *    - The [add] slot with the expression `:x:@mysql.connect/*/return-nodes/0/-/*/columns` adds a new node to the [columns] node, with its value set from [Column_name] inside the current [.dp] reference node.
+ * 
+ * Use cases:
+ * - Filtering out non-primary keys and grouping their columns for further processing or documentation.
+ * - Dynamically building a data structure representing non-primary key indexes and their associated columns from database metadata.
+ * - Preparing a result set for API responses or schema introspection tools that need to list secondary indexes and their columns.
+ */
+if
+   neq:x:@.dp/#/*/Key_name
+      .:PRIMARY
+   .lambda
+      unwrap:x:+/*/*/*
+      add:x:@mysql.connect/*/return-nodes
+         .
+            .
+               name:x:@.dp/#/*/Key_name
+               columns
+      unwrap:x:+/*/*
+      add:x:@mysql.connect/*/return-nodes/0/-/*/columns
+         .
+            .:x:@.dp/#/*/Column_name

@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [include] slot executes the children of the [data.read] node and includes the resulting nodes into the current execution context.
+ * 2. The [data.read] slot reads records from the [Order] table in the database.
+ * 3. The [columns] node specifies that only the [OrderId] and [OrderDate] columns should be returned.
+ * 4. The [where] clause uses an [and] node to filter records so that only orders where [CustomerId] matches the value found at the expression `:x:@.dp/#/*/CustomerId` are selected.
+ * 5. The [yield] slot returns the results of the [data.read] operation as [orders], making the selected order records available to the caller.
+ * 
+ * Use cases:
+ * - Retrieve all orders for a specific customer, where the customer ID is dynamically determined from the execution context.
+ * - Use as a subroutine in a workflow to fetch and return order summaries for a given customer.
+ * - Populate a list of orders for a customer detail view in an API endpoint or UI component.
+ */
+include:x:@data.read/*
+   data.read
+      table:Order
+      columns
+         OrderId
+         OrderDate
+      where
+         and
+            CustomerId.eq:x:@.dp/#/*/CustomerId
+   yield
+      orders:x:@data.read/*

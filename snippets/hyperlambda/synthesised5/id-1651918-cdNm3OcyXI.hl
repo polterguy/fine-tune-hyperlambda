@@ -1,0 +1,37 @@
+
+/*
+ * 1. [mysql.connect] establishes a connection to a MySQL database using the connection information provided in [.connection].
+ * 2. [strings.concat] constructs a SQL query string by concatenating "show indexes from " with the value of [.arguments]/*/table, resulting in a query to retrieve index information for a specified table.
+ * 3. [mysql.select] executes the dynamically constructed SQL query and retrieves the index metadata for the specified table.
+ * 4. [for-each] iterates over each row in the result set returned by [mysql.select].
+ * 5. [if] checks if the [Key_name] of the current row is not equal to "PRIMARY", effectively filtering out the primary key index.
+ * 6. Inside the [if] block, [unwrap] and [add] are used to build a structured node for each non-primary index, adding a [name] node with the index name and a [columns] node to [.return-nodes].
+ * 7. Another [unwrap] and [add] sequence adds the [Column_name] of the current index entry to the [columns] node of the corresponding index in [.return-nodes].
+ * 8. [return-nodes] returns the constructed node structure containing all non-primary indexes and their associated columns for the specified table.
+ * 
+ * Use cases:
+ * - Retrieve all non-primary indexes and their columns for a given MySQL table for documentation or schema analysis.
+ * - Programmatically inspect or display the index structure of a table in a database management tool.
+ * - Support database migration or synchronization scripts by extracting index metadata for further processing.
+ */
+mysql.connect:x:@.connection
+   strings.concat
+      .:"show indexes from "
+      get-value:x:@.arguments/*/table
+   mysql.select:x:@strings.concat
+   for-each:x:@mysql.select/*
+      if
+         neq:x:@.dp/#/*/Key_name
+            .:PRIMARY
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:@mysql.connect/*/return-nodes
+               .
+                  .
+                     name:x:@.dp/#/*/Key_name
+                     columns
+            unwrap:x:+/*/*
+            add:x:@mysql.connect/*/return-nodes/0/-/*/columns
+               .
+                  .:x:@.dp/#/*/Column_name
+   return-nodes

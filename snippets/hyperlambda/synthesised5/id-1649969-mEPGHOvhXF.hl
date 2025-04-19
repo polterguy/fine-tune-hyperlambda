@@ -1,0 +1,24 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the [cms] database using the [generic] connection string, specifying the database type as SQLite.
+ * 2. [add] collects all argument nodes from [.arguments] and adds them as child nodes under [values] within the [data.create] node. This dynamically maps incoming HTTP arguments to the fields being inserted.
+ * 3. [data.create] inserts a new record into the [comments] table in the SQLite database, using the dynamically populated [values] node as the data to insert.
+ * 4. [response.status.set] sets the HTTP response status code to 201, indicating successful creation of a resource.
+ * 5. [yield] returns the ID of the newly created record, as produced by the [data.create] operation.
+ * 
+ * Use cases:
+ * - Creating a new comment in a CMS system via an HTTP POST endpoint, where the fields are dynamically mapped from the request's arguments.
+ * - Building a generic API endpoint for inserting records into a database table, with flexible field mapping based on incoming data.
+ * - Returning the ID of a newly created resource to the client after successful insertion, following RESTful best practices.
+ */
+data.connect:[generic|cms]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:comments
+      values
+   response.status.set:201
+   yield
+      id:x:@data.create

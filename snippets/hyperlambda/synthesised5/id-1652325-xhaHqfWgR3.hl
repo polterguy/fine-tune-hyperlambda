@@ -1,0 +1,31 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the database specified by the "generic" connection string and the "crm" database.
+ * 2. [add] under [data.create/*/values] copies all argument nodes from [.arguments] into the [values] node, preparing the data for insertion.
+ * 3. [data.create] inserts a new record into the [leads] table of the SQLite database, using the values previously set.
+ * 4. [response.status.set] sets the HTTP response status code to 201, indicating successful creation of a resource.
+ * 5. [add] under [sockets.signal/*/args] again copies all argument nodes from [.arguments] into the [args] node, preparing arguments for the socket signal.
+ * 6. [sockets.signal] emits a socket event named "crm.leads.post" with the provided arguments and restricts the signal to users with "admin" or "root" roles.
+ * 7. [yield] returns the ID of the newly created lead record from the [data.create] operation.
+ * 
+ * Use cases:
+ * - Creating a new lead in a CRM system and notifying connected clients in real-time via sockets.
+ * - Building an HTTP POST endpoint that inserts a record and broadcasts the creation event to privileged users.
+ * - Automating lead creation workflows where both database persistence and live UI updates are required.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      database-type:sqlite
+      table:leads
+      values
+   response.status.set:201
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:crm.leads.post
+      args
+      roles:admin,root
+   yield
+      id:x:@data.create

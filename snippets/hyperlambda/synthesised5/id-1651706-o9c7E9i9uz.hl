@@ -1,0 +1,23 @@
+
+/*
+ * 1. The [slots.create] slot defines a new dynamic slot named [magic.crypto.http.persist-invocation].
+ * 2. The [convert] slot retrieves the value of [.request-id] from [.arguments], and ensures it is of type string.
+ * 3. The [data.connect] slot establishes a connection to the "magic" database.
+ * 4. The [data.execute] slot executes a raw SQL INSERT statement to add a new record into the [crypto_invocations] table, using parameterized values to prevent SQL injection.
+ * 5. The parameters [@crypto_key], [@request_id], [@request], [@request_raw], and [@response] are populated from the corresponding arguments or the converted request ID.
+ * 
+ * Use cases:
+ * - Persisting details of a cryptographic HTTP invocation, including the key, request, raw request, and response, into a database for auditing or logging.
+ * - Recording each cryptographic operation request and its response for later analysis or troubleshooting.
+ * - Storing invocation data to support replay, verification, or compliance requirements.
+ */
+slots.create:magic.crypto.http.persist-invocation
+   convert:x:@.arguments/*/request-id
+      type:string
+   data.connect:magic
+      data.execute:insert into crypto_invocations (crypto_key, request_id, request, request_raw, response) values (@crypto_key, @request_id, @request, @request_raw, @response)
+         @crypto_key:x:@.arguments/*/crypto-key
+         @request_id:x:@convert
+         @request:x:@.arguments/*/request
+         @request_raw:x:@.arguments/*/request-raw
+         @response:x:@.arguments/*/response

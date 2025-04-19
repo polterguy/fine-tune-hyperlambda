@@ -1,0 +1,31 @@
+
+/*
+ * 1. The [for-each] slot iterates over each child node of [sqlite.select], processing each as the current [.dp] node.
+ * 2. The [unwrap] slot evaluates all descendant nodes of the current [.dp] node, ensuring values are resolved before further processing.
+ * 3. The [add] slot creates a new node structure under [return-nodes], storing the current index name and an empty [columns] node for later population.
+ * 4. The [strings.concat] slot constructs a PRAGMA SQL statement to retrieve index information for the current index.
+ * 5. The [sqlite.select] slot executes the dynamically generated PRAGMA statement to fetch index column details.
+ * 6. A nested [for-each] iterates over the results of the PRAGMA query, unwrapping each result and adding the column name to the [columns] node of the corresponding index in [return-nodes].
+ * 
+ * Use cases:
+ * - Enumerating all indexes of a SQLite table and retrieving their column details.
+ * - Building a structured representation of indexes and their columns for documentation or schema introspection.
+ * - Dynamically generating metadata for use in database migration or synchronization tools.
+ */
+for-each:x:@sqlite.select/*
+   unwrap:x:+/*/*/*
+   add:x:../*/return-nodes
+      .
+         .
+            name:x:@.dp/#/*/name
+            columns
+   strings.concat
+      .:"pragma index_info('"
+      get-value:x:@.dp/#/*/name
+      .:"')"
+   sqlite.select:x:@strings.concat
+   for-each:x:@sqlite.select/*
+      unwrap:x:+/*/*
+      add:x:../*/return-nodes/0/-/*/columns
+         .
+            .:x:@.dp/#/*/name

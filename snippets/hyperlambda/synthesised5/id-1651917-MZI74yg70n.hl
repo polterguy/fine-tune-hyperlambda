@@ -1,0 +1,15 @@
+
+/*
+ * 1. The [mysql.select] slot executes a raw SQL query against a MySQL database, retrieving information about foreign key constraints from the `information_schema.key_column_usage` table.
+ * 2. The SQL query selects the column name (aliased as `column`), the referenced table and column, and the constraint name for all foreign key relationships for a specific table and database schema.
+ * 3. The `@table` and `@database` parameters are dynamically injected into the SQL query using the values from [.arguments] nodes named [table] and [database].
+ * 4. The query filters results to only include rows where the referenced column is not null, ensuring only foreign key constraints are returned, and orders the results by column name.
+ * 
+ * Use cases:
+ * - Retrieve all foreign key relationships for a specific table in a given database schema.
+ * - Generate documentation or diagrams of table relationships in a MySQL database.
+ * - Dynamically inspect or validate foreign key constraints for code generation or migration tools.
+ */
+mysql.select:"select\n   `column_name` as `column`, `referenced_table_name` as foreign_table, `referenced_column_name` as foreign_column, `constraint_name` as name\n   from `information_schema`.`key_column_usage`\n   where `constraint_schema` = schema() and\n      `table_name` = @table and\n      `referenced_column_name` is not null and\n      `constraint_schema` = @database\n   order by `column_name`"
+   @table:x:@.arguments/*/table
+   @database:x:@.arguments/*/database

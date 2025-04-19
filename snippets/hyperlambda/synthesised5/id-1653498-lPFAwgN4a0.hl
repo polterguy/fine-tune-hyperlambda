@@ -1,0 +1,38 @@
+
+/*
+ * 1. [data.connect] opens a connection to the database named "logistics" using the "generic" connection string and specifies the database type as SQLite.
+ * 2. [add:x:./*/data.update/*/values] collects argument nodes from [.arguments] (specifically nodes 1 to 1000) and adds them as children to the [values] node under [data.update].
+ * 3. [add:x:./*/data.update/*/where/*/and] collects the first argument node from [.arguments] and adds it as a child to the [and] node under [where] in [data.update].
+ * 4. [data.update] constructs and executes an SQL UPDATE statement on the [Carriers] table using the provided [values] and [where] conditions, specifying SQLite as the database type.
+ * 5. [if] checks if the result of [data.update] is 0 (meaning no records were updated). If true, it sets the response status to 404 and returns a result indicating "Record not found".
+ * 6. If records were updated, [response.status.set:202] sets the HTTP response status to 202 (Accepted).
+ * 7. [yield] returns the number of affected records from the update operation in an [affected_records] node.
+ * 
+ * Use cases:
+ * - Updating carrier information in the "Carriers" table based on provided criteria, and returning the number of records updated.
+ * - Returning a 404 status and message if no records matched the update criteria.
+ * - Providing a standardized API response for batch update operations in a logistics management system.
+ */
+data.connect:[generic|logistics]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Carriers
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   yield
+      affected_records:x:@data.update

@@ -1,0 +1,51 @@
+
+/*
+ * 1. [data.connect] opens a connection to the "northwind" database using the "generic" connection string and specifies SQLite as the database type.
+ * 2. [add:x:./*/data.update/*/values] collects argument nodes from [.arguments] (indices 1 to 1000) and adds them as children to the [values] node under [data.update]. This prepares the update values for the SQL operation.
+ * 3. [add:x:./*/data.update/*/where/*/and] collects the first argument node (index 0 or 1) from [.arguments] and adds it to the [and] node under [where] in [data.update], setting up the WHERE clause for the update.
+ * 4. [data.update] performs an update on the [Categories] table using the provided [values] and [where] conditions, with SQLite as the database type.
+ * 5. [if] checks if the result of [data.update] is 0 (no records updated). If so, it sets the HTTP response status to 404 and returns a result indicating "Record not found".
+ * 6. If records were updated, [response.status.set:202] sets the HTTP response status to 202 (Accepted).
+ * 7. [add:x:./*/sockets.signal/*/args] and [add:x:./*/sockets.signal] prepare arguments and authentication data for a socket signal by collecting relevant nodes.
+ * 8. [set-name:x:./*/sockets.signal/*/auth.ticket.verify] renames the [auth.ticket.verify] node to [roles] under [sockets.signal].
+ * 9. [sockets.signal:northwind.Categories.put] sends a socket signal named "northwind.Categories.put" with the prepared arguments.
+ * 10. [unwrap:x:+/*] evaluates and unwraps the results of the previous sibling nodes.
+ * 11. [return] returns the number of affected records from [data.update].
+ * 
+ * Use cases:
+ * - Updating a category record in the Northwind database and notifying clients in real-time via sockets.
+ * - Returning a 404 error if the specified record to update does not exist.
+ * - Broadcasting changes to the "Categories" table to connected clients after a successful update.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Categories
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Categories.put
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.update
