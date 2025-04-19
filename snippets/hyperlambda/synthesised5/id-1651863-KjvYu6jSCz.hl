@@ -1,0 +1,14 @@
+
+/*
+ * 1. The [data.select] slot executes a raw SQL query against the connected database, allowing for direct control over the SQL syntax and structure.
+ * 2. The SQL query selects the [prompt] column and the maximum value of the [completion] column (aliased as [completion]) from the [ml_requests] table, grouping the results by [prompt].
+ * 3. The [where] clause filters records to only include those where [user_id] matches the supplied parameter, [questionnaire] equals 1, and [context] equals 1.
+ * 4. The [user_id] argument is dynamically injected into the SQL query using the value from [.arguments] node's [user_id] child, ensuring the query is parameterized for the current user.
+ * 
+ * Use cases:
+ * - Retrieve the latest completion for each unique prompt for a specific user within a questionnaire and context.
+ * - Generate a summary report of user responses, showing only the most recent completion per prompt.
+ * - Support analytics or progress tracking features by grouping and aggregating completion data per prompt for a given user.
+ */
+data.select:"\nselect prompt, max(completion) as completion\n   from ml_requests\n   where user_id = @user_id and questionnaire = 1 and context = 1\n   group by prompt"
+   user_id:x:@.arguments/*/user_id

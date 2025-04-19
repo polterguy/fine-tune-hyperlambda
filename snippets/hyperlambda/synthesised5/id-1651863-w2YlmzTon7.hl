@@ -1,0 +1,49 @@
+
+/*
+ * 1. The [if] slot checks a compound condition using the [and] slot, ensuring all of the following are true:
+ *    - [exists] verifies that both [.arguments/*/to] and [.arguments/*/from] nodes exist.
+ *    - [not-null] ensures these nodes are not null.
+ *    - [strings.contains] checks that both [.arguments/*/to] and [.arguments/*/from] contain the ":" character.
+ * 
+ * 2. If the condition is true, the [.lambda] block is executed:
+ *    - Temporary nodes [.channel], [.to], and [.from] are created for intermediate values.
+ *    - [strings.split] splits the value of [.arguments/*/to] by ":", and [set-value] assigns the first part to [.channel] and the second part to [.to].
+ *    - [strings.split] splits the value of [.arguments/*/from] by ":", and [set-value] assigns the second part to [.from].
+ *    - [unwrap] evaluates all child nodes of the next sibling node, ensuring any expressions are resolved.
+ *    - [add] creates a new [signal] node under [.exe], setting its [to], [from], and [channel] values from the previously parsed nodes.
+ * 
+ * Use cases:
+ * 1. Validating and parsing messaging addresses in the format "channel:identifier" for both sender and recipient, then creating a signal for message routing.
+ * 2. Ensuring required arguments are present and properly formatted before proceeding with message processing logic.
+ * 3. Dynamically constructing and dispatching a signal based on parsed input values from user or system input.
+ */
+if
+   and
+      exists:x:@.arguments/*/to
+      exists:x:@.arguments/*/from
+      not-null:x:@.arguments/*/to
+      not-null:x:@.arguments/*/from
+      strings.contains:x:@.arguments/*/to
+         .:":"
+      strings.contains:x:@.arguments/*/from
+         .:":"
+   .lambda
+      .channel
+      .to
+      .from
+      strings.split:x:@.arguments/*/to
+         .:":"
+      set-value:x:@.channel
+         get-value:x:@strings.split/0
+      set-value:x:@.to
+         get-value:x:@strings.split/1
+      strings.split:x:@.arguments/*/from
+         .:":"
+      set-value:x:@.from
+         get-value:x:@strings.split/1
+      unwrap:x:+/*/*
+      add:x:@.exe/*/signal
+         .
+            to:x:@.from
+            from:x:@.to
+            channel:x:@.channel

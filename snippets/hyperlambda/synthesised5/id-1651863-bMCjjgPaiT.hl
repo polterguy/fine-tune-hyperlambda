@@ -1,0 +1,30 @@
+
+/*
+ * 1. The [data.connect] slot establishes a database connection using the [generic|magic] connection string or configuration.
+ * 2. The [data.select] slot executes a raw SQL query to select the [prompt] and the maximum [completion] value from the [ml_requests] table, filtered by [user_id], [questionnaire], and [context], grouping results by [prompt]. The [user_id] parameter is dynamically injected from [.arguments] using an expression.
+ * 3. The [for-each] slot iterates over each result row returned by [data.select].
+ * 4. The [unwrap] slot with the expression `:x:+/*/*/*/content` is used to evaluate and extract the [content] node from the next sibling structure, preparing data for subsequent operations.
+ * 5. The [add] slot appends a new node to the [.session] node, creating a structure with [role:assistant] and [content] set to the current [prompt] value from the iterated result.
+ * 6. The next [unwrap] and [add] slots repeat the process, but this time creating a structure with [role:user] and [content] set to the current [completion] value from the iterated result.
+ * 
+ * Use cases:
+ * - Reconstructing a conversation history in [.session] by alternating between assistant and user roles based on previously stored prompts and completions for a specific user.
+ * - Migrating or replaying dialogue data for a user from a database into a session object for further processing, such as feeding into a machine learning model.
+ * - Generating a chat transcript from grouped database records for auditing, analytics, or user experience continuity.
+ */
+data.connect:[generic|magic]
+   data.select:"\nselect prompt, max(completion) as completion\n   from ml_requests\n   where user_id = @user_id and questionnaire = 1 and context = 1\n   group by prompt"
+      user_id:x:@.arguments/*/user_id
+   for-each:x:@data.select/*
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:assistant
+               content:x:@.dp/#/*/prompt
+      unwrap:x:+/*/*/*/content
+      add:x:@.session
+         .
+            .
+               role:user
+               content:x:@.dp/#/*/completion
