@@ -94,76 +94,95 @@ for-each:x:@execute/*
 
                   else
 
-                     /*
-                      * Making sure we've not go more than maximum 5 snippets with the same completion.
-                      *
-                      * This avoids over training LLM resulting in memorisation.
-                      */
+                     // Verifying that the same prompt is not used twice.
                      data.read
                         table:hyperlambda
-                        columns
-                           count(*)
-                              as:count
                         where
                            and
-                              code.eq:x:@lambda2hyper
+                              prompt.eq:x:@.prompt
+                        limit:1
+
+                     // Checking if we've the exact prompt/completion combination already in database.
                      if
-                        mte
-                           get-value:x:@data.read/*/*/count
-                           .:long:4
+                        exists:x:@data.read/*
                         .lambda
 
-                           // Deleting file since we've got 12 similar completions!
+                           // Deleting file since it's a duplicate!
                            io.file.delete:x:@.dp/#
                            math.increment:x:@.deleted
 
                      else
 
-                        // Checking if this is validation data.
-                        .validation:int:0
-                        if
-                           and
-                              eq:x:@.arguments/*/randomize
-                                 .:int:1
-                              eq
-                                 math.modulo:x:@.no
-                                    .:int:8
-                                 .:int:0
-                           .lambda
-
-                              // Using every 8th snippet as a validation snippet.
-                              set-value:x:@.validation
-                                 .:int:1
-
-                        else-if
-
-                           // Using file path to determine if this is a validation snippet.
-                           strings.contains:x:@.dp/#
-                              .:/validation/
-                           .lambda
-                              set-value:x:@.validation
-                                 .:int:1
-
-                        // Checking if this is validation data.
-                        .synthesised:int:0
-                        if
-                           strings.contains:x:@.dp/#
-                              .:/synthesised
-                           .lambda
-
-                              set-value:x:@.synthesised
-                                 .:int:1
-
-                        data.create
+                        /*
+                         * Making sure we've not go more than maximum 5 snippets with the same completion.
+                         *
+                         * This avoids over training LLM resulting in memorisation.
+                         */
+                        data.read
                            table:hyperlambda
-                           values
-                              prompt:x:@.prompt
-                              code:x:@lambda2hyper
-                              validation:x:@.validation
-                              synthesised:x:@.synthesised
+                           columns
+                              count(*)
+                                 as:count
+                           where
+                              and
+                                 code.eq:x:@lambda2hyper
+                        if
+                           mte
+                              get-value:x:@data.read/*/*/count
+                              .:long:4
+                           .lambda
 
-                        // Counting how many training snippets we're inserting
-                        math.increment:x:@.no
+                              // Deleting file since we've already got 4 similar completions!
+                              io.file.delete:x:@.dp/#
+                              math.increment:x:@.deleted
+
+                        else
+
+                           // Checking if this is validation data.
+                           .validation:int:0
+                           if
+                              and
+                                 eq:x:@.arguments/*/randomize
+                                    .:int:1
+                                 eq
+                                    math.modulo:x:@.no
+                                       .:int:8
+                                    .:int:0
+                              .lambda
+
+                                 // Using every 8th snippet as a validation snippet.
+                                 set-value:x:@.validation
+                                    .:int:1
+
+                           else-if
+
+                              // Using file path to determine if this is a validation snippet.
+                              strings.contains:x:@.dp/#
+                                 .:/validation/
+                              .lambda
+                                 set-value:x:@.validation
+                                    .:int:1
+
+                           // Checking if this is validation data.
+                           .synthesised:int:0
+                           if
+                              strings.contains:x:@.dp/#
+                                 .:/synthesised
+                              .lambda
+
+                                 set-value:x:@.synthesised
+                                    .:int:1
+
+                           data.create
+                              table:hyperlambda
+                              values
+                                 prompt:x:@.prompt
+                                 code:x:@lambda2hyper
+                                 validation:x:@.validation
+                                 synthesised:x:@.synthesised
+
+                           // Counting how many training snippets we're inserting
+                           math.increment:x:@.no
 
    .catch
    
