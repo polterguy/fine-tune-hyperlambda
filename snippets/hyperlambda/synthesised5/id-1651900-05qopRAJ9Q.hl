@@ -1,0 +1,26 @@
+
+/*
+ * 1. The [if] slot checks if the value of [.arguments/*/databaseType] is "sqlite". If true, it executes its child nodes.
+ * 2. Inside the first [if], a nested [if] checks if [.arguments/*/generate] is true. If so, it returns a result node with the message "/* SQLite does not support drop database syntax */".
+ * 3. If the nested [if] is not true, [strings.concat] constructs the file path for the SQLite database by concatenating "/data/", the value of [.arguments/*/databaseName], and ".db".
+ * 4. [io.file.delete] deletes the file at the constructed path (the SQLite database file).
+ * 5. [sqlite.connections.flush] clears any cached SQLite connection pools and schemas to ensure the deleted database is fully released.
+ * 
+ * Use cases:
+ * - Deleting a SQLite database file if the database type is "sqlite" and a "generate" flag is not set.
+ * - Returning an informational message if a user tries to generate a "drop database" statement for SQLite, which is not supported.
+ * - Cleaning up and releasing resources after deleting a SQLite database file.
+ */
+if
+   eq:x:@.arguments/*/databaseType
+      .:sqlite
+   .lambda
+      if:x:@.arguments/*/generate
+         return
+            result:/* SQLite does not support drop database syntax */
+      strings.concat
+         .:/data/
+         get-value:x:@.arguments/*/databaseName
+         .:.db
+      io.file.delete:x:-
+      sqlite.connections.flush

@@ -1,0 +1,50 @@
+
+/*
+ * 1. [data.connect:[generic|northwind]] establishes a connection to the "northwind" database using the generic data adapter, and specifies the database type as SQLite with [database-type:sqlite].
+ * 2. [add:x:./*/data.update/*/values] and [add:x:./*/data.update/*/where/*/and] populate the [values] and [where]/[and] nodes for the upcoming [data.update] operation by extracting relevant nodes from the [.arguments] node. Specifically, it takes argument nodes 1 to 1000 for [values], and nodes 0 to 1 for the [where]/[and] clause.
+ * 3. [data.update] performs an update operation on the "Customers" table in the SQLite database, using the previously constructed [values] and [where]/[and] nodes to determine which records to update and what values to set.
+ * 4. [if] checks if the result of [data.update] is 0 (i.e., no records were updated). If so, it sets the HTTP response status to 404 and returns a result indicating "Record not found".
+ * 5. If records were updated, [response.status.set:202] sets the HTTP response status to 202 (Accepted).
+ * 6. [add:x:./*/sockets.signal/*/args] and [add:x:./*/sockets.signal] prepare the arguments and authentication ticket for a socket signal by extracting nodes from [.arguments] and [auth.ticket.verify].
+ * 7. [set-name:x:./*/sockets.signal/*/auth.ticket.verify] renames the [auth.ticket.verify] node to [roles] within the socket signal arguments.
+ * 8. [sockets.signal:northwind.Customers.put] sends a socket signal named "northwind.Customers.put" with the constructed [args], likely to notify clients of the update.
+ * 9. [unwrap:x:+/*] evaluates the immediate sibling nodes after the current node, ensuring any expressions are resolved.
+ * 10. [return] returns an object containing the number of affected records from the [data.update] operation.
+ * 
+ * Use cases:
+ * - Updating customer records in the Northwind database and notifying connected clients in real time via socket signals.
+ * - Handling HTTP requests to update customer data, with proper error handling if no records are found.
+ * - Integrating authentication and authorization information into real-time notifications after a successful database update.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      database-type:sqlite
+      table:Customers
+      values
+      where
+         and
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+   response.status.set:202
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Customers.put
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.update
