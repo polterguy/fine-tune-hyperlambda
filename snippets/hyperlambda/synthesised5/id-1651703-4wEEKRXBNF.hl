@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [slots.create] slot defines a dynamic slot named [magic.crypto.get-server-public-key], making it available for invocation elsewhere in your application.
+ * 2. Inside the slot, [cache.try-get] is used with the key [magic.crypto.get-server-public-key] and an expiration of 300 seconds. This ensures that the public key and its fingerprint are cached, and the expensive retrieval and processing logic is only executed if the cache is empty or expired.
+ * 3. The [.lambda] node under [cache.try-get] contains the logic to load the public key from the file system using [io.file.load], then generates a fingerprint of the key with [crypto.fingerprint]. The results are combined into a Hyperlambda object with [lambda2hyper], containing both the [key] and [fingerprint] nodes, and returned.
+ * 4. After retrieving the cached value, [hyper2lambda] converts the cached Hyperlambda string back into a lambda object.
+ * 5. [add] merges the nodes from the deserialized lambda object into the current execution context.
+ * 6. Finally, [return] returns the result to the caller.
+ * 
+ * Use cases:
+ * - Efficiently retrieve the server's public key and its fingerprint for cryptographic operations, minimizing file system access by caching the result.
+ * - Provide a reusable endpoint or function that returns the current public key and fingerprint for clients or internal modules.
+ * - Ensure that the public key is only read from disk once every 5 minutes, reducing I/O and improving performance in high-load environments.
+ */
+slots.create:magic.crypto.get-server-public-key
+   cache.try-get:magic.crypto.get-server-public-key
+      expiration:300
+      .lambda
+         io.file.load:/etc/system/crypto/keys/public.key
+         crypto.fingerprint:x:@io.file.load
+         unwrap:x:+/*
+         lambda2hyper
+            key:x:@io.file.load
+            fingerprint:x:@crypto.fingerprint
+         return:x:@lambda2hyper
+   hyper2lambda:x:@cache.try-get
+   add:x:+
+      get-nodes:x:@hyper2lambda/*
+   return

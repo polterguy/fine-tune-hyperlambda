@@ -1,0 +1,22 @@
+
+/*
+ * 1. [for-each] iterates over each child node of [data.read], passing each as a reference node [.dp].
+ * 2. For each [.dp], [http.get] performs an HTTP GET request to "https://api.streamstats.com/plays", adding a query parameter "id" set to the [ArtistId] value found under the current [.dp]. The [convert] argument ensures the response is converted to a Hyperlambda node structure.
+ * 3. [add:x:+/*/*] adds the content nodes from the HTTP response (under [content]) to the next sibling node in the execution tree.
+ * 4. [add:x:@.dp/#] adds a new [plays] node as a child of the currently iterated [.dp] node.
+ * 
+ * Use cases:
+ * - Enriching each artist node in [data.read] with their play statistics from an external API.
+ * - Merging external API data into an existing dataset for further processing or reporting.
+ * - Automating the augmentation of local data records with remote service results in batch operations.
+ */
+for-each:x:@data.read/*
+   http.get:"https://api.streamstats.com/plays"
+      query
+         id:x:@.dp/#/*/ArtistId
+      convert:bool:true
+   add:x:+/*/*
+      get-nodes:x:@http.get/*/content/*
+   add:x:@.dp/#
+      .
+         plays

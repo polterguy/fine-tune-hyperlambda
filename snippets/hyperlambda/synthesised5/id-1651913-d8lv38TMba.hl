@@ -1,0 +1,69 @@
+
+/*
+ * 1. The [slots.create] slot defines a dynamic slot named [magic.db.sqlite.indexes], which retrieves index information for a specified SQLite database table.
+ * 2. [validators.mandatory] ensures that both [.arguments/*/database] and [.arguments/*/table] are provided as arguments to the slot.
+ * 3. The code constructs a connection string in [.connection] based on whether [.arguments/*/connection-string] is provided and not empty. If a custom connection string is given, it combines it with the database name; otherwise, it defaults to "[generic|database]".
+ * 4. [sqlite.connect] establishes a connection to the SQLite database using the constructed [.connection] string.
+ * 5. A SQL query is dynamically constructed to select all index definitions from [sqlite_master] for the specified table, and [sqlite.select] executes this query.
+ * 6. [for-each] iterates over each index found, unwrapping the result and adding a node with the index [name] and an empty [columns] node to the result set.
+ * 7. For each index, a "pragma index_info" query is constructed and executed via [sqlite.select] to retrieve column information for the index.
+ * 8. Another [for-each] loop iterates through the columns of each index, unwrapping and adding each column name to the [columns] node of the corresponding index in the result set.
+ * 9. [return-nodes] returns the constructed node structure containing all indexes and their columns for the specified table.
+ * 
+ * Use cases:
+ * - Retrieve a list of all indexes and their columns for a given table in a SQLite database for documentation or schema analysis.
+ * - Dynamically inspect database structure for migration or synchronization tools.
+ * - Build UI components that display index information for database administration panels.
+ */
+slots.create:magic.db.sqlite.indexes
+   validators.mandatory:x:@.arguments/*/database
+   validators.mandatory:x:@.arguments/*/table
+   .connection:
+   if
+      and
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .
+         not
+            eq
+               get-value:x:@.arguments/*/connection-string
+               .:
+      .lambda
+         set-value:x:@.connection
+            strings.concat
+               .:[
+               get-value:x:@.arguments/*/connection-string
+               .:|
+               get-value:x:@.arguments/*/database
+               .:]
+   else
+      set-value:x:@.connection
+         strings.concat
+            .:[generic|
+            get-value:x:@.arguments/*/database
+            .:]
+   sqlite.connect:x:@.connection
+      strings.concat
+         .:"select * from sqlite_master where type = 'index' and tbl_name='"
+         get-value:x:@.arguments/*/table
+         .:"'"
+      sqlite.select:x:@strings.concat
+      for-each:x:@sqlite.select/*
+         unwrap:x:+/*/*/*
+         add:x:../*/return-nodes
+            .
+               .
+                  name:x:@.dp/#/*/name
+                  columns
+         strings.concat
+            .:"pragma index_info('"
+            get-value:x:@.dp/#/*/name
+            .:"')"
+         sqlite.select:x:@strings.concat
+         for-each:x:@sqlite.select/*
+            unwrap:x:+/*/*
+            add:x:../*/return-nodes/0/-/*/columns
+               .
+                  .:x:@.dp/#/*/name
+   return-nodes

@@ -1,0 +1,37 @@
+
+/*
+ * 1. [data.connect] opens a connection to the [northwind] SQLite database, making all child nodes execute within this database context.
+ * 2. [add] with `:x:./*/data.delete/*/where/*/and` dynamically adds all nodes from [.arguments] as conditions to the [and] node under [where] in [data.delete], effectively building the WHERE clause for the delete operation based on input arguments.
+ * 3. [data.delete] deletes records from the [Order Details] table in the SQLite database, using the dynamically constructed [where] clause.
+ * 4. [add] with `:x:./*/sockets.signal/*/args` adds all nodes from [.arguments] as arguments to the [args] node under [sockets.signal], preparing the data for a socket signal.
+ * 5. [add] with `:x:./*/sockets.signal` adds the result of [auth.ticket.verify] as a child node to [sockets.signal], likely to include authentication or authorization information.
+ * 6. [set-name] renames the [auth.ticket.verify] node under [sockets.signal] to [roles], standardizing the node name for downstream consumers.
+ * 7. [sockets.signal] emits a signal named [northwind.Order Details.delete] with the prepared [args] and [roles] nodes, notifying subscribers about the delete operation.
+ * 8. [unwrap] evaluates all expressions in the next sibling nodes, ensuring any dynamic content is resolved before returning.
+ * 9. [return] returns the number of affected rows from the [data.delete] operation as [affected].
+ * 
+ * Use cases:
+ * - Deleting one or more records from the [Order Details] table in the Northwind SQLite database based on dynamic filter criteria received as arguments.
+ * - Broadcasting a real-time notification via sockets to inform connected clients about the deletion, including both the arguments used for deletion and the user's roles.
+ * - Enforcing authorization by including the result of [auth.ticket.verify] (renamed to [roles]) in the socket signal, allowing clients to react according to user permissions.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:Order Details
+      where
+         and
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Order Details.delete
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

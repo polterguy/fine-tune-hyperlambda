@@ -1,0 +1,38 @@
+
+/*
+ * 1. [sqlite.connect] establishes a connection to the SQLite database using the connection information found in the [.connection] node.
+ * 2. [strings.concat] dynamically builds an SQL query string to retrieve all indexes for the table specified in [.arguments] → [table].
+ * 3. [sqlite.select] executes the generated SQL query to fetch index metadata from the SQLite system table [sqlite_master].
+ * 4. [for-each] iterates over each index found, unwrapping the result and adding a new node to [return-nodes] containing the index [name] and an empty [columns] node.
+ * 5. [strings.concat] constructs a PRAGMA SQL statement for each index to get detailed column information for that index.
+ * 6. [sqlite.select] executes the PRAGMA statement to fetch column details for the current index.
+ * 7. The inner [for-each] iterates over each column in the current index, unwraps the result, and adds the column name to the [columns] child node of the corresponding index node in [return-nodes].
+ * 
+ * Use cases:
+ * - Retrieve all indexes and their columns for a given table in an SQLite database for schema introspection.
+ * - Generate documentation or metadata about table indexes programmatically.
+ * - Support tooling that visualizes or analyzes database index structures for optimization or migration tasks.
+ */
+sqlite.connect:x:@.connection
+   strings.concat
+      .:"select * from sqlite_master where type = 'index' and tbl_name='"
+      get-value:x:@.arguments/*/table
+      .:"'"
+   sqlite.select:x:@strings.concat
+   for-each:x:@sqlite.select/*
+      unwrap:x:+/*/*/*
+      add:x:../*/return-nodes
+         .
+            .
+               name:x:@.dp/#/*/name
+               columns
+      strings.concat
+         .:"pragma index_info('"
+         get-value:x:@.dp/#/*/name
+         .:"')"
+      sqlite.select:x:@strings.concat
+      for-each:x:@sqlite.select/*
+         unwrap:x:+/*/*
+         add:x:../*/return-nodes/0/-/*/columns
+            .
+               .:x:@.dp/#/*/name

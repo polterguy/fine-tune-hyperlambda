@@ -1,0 +1,25 @@
+
+/*
+ * 1. The [data.connect] slot establishes a database connection using the generic or Magic data adapter, explicitly specifying the database type as SQLite with the [database-type] node.
+ * 2. The [add] slot dynamically adds all nodes found at `:x:@.arguments/*` as children to the [and] node inside the [where] clause of a [data.delete] operation. This allows the [where] clause to be constructed based on incoming arguments, enabling dynamic filtering criteria for the delete operation.
+ * 3. The [data.delete] slot performs a delete operation on the [questions] table in the SQLite database, using the dynamically constructed [where] clause to determine which records to delete.
+ * 4. The [unwrap] slot executes all expressions in the immediate next sibling nodes, ensuring that any expressions (such as those referencing the result of [data.delete]) are evaluated before returning.
+ * 5. The [return] slot returns a node named [affected] containing the number of records affected by the [data.delete] operation, using the value from `:x:@data.delete`.
+ * 
+ * Use cases:
+ * - Deleting questions from a SQLite database based on dynamic filters provided as arguments (such as question ID, category, or other fields).
+ * - Building a generic endpoint for deleting records from the [questions] table, where the filter criteria are determined at runtime.
+ * - Returning the number of deleted records to the client after performing a delete operation with custom conditions.
+ */
+data.connect:[generic|magic]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:questions
+      where
+         and
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

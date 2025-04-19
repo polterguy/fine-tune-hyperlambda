@@ -1,0 +1,18 @@
+
+/*
+ * 1. The [include] slot is used to execute the nodes returned from the expression `:x:@data.read/*`, effectively including and running external or previously defined logic as part of the current execution flow.
+ * 2. The [http.get] slot performs an HTTP GET request to "https://api.example.com/orders". It includes a [query] child node, which adds a query parameter named "customerId" whose value is dynamically retrieved from the [CustomerId] node inside the current [.dp] node. The [convert:bool:true] argument ensures the response is automatically converted into a lambda object if possible.
+ * 3. The [yield] slot returns the result of the HTTP GET request, specifically extracting all child nodes under the [content] node from the HTTP response and returning them as [orders].
+ * 
+ * Use cases:
+ * - Fetching a list of orders for a specific customer by dynamically retrieving their [CustomerId] from the current data context and returning the orders as structured data.
+ * - Integrating with an external orders API and transforming the response into a Hyperlambda-friendly format for further processing.
+ * - Building a data pipeline where customer information is read, and corresponding orders are fetched and returned for downstream logic or API responses.
+ */
+include:x:@data.read/*
+   http.get:"https://api.example.com/orders"
+      query
+         customerId:x:@.dp/#/*/CustomerId
+      convert:bool:true
+   yield
+      orders:x:@http.get/*/content/*

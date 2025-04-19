@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [cache.try-get] slot attempts to retrieve a cached value associated with the key [magic.crypto.get-server-public-key]. If the value is not found or has expired (after 300 seconds), it executes its [.lambda] child to generate and cache the value.
+ * 2. The [io.file.load] slot loads the contents of the file located at /etc/system/crypto/keys/public.key, which is expected to be the server's public key.
+ * 3. The [crypto.fingerprint] slot generates a fingerprint (a human-readable hash) of the loaded public key, using the value from [io.file.load].
+ * 4. The [unwrap] slot evaluates all child expressions of the next sibling nodes, ensuring that the results of [io.file.load] and [crypto.fingerprint] are available as values.
+ * 5. The [lambda2hyper] slot constructs a new node structure containing the [key] (the loaded public key) and the [fingerprint] (the generated fingerprint).
+ * 6. The [return] slot returns the result of [lambda2hyper], making the public key and its fingerprint available to the caller.
+ * 
+ * Use cases:
+ * - Efficiently retrieve and cache the server's public key and its fingerprint for repeated cryptographic operations, reducing file system access.
+ * - Provide clients with the server's public key and its fingerprint for secure key exchange or verification processes.
+ * - Support cryptographic protocols that require frequent access to the server's public key while minimizing performance overhead.
+ */
+cache.try-get:magic.crypto.get-server-public-key
+   expiration:300
+   .lambda
+      io.file.load:/etc/system/crypto/keys/public.key
+      crypto.fingerprint:x:@io.file.load
+      unwrap:x:+/*
+      lambda2hyper
+         key:x:@io.file.load
+         fingerprint:x:@crypto.fingerprint
+      return:x:@lambda2hyper

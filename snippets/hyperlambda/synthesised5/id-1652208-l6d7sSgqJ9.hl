@@ -1,0 +1,37 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the "northwind" database using the "generic" connection string and specifies the database type as SQLite.
+ * 2. [add] with expression `:x:./*/data.delete/*/where/*/and` injects all nodes from [.arguments] as conditions into the [and] node of the [where] clause for the [data.delete] operation.
+ * 3. [data.delete] is configured to delete records from the [Employees] table in the SQLite database, using the dynamically injected [where]/[and] conditions.
+ * 4. [add] with expression `:x:./*/sockets.signal/*/args` adds all nodes from [.arguments] as arguments to the [args] node of [sockets.signal].
+ * 5. [add] with expression `:x:./*/sockets.signal` adds the result of [auth.ticket.verify] as a child node to [sockets.signal].
+ * 6. [set-name] renames the [auth.ticket.verify] node under [sockets.signal] to [roles].
+ * 7. [sockets.signal] emits a signal named "northwind.Employees.delete" with the prepared [args] and [roles] nodes.
+ * 8. [unwrap] evaluates all immediate children of the current node, ensuring any expressions are resolved.
+ * 9. [return] returns a node named [affected] containing the number of records deleted, as reported by [data.delete].
+ * 
+ * Use cases:
+ * - Deleting one or more employees from the [Employees] table in the Northwind database based on dynamic conditions provided as arguments.
+ * - Broadcasting a real-time signal to clients or systems after employee records are deleted, including authorization information.
+ * - Integrating secure, transactional employee deletion with event-driven notification in a multi-user application.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:Employees
+      where
+         and
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.Employees.delete
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

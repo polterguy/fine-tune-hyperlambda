@@ -1,0 +1,32 @@
+
+/*
+ * 1. [fork] is used to execute the enclosed logic asynchronously, allowing the process to run in parallel with other operations.
+ * 2. [try] is used to handle exceptions during the execution of its child nodes, with a [.catch] block to manage errors if they occur.
+ * 3. [execute] runs the [magic.ai.create-system-message] slot, passing in [url], [template], and [instruction] arguments from the [.arguments] node.
+ * 4. [unwrap] is used to extract the [message] node from the result of the [execute] slot, making its value available for further processing.
+ * 5. [sockets.signal] sends a message to the specified [channel] (from [.arguments]) and targets users with the [root] role, transmitting the generated [message] as an argument.
+ * 6. In the [.catch] block, [unwrap] extracts error information, and [sockets.signal] sends an error notification to the same [channel], including an [ERROR] message and any additional error details from the exception.
+ * 
+ * Use cases:
+ * - Asynchronously generate a system message using AI and broadcast it to administrators or root users via a socket channel.
+ * - Notify root users in real time if an error occurs during AI message generation, including error details for debugging.
+ * - Integrate automated system notifications or alerts into a real-time dashboard for privileged users.
+ */
+fork
+   try
+      execute:magic.ai.create-system-message
+         url:x:@.arguments/*/url
+         template:x:@.arguments/*/template
+         instruction:x:@.arguments/*/instruction
+      unwrap:x:+/*/*/message
+      sockets.signal:x:@.arguments/*/channel
+         roles:root
+         args
+            message:x:@execute
+   .catch
+      unwrap:x:+/*/*
+      sockets.signal:x:@.arguments/@.arguments/*/channel
+         roles:root
+         args
+            message:ERROR
+            extra:x:@.arguments/*/message

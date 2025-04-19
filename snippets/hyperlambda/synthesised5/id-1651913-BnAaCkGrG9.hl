@@ -1,0 +1,31 @@
+
+/*
+ * 1. [for-each] iterates through each child node of [sqlite.select], processing each as the current context by reference via [.dp].
+ * 2. [unwrap] is used multiple times to evaluate and expand the structure of nodes deeply within the current [.dp] node, ensuring all nested data is accessible for further processing.
+ * 3. [add] appends a new node structure to the [return-nodes] node, capturing the name of the current index and preparing a [columns] node for later population.
+ * 4. [strings.concat] constructs a PRAGMA SQL statement to retrieve index information by concatenating static SQL fragments with the current index name.
+ * 5. [sqlite.select] executes the dynamically constructed PRAGMA statement, retrieving metadata about the columns in the current index.
+ * 6. A nested [for-each] iterates through each result row from the PRAGMA query, unwrapping the structure and adding each column name to the [columns] node of the corresponding index node in [return-nodes].
+ * 
+ * Use cases:
+ * - Dynamically introspecting all indexes on a SQLite table and returning their names along with the columns they cover.
+ * - Building a metadata explorer for SQLite databases that lists indexes and their associated columns for documentation or UI display.
+ * - Generating a schema report or performing automated validation of index structures in a SQLite database.
+ */
+for-each:x:@sqlite.select/*
+   unwrap:x:+/*/*/*
+   add:x:../*/return-nodes
+      .
+         .
+            name:x:@.dp/#/*/name
+            columns
+   strings.concat
+      .:"pragma index_info('"
+      get-value:x:@.dp/#/*/name
+      .:"')"
+   sqlite.select:x:@strings.concat
+   for-each:x:@sqlite.select/*
+      unwrap:x:+/*/*
+      add:x:../*/return-nodes/0/-/*/columns
+         .
+            .:x:@.dp/#/*/name

@@ -1,0 +1,37 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the "northwind" database using the "generic" connection string and specifies the database type as SQLite.
+ * 2. [add] with the expression `:x:./*/data.delete/*/where/*/and` appends all argument nodes from [.arguments] as conditions to the [and] node inside the [where] clause for the [data.delete] operation.
+ * 3. [data.delete] performs a delete operation on the [EmployeeTerritories] table, using SQLite as the database type, and applies the dynamically constructed [where] clause.
+ * 4. [add] with the expression `:x:./*/sockets.signal/*/args` adds all argument nodes from [.arguments] as children of the [args] node under [sockets.signal].
+ * 5. [add] with the expression `:x:./*/sockets.signal` adds all nodes from [auth.ticket.verify] as children of [sockets.signal].
+ * 6. [set-name] renames the [auth.ticket.verify] node under [sockets.signal] to [roles].
+ * 7. [sockets.signal] emits a signal named "northwind.EmployeeTerritories.delete" with the constructed [args] and [roles] as its payload.
+ * 8. [unwrap] evaluates all nodes that are immediate siblings after the current node.
+ * 9. [return] returns the number of affected rows from the [data.delete] operation.
+ * 
+ * Use cases:
+ * - Deleting records from the [EmployeeTerritories] table in the Northwind database based on dynamic arguments provided to the endpoint.
+ * - Broadcasting a real-time signal to notify clients about the deletion, including arguments and verified roles.
+ * - Returning the number of rows deleted as the result of the operation.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.delete
+      database-type:sqlite
+      table:EmployeeTerritories
+      where
+         and
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   add:x:./*/sockets.signal
+      get-nodes:x:@auth.ticket.verify
+   set-name:x:./*/sockets.signal/*/auth.ticket.verify
+      .:roles
+   sockets.signal:northwind.EmployeeTerritories.delete
+      args
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,0 +1,22 @@
+
+/*
+ * 1. The [include] slot iterates over each child node of [data.read], executing its children for each node and appending the results to the current node.
+ * 2. [strings.concat] constructs a file path by concatenating the static string "/data/preferences/", the value of the [CustomerId] node found within the current [data.read] child, and the static string ".json".
+ * 3. [io.file.load] loads the contents of the file at the dynamically constructed path.
+ * 4. [json2lambda] parses the loaded JSON file content into a lambda object.
+ * 5. [yield] returns the parsed preferences as a [preferences] node for each iteration, making the preferences data available for further processing.
+ * 
+ * Use cases:
+ * - Dynamically load and attach customer-specific preferences from JSON files to each customer record in [data.read].
+ * - Aggregate and process user preferences for a batch of users by including their settings in the current execution context.
+ * - Enrich data records with external configuration or metadata stored in separate files, based on an identifier in each record.
+ */
+include:x:@data.read/*
+   strings.concat
+      .:/data/preferences/
+      get-value:x:@.dp/#/*/CustomerId
+      .:.json
+   io.file.load:x:-
+   json2lambda:x:-
+   yield
+      preferences:x:@json2lambda/*

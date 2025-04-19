@@ -1,0 +1,22 @@
+
+/*
+ * 1. [data.connect] opens a database connection using the "generic" connection string and the "magic" database, making database operations available to its child nodes.
+ * 2. [add] collects all argument nodes from [.arguments] and adds them as children to the [values] node under [data.create], effectively mapping incoming request data to the database insert operation.
+ * 3. [data.create] inserts a new record into the [ml_training_snippets] table using the dynamically constructed [values] node.
+ * 4. [response.status.set] sets the HTTP response status code to 201, indicating successful creation of a resource.
+ * 5. [yield] returns the ID of the newly created record from the [data.create] operation as the endpoint response.
+ * 
+ * Use cases:
+ * - Creating a new training snippet in the [ml_training_snippets] table using data sent in an HTTP POST request.
+ * - Building a REST API endpoint for inserting new records into a database and returning the new record's ID.
+ * - Handling dynamic input fields for database creation by mapping all incoming arguments directly to database columns.
+ */
+data.connect:[generic|magic]
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+   data.create
+      table:ml_training_snippets
+      values
+   response.status.set:201
+   yield
+      id:x:@data.create

@@ -1,0 +1,35 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the [ecommerce] database, setting the context for subsequent database operations.
+ * 2. [data.read] selects up to 50 records from the [Customer] table, retrieving only the [CustomerId] and [Email] columns.
+ * 3. The first [include] iterates over each customer record returned by [data.read], performing an [http.get] request to "https://api.example.com/orders" with a query parameter [customerId] set to the current [CustomerId]. The response is converted to a lambda object, and the [orders] for each customer are yielded as a child node.
+ * 4. The second [include] also iterates over each customer record, concatenates a file path using the [CustomerId], loads the corresponding JSON file from disk, converts it to a lambda object, and yields the customer's [preferences] as a child node.
+ * 
+ * Use cases:
+ * - Retrieve a list of customers along with their associated orders from an external API and their preferences from local JSON files.
+ * - Aggregate customer data from both the database and external/local sources for reporting or data enrichment.
+ * - Build a customer profile view that combines core customer details, order history, and personalized preferences.
+ */
+data.connect:ecommerce
+   data.read
+      table:Customer
+      limit:50
+      columns
+         CustomerId
+         Email
+   include:x:@data.read/*
+      http.get:"https://api.example.com/orders"
+         query
+            customerId:x:@.dp/#/*/CustomerId
+         convert:bool:true
+      yield
+         orders:x:@http.get/*/content/*
+   include:x:@data.read/*
+      strings.concat
+         .:/data/preferences/
+         get-value:x:@.dp/#/*/CustomerId
+         .:.json
+      io.file.load:x:-
+      json2lambda:x:-
+      yield
+         preferences:x:@json2lambda/*

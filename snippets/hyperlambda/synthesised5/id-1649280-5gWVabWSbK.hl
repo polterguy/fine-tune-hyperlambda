@@ -1,0 +1,27 @@
+
+/*
+ * 1. The [data.connect] slot establishes a connection to a database using the specified provider, either [generic] or [magic].
+ * 2. The first [add] slot populates the [values] node under [data.update] with up to 1000 argument nodes from [.arguments], starting from the second node (index 1). This prepares the update values for the SQL operation.
+ * 3. The second [add] slot populates the [and] node under [where] inside [data.update] with the first argument node (index 0) from [.arguments], setting up the WHERE clause for the update statement.
+ * 4. The [data.update] slot performs an update operation on the [users] table, using the [values] and [where] conditions constructed in the previous steps.
+ * 5. The [response.status.set] slot sets the HTTP response status to 202, indicating that the request has been accepted for processing.
+ * 6. The [yield] slot returns the number of affected rows from the [data.update] operation.
+ * 
+ * Use cases:
+ * - Updating user records in the [users] table based on dynamic input, such as changing user details where a specific condition is met.
+ * - Building a generic API endpoint for bulk user updates, where the update values and conditions are provided at runtime.
+ * - Supporting partial updates to user data with flexible WHERE clauses, while returning the number of rows affected to the client.
+ */
+data.connect:[generic|magic]
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+   data.update
+      table:users
+      values
+      where
+         and
+   response.status.set:202
+   yield
+      affected:x:@data.update

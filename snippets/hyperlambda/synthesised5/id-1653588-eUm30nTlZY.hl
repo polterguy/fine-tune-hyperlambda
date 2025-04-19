@@ -1,0 +1,19 @@
+
+/*
+ * 1. The [include] slot with the expression `:x:@data.read/*` is used to iterate over each child node of [data.read], effectively processing a set of data items.
+ * 2. For each item, [http.get] performs an HTTP GET request to "https://api.streamstats.com/plays". It adds a [query] node with an [id] parameter, whose value is dynamically set from the [ArtistId] child node of the current data item (referenced by `.dp/#/*/ArtistId`).
+ * 3. The [convert:bool:true] argument ensures the HTTP response content is automatically converted into a lambda object if possible.
+ * 4. The [yield] slot returns a [stats] node containing the converted content from the HTTP GET response, specifically extracting the [content] part of the response.
+ * 
+ * Use cases:
+ * - Enriching a list of artists with their play statistics by fetching data from an external API for each artist.
+ * - Aggregating external streaming statistics for multiple records in a dataset and returning the results in a unified format.
+ * - Automating the retrieval and transformation of third-party data for each item in a local collection.
+ */
+include:x:@data.read/*
+   http.get:"https://api.streamstats.com/plays"
+      query
+         id:x:@.dp/#/*/ArtistId
+      convert:bool:true
+   yield
+      stats:x:@http.get/*/content
