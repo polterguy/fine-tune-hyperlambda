@@ -25,10 +25,10 @@ Below are some example prompts you can run through the model after fine tuning i
 * Generate a list of objects being employees
   - Add one more item to it as a static node
   - Change the code and dynamically add one item to it
-  - Wrap it into and endpoint and return all employees
-  - Loop through them and remove their names
-  - Add departments to each entry from within your existing loop in addition to continuing removing items
-  - Add a static variable node being the department to add employees to
+  - Wrap the code into and endpoint and return all employees
+  - Add a loop that removes the names of all employees
+  - Add departments to each entry from within your existing loop in addition to continuing removing names
+  - Add a static variable node being the title to add employees to
   - Add an argument being department and use this value as you add departments
 * How do I open a database connection?
 * How do I concatenate 2 strings?
