@@ -1,0 +1,32 @@
+/*
+ * Retrieves book records from the [Books] table in the [library] database with strict pagination enforcement.
+ *
+ * The [.arguments] block requires:
+ * - [limit:int]  → Max number of books to return.
+ * - [offset:int] → Number of rows to skip before starting.
+ *
+ * 🔹 These arguments are enforced using [validators.mandatory], ensuring the caller must supply both.
+ * 🔹 Pagination arguments are logged to [log.info] for audit and debugging purposes.
+ * 🔹 The [add] slot dynamically inserts the values into the [data.read] clause, making the logic modular and reusable.
+ *
+ * This design prevents unbounded queries, supports consistent paging, and makes troubleshooting easy with transparent logging.
+ */
+.arguments
+   limit:int
+   offset:int
+
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+
+log.info:Arguments received
+   limit:x:@.arguments/*/limit
+   offset:x:@.arguments/*/offset
+
+data.connect:library
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Books
+   yield
+      books:x:@data.read/*

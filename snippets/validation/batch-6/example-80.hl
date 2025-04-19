@@ -1,0 +1,51 @@
+/*
+ * Retrieves employee records from the [employees] table in the [hr] database using **strict pagination**.
+ *
+ * The [.arguments] block defines two input parameters:
+ * - [limit:int] → Specifies how many rows to return.
+ * - [offset:int] → Specifies how many rows to skip before starting the result set.
+ *
+ * 🔹 Unlike flexible queries, this version enforces the presence of both arguments using [validators.mandatory].
+ * - If either [limit] or [offset] is missing, the request will be rejected.
+ * - This is useful when you want to strictly control paging behavior at the API level.
+ *
+ * 🔹 [log.info] is used to log both argument values when the request is received, aiding observability and debugging.
+ *
+ * 🔹 Within [data.connect], the paging parameters are injected into [data.read] dynamically using [add].
+ * - Even though the arguments are required, [add] makes the code reusable for different contexts (e.g., if default values were added later).
+ *
+ * 🔹 The structure of this endpoint ensures:
+ * 1. All queries are paginated to avoid large unbounded result sets.
+ * 2. Arguments are validated up front.
+ * 3. Behavior is predictable, with full logging and enforced control over the result window.
+ */
+.arguments
+   limit:int
+   offset:int
+
+// Ensures that the 'limit' argument is provided.
+validators.mandatory:x:@.arguments/*/limit
+
+// Ensures that the 'offset' argument is provided.
+validators.mandatory:x:@.arguments/*/offset
+
+// Logging invocation including its arguments.
+log.info:Arguments received
+   limit:x:@.arguments/*/limit
+   offset:x:@.arguments/*/offset
+
+// Connects to the 'hr' database.
+data.connect:hr
+
+   // Adds 'limit' and 'offset' arguments to the data.read node.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+
+   // Reads data from the 'employees' table.
+   data.read
+      table:employees
+
+   // Returns the retrieved employees to the caller.
+   yield
+      employees:x:@data.read/*

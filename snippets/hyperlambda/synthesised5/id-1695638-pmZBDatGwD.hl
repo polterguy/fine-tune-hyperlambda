@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [if] slot checks a compound condition using [and], ensuring that [.arguments] contains a [prefix-url] node, the node is not null, and its value is not empty.
+ * 2. Inside the conditional lambda, [set-value] assigns a formatted string to [.prefix-url], indicating the SQL prefix condition.
+ * 3. The [add] slot then appends a new node to all [data.select] children under [data.connect], setting an [@prefix] child node with the current value of [.arguments]’s [prefix-url].
+ * 
+ * Use cases:
+ * - Dynamically building SQL WHERE clauses based on user-provided URL prefixes.
+ * - Conditionally injecting query parameters into a data selection process only when a valid prefix is supplied.
+ * - Ensuring that query construction only proceeds if the required prefix argument is present, not null, and not empty.
+ * - Supporting extensible API endpoints where filtering by prefix is optional but, if given, must be properly handled.
+ */
+if
+   and
+      exists:x:@.arguments/*/prefix-url
+      not-null:x:@.arguments/*/prefix-url
+      neq:x:@.arguments/*/prefix-url
+         .:
+   .lambda
+      set-value:x:@.prefix-url
+         .:"ts.uri like @prefix and "
+      add:x:@data.connect/*/data.select
+         .
+            @prefix:x:@.arguments/*/prefix-url

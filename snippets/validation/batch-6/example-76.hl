@@ -1,0 +1,28 @@
+/*
+ * Loads order records from the [Orders] table in the [sales] database using optional pagination.
+ *
+ * The [.arguments] structure supports:
+ * - [limit:int] → Limits the number of returned orders.
+ * - [offset:int] → Skips a given number of rows before starting the result.
+ *
+ * 🔹 The node names [limit] and [offset] are required for the pagination to function.
+ * - These are reserved internally by [data.read] and must match exactly.
+ * - Renaming them (e.g., [page] or [rowStart]) will break pagination logic silently.
+ *
+ * 🔹 The [add] node conditionally injects these into the [data.read] query:
+ * - If either argument is missing, it will simply be excluded.
+ * - This makes the query work with or without pagination input.
+ *
+ * 🔸 This approach ensures clean, predictable, and SQL-compatible pagination in Hyperlambda.
+ */
+.arguments
+   limit:int
+   offset:int
+data.connect:sales
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Orders
+   yield
+      orders:x:@data.read/*

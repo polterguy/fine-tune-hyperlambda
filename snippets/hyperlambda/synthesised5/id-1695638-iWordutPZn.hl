@@ -1,0 +1,16 @@
+
+/*
+ * 1. The [strings.concat] slot is used to concatenate multiple string values and expressions into a single string. This slot processes all its child nodes, joining their values in the order they appear.
+ * 2. The first child node of [strings.concat] is a static string containing part of a SQL query, specifically the initial SELECT and JOIN clauses, along with a WHERE condition that checks for `ts.type = @type`.
+ * 3. The [get-value:x:@.prefix-url] slot retrieves the value of the [.prefix-url] node from the current lambda context and inserts it into the concatenated string at this position.
+ * 4. The final child node is another static string with additional SQL, including a vector search function, a distance filter, group by, order by, and limit clauses.
+ * 
+ * Use cases:
+ * - Dynamically constructing a SQL query string by combining static SQL with a runtime URL prefix value stored in [.prefix-url].
+ * - Generating complex SQL statements for machine learning or search operations where part of the query depends on configuration or input parameters.
+ * - Building queries for systems that use vector similarity search and need to filter and group results based on dynamic embedding or distance thresholds.
+ */
+strings.concat
+   .:"\nselect vss.distance, ts.prompt, ts.uri\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and "
+   get-value:x:@.prefix-url
+   .:"vss_search(vss.embedding_vss, @embedding) and\n       vss.distance < @threshold\ngroup by ts.uri\norder by vss.distance\nlimit @limit"

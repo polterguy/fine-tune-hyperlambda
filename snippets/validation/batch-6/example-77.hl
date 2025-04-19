@@ -1,0 +1,31 @@
+/*
+ * Retrieves employee records from the [employees] table in the [hr] database with optional pagination.
+ *
+ * The [.arguments] block defines two optional paging parameters:
+ * - [limit:int] → The maximum number of rows to return.
+ * - [offset:int] → The number of rows to skip before beginning the result set.
+ *
+ * 🔹 The names [limit] and [offset] are **not arbitrary** — they are **reserved identifiers** expected by [data.read].
+ * - When performing pagination, you must use these **exact node names** for the database engine to recognize and apply them.
+ * - Renaming them (e.g., to [pageSize] or [start]) will cause [data.read] to ignore them entirely.
+ *
+ * 🔹 The [add] slot dynamically merges the pagination arguments into the [data.read] node:
+ * - If provided, they are included in the query.
+ * - If omitted, the query runs unpaged and returns all results.
+ *
+ * 🔸 Why this matters:
+ * 1. Accurate naming ensures the underlying SQL generation respects paging.
+ * 2. This convention allows consistent behavior across different datasets.
+ * 3. It prevents silent errors where filters are ignored due to naming mismatches.
+ */
+.arguments
+   limit:int
+   offset:int
+data.connect:hr
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:employees
+   yield
+      employees:x:@data.read/*

@@ -56,7 +56,7 @@ Below are some example prompts you can run through the model after fine tuning i
   - Include Album records for each record. Use ArtistId as your foreign key!
   - Add filtering on name
 * Create an endpoint taking a message only allowing admin users to execute it, then log the message
-  - Return success
+  - Change it such that it returns success
   - Add 30 seconds of http caching
 * Create an endpoint that allows me to return records from my employees table in my hr database with paging and sorting.
   - Make sorting optional

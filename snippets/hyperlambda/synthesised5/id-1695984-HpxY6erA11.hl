@@ -1,0 +1,66 @@
+
+/*
+ * 1. [set-name] is used multiple times to rename nodes inside the SQL query structure, dynamically assigning column names for grouping and aggregation based on arguments provided in [.arguments].  
+ * 2. [insert-before] injects a [group_column] node into the [columns] collection before the first column, ensuring the group-by column appears correctly in the final SQL statement.  
+ * 3. [set-value] modifies the alias ([as]) for the aggregation column, using the value of [aggregate_function] from [.arguments], allowing dynamic renaming of the result column.  
+ * 4. [remove-nodes] is repeatedly used to clean up argument nodes ([group_column], [limit], [offset], [order], [direction]) after their values have been mapped into the query, ensuring the arguments do not pollute the query structure.  
+ * 5. [add] combines nodes from arguments like [limit], [offset], [order], and [direction] into the [data.read] node, supporting flexible query options such as paging and sorting.  
+ * 6. [strings.concat] constructs the full aggregate function (e.g., `SUM(column)`) by concatenating the [aggregate_function] and [aggregate_column] values, and [set-name] assigns this to [aggregate_functor] in columns, making the aggregation operation dynamic.  
+ * 7. A [data.read] operation is configured to perform a left join between [EmployeeTerritories] and [Employees], selecting the aggregate result and grouping by the specified column, with placeholders set for dynamic WHERE and GROUP BY clauses.  
+ * 8. [return-nodes] returns the output of [data.read], presenting the final query result node tree.
+ * 
+ * Use cases:
+ * - Generating dynamic aggregate SQL queries (such as SUM, COUNT, AVG) grouped by a user-specified column, where both aggregation and grouping logic can be changed at runtime.
+ * - Building report endpoints that support sorting, paging, and dynamic filtering by accepting parameters and constructing custom SQL read operations.
+ * - Performing analytics, like counting employees per territory or calculating totals per category, without hardcoding the SQL logic.
+ * - Supporting UI-driven queries where end users pick grouping and aggregation columns, and the backend dynamically builds and executes the corresponding SQL.
+ * - Efficiently cleaning up and transforming input arguments into a normalized internal query structure for further processing or debugging.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:EmployeeTerritories
+         join:Employees
+            as:EmployeeID
+            type:left
+            on
+               and
+                  EmployeeTerritories.EmployeeID:EmployeeID.EmployeeID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

@@ -1,0 +1,57 @@
+
+/*
+ * 1. [if]: Checks if there are no child nodes under the [data.read] node using the [not-exists] slot with the expression `:x:@data.read/*`. If true, the following actions are performed.
+ * 2. [log.info]: Logs a message indicating that a synthetic snippet is being created, including an [expression] argument referencing [.tmp].
+ * 3. [execute]: Runs the [magic.workflows.actions.execute] slot to invoke an OpenAI query workflow, passing in model parameters, instructions, and the [query] from [.tmp].
+ * 4. [unwrap]: Extracts and evaluates all descendant nodes of [.foo] to retrieve the generated answer from the previous execution.
+ * 5. [add]: Adds a new node to [.foo] containing the answer retrieved from the OpenAI execution.
+ * 6. [lambda2hyper]: Converts the lambda hierarchy under [.foo] to a Hyperlambda string, preserving comments.
+ * 7. [set-value]: Updates [.tmp] by concatenating the Hyperlambda text, a newline, and the previous value of [.tmp].
+ * 8. [set-value] (for [.filename]): Constructs a unique filename for the snippet using a directory prefix, an ID from the lambda context, a random value, and the ".hl" extension.
+ * 9. [io.file.save]: Saves the concatenated Hyperlambda content from [.tmp] into the generated filename.
+ * 
+ * Use cases:
+ * - Automatically generate a Hyperlambda snippet using OpenAI when no data is present, log the process, and save the result as a uniquely named file.
+ * - Construct a workflow that dynamically synthesizes and persists new Hyperlambda examples for fine-tuning or documentation purposes.
+ * - Enhance a dataset of Hyperlambda snippets by creating synthetic examples only when missing, ensuring no duplicate content is generated.
+ * - Archive AI-generated code responses into a structured directory with traceable and unique filenames for further analysis or training.
+ */
+if
+   not-exists:x:@data.read/*
+   .lambda
+      log.info:Creating synthetic snippet
+         expression:x:@.tmp
+      execute:magic.workflows.actions.execute
+         name:openai-query
+         filename:/modules/openai/workflows/actions/openai-query.hl
+         arguments
+            model:gpt-4o
+            max_tokens:int:1500
+            instruction:x:@.system-message
+            query:x:@.tmp
+      .foo
+      unwrap:x:+/*/*
+      add:x:@.foo
+         .
+            ..:x:@execute/*/answer
+      lambda2hyper:x:@.foo/*
+         comments:true
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@lambda2hyper
+            .:@"
+"
+            get-value:x:@.tmp
+      .filename
+      set-value:x:@.filename
+         strings.concat
+            .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
+            .:id-
+            get-value:x:@for-each/@.dp/#/*/hyperlambda_id
+            .:-
+            crypto.random
+               min:10
+               max:10
+            .:.hl
+      io.file.save:x:@.filename
+         get-value:x:@.tmp

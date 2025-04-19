@@ -1,0 +1,32 @@
+/*
+ * Fetches invoice records from the [Invoices] table in the [sales] database using enforced pagination controls.
+ *
+ * Requires:
+ * - [limit:int]  → Limits number of rows returned.
+ * - [offset:int] → Skips a set number of rows from the start.
+ *
+ * 🔹 [validators.mandatory] ensures both parameters are present to prevent accidental overloading.
+ * 🔹 Arguments are logged using [log.info] to track usage patterns and debug issues.
+ * 🔹 [add] allows dynamic merging into [data.read] while keeping the logic flexible and readable.
+ *
+ * Best used in admin dashboards or financial reports that need to enforce strict pagination.
+ */
+.arguments
+   limit:int
+   offset:int
+
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+
+log.info:Arguments received
+   limit:x:@.arguments/*/limit
+   offset:x:@.arguments/*/offset
+
+data.connect:sales
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Invoices
+   yield
+      invoices:x:@data.read/*

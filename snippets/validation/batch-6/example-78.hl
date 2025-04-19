@@ -1,0 +1,27 @@
+/*
+ * Retrieves book entries from the [Books] table in the [library] database, with support for optional pagination.
+ *
+ * The [.arguments] block defines the paging inputs:
+ * - [limit:int] → The number of books to return.
+ * - [offset:int] → How many books to skip before starting the result.
+ *
+ * 🔹 It is essential to use the exact node names [limit] and [offset] when working with [data.read].
+ * - These are special keywords interpreted by the SQL generation layer.
+ * - Using alternate names like [count] or [startAt] will not trigger pagination.
+ *
+ * 🔹 The [add] statement dynamically injects these arguments if they are present:
+ * - This keeps the query flexible — paged if arguments exist, unpaged if not.
+ *
+ * 🔸 Use this convention to ensure predictable paging behavior in list-based endpoints.
+ */
+.arguments
+   limit:int
+   offset:int
+data.connect:library
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Books
+   yield
+      books:x:@data.read/*

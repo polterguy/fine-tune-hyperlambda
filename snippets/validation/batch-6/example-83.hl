@@ -1,0 +1,32 @@
+/*
+ * Returns paginated ticket records from the [Tickets] table in the [support] database.
+ *
+ * Parameters required via [.arguments]:
+ * - [limit:int]  → Number of tickets to return.
+ * - [offset:int] → Number of tickets to skip.
+ *
+ * 🔹 [validators.mandatory] ensures these parameters are not optional — enforcing paging discipline.
+ * 🔹 Logging via [log.info] captures what values were passed, helping in debugging and monitoring usage.
+ * 🔹 [add] is used to cleanly insert both arguments into the [data.read] logic.
+ *
+ * This structure supports efficient, predictable data access patterns while preventing large queries.
+ */
+.arguments
+   limit:int
+   offset:int
+
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+
+log.info:Arguments received
+   limit:x:@.arguments/*/limit
+   offset:x:@.arguments/*/offset
+
+data.connect:support
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   data.read
+      table:Tickets
+   yield
+      tickets:x:@data.read/*

@@ -1,0 +1,79 @@
+
+/*
+ * 1. [for-each] iterates through all descendant nodes of [hyper2lambda], applying the logic to each node found.
+ * 2. [if] with [and] checks if the current node ([.dp]) is not null and its type is "x", filtering only nodes of a certain type for further processing.
+ * 3. [set-value] creates a new string expression in [.tmp] by concatenating ".:x:" with the string value of the current node, preparing a unique identifier or key.
+ * 4. [data.read] queries the "hyperlambda" table for records matching this key; if a match does not exist ([not-exists]), a synthetic snippet is created.
+ * 5. [execute] runs an external workflow ("openai-query") to generate content using the OpenAI API, passing relevant arguments such as model, instruction, and the generated query.
+ * 6. [unwrap] and [add] extract the answer from the OpenAI response and inject it into a temporary [.foo] node.
+ * 7. [lambda2hyper] serializes the [.foo] lambda structure back into Hyperlambda code, preserving comments.
+ * 8. [set-value] and [strings.concat] build the final code snippet and generate a unique filename for saving, incorporating an id and a random number.
+ * 9. [io.file.save] persists this generated code to a file path under "snippets/hyperlambda/synthesised4".
+ * 10. If a matching snippet already exists, a log message is written instead of generating a new snippet.
+ * 
+ * Use cases:
+ * - Automatically generate and persist Hyperlambda snippets for all matching nodes in a parsed Hyperlambda structure that do not already exist in storage.
+ * - Integrate AI-generated code completion into a repository, ensuring that each unique node is only processed and stored once.
+ * - Batch process and serialize new Hyperlambda code fragments for fine-tuning or documentation purposes.
+ * - Maintain a deduplicated library of code templates by querying existing storage before generating new content.
+ */
+for-each:x:@hyper2lambda/**/*
+   if
+      and
+         not-null:x:@.dp/#
+         eq
+            type:x:@.dp/#
+            .:x
+      .lambda
+         .tmp
+         set-value:x:@.tmp
+            strings.concat
+               .:".:x:"
+               convert:x:@.dp/#
+                  type:string
+         data.read
+            table:hyperlambda
+            where
+               and
+                  code.eq:x:@.tmp
+         if
+            not-exists:x:@data.read/*
+            .lambda
+               log.info:Creating synthetic snippet
+                  expression:x:@.tmp
+               execute:magic.workflows.actions.execute
+                  name:openai-query
+                  filename:/modules/openai/workflows/actions/openai-query.hl
+                  arguments
+                     model:gpt-4o
+                     max_tokens:int:1500
+                     instruction:x:@.system-message
+                     query:x:@.tmp
+               .foo
+               unwrap:x:+/*/*
+               add:x:@.foo
+                  .
+                     ..:x:@execute/*/answer
+               lambda2hyper:x:@.foo/*
+                  comments:true
+               set-value:x:@.tmp
+                  strings.concat
+                     get-value:x:@lambda2hyper
+                     .:@"
+"
+                     get-value:x:@.tmp
+               .filename
+               set-value:x:@.filename
+                  strings.concat
+                     .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised4/
+                     .:id-
+                     get-value:x:@for-each/@.dp/#/*/hyperlambda_id
+                     .:-
+                     crypto.random
+                        min:10
+                        max:10
+                     .:.hl
+               io.file.save:x:@.filename
+                  get-value:x:@.tmp
+         else
+            log.info:Snippet already exists.

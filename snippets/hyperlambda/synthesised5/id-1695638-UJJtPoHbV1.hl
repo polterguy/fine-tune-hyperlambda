@@ -1,0 +1,116 @@
+
+/*
+ * 1. [slots.create]: Defines a new dynamic slot named [magic.ai.search], which acts as a custom Hyperlambda function for AI-powered search.
+ * 2. [validators.mandatory]: Ensures that required arguments ([type], [prompt], [threshold], [max], [vector_model]) are provided when this slot is executed.
+ * 3. [validators.string]: Validates that [prompt] is a string with a minimum length of one character.
+ * 4. [set-value] (threshold): Converts the [threshold] argument to a double data type for use in similarity calculations.
+ * 5. [strings.concat] and [config.get]: Constructs a Bearer token by retrieving the OpenAI API key from configuration and prefixing it properly.
+ * 6. [http.post]: Sends a request to the OpenAI embeddings API to generate a vector embedding for the provided [prompt] using the specified [vector_model].
+ * 7. [if] (HTTP response handling): Checks if the HTTP response status code is not in the 200-299 range, and if so, logs the error, converts the response, and throws a public exception with details.
+ * 8. [data.connect]: Establishes a database connection, optionally using a prefix filter for [ts.uri], and prepares to execute further database queries.
+ * 9. [floatArray2bytes]: Converts the embedding array in the OpenAI response to a binary format suitable for database querying.
+ * 10. [strings.concat] (SQL query): Assembles a SQL statement that performs a similarity search against stored vector embeddings in the database, filtering by [type], [prefix-url], and [threshold].
+ * 11. [data.select]: Executes the constructed SQL query, passing in the embedding, type, threshold, and limit as parameters.
+ * 12. [set-value] (timing): Measures the time taken by the database search, formatting it as seconds with milliseconds.
+ * 13. [if]/[else] (results handling): Removes the [snippets] node from the return structure if there are no results, or populates it with the search results.
+ * 14. [unwrap]: Processes and finalizes the output nodes for return.
+ * 15. [return]: Outputs the database query time and the resulting [snippets].
+ * 
+ * Use cases:
+ * - Implementing a semantic search endpoint that matches user queries to relevant database records using OpenAI embeddings and a similarity search.
+ * - Filtering search results by resource type and optional URI prefix, with configurable similarity thresholds and maximum results.
+ * - Automatically handling errors from OpenAI API calls and providing detailed error feedback.
+ * - Tracking and reporting the execution time of semantic search queries for monitoring or optimization purposes.
+ * - Integrating AI-powered search into applications that require natural language matching against structured or unstructured data stored in a relational database.
+ */
+slots.create:magic.ai.search
+   validators.mandatory:x:@.arguments/*/type
+   validators.mandatory:x:@.arguments/*/prompt
+   validators.mandatory:x:@.arguments/*/threshold
+   validators.mandatory:x:@.arguments/*/max
+   validators.mandatory:x:@.arguments/*/vector_model
+   validators.string:x:@.arguments/*/prompt
+      min:1
+   set-value:x:@.arguments/*/threshold
+      convert:x:@.arguments/*/threshold
+         type:double
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         config.get:"magic:openai:key"
+   http.post:"https://api.openai.com/v1/embeddings"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         input:x:@.arguments/*/prompt
+         model:x:@.arguments/*/vector_model
+      convert:true
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            error:x:@lambda2hyper
+         throw:x:@http.post/*/content/*/error/*/message
+            public:bool:true
+            status:x:@http.post
+   data.connect:[generic|magic]
+      .prefix-url:"ts.uri is not null and "
+      if
+         and
+            exists:x:@.arguments/*/prefix-url
+            not-null:x:@.arguments/*/prefix-url
+            neq:x:@.arguments/*/prefix-url
+               .:
+         .lambda
+            set-value:x:@.prefix-url
+               .:"ts.uri like @prefix and "
+            add:x:@data.connect/*/data.select
+               .
+                  @prefix:x:@.arguments/*/prefix-url
+      .begin
+      set-value:x:@.begin
+         date.now
+      floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+      math.subtract
+         .:float:1
+         get-value:x:@.arguments/*/threshold
+      strings.concat
+         .:"\nselect vss.distance, ts.prompt, ts.uri\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and "
+         get-value:x:@.prefix-url
+         .:"vss_search(vss.embedding_vss, @embedding) and\n       vss.distance < @threshold\ngroup by ts.uri\norder by vss.distance\nlimit @limit"
+      data.select:x:@strings.concat
+         @embedding:x:@floatArray2bytes
+         @type:x:@.arguments/*/type
+         @threshold:x:@math.subtract
+         @limit:x:@.arguments/*/max
+      .end
+      set-value:x:@.end
+         date.now
+      .time
+      set-value:x:@.time
+         math.subtract
+            get-value:x:@.end
+            get-value:x:@.begin
+      set-value:x:@.time
+         time.format:x:@.time
+            format:"ss\\.fff"
+      if
+         not-exists:x:@data.select/*
+         .lambda
+            remove-nodes:x:../*/return/*/snippets
+      else
+         add:x:@data.connect/*/return/*/snippets
+            get-nodes:x:@data.select/*
+      unwrap:x:./*/return/*
+      return
+         db_time:x:@.time
+         snippets
