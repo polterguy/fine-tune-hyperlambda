@@ -1,34 +1,17 @@
-
 /*
- * Endpoint that returns a paged list of companies associated with a specified director,
- * excluding companies where the director's ID matches the one currently being queried.
+ * Retrieves a paginated list of companies associated with a specific director, excluding the company currently under evaluation.
  *
- * ### Arguments
- * - [.arguments] includes:
- *   - [director_id]: The ID of the director being queried.
- *   - [limit]: Maximum number of records to return.
- *   - [offset]: Number of records to skip (for paging).
+ * 1. Accepts three parameters via [.arguments]: 'director_id', 'limit', and 'offset', used to filter and paginate the result set.
+ * 2. Establishes a connection to the PostgreSQL database '[finovo|finovo]' using [data.connect].
+ * 3. Executes a parameterized SQL query via [data.select] to:
+ *    - Join the [directors] and [basic] tables on organization number.
+ *    - Filter for all companies linked to the given 'director_id' except the primary one.
+ *    - Support pagination through the [limit] and [offset] arguments.
+ * 4. Uses [if] logic to compare the result count with the specified 'limit'.
+ *    - If they match, adds a [notice] node indicating that the result set might be incomplete (i.e., more companies exist).
+ * 5. Returns the selected companies under the [companies] node using [yield].
  *
- * ### Database Connection
- * - [data.connect] connects to the [finovo] PostgreSQL database using the [finovo] connection string.
- *
- * ### Query Execution
- * - [data.select] executes a raw SQL query that:
- *   - Retrieves [org_number], [company_name], and [role_name] from joined tables [directors] and [basic].
- *   - Filters records where [d2.director_id] matches the provided [director_id],
- *     excluding records where [org_number] is the same in both [d1] and [d2].
- *   - Applies [limit] and [offset] parameters for paging.
- *
- * ### Additional Paging Notice
- * - [if] compares the number of returned rows to the [limit] value.
- * - If they match, it implies more data may exist beyond the current page.
- *   - [add] appends a [notice] to the result, alerting the caller that there may be more companies.
- *
- * ### Response
- * - [yield] returns the matching company records under the [companies] node.
- *
- * This endpoint demonstrates raw SQL querying with joins and paging,
- * dynamic filtering using arguments, and conditionally enriching the response with metadata.
+ * This pattern is useful when querying cross-organizational relationships while gracefully handling paginated boundaries.
  */
 .arguments
    director_id:long

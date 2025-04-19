@@ -1,26 +1,17 @@
-
 /*
- * This Hyperlambda endpoint performs an aggregated SQL query on the [MediaType] table in the [chinook] SQLite database.
- * It returns the number of tracks associated with each media type, filtered by a name pattern, and ordered by count in descending order.
+ * Accepts a [filter] argument and queries the 'chinook' SQLite database using a parameterized SQL SELECT statement.
  *
- * 1. [.arguments]
- *    * Declares an input argument named [filter] of type [string], used for filtering media types via SQL `LIKE`.
-
- * 2. [data.connect]
- *    * Opens a connection to the [chinook] database using SQLite as the database type.
-
- * 3. [add]
- *    * Appends all argument nodes (in this case, [filter]) to the child scope of [data.select].
- *    * Ensures that the SQL query can use `@filter` as a bound parameter.
-
- * 4. [data.select]
- *    * Executes a raw SQL query joining [MediaType] and [Track] tables.
- *    * Aggregates the number of tracks per media type using `count(mt.MediaTypeId) as Amount`.
- *    * Applies a `LIKE` filter on the media type name using the [filter] argument.
- *    * Results are grouped by media type and ordered descending by the count.
-
- * 5. [return-nodes]
- *    * Returns the query result to the HTTP caller as a structured node set.
+ * 1. Connects to the 'chinook' database with 'sqlite' as the database type.
+ * 2. Injects the input parameters from [.arguments] into the parameter list of [data.select] using [add].
+ *    - This ensures the @filter parameter is bound safely and prevents SQL injection.
+ * 3. Executes a SQL query with [data.select] to:
+ *    - Join [MediaType] and [Track] tables.
+ *    - Filter media types where name matches the [filter] parameter.
+ *    - Group results by media type and count tracks per type.
+ *    - Sort descending by the number of tracks.
+ * 4. Returns the resulting rows from the executed query using [return-nodes].
+ *
+ * This structure enables safe, reusable querying with input filtering, ideal for endpoints or scripts that need media-type statistics.
  */
 .arguments
    filter:string
