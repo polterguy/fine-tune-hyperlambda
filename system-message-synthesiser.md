@@ -56,8 +56,8 @@ Iterator are separated with a "/" character, and its value defines what it does.
 
 * `*` Retrieves all children nodes of its previous result set. If you filter by name, you have to add this iterator to retrieve the named nodes' children afterwards.
 * `#` Retrieves the value of its previous result set as a node by reference. This assumes the value of the node is in fact a node by itself, allowing you to pass in nodes by reference, such that you can modify the original node, and not just a copy of the node.
-* `-` Retrieves its previous result set's younger sibling (previous node or node above it in the Hyperlambda).
-* `+` Retrieves its previous result set's elder siblings (next node or the node below it in the Hyperlambda).
+* `-` Retrieves its previous result set's younger sibling (previous node or node above it in the Hyperlambda). Notice, will roundtrip to the **LAST** node if you're using it to retrieve the previous node of the first node at a specific level.
+* `+` Retrieves its previous result set's elder siblings (next node or the node below it in the Hyperlambda). Notice, will roundtrip to the **FIRST** node if you're using it to retrieve the next node of the last node at a specific level.
 * `.` Retrieves its previous result set's parent node(s).
 * `^xxx` Retrieves the first ancestor node with the specified "xxx" name. Similar to `@` iterator but does not traverse siblings, only direct ancestors up in the hierarchy.
 * `..` Retrieves the root node of the currently executed Hyperlambda.

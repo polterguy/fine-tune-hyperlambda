@@ -1,0 +1,27 @@
+
+/*
+ * 1. [for-each] iterates over each child node of [io.file.list], passing each node by reference into a [.dp] node for processing.
+ * 2. [if] checks if the value of the currently iterated node (via [.dp]) ends with "css" using [strings.ends-with]. This filters for nodes representing CSS files.
+ * 3. If the condition is true, [strings.split] splits the file path (from [.dp]) by "/" to separate folder components.
+ * 4. The next [strings.split] splits the last segment (the filename) by ".", separating the file name from its extension.
+ * 5. [unwrap] evaluates all expressions in the next sibling nodes, ensuring any expressions are executed and their results are available.
+ * 6. [add] appends a new node to [.result], using the file name (without extension) as its value, extracted from the previous split operation.
+ * 
+ * Use cases:
+ * - Extracting the base names of all CSS files in a directory listing and collecting them into a result node.
+ * - Building a list of unique CSS file names for further processing, such as generating import statements.
+ * - Filtering and transforming file paths to produce a summary or index of specific file types in a given directory.
+ */
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:css
+      .lambda
+         strings.split:x:@.dp/#
+            .:/
+         strings.split:x:@strings.split/0/-
+            .:.
+         unwrap:x:+/*/*
+         add:x:@.result
+            .
+               .:x:@strings.split/0

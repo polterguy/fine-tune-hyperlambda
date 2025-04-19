@@ -1,0 +1,33 @@
+
+/*
+ * 1. [if] checks if the folder [/etc/system/openai/css/search/] exists by invoking [io.folder.exists]. If the folder exists, it executes the following logic inside [.lambda].
+ * 2. [io.file.list] lists all files in the [/etc/system/openai/css/search/] folder.
+ * 3. [for-each] iterates over each file returned by [io.file.list], with each file node referenced by [.dp].
+ * 4. [if] checks if the current file's name ends with "css" using [strings.ends-with]. If true, it executes the nested logic.
+ * 5. [strings.split] splits the file path by "/" to separate the path components.
+ * 6. [strings.split] splits the last component (the file name) by "." to separate the file name from its extension.
+ * 7. [unwrap] evaluates the expression to get the file name without extension.
+ * 8. [add] adds the file name (without extension) to the [.result] node.
+ * 
+ * Use cases:
+ * - Generating a list of CSS file names (without extensions) from a specific folder for further processing.
+ * - Dynamically building a set of CSS class or file references for use in a web application.
+ * - Preparing a manifest or index of available CSS files for configuration or documentation purposes.
+ */
+if
+   io.folder.exists:/etc/system/openai/css/search/
+   .lambda
+      io.file.list:/etc/system/openai/css/search/
+      for-each:x:@io.file.list/*
+         if
+            strings.ends-with:x:@.dp/#
+               .:css
+            .lambda
+               strings.split:x:@.dp/#
+                  .:/
+               strings.split:x:@strings.split/0/-
+                  .:.
+               unwrap:x:+/*/*
+               add:x:@.result
+                  .
+                     .:x:@strings.split/0

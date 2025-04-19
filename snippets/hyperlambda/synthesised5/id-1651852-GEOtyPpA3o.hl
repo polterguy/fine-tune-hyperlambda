@@ -1,0 +1,35 @@
+
+/*
+ * 1. The [if] slot checks if the folder named [search] exists inside [/system/openai/front.files/]. If it does, the code inside [.lambda] is executed.
+ * 2. [io.file.list] retrieves all files inside the [search] folder.
+ * 3. [for-each] iterates over each file found in the previous step.
+ * 4. For each file, [if] checks if the file name ends with "css" using [strings.ends-with]. If true, the following logic is executed.
+ * 5. [strings.split] splits the file path by "/" to isolate the file name, then splits the file name by "." to separate the base name from its extension.
+ * 6. The innermost [if] checks if an entry with the same base file name does not already exist in [.result]. If it does not exist, it proceeds.
+ * 7. [unwrap] evaluates the previous node's children, and [add] creates a new entry in [.result] with the base file name as its value.
+ * 
+ * Use cases:
+ * - Collect a list of unique CSS file base names from a specific folder, avoiding duplicates.
+ * - Dynamically build a manifest or index of CSS files for further processing or inclusion.
+ * - Prepare a list of available CSS themes or stylesheets in a web application for user selection.
+ */
+if
+   io.folder.exists:/system/openai/front.files/search/
+   .lambda
+      io.file.list:/system/openai/front.files/search/
+      for-each:x:@io.file.list/*
+         if
+            strings.ends-with:x:@.dp/#
+               .:css
+            .lambda
+               strings.split:x:@.dp/#
+                  .:/
+               strings.split:x:@strings.split/0/-
+                  .:.
+               if
+                  not-exists:x:"@.result/*/\"={@strings.split/0}\""
+                  .lambda
+                     unwrap:x:+/*/*
+                     add:x:@.result
+                        .
+                           .:x:@strings.split/0

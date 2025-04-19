@@ -1,0 +1,44 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the "[generic|magic]" database provider, setting the context for subsequent database operations.
+ * 2. The first [if] checks if a [type] argument exists in [.arguments]. If it does, it dynamically adds a condition to the [where]/[and] clause of [data.read], filtering records by the specified [type].
+ * 3. [data.read] queries the [ml_requests] table, selecting only the [prompt] column (aliased as [lead]), and filters for records where [finish_reason] equals "lead". The [limit:-1] ensures all matching records are returned.
+ * 4. The second [if] checks if no records were found by [data.read]. If so, it sets the HTTP response status to 404 and returns a message indicating no records were found.
+ * 5. [lambda2csv] converts the resulting records from [data.read] into CSV format.
+ * 6. [response.headers.set] sets HTTP headers to indicate the response is a downloadable CSV file named "leads.csv" and exposes relevant headers for CORS.
+ * 7. [return] sends the generated CSV as the HTTP response.
+ * 
+ * Use cases:
+ * - Exporting all "lead" prompts from the [ml_requests] table as a CSV file, optionally filtered by a specific [type] if provided.
+ * - Providing a downloadable CSV export endpoint for lead data, suitable for integration with CRM or marketing tools.
+ * - Returning a 404 error with a clear message if no matching leads are found, improving API usability and error handling.
+ */
+data.connect:[generic|magic]
+   if
+      exists:x:@.arguments/*/type
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@data.connect/*/data.read/*/where/*/and
+            .
+               type.eq:x:@.arguments/*/type
+   data.read
+      table:ml_requests
+      columns
+         prompt
+            as:lead
+      where
+         and
+            finish_reason.eq:lead
+      limit:-1
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         response.status.set:404
+         return
+            result:No records found
+   lambda2csv:x:@data.read/*
+   response.headers.set
+      Content-Type:text/csv
+      Access-Control-Expose-Headers:Content-Disposition
+      Content-Disposition:"attachment; filename=\"leads.csv\""
+   return:x:@lambda2csv

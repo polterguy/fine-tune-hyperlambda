@@ -1,0 +1,28 @@
+
+/*
+ * 1. The [if] slot checks if the value of the currently iterated [.dp] node ends with the string "css" using [strings.ends-with]. If true, it executes the following logic.
+ * 2. [strings.split] splits the value of [.dp] by the "/" character, breaking the path into segments.
+ * 3. Another [strings.split] splits the last segment (from the previous split) by the "." character, isolating the filename without its extension.
+ * 4. An inner [if] checks if a node with the name equal to the filename (from the previous split) does not already exist as a child of [.result]. This is done using [not-exists] and a dynamic expression.
+ * 5. If the filename does not exist as a child of [.result], [unwrap] and [add] are used to add a new child node to [.result] with the name set to the filename.
+ * 
+ * Use cases:
+ * - Ensuring unique CSS file references are added to a result node only once, based on their filename.
+ * - Processing a list of file paths and extracting unique CSS file names for further processing or output.
+ * - Dynamically building a set of CSS dependencies from a collection of file paths, avoiding duplicates.
+ */
+if
+   strings.ends-with:x:@.dp/#
+      .:css
+   .lambda
+      strings.split:x:@.dp/#
+         .:/
+      strings.split:x:@strings.split/0/-
+         .:.
+      if
+         not-exists:x:"@.result/*/\"={@strings.split/0}\""
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.result
+               .
+                  .:x:@strings.split/0

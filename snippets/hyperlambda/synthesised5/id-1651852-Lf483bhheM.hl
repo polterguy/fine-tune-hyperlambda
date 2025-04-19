@@ -1,0 +1,29 @@
+
+/*
+ * 1. [for-each] iterates over each child node of [io.file.list], passing each node by reference as [.dp] for processing.
+ * 2. [if] with [strings.ends-with] checks if the current file's value (from [.dp]) ends with "css", ensuring only CSS files are processed.
+ * 3. [strings.split] splits the file path by "/" to isolate the filename, then splits the filename by "." to separate the base name from its extension.
+ * 4. The inner [if] with [not-exists] checks if a node with a value equal to the base filename (without extension) does not already exist under [.result].
+ * 5. If the base filename is not present in [.result], [unwrap] and [add] are used to append a new node with the base filename as its value to [.result].
+ * 
+ * Use cases:
+ * - Collect a unique list of CSS file base names from a directory listing, avoiding duplicates.
+ * - Build a summary of CSS files present in a folder, storing only their base names for further processing.
+ * - Prepare a node structure for generating a CSS bundle or manifest file by extracting and deduplicating CSS filenames.
+ */
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:css
+      .lambda
+         strings.split:x:@.dp/#
+            .:/
+         strings.split:x:@strings.split/0/-
+            .:.
+         if
+            not-exists:x:"@.result/*/\"={@strings.split/0}\""
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.result
+                  .
+                     .:x:@strings.split/0
