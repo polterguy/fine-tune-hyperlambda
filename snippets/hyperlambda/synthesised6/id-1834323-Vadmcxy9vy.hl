@@ -1,0 +1,29 @@
+
+// Iterate through each file listed by [io.file.list] using [for-each], and for every file with a name ending in ".sql", load its content with [io.file.load]. Attempt to execute the SQL script using [data.execute], but if the value of [.db-type] is "mssql", first set the name of [data.execute] to "mssql.execute-batch". Log a success message if the script runs without error, or log a failure message and the error if an exception occurs during execution.
+for-each:x:@io.file.list/*
+   if
+      strings.ends-with:x:@.dp/#
+         .:.sql
+      .lambda
+         io.file.load:x:@.dp/#
+         try
+            if
+               eq
+                  get-value:x:@.db-type
+                  .:mssql
+               .lambda
+                  set-name:x:@if/./*/data.execute
+                     .:mssql.execute-batch
+            data.execute:x:@io.file.load
+            strings.concat
+               .:"Script '"
+               get-value:x:@.dp/#
+               .:"' succeeded"
+            console.log:x:@strings.concat
+         .catch
+            strings.concat
+               .:"Script '"
+               get-value:x:@.dp/#
+               .:"' failed"
+            console.log:x:@strings.concat
+            console.log:x:@.arguments/*/message

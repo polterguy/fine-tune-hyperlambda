@@ -1,0 +1,22 @@
+
+// Create an [else-if] block that checks if the value of the [.db-type] node is "sqlite". If true, attempt to connect to the "magic" database using [data.connect:[generic|magic]], and execute a [data.select] statement to select the count of log entries. If successful, log a success message to the console. If an exception is thrown, log that the database is corrupted, then check if the file "/data/magic.backup" exists. If the backup exists, flush SQLite connections, delete "/data/magic.db", copy the backup to "/data/magic.db", log the restoration, and set the [.corrupt] node to boolean true.
+else-if
+   eq:x:@.db-type
+      .:sqlite
+   .lambda
+      try
+         data.connect:[generic|magic]
+            data.select:select count(*) from log_entries
+         console.log:Successfully connected to magic database
+      .catch
+         console.log:Magic database is corrupted
+         if
+            io.file.exists:/data/magic.backup
+            .lambda
+               sqlite.connections.flush
+               io.file.delete:/data/magic.db
+               io.file.copy:/data/magic.backup
+                  .:/data/magic.db
+               console.log:Reverted to backup of magic database
+               set-value:x:@.corrupt
+                  .:bool:true

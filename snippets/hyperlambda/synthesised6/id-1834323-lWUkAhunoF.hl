@@ -1,0 +1,30 @@
+
+// Open a connection to the [magic] database using the [generic] connection string, then iterate over all files listed in the [io.file.list] node. For each file, if the filename ends with ".sql", load the file and execute its SQL script using [data.execute]. If the [db-type] node's value equals "mssql", rename the [data.execute] invocation to [mssql.execute-batch] before execution. Log a success message to the console if the script executes successfully; otherwise, catch any errors, log a failure message, and output the exception message to the console.
+data.connect:[generic|magic]
+   for-each:x:@io.file.list/*
+      if
+         strings.ends-with:x:@.dp/#
+            .:.sql
+         .lambda
+            io.file.load:x:@.dp/#
+            try
+               if
+                  eq
+                     get-value:x:@.db-type
+                     .:mssql
+                  .lambda
+                     set-name:x:@if/./*/data.execute
+                        .:mssql.execute-batch
+               data.execute:x:@io.file.load
+               strings.concat
+                  .:"Script '"
+                  get-value:x:@.dp/#
+                  .:"' succeeded"
+               console.log:x:@strings.concat
+            .catch
+               strings.concat
+                  .:"Script '"
+                  get-value:x:@.dp/#
+                  .:"' failed"
+               console.log:x:@strings.concat
+               console.log:x:@.arguments/*/message

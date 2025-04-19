@@ -1,0 +1,23 @@
+
+// Connect to the "fine-tune" data source using [data.connect], then attempt to read from the "hyperlambda" table where the [code] column is equal to the value of [lambda2hyper]. If no such record exists, create a new entry in the "hyperlambda" table with values for [prompt], [code], [validation], and [synthesised] taken from the respective nodes, and increment the [.no] node. If [.delete_duplicates] exists, delete the file referenced by the value of the currently iterated node [.dp/#] using [io.file.delete].
+data.connect:fine-tune
+   .exists:bool:false
+   data.read
+      table:hyperlambda
+      where
+         and
+            code.eq:x:@lambda2hyper
+      limit:1
+   if
+      not-exists:x:@data.read/*
+      .lambda
+         data.create
+            table:hyperlambda
+            values
+               prompt:x:@.prompt
+               code:x:@lambda2hyper
+               validation:x:@.validation
+               synthesised:x:@.synthesised
+         math.increment:x:@.no
+   else-if:x:@.delete_duplicates
+      io.file.delete:x:@.dp/#

@@ -1,0 +1,14 @@
+
+// Create a scheduled task that creates a backup of your Magic database every day at 1AM UTC time. The task should connect to the [generic|magic] database, check if the file "/data/magic.backup" exists and delete it if present, then create a backup using [sqlite.backup] with the filename "magic.backup", flush the SQLite connection pools, and finally log an informational message indicating the backup was created. Use the [tasks.create] slot with the appropriate [description], [repeats] pattern for daily execution at 1AM, and implement the logic inside the [.lambda] child node.
+tasks.create:sqlite.create-backup
+   description:Creates a backup of your magic database 1AM UTC time every day.
+   repeats:**.**.01.00.00
+   .lambda
+      data.connect:[generic|magic]
+         if
+            io.file.exists:/data/magic.backup
+            .lambda
+               io.file.delete:/data/magic.backup
+         sqlite.backup:magic.backup
+         sqlite.connections.flush
+         log.info:Created backup of magic database

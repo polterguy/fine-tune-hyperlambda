@@ -1,0 +1,25 @@
+
+// Iterate through all child nodes of any [yield], [return], or [return-nodes] node anywhere inside the [hyper2lambda] node and for each such child node, check if it contains children. If it does, set a warning in the [.warning] node indicating that complex objects are being returned and candidate expressions cannot be created automatically. Then, for each child, build an expression string in the [.x] node consisting of "--/execute/=", the value of the [name] node within the current [dp] node's parent, followed by "/*/", and finally the name of the current node. Next, check if this expression does not already exist under [../*/return/*/candidates/*/*/expression]. If it does not exist, unwrap the upcoming nodes and add a new candidate node under [../*/return/*/candidates], setting [name], [expression], and [complete] using the constructed [.x] value and marking [complete] as true.
+for-each:x:@hyper2lambda/**/[yield|return|return-nodes]/*
+   if
+      exists:x:@.dp/#/*
+      .lambda
+         set-value:x:@.warning
+            .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+   .x
+   set-value:x:@.x
+      strings.concat
+         .:--/execute/=
+         get-value:x:@.dp/@.dp/#/*/name
+         .:/*/
+         get-name:x:@.dp/#
+   if
+      not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+      .lambda
+         unwrap:x:+/*/*/*
+         add:x:../*/return/*/candidates
+            .
+               .
+                  name:x:@.x
+                  expression:x:@.x
+                  complete:bool:true

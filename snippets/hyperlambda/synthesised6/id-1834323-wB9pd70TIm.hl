@@ -1,0 +1,28 @@
+
+// Iterate over each node referenced by [.dp], and if its value ends with ".sql", load the file using [io.file.load]. Then, within a try/catch block, check if the value of [.db-type] is "mssql", and if so, rename the sibling [data.execute] node to [mssql.execute-batch]. Execute the loaded SQL file, and log a success message if it succeeds. If an exception occurs, log a failure message and the error message from [.arguments/*/message].
+if
+   strings.ends-with:x:@.dp/#
+      .:.sql
+   .lambda
+      io.file.load:x:@.dp/#
+      try
+         if
+            eq
+               get-value:x:@.db-type
+               .:mssql
+            .lambda
+               set-name:x:@if/./*/data.execute
+                  .:mssql.execute-batch
+         data.execute:x:@io.file.load
+         strings.concat
+            .:"Script '"
+            get-value:x:@.dp/#
+            .:"' succeeded"
+         console.log:x:@strings.concat
+      .catch
+         strings.concat
+            .:"Script '"
+            get-value:x:@.dp/#
+            .:"' failed"
+         console.log:x:@strings.concat
+         console.log:x:@.arguments/*/message

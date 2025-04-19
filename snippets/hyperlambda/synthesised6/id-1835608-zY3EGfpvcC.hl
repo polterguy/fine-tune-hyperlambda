@@ -1,0 +1,74 @@
+
+/*
+ * Create a Hyperlambda routine that dynamically builds and executes a grouped aggregate SQL query against the Northwind Orders table using SQLite. The routine should accept arguments for [group_column], [aggregate_function], [aggregate_column], [limit], [offset], [order], and [direction]. It should:
+ * 
+ * - Set the group column name in the [group] clause and in the [columns] clause using the value from [group_column].
+ * - Insert the group column as the first item in [columns].
+ * - Set the [as] alias of the aggregate function result column to the value of [aggregate_function].
+ * - Remove used arguments ([group_column], [limit], [offset], [order], [direction]) from [.arguments] after processing.
+ * - Add [limit] and [offset] nodes to [data.read] if supplied.
+ * - Add [order] and [direction] to [data.read] if supplied.
+ * - Build the aggregate function call in [columns]/aggregate_functor as [aggregate_function]([aggregate_column]).
+ * - Remove the first two remaining argument nodes from [.arguments] after processing.
+ * - Add any remaining argument nodes as additional [and] conditions in the [where] clause.
+ * - Execute a [data.read] that:
+ *   - Targets SQLite and the Orders table.
+ *   - Left joins Employees (on Orders.EmployeeID = EmployeeID.EmployeeID) and Shippers (on Orders.ShipVia = ShipVia.ShipperID).
+ *   - Selects the aggregate_functor as [result].
+ *   - Applies the constructed [where] and [group] clauses.
+ * - Return all child nodes of the executed [data.read].
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Orders
+         join:Employees
+            as:EmployeeID
+            type:left
+            on
+               and
+                  Orders.EmployeeID:EmployeeID.EmployeeID
+         join:Shippers
+            as:ShipVia
+            type:left
+            on
+               and
+                  Orders.ShipVia:ShipVia.ShipperID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

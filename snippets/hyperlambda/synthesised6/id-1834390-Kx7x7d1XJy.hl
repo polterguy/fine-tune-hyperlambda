@@ -1,0 +1,44 @@
+
+// In the [else] block, for each child node of the node referenced by [.dp], check if the child has any children nodes itself. If it does, set the value of [.warning] to a message indicating that some actions or arguments are returning complex objects, and that candidate expressions must be manually edited. For each child, construct a candidate expression of the form `@{node-name}/*/{child-name}` and check if this expression already exists in any candidate expressions under [return] → [candidates]. If it does not exist, unwrap the next three sibling nodes and add a new candidate to [return] → [candidates] with the constructed name, expression, and set [complete] to true. After processing all children, if the [.dp] node itself is not null, construct a candidate expression of the form `@{node-name}` and, if it does not already exist in [return] → [candidates], unwrap the next three sibling nodes and add a new candidate with the constructed name, expression, and [complete] set to true.
+else
+   for-each:x:@.dp/#/*
+      if
+         exists:x:@.dp/#/*
+         .lambda
+            set-value:x:@.warning
+               .:Warning, some of your actions, and/or arguments, are returning complex objects, and we cannot automatically create candidate expressions for these. You will have to manually edit some of your expressions if you want to reference these nodes in your actions.
+      .x
+      set-value:x:@.x
+         strings.concat
+            .:@
+            get-value:x:@.node-name
+            .:/*/
+            get-name:x:@.dp/#
+      if
+         not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:../*/return/*/candidates
+               .
+                  .
+                     name:x:@.x
+                     expression:x:@.x
+                     complete:bool:true
+   if
+      not-null:x:@.dp/#
+      .lambda
+         .x
+         set-value:x:@.x
+            strings.concat
+               .:@
+               get-value:x:@.node-name
+         if
+            not-exists:x:../*/return/*/candidates/*/*/expression/={@.x}
+            .lambda
+               unwrap:x:+/*/*/*
+               add:x:../*/return/*/candidates
+                  .
+                     .
+                        name:x:@.x
+                        expression:x:@.x
+                        complete:bool:true
