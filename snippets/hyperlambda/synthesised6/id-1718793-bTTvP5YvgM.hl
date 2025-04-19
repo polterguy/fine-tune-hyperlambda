@@ -1,0 +1,24 @@
+
+// Check if there are no child nodes of [data.read], and if so, execute the following: If [.arguments] contains a child node named [insert_url] that evaluates to true, then append a markdown-formatted sentence referencing the URL from [.arguments] as additional text to the [completion] node under the currently iterated [.dp] node. Then, create new data in the [ml_training_snippets] table, using values from the corresponding child nodes of [.dp] and [.arguments] for [type], [uri], [prompt], [completion], and set [meta] to "AINIRO-Website-Crawler".
+if
+   not-exists:x:@data.read/*
+   .lambda
+      if:x:@.arguments/*/insert_url
+         set-value:x:@.dp/#/*/completion
+            strings.concat
+               get-value:x:@.dp/#/*/completion
+               .:@"
+"
+               .:@"
+"
+               .:This information was taken from [this URL](
+               get-value:x:@.arguments/*/url
+               .:)
+      data.create
+         table:ml_training_snippets
+         values
+            type:x:@.arguments/*/type
+            uri:x:@.arguments/*/url
+            prompt:x:@.dp/#/*/prompt
+            completion:x:@.dp/#/*/completion
+            meta:AINIRO-Website-Crawler

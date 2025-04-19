@@ -1,0 +1,87 @@
+
+/*
+ * Create a loop that continues as long as the value of [.no] is greater than 0. In each iteration, attempt to send a POST request to the OpenAI chat completions endpoint using [http.post], including appropriate [headers] (with Authorization from [.token] and Content-Type set to application/json) and a [payload] constructed from [.model], [.max-size], and a message array with system and user roles, where the user content is taken from the current [.dp/#/*/completion]. Convert the response automatically.
+ * 
+ * After the HTTP request, use [if], [else-if], and [else] to handle different status codes:
+ * - If the response status is 400, signal a warning on the feedback channel, sleep for 100ms, log the error with details from the response, and set [.no] to 0.
+ * - If the status is between 200 and 299, signal success, sleep for 100ms, set the current completion to the trimmed content of the response, prepend the prompt with "Summary; " and the first 150 characters of the previous prompt, and set [.no] to 0.
+ * - Otherwise, signal a warning, sleep for 3 seconds, log the error, and decrement [.no].
+ * 
+ * Wrap the HTTP request and subsequent logic in a [try] block, and in the [.catch] handler, decrement [.no]. Use [unwrap:x:+/**] to evaluate all expressions in the next sibling node before executing the HTTP request.
+ */
+while
+   mt:x:@.no
+      .:int:0
+   .lambda
+      try
+         unwrap:x:+/**
+         http.post:"https://api.openai.com/v1/chat/completions"
+            headers
+               Authorization:x:@.token
+               Content-Type:application/json
+            payload
+               model:x:@.model
+               max_tokens:x:@.max-size
+               temperature:decimal:0.3
+               messages
+                  .
+                     role:system
+                     content:Create a summary of the following information
+                  .
+                     role:user
+                     content:x:@.dp/#/*/completion
+            convert:true
+         if
+            eq:x:@http.post
+               .:int:400
+            .lambda
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Could not summarize snippet, check your log for details
+                     type:warning
+               sleep:100
+               lambda2hyper:x:@http.post
+               log.error:Something went wrong while invoking OpenAI
+                  message:x:@http.post/*/content/*/error/*/message
+                  status:x:@http.post
+                  error:x:@lambda2hyper
+               set-value:x:@.no
+                  .:int:0
+         else-if
+            and
+               mte:x:@http.post
+                  .:int:200
+               lt:x:@http.post
+                  .:int:300
+            .lambda
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Successfully created summary of snippet
+                     type:info
+               sleep:100
+               set-value:x:@.dp/#/*/completion
+                  strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+                     .:@"
+	 "
+               set-value:x:@.dp/#/*/prompt
+                  strings.concat
+                     .:"Summary; "
+                     strings.substring:x:@.dp/#/*/prompt
+                        .:int:0
+                        .:int:150
+               set-value:x:@.no
+                  .:int:0
+         else
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+                  type:warning
+            sleep:3000
+            lambda2hyper:x:@http.post
+            log.error:Something went wrong while invoking OpenAI
+               message:x:@http.post/*/content/*/error/*/message
+               status:x:@http.post
+               error:x:@lambda2hyper
+            math.decrement:x:@.no
+      .catch
+         math.decrement:x:@.no

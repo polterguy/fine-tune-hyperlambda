@@ -1,0 +1,34 @@
+
+// Implement logic inside your [case:pre] block that checks if there is any [#text] node within the currently iterated [.dp] node. If such a node exists, check if a [completion] node exists under the first snippet. If it does, append a formatted code block containing the trimmed [#text] to the existing [completion] value. If not, create a new [completion] node under the current snippet with the formatted and trimmed [#text] as its value. Use [strings.concat] to construct the Markdown code block, and [strings.trim] to clean up whitespace from the extracted text.
+case:pre
+   if
+      exists:x:"@.dp/#/**/\\#text"
+      .lambda
+         if
+            exists:x:@.snippets/0/-/*/completion
+            .lambda
+               set-value:x:@.snippets/0/-/*/completion
+                  strings.concat
+                     get-value:x:@.snippets/0/-/*/completion
+                     .:@"
+
+```
+"
+                     strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                        .:@"  
+	"
+                     .:@"
+```"
+         else
+            strings.concat
+               .:@"```
+"
+               strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                  .:@"  
+	"
+               .:@"
+```"
+            unwrap:x:+/*/*
+            add:x:@.snippets/0/-
+               .
+                  completion:x:@strings.concat

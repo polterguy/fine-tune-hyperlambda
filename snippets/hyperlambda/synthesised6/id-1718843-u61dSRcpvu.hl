@@ -1,0 +1,51 @@
+
+/*
+ * Inside an [else] block, implement two conditional [if] statements:
+ * 
+ * 1. The first [if] checks if the node at [json2lambda/*/done_reason] exists and is not null. If true, set the [.finish_reason] node to the value of [json2lambda/*/done_reason], then unwrap the next sibling and send a signal using [sockets.signal] to the session in [.session] with an argument [finish_reason] containing the value from [.finish_reason].
+ * 
+ * 2. The second [if] checks if [json2lambda/*/message/*/content] is not null and not equal to an empty string. If true, append the value of [json2lambda/*/message/*/content] to [.result] using [strings.concat]. Then, use a nested [if] to check if [.result] does not contain "___". If so, unwrap the next sibling and signal the session with the message content as an argument. Use an [else-if] block to check if [.result] contains "FUNCTION_INVOCATION[" and [.has-sent-waiting] is not true. If both are true, signal the session that a function is waiting and set [.has-sent-waiting] to true.
+ */
+else
+   if
+      and
+         exists:x:@json2lambda/*/done_reason
+         not-null:x:@json2lambda/*/done_reason
+      .lambda
+         set-value:x:@.finish_reason
+            get-value:x:@json2lambda/*/done_reason
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               finish_reason:x:@.finish_reason
+   if
+      and
+         not-null:x:@json2lambda/*/message/*/content
+         neq:x:@json2lambda/*/message/*/content
+            .:
+      .lambda
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               get-value:x:@json2lambda/*/message/*/content
+         if
+            not
+               strings.contains:x:@.result
+                  .:___
+            .lambda
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     message:x:@json2lambda/*/message/*/content
+         else-if
+            and
+               strings.contains:x:@.result
+                  .:FUNCTION_INVOCATION[
+               neq:x:@.has-sent-waiting
+                  .:bool:true
+            .lambda
+               sockets.signal:x:@.session
+                  args
+                     function_waiting:bool:true
+               set-value:x:@.has-sent-waiting
+                  .:bool:true

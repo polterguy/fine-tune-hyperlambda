@@ -1,0 +1,33 @@
+
+// Create an [if] block to check if the [content] node inside [message], which is a child of [json2lambda], is not null and not equal to an empty string. If this condition is true, append the value of [json2lambda/*/message/*/content] to [.result]. Then, create another [if] statement to check if [.result] does not contain the substring "___", and if so, use [unwrap] to forward evaluate the next sibling's children, then send a [sockets.signal] to the node referenced by [.session], passing an [args] object with a [message] property containing the content. Alternatively, if [.result] contains "FUNCTION_INVOCATION[" and [.has-sent-waiting] is not true, use [sockets.signal] to send an [args] object with [function_waiting:bool:true] to [.session], and set [.has-sent-waiting] to true.
+if
+   and
+      not-null:x:@json2lambda/*/message/*/content
+      neq:x:@json2lambda/*/message/*/content
+         .:
+   .lambda
+      set-value:x:@.result
+         strings.concat
+            get-value:x:@.result
+            get-value:x:@json2lambda/*/message/*/content
+      if
+         not
+            strings.contains:x:@.result
+               .:___
+         .lambda
+            unwrap:x:+/*/*
+            sockets.signal:x:@.session
+               args
+                  message:x:@json2lambda/*/message/*/content
+      else-if
+         and
+            strings.contains:x:@.result
+               .:FUNCTION_INVOCATION[
+            neq:x:@.has-sent-waiting
+               .:bool:true
+         .lambda
+            sockets.signal:x:@.session
+               args
+                  function_waiting:bool:true
+            set-value:x:@.has-sent-waiting
+               .:bool:true

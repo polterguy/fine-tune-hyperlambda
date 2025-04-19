@@ -1,0 +1,76 @@
+
+/*
+ * Implement conditional logic inside a [case] node named [a] that processes nodes referenced by the expression `@.dp/#/*/\@href/[0,1]`. 
+ * 
+ * For the first [if] block, ensure the following conditions are true:
+ * - [exists] for the expression `@.dp/#/*/\@href/[0,1]`
+ * - [not-null] for the same expression
+ * - [neq] for the expression versus both `.#` and `.:`
+ * - [not] [strings.starts-with] for the value with "http://" and "https://"
+ * 
+ * If these conditions are met, split the value of [@.dp/#/*/\@href/[0,1]] by "#", then trim any trailing "/" from the first token. If the trimmed value starts with "/", concatenate [@.base] with the trimmed value and assign to [.tmp]. Otherwise, concatenate [@.base], "/", and the trimmed value and assign to [.tmp]. If the resulting value does not exist in [@.url], unwrap and add it to [.urls].
+ * 
+ * For the [else-if] block, check similar existence and null/empty conditions, but do not check for "http" prefixes. Split [@.dp/#/*/\@href/[0,1]] by "#", trim any trailing "/" from the first token, and if it does not already exist in [.urls], unwrap and add it to [.urls].
+ */
+case:a
+   if
+      and
+         exists:x:"@.dp/#/*/\\@href/[0,1]"
+         not-null:x:"@.dp/#/*/\\@href/[0,1]"
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:
+         not
+            strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+               .:"http://"
+         not
+            strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+               .:"https://"
+      .lambda
+         strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         strings.trim-end:x:@strings.split/0
+            .:/
+         .tmp
+         if
+            strings.starts-with:x:@strings.trim-end
+               .:/
+            .lambda
+               set-value:x:@.tmp
+                  strings.concat
+                     get-value:x:@.base
+                     get-value:x:@strings.trim-end
+         else
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.base
+                  .:/
+                  get-value:x:@strings.trim-end
+         if
+            not-exists:x:@.url/*/{@strings.concat}
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.urls
+                  .
+                     .:x:@.tmp
+   else-if
+      and
+         exists:x:"@.dp/#/*/\\@href/[0,1]"
+         not-null:x:"@.dp/#/*/\\@href/[0,1]"
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         neq:x:"@.dp/#/*/\\@href/[0,1]"
+            .:
+      .lambda
+         strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+            .:#
+         strings.trim-end:x:@strings.split/0
+            .:/
+         if
+            not-exists:x:"@.urls/*/\"{@strings.split/0}\""
+            .lambda
+               unwrap:x:+/*/*
+               add:x:@.urls
+                  .
+                     .:x:@strings.trim-end

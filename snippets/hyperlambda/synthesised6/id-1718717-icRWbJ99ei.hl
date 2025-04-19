@@ -1,0 +1,43 @@
+
+// Create a conditional block that processes the [@href] attribute of the current [.dp] node if it exists, is not null, is not equal to "#" or an empty string, and does not start with "http://" or "https://". Inside this block, split the [@href] value by "#" and remove any trailing "/" from the first part. If the resulting string starts with "/", concatenate [.base] and the trimmed string and assign it to [.tmp]; otherwise, concatenate [.base], "/", and the trimmed string and assign to [.tmp]. If a node with the value of the concatenated string does not already exist under [.url], unwrap and add it to the [.urls] collection.
+if
+   and
+      exists:x:"@.dp/#/*/\\@href/[0,1]"
+      not-null:x:"@.dp/#/*/\\@href/[0,1]"
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"http://"
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"https://"
+   .lambda
+      strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      strings.trim-end:x:@strings.split/0
+         .:/
+      .tmp
+      if
+         strings.starts-with:x:@strings.trim-end
+            .:/
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:@strings.trim-end
+      else
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.base
+               .:/
+               get-value:x:@strings.trim-end
+      if
+         not-exists:x:@.url/*/{@strings.concat}
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.urls
+               .
+                  .:x:@.tmp

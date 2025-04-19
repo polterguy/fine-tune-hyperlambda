@@ -1,0 +1,33 @@
+
+// Check if there is a [#text] node anywhere in the current [.dp] node's value. If it exists, then check if there is a [completion] node inside the first snippet. If the [completion] node exists, append a Markdown code block containing the trimmed [#text] content to the current [completion] node. If the [completion] node does not exist, create a new completion entry in the first snippet, setting its value to a Markdown code block containing the trimmed [#text] content.
+if
+   exists:x:"@.dp/#/**/\\#text"
+   .lambda
+      if
+         exists:x:@.snippets/0/-/*/completion
+         .lambda
+            set-value:x:@.snippets/0/-/*/completion
+               strings.concat
+                  get-value:x:@.snippets/0/-/*/completion
+                  .:@"
+
+```
+"
+                  strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                     .:@"  
+	"
+                  .:@"
+```"
+      else
+         strings.concat
+            .:@"```
+"
+            strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+               .:@"  
+	"
+            .:@"
+```"
+         unwrap:x:+/*/*
+         add:x:@.snippets/0/-
+            .
+               completion:x:@strings.concat

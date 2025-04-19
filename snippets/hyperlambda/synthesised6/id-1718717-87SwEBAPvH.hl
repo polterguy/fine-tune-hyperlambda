@@ -1,0 +1,82 @@
+
+/*
+ * Iterate through all descendant [\#text] nodes within the currently referenced [.dp] node. For each such text node, if it is not null and not empty, replace any carriage returns, line feeds, tabs, and double spaces with single spaces in its value. If the parent element of the text node is an "a" element that has a non-null "href" attribute as its first attribute, construct a URL for the link:  
+ * - If the "href" starts with "/", concatenate the value of [.base] and the "href" value.  
+ * - If the "href" does not start with "http://" or "https://", concatenate [.base], "/", and the "href" value.  
+ * - Otherwise, use the "href" value as is.  
+ * Then, append to [.completion] a string in the format: space, left bracket, the trimmed text value, right bracket, left parenthesis, the constructed URL, right parenthesis, and a space.  
+ * If the text node is not within an "a" element with a valid "href", simply append the trimmed text value and a space to [.completion].
+ */
+for-each:x:"@.dp/#/**/\\#text"
+   if
+      and
+         not-null:x:@.dp/#
+         neq:x:@.dp/#
+            .:
+      .lambda
+         strings.replace:x:@.dp/#
+            .:"\r"
+            .:" "
+         strings.replace:x:@strings.replace
+            .:"\n"
+            .:" "
+         strings.replace:x:@strings.replace
+            .:"\t"
+            .:" "
+         strings.replace:x:@strings.replace
+            .:"  "
+            .:" "
+         if
+            and
+               eq
+                  get-name:x:@.dp/#/.
+                  .:a
+               exists:x:"@.dp/#/./*/\\@href/[0,1]"
+               not-null:x:"@.dp/#/./*/\\@href/[0,1]"
+            .lambda
+               .url
+               if
+                  strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                     .:/
+                  .lambda
+                     set-value:x:@.url
+                        strings.concat
+                           get-value:x:@.base
+                           get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+               else-if
+                  and
+                     not
+                        strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                           .:"http://"
+                     not
+                        strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                           .:"https://"
+                  .lambda
+                     set-value:x:@.url
+                        strings.concat
+                           get-value:x:@.base
+                           .:/
+                           get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+               else
+                  set-value:x:@.url
+                     get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+               set-value:x:@.completion
+                  strings.concat
+                     get-value:x:@.completion
+                     .:" "
+                     .:[
+                     strings.trim:x:@strings.replace
+                        .:@"  
+	"
+                     .:](
+                     get-value:x:@.url
+                     .:)
+                     .:" "
+         else
+            set-value:x:@.completion
+               strings.concat
+                  get-value:x:@.completion
+                  strings.trim:x:@strings.replace
+                     .:@"  
+	"
+                  .:" "

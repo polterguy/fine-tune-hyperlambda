@@ -1,0 +1,38 @@
+
+// Check if the value of the [found] node inside of the [signal] node is true. If so, send a feedback signal to the channel specified in [.arguments] with an info message that the site has robots.txt. Wait 100 milliseconds, then create a string describing how many [sitemap] nodes exist inside of [signal], and send this info as another feedback signal. Wait another 100 milliseconds. Then, if a [crawl-delay] node exists inside of [signal], remove any existing [delay] node from [.arguments], unwrap the next sibling nodes, set a default value for [delay] in [.arguments] to the value of [crawl-delay], build a message string showing the crawl-delay value in seconds (by dividing it by 1000), unwrap the next sibling nodes, and finally send this message as a feedback signal to the specified channel.
+if
+   eq:x:@signal/*/found
+      .:bool:true
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Site has robots.txt
+            type:info
+      sleep:100
+      strings.concat
+         .:"Found "
+         get-count:x:@signal/*/sitemap/*
+         .:" sitemaps in robots.txt file"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      sleep:100
+      if
+         exists:x:@signal/*/crawl-delay
+         .lambda
+            remove-nodes:x:@.arguments/*/delay
+            unwrap:x:+/*
+            validators.default:x:@.arguments
+               delay:x:@signal/*/crawl-delay
+            strings.concat
+               .:"Robots.txt file contains a Crawl-Delay value of "
+               math.divide:x:@signal/*/crawl-delay
+                  .:int:1000
+               .:" seconds"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info

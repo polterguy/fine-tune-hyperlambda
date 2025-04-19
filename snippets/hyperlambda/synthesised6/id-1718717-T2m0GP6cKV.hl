@@ -1,0 +1,75 @@
+
+// Implement Hyperlambda logic to process a header (h6) node, aggregating all descendant text nodes into a single string in [.prompt], trimming and concatenating the text with spaces. Then, according to the node type (h1-h6), update only the relevant node in [.page-header] with the prompt value and clear the others. Afterward, for each non-empty value in [.page-header], concatenate it to [.prompt] with a " - " separator. Clean up [.prompt] by replacing double spaces with a single space and trimming any trailing " -". Finally, add the resulting prompt as a snippet to [.snippets].
+case:h6
+   .prompt:
+   for-each:x:"@.dp/#/**/\\#text"
+      set-value:x:@.prompt
+         strings.concat
+            get-value:x:@.prompt
+            strings.trim:x:@.dp/#
+               .:@"  
+	"
+            .:" "
+   set-value:x:@.prompt
+      strings.trim:x:@.prompt
+         .:" "
+   switch:x:@get-name
+      case:h1
+         set-value:x:@.page-header/*/h1
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h2
+         set-value:x:@.page-header/*/h3
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h2
+         set-value:x:@.page-header/*/h2
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h3
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h3
+         set-value:x:@.page-header/*/h3
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h4
+         set-value:x:@.page-header/*/h4
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h5
+         set-value:x:@.page-header/*/h5
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h6
+      case:h6
+         set-value:x:@.page-header/*/h6
+            get-value:x:@.prompt
+   set-value:x:@.prompt
+      .:
+   for-each:x:@.page-header/*
+      if
+         and
+            not-null:x:@.dp/#
+            neq:x:@.dp/#
+               .:
+         .lambda
+            set-value:x:@.prompt
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:" - "
+                  get-value:x:@.prompt
+   set-value:x:@.prompt
+      strings.replace:x:@.prompt
+         .:"  "
+         .:" "
+   set-value:x:@.prompt
+      strings.trim-end:x:@.prompt
+         .:" -"
+   unwrap:x:+/*/*/*
+   add:x:@.snippets
+      .
+         .
+            prompt:x:@.prompt

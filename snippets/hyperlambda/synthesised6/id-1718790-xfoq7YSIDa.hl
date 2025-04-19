@@ -1,0 +1,26 @@
+
+// Create a [case] node named [sitemap] that checks if [.value] starts with either "http://" or "https://", and if so, unwraps the next two sibling nodes and adds the value of [.value] as a child to [.sitemap]. If not, concatenate [.domain], "/" and [.value], then replace all occurrences of "://" with ":/" in the concatenated result, unwrap the next two sibling nodes, and add the processed string as a child to [.sitemap].
+case:sitemap
+   if
+      or
+         strings.starts-with:x:@.value
+            .:"http://"
+         strings.starts-with:x:@.value
+            .:"https://"
+      .lambda
+         unwrap:x:+/*/*
+         add:x:@.sitemap
+            .
+               .:x:@.value
+   else
+      strings.concat
+         get-value:x:@.domain
+         .:/
+         get-value:x:@.value
+      strings.replace:x:@strings.concat
+         .://
+         .:/
+      unwrap:x:+/*/*
+      add:x:@.sitemap
+         .
+            .:x:@strings.replace

@@ -1,0 +1,29 @@
+
+// Iterate through the first 25 [loc] nodes under [sitemap] in the node set at [@xml2lambda/*/sitemapindex/*/sitemap]. For each [#cdata-section] child node, if the count of nodes in [.urls] is less than 10,000, add the nodes from [.arguments/*/headers] as a [signal] sibling at the current level, then unwrap all nodes two levels down from the next sibling, and signal the [magic.ai.load-sitemap] slot with a maximum of 10,000 and additional arguments from [feedback-channel], [filter-on-url], and the current [#cdata-section] node as [sitemap]. After signaling, add all [urls] returned from the [signal] execution to the [.urls] node. If the [signal] result has [has-sitemap] as false and the count of [.urls] is zero, set [.has-sitemap] to false.
+for-each:x:"@xml2lambda/*/sitemapindex/*/sitemap/*/[0,25]/loc/*/\\#cdata-section"
+   if
+      lt
+         get-count:x:@.urls/*
+         .:int:10000
+      .lambda
+         add:x:./*/signal
+            get-nodes:x:@.arguments/*/headers
+         unwrap:x:+/**
+         signal:magic.ai.load-sitemap
+            max:int:10000
+            feedback-channel:x:@.arguments/*/feedback-channel
+            filter-on-url:x:@.arguments/*/filter-on-url
+            sitemap
+               .:x:@.dp/#
+         add:x:@.urls
+            get-nodes:x:@signal/*/urls/*
+         if
+            and
+               eq:x:@signal/*/has-sitemap
+                  .:bool:false
+               eq
+                  get-count:x:@.urls/*
+                  .:int:0
+            .lambda
+               set-value:x:@.has-sitemap
+                  .:bool:false

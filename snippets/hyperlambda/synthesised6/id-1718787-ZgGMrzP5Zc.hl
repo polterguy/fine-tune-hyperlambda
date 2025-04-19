@@ -1,0 +1,19 @@
+
+// Create a conditional block that checks if a node named [crawl-delay] exists as a child of the [signal] node. If it does, perform the following actions within a [.lambda] block: remove the [delay] node from the [.arguments] node, forward evaluate the next sibling node, set a default value for [delay] in [.arguments] using the [crawl-delay] value from [signal], concatenate a message string that includes the [crawl-delay] value divided by 1000 and the text " seconds", forward evaluate all descendant nodes of the next sibling, and finally send a signal over the feedback channel specified in [.arguments/*/feedback-channel], with a message containing the concatenated string and a type of "info".
+if
+   exists:x:@signal/*/crawl-delay
+   .lambda
+      remove-nodes:x:@.arguments/*/delay
+      unwrap:x:+/*
+      validators.default:x:@.arguments
+         delay:x:@signal/*/crawl-delay
+      strings.concat
+         .:"Robots.txt file contains a Crawl-Delay value of "
+         math.divide:x:@signal/*/crawl-delay
+            .:int:1000
+         .:" seconds"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info

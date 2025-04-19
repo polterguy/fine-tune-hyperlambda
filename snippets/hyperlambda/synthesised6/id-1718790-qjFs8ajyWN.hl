@@ -1,0 +1,32 @@
+
+// Set [.crawl-delay] to the value of [.value] multiplied by 1000, but only if [.relevant] is true and [.value] is not empty. If the result is more than 60000, send a warning via [sockets.signal] to the channel at [.arguments/*/feedback-channel] and set [.crawl-delay] to 60000. If any exception occurs (e.g., [.value] is not a valid integer), send a warning to the same feedback channel and set [.crawl-delay] to 10000.
+if
+   and
+      eq:x:@.relevant
+         .:bool:true
+      neq:x:@.value
+         .:
+   .lambda
+      try
+         set-value:x:@.crawl-delay
+            math.multiply
+               .:int:1000
+               convert:x:@.value
+                  type:int
+         if
+            mt:x:@.crawl-delay
+               .:int:60000
+            .lambda
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Crawl-Delay was more than 60 seconds, using 60 seconds as our value
+                     type:warning
+               set-value:x:@.crawl-delay
+                  .:int:60000
+      .catch
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Crawl-Delay was not a valid integer value, using 10 seconds as our value
+               type:warning
+         set-value:x:@.crawl-delay
+            .:int:10000

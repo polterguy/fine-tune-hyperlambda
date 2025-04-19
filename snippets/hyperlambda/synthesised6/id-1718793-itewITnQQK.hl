@@ -1,0 +1,18 @@
+
+// Create conditional logic that checks if the value of [http.post] is 400. If true, send a warning message using [sockets.signal] to the feedback channel specified in [.arguments/*/feedback-channel], pause execution for 100 milliseconds, convert the [http.post] node structure to a Hyperlambda string using [lambda2hyper], log an error with details extracted from [http.post/*/content/*/error/*/message], the status from [http.post], and the converted Hyperlambda, then set the value of [.no] to 0 (integer).
+if
+   eq:x:@http.post
+      .:int:400
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Could not summarize snippet, check your log for details
+            type:warning
+      sleep:100
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      set-value:x:@.no
+         .:int:0

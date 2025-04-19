@@ -1,0 +1,76 @@
+
+// Create a [case] block for the [img] node that generates Markdown image syntax based on the [@src] attribute of the current node. First, use [if] with [and] to check that [@src] exists, is not null, and is not empty. Inside the lambda, resolve the full image URL into a [.url] node based on whether [@src] is an absolute URL (starting with "http://" or "https://"), starts with "//", starts with "/", or is relative, using nested [if], [else-if], and [else] blocks to handle each case and concatenate with [.base] as needed. Then, if a [completion] node exists inside the previous snippet, append the Markdown image syntax to it using [strings.concat], including the [@alt] attribute if present or "Image " as default. Otherwise, create a new completion node in [@.snippets/0/-] with the Markdown image string, making sure to unwrap the generated string before adding it.
+case:img
+   if
+      and
+         exists:x:"@.dp/#/*/\\@src/[0,1]"
+         not-null:x:"@.dp/#/*/\\@src/[0,1]"
+         neq:x:"@.dp/#/*/\\@src/[0,1]"
+            .:
+      .lambda
+         .url
+         if
+            and
+               not
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:"http://"
+               not
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:"https://"
+            .lambda
+               if
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .://
+                  .lambda
+                     strings.split:x:@.base
+                        .:"://"
+                     set-value:x:@.url
+                        strings.concat
+                           get-value:x:@strings.split/0
+                           .:":"
+                           get-value:x:"@.dp/#/*/\\@src/[0,1]"
+               else-if
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:/
+                  .lambda
+                     set-value:x:@.url
+                        strings.concat
+                           get-value:x:@.base
+                           get-value:x:"@.dp/#/*/\\@src/[0,1]"
+               else
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        .:/
+                        get-value:x:"@.dp/#/*/\\@src/[0,1]"
+         else
+            set-value:x:@.url
+               get-value:x:"@.dp/#/*/\\@src/[0,1]"
+         if
+            exists:x:@.snippets/0/-/*/completion
+            .lambda
+               set-value:x:@.snippets/0/-/*/completion
+                  strings.concat
+                     get-value:x:@.snippets/0/-/*/completion
+                     .:@"
+
+!["
+                     get-first-value
+                        get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                        .:"Image "
+                     .:](
+                     get-value:x:@.url
+                     .:)
+         else
+            strings.concat
+               .:![
+               get-first-value
+                  get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                  .:"Image "
+               .:](
+               get-value:x:@.url
+               .:)
+            unwrap:x:+/*/*
+            add:x:@.snippets/0/-
+               .
+                  completion:x:@strings.concat

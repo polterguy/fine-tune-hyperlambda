@@ -1,0 +1,85 @@
+
+/*
+ * Create a Hyperlambda workflow that attempts to summarize a user-provided text snippet using OpenAI's chat completion API. The code should:
+ * 
+ * - Use [unwrap] to evaluate all expressions in the current context.
+ * - Send a POST request to "https://api.openai.com/v1/chat/completions" via [http.post], including headers for Authorization (using [@.token]) and content-type "application/json".
+ * - The payload must specify the model ([.model]), max_tokens ([.max-size]), temperature of 0.3, and a [messages] array with a system prompt ("Create a summary of the following information") and a user message containing the snippet ([x:@.dp/#/*/completion]).
+ * - Set [convert:true] to automatically parse the response.
+ * - If the response status code is 400, signal the [.arguments/*/feedback-channel] with a warning, sleep for 100ms, log the error message and status, and set [.no] to 0.
+ * - If the status code is between 200 and 299 (inclusive), signal the feedback channel with a success message, sleep for 100ms, trim and set the summarized text back into [.dp/#/*/completion], update [.dp/#/*/prompt] with the first 150 characters of the existing prompt prefixed by "Summary; ", and set [.no] to 0.
+ * - For any other response, signal the feedback channel with a warning (indicating retry), sleep for 3 seconds, log the error, and decrement [.no].
+ * - Use [lambda2hyper] to serialize the HTTP response object for error logging in relevant branches.
+ * - Reference all nodes using their full names (e.g., [.dp/#/*/completion], [.arguments/*/feedback-channel], etc.).
+ * - Ensure all slot invocations and logic branches match the described behavior.
+ */
+try
+   unwrap:x:+/**
+   http.post:"https://api.openai.com/v1/chat/completions"
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:x:@.model
+         max_tokens:x:@.max-size
+         temperature:decimal:0.3
+         messages
+            .
+               role:system
+               content:Create a summary of the following information
+            .
+               role:user
+               content:x:@.dp/#/*/completion
+      convert:true
+   if
+      eq:x:@http.post
+         .:int:400
+      .lambda
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Could not summarize snippet, check your log for details
+               type:warning
+         sleep:100
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+         set-value:x:@.no
+            .:int:0
+   else-if
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+      .lambda
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:Successfully created summary of snippet
+               type:info
+         sleep:100
+         set-value:x:@.dp/#/*/completion
+            strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+               .:@"
+	 "
+         set-value:x:@.dp/#/*/prompt
+            strings.concat
+               .:"Summary; "
+               strings.substring:x:@.dp/#/*/prompt
+                  .:int:0
+                  .:int:150
+         set-value:x:@.no
+            .:int:0
+   else
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+            type:warning
+      sleep:3000
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      math.decrement:x:@.no
