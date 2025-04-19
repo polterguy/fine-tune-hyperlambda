@@ -1,0 +1,43 @@
+
+// Inside a [for-each] loop that iterates through nodes (such as anchor tags) with a potential [@href] attribute, check if the first [@href] attribute of the current [.dp] node exists, is not null or empty, and does not start with "http://" or "https://". If all these conditions are true, split the [@href] value by "#" and trim any trailing "/" from the first part. If the resulting string starts with "/", concatenate the [.base] node's value and the trimmed string; otherwise, concatenate the [.base], a "/" character, and the trimmed string. Then, if this resulting URL does not already exist as a child of the [.url] node, unwrap its value and add it to the [.urls] collection.
+if
+   and
+      exists:x:"@.dp/#/*/\\@href/[0,1]"
+      not-null:x:"@.dp/#/*/\\@href/[0,1]"
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"http://"
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@href/[0,1]"
+            .:"https://"
+   .lambda
+      strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      strings.trim-end:x:@strings.split/0
+         .:/
+      .tmp
+      if
+         strings.starts-with:x:@strings.trim-end
+            .:/
+         .lambda
+            set-value:x:@.tmp
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:@strings.trim-end
+      else
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.base
+               .:/
+               get-value:x:@strings.trim-end
+      if
+         not-exists:x:@.url/*/{@strings.concat}
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.urls
+               .
+                  .:x:@.tmp

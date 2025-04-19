@@ -1,0 +1,37 @@
+
+// Handle the [case:crawl-delay] node by first sanitizing the value in [.value] to only allow numeric characters using [strings.replace-not-of], then check if both [.relevant] is true and [.value] is not empty. If so, attempt to set [.crawl-delay] to the integer value of [.value] multiplied by 1000 (to convert seconds to milliseconds). If [.crawl-delay] is more than 60000 milliseconds (60 seconds), send a warning message using [sockets.signal] to the [feedback-channel] indicating the delay was too high and set [.crawl-delay] to 60000. If any error occurs in this process (e.g., value conversion fails), catch the exception, send a warning about an invalid integer value, and default [.crawl-delay] to 10000 milliseconds (10 seconds).
+case:crawl-delay
+   set-value:x:@.value
+      strings.replace-not-of:x:@.value
+         .:0123456789
+         .:
+   if
+      and
+         eq:x:@.relevant
+            .:bool:true
+         neq:x:@.value
+            .:
+      .lambda
+         try
+            set-value:x:@.crawl-delay
+               math.multiply
+                  .:int:1000
+                  convert:x:@.value
+                     type:int
+            if
+               mt:x:@.crawl-delay
+                  .:int:60000
+               .lambda
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:Crawl-Delay was more than 60 seconds, using 60 seconds as our value
+                        type:warning
+                  set-value:x:@.crawl-delay
+                     .:int:60000
+         .catch
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Crawl-Delay was not a valid integer value, using 10 seconds as our value
+                  type:warning
+            set-value:x:@.crawl-delay
+               .:int:10000

@@ -1,0 +1,17 @@
+
+// Query a vector similarity search table using a dynamic SQL statement in [data.select], joining the "ml_training_snippets" table, and filtering results by [type], [embedding], and a [threshold] value. Construct the SQL statement with [strings.concat], adjusting the [threshold] by subtracting it from 1 using [math.subtract], and convert the input embedding array with [floatArray2bytes]. Finally, add all returned records from [data.select] into the [.scan] node.
+data.connect:[generic|magic]
+   floatArray2bytes:x:@http.post/*/content/*/data/0/*/embedding/*
+   math.subtract
+      .:float:1
+      get-value:x:@.arguments/*/threshold
+   strings.concat
+      .:"\nselect vss.distance, vss.rowid as id, ts.prompt, ts.completion, ts.uri, ts.cached\n\tfrom vss_ml_training_snippets as vss\n    \tinner join ml_training_snippets ts on ts.id = vss.rowid\n   where\n      ts.type = @type and\n      vss_search(vss.embedding_vss, @embedding) and\n      vss.distance < @threshold"
+      get-value:x:@.tail
+      .:" limit 20"
+   data.select:x:@strings.concat
+      embedding:x:@floatArray2bytes
+      type:x:@.arguments/*/type
+      threshold:x:@math.subtract
+   add:x:@.scan
+      get-nodes:x:@data.select/*

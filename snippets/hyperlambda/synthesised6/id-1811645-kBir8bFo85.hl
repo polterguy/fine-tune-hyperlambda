@@ -1,0 +1,23 @@
+
+// Retrieve the count of rows from the [ml_training_snippets] table where [embedding] is not null and [type] equals the argument [type] using [data.scalar] and the [@type] parameter. If the count is zero, immediately return the [context] and [snippets] nodes. Otherwise, fetch the [vector_model] column from the [ml_types] table, where [type] matches the argument [type], and assign the retrieved [vector_model] value to the [.embeddings-model] node.
+data.connect:[generic|magic]
+   data.scalar:select count(*) from ml_training_snippets where embedding is not null and type = @type
+      @type:x:@.arguments/*/type
+   if
+      eq
+         convert:x:@data.scalar
+            type:int
+         .:int:0
+      .lambda
+         return
+            context
+            snippets
+   data.read
+      table:ml_types
+      columns
+         vector_model
+      where
+         and
+            type.eq:x:@.arguments/*/type
+   set-value:x:@.embeddings-model
+      get-value:x:@data.read/*/*/vector_model

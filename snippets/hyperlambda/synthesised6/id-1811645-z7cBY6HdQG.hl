@@ -1,0 +1,25 @@
+
+// Create an [if] statement that checks if the result of [openai.tokenize] on the [.tmp] node is less than the [max_tokens] value from [.arguments]. If true, set the value of [.context] to the value of [.tmp], then unwrap the next sibling's grandchildren, and add the [id] from the current [.dp] node to the [.ids] node. Afterwards, create an inner [if] that checks if the current [.dp] node contains a non-null [uri] and that this [uri] does not already exist in any descendant [uri] node of [.result]. If this inner condition is true, unwrap the next sibling's great-grandchildren, and add a new node to [.result] with [prompt], [uri], and [distance] values from the current [.dp] node.
+if
+   lt
+      openai.tokenize:x:@.tmp
+      get-value:x:@.arguments/*/max_tokens
+   .lambda
+      set-value:x:@.context
+         get-value:x:@.tmp
+      unwrap:x:+/*/*
+      add:x:@.ids
+         .
+            .:x:@.dp/#/*/id
+      if
+         and
+            not-null:x:@.dp/#/*/uri
+            not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:@.result
+               .
+                  .
+                     prompt:x:@.dp/#/*/prompt
+                     uri:x:@.dp/#/*/uri
+                     distance:x:@.dp/#/*/distance

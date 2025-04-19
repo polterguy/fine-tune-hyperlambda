@@ -1,0 +1,44 @@
+
+// If the HTTP POST result is not a successful status code (i.e., not greater than or equal to 200 and less than 300), increment the [.failed] node, convert the [http.post] response to Hyperlambda using [lambda2hyper], and log an error with the error message extracted from [http.post/*/content/*/error/*/message] and the converted error. Then, concatenate and send a warning signal to the feedback channel containing the prompt that failed. If the HTTP status code is 429 or 500, send an informational signal to the feedback channel that the system will pause for 5 seconds, then sleep for 5 seconds. Otherwise, send an error message to [magic.backend.message] for the root role, abort the vectorization process by setting [.continue] to false.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      math.increment:x:@.failed
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         error:x:@lambda2hyper
+      strings.concat
+         .:"OpenAI failed, could not create vectors for '"
+         get-value:x:@.dp/#/*/prompt
+         .:"'"
+      unwrap:x:+/*/args/*/message
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:warning
+      if
+         or
+            eq:x:@http.post
+               .:int:429
+            eq:x:@http.post
+               .:int:500
+         .lambda
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Continuing in 5 seconds with the next snippet to let OpenAI cool down first
+                  type:info
+            sleep:5000
+      else
+         sockets.signal:magic.backend.message
+            roles:root
+            args
+               message:Could not vectorize snippet and it was a non-transitional error, aborting vectorization for type
+               type:error
+         set-value:x:@.continue
+            .:bool:false

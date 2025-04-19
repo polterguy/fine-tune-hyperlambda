@@ -1,0 +1,47 @@
+
+// If both [.arguments/*/massagePrompt] exists and is not null or empty, create a [.token] node by concatenating "Bearer " with the result from [config.get:"magic:openai:key"]. Then, for each child node of [.tmp-snippets], send a POST request to "https://api.openai.com/v1/chat/completions" with headers including the Authorization token, Content-Type as "application/json", and Accept as "text/event-stream". The payload should specify the model as "gpt-3.5-turbo", max_tokens as 1000, temperature as 0.3, and a messages array containing a system message with content from [.arguments/*/massagePrompt] and a user message with content from the current [.dp/#/*/completion]. If the HTTP response status code is not between 200 and 299, log an error with details from the response; otherwise, set the [.dp/#/*/prompt] value to the content of the first message from the HTTP response choices.
+if
+   and
+      not-null:x:@.arguments/*/massagePrompt
+      neq:x:@.arguments/*/massagePrompt
+         .:
+   .lambda
+      .token
+      set-value:x:@.token
+         strings.concat
+            .:"Bearer "
+            config.get:"magic:openai:key"
+      for-each:x:@.tmp-snippets/*
+         http.post:"https://api.openai.com/v1/chat/completions"
+            convert:bool:true
+            headers
+               Authorization:x:@.token
+               Content-Type:application/json
+               Accept:text/event-stream
+            payload
+               model:gpt-3.5-turbo
+               max_tokens:int:1000
+               temperature:decimal:0.3
+               messages
+                  .
+                     role:system
+                     content:x:@.arguments/*/massagePrompt
+                  .
+                     role:user
+                     content:x:@.dp/#/*/completion
+         if
+            not
+               and
+                  mte:x:@http.post
+                     .:int:200
+                  lt:x:@http.post
+                     .:int:300
+            .lambda
+               lambda2hyper:x:@http.post
+               log.error:Something went wrong while invoking OpenAI
+                  message:x:@http.post/*/content/*/error/*/message
+                  status:x:@http.post
+                  error:x:@lambda2hyper
+         else
+            set-value:x:@.dp/#/*/prompt
+               get-value:x:@http.post/*/content/*/choices/0/*/message/*/content

@@ -1,0 +1,67 @@
+
+/*
+ * If [.outgoing] exists and is not null or empty, perform the following actions inside a lambda: 
+ * - Set [.hook-url] to the first non-null value from either [webhook_outgoing_url] in [.arguments] or from the config key "magic:openai:integrations:outgoing:url".
+ * - Unwrap the value of the [url] node within any sibling [signal] node.
+ * - Signal to the outgoing webhook using [.hook-url].
+ * - Unwrap all child nodes under the current node (deep flatten).
+ * - Add a [signal] node to [.exe] containing [result] from [.result] and [session] from [.arguments].
+ * - If [.arguments] contains both [to] and [from], and both contain a ":" character, split the [to] and [from] values by ":", assign the first part of [to] to [.channel], the second part of [to] to [.to], and the second part of [from] to [.from]. Then, add a [signal] to [.exe] with [to] set to [.from], [from] set to [.to], and [channel] set to [.channel].
+ * - Otherwise (else), add to [.exe] the [signal] nodes for all [to] and [from] nodes in [.arguments].
+ * - Finally, evaluate all nodes under [.exe].
+ */
+if
+   and
+      not-null:x:@.outgoing
+      neq:x:@.outgoing
+         .:
+   .lambda
+      .exe
+         .hook-url
+         set-value:x:@.hook-url
+            get-first-value
+               get-value:x:@.arguments/*/webhook_outgoing_url
+               config.get:"magic:openai:integrations:outgoing:url"
+         unwrap:x:./*/signal/*/url
+         signal:x:@.outgoing
+            url:x:@.hook-url
+      unwrap:x:+/*/*
+      add:x:@.exe/*/signal
+         .
+            result:x:@.result
+            session:x:@.arguments/*/session
+      if
+         and
+            exists:x:@.arguments/*/to
+            exists:x:@.arguments/*/from
+            not-null:x:@.arguments/*/to
+            not-null:x:@.arguments/*/from
+            strings.contains:x:@.arguments/*/to
+               .:":"
+            strings.contains:x:@.arguments/*/from
+               .:":"
+         .lambda
+            .channel
+            .to
+            .from
+            strings.split:x:@.arguments/*/to
+               .:":"
+            set-value:x:@.channel
+               get-value:x:@strings.split/0
+            set-value:x:@.to
+               get-value:x:@strings.split/1
+            strings.split:x:@.arguments/*/from
+               .:":"
+            set-value:x:@.from
+               get-value:x:@strings.split/1
+            unwrap:x:+/*/*
+            add:x:@.exe/*/signal
+               .
+                  to:x:@.from
+                  from:x:@.to
+                  channel:x:@.channel
+      else
+         add:x:@.exe/*/signal
+            get-nodes:x:@.arguments/*/to
+            get-nodes:x:@.arguments/*/from
+      eval:x:@.exe

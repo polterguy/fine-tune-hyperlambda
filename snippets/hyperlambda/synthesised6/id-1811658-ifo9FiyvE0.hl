@@ -1,0 +1,25 @@
+
+// Create a conditional block that checks if the [.relevant] node is true. If it is, then check if the [.value] node starts with either "http://" or "https://". If so, unwrap the next-nested node, and add the value of [.value] to the [.allow] node. Otherwise, concatenate the values of [.domain] and [.value], unwrap the next-nested node, and add the result to the [.allow] node.
+if
+   eq:x:@.relevant
+      .:bool:true
+   .lambda
+      if
+         or
+            strings.starts-with:x:@.value
+               .:"http://"
+            strings.starts-with:x:@.value
+               .:"https://"
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.allow
+               .
+                  .:x:@.value
+      else
+         strings.concat
+            get-value:x:@.domain
+            get-value:x:@.value
+         unwrap:x:+/*/*
+         add:x:@.allow
+            .
+               .:x:@strings.concat

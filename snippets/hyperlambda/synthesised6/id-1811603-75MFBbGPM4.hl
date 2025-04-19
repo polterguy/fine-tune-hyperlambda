@@ -1,0 +1,40 @@
+
+// Create a conditional workflow that checks if [.auto_destruct] is true. If so, send an informational message to the feedback channel indicating a scheduled task will delete the chatbot in 7 days. Wait briefly, then calculate the date 7 days from now by adding 7 days to the current date. Create a task name by concatenating "delete-chatbot-" with the value of [.type]. Unwrap and assign values for [.task] and [.type] from their respective nodes. Use [tasks.create] to define a new task with the generated name and description, and schedule it to run at the computed date. Inside the task's lambda, perform the following actions: store [.type], connect to the database and delete relevant rows from [ml_training_snippets] where type matches, store [.task], connect again to delete entries from [ml_types] where type matches, build a file path by concatenating "/etc/www/", [.type], and ".html", delete the corresponding file, log that the demo chatbot was deleted including the type, and finally delete the scheduled task itself using [tasks.delete].
+if:x:@.auto_destruct
+   sockets.signal:x:@.feedback-channel
+      args
+         message:Creating scheduled task that deletes chatbot 7 days from now
+         type:info
+   sleep:100
+   math.add
+      date.now
+      time
+         days:7
+   strings.concat
+      .:delete-chatbot-
+      get-value:x:@.type
+   unwrap:x:+/+/*/.lambda/*/.task
+   unwrap:x:+/*/.lambda/*/.type
+   tasks.create:x:@strings.concat
+      description:Deletes demo chatbot 7 days after creating it
+      due:x:@math.add
+      .lambda
+         .type:x:@.type
+         data.connect:[generic|magic]
+            data.execute:"\ndelete from vss_ml_training_snippets\n   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+               type:x:@.type
+         .task:x:@strings.concat
+         data.connect:[generic|magic]
+            data.delete
+               table:ml_types
+               where
+                  and
+                     type.eq:x:@.type
+         strings.concat
+            .:/etc/www/
+            get-value:x:@.type
+            .:.html
+         io.file.delete:x:@strings.concat
+         log.info:Demo chatbot was deleted
+            type:x:@.type
+         tasks.delete:x:@.task

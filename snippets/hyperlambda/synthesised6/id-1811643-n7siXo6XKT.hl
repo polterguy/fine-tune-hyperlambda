@@ -1,0 +1,33 @@
+
+// Create a conditional block using [if] that verifies all of the following using [and]: authentication ticket exists ([auth.ticket.get]), the [recaptcha] value from [.model] (converted to decimal) is more than 0 ([mt]), and [recaptcha] is not null ([not-null]). If this is true, then inside the [.lambda] block, check with [if] and [or] if [recaptcha_response] is either not supplied ([not-exists]) or is null ([null]) in [.arguments]; if so, set the response status to 499 and return an error message. Otherwise, retrieve the reCAPTCHA [site-key] and [secret] from configuration using [config.get], convert the [.model] [recaptcha] value to decimal, and call [validators.recaptcha] on the [recaptcha_response] argument, passing in the minimum value, site key, and secret as arguments, all retrieved earlier.
+if
+   and
+      eq
+         auth.ticket.get
+         .
+      mt
+         convert:x:@.model/*/recaptcha
+            type:decimal
+         .:decimal:0
+      not-null:x:@.model/*/recaptcha
+   .lambda
+      if
+         or
+            not-exists:x:@.arguments/*/recaptcha_response
+            null:x:@.arguments/*/recaptcha_response
+         .lambda
+            response.status.set:499
+            return
+               error:No reCAPTCHA supplied
+      .key
+      set-value:x:@.key
+         config.get:"magic:auth:recaptcha:key"
+      .secret
+      set-value:x:@.secret
+         config.get:"magic:auth:recaptcha:secret"
+      convert:x:@.model/*/recaptcha
+         type:decimal
+      validators.recaptcha:x:@.arguments/*/recaptcha_response
+         min:x:@convert
+         site-key:x:@.key
+         secret:x:@.secret

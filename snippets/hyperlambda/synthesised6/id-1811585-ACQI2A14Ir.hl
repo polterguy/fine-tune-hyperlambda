@@ -1,0 +1,75 @@
+
+// Parse the text content from all [#text] descendant nodes of the current [h6] node, trim whitespace and concatenate them into a single string with spaces. Store the result in [.prompt]. Based on the heading level returned by [get-name], populate the appropriate [.page-header] heading node (h1-h6) with the prompt, and clear all lower-level headers. Then, for each non-empty header in [.page-header], prepend its value (with a " - " separator) to [.prompt]. Normalize whitespace in [.prompt] by replacing double spaces with single spaces and trimming any trailing " -". Unwrap and add the resulting [.prompt] as a [prompt] node inside a new snippet object to the [.snippets] node.
+case:h6
+   .prompt:
+   for-each:x:"@.dp/#/**/\\#text"
+      set-value:x:@.prompt
+         strings.concat
+            get-value:x:@.prompt
+            strings.trim:x:@.dp/#
+               .:@"  
+	"
+            .:" "
+   set-value:x:@.prompt
+      strings.trim:x:@.prompt
+         .:" "
+   switch:x:@get-name
+      case:h1
+         set-value:x:@.page-header/*/h1
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h2
+         set-value:x:@.page-header/*/h3
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h2
+         set-value:x:@.page-header/*/h2
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h3
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h3
+         set-value:x:@.page-header/*/h3
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h4
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h4
+         set-value:x:@.page-header/*/h4
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h5
+         set-value:x:@.page-header/*/h6
+      case:h5
+         set-value:x:@.page-header/*/h5
+            get-value:x:@.prompt
+         set-value:x:@.page-header/*/h6
+      case:h6
+         set-value:x:@.page-header/*/h6
+            get-value:x:@.prompt
+   set-value:x:@.prompt
+      .:
+   for-each:x:@.page-header/*
+      if
+         and
+            not-null:x:@.dp/#
+            neq:x:@.dp/#
+               .:
+         .lambda
+            set-value:x:@.prompt
+               strings.concat
+                  get-value:x:@.dp/#
+                  .:" - "
+                  get-value:x:@.prompt
+   set-value:x:@.prompt
+      strings.replace:x:@.prompt
+         .:"  "
+         .:" "
+   set-value:x:@.prompt
+      strings.trim-end:x:@.prompt
+         .:" -"
+   unwrap:x:+/*/*/*
+   add:x:@.snippets
+      .
+         .
+            prompt:x:@.prompt

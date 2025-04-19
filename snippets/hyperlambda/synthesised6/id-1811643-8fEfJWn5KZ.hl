@@ -1,0 +1,35 @@
+
+// Create a conditional block using [if] that checks multiple conditions using [and]: ensure that both [.to] and [.from] nodes exist inside [.arguments], are not null, and each contains a ":" character using [strings.contains]. If all conditions pass, inside the [.lambda] block, split the values of [.to] and [.from] by ":", assign the first part of [.to] to [.channel] and the second part of each to [.to] and [.from] respectively. Then, add nodes from [.prompt] and [.session] under [signal] inside [.exe], unwrap all immediate children of the next sibling node, and finally add a new [signal] node to [.exe] containing the prepared values for [to], [from], and [channel].
+if
+   and
+      exists:x:@.arguments/*/to
+      exists:x:@.arguments/*/from
+      not-null:x:@.arguments/*/to
+      not-null:x:@.arguments/*/from
+      strings.contains:x:@.arguments/*/to
+         .:":"
+      strings.contains:x:@.arguments/*/from
+         .:":"
+   .lambda
+      .channel
+      .to
+      .from
+      strings.split:x:@.arguments/*/to
+         .:":"
+      set-value:x:@.channel
+         get-value:x:@strings.split/0
+      set-value:x:@.to
+         get-value:x:@strings.split/1
+      strings.split:x:@.arguments/*/from
+         .:":"
+      set-value:x:@.from
+         get-value:x:@strings.split/1
+      add:x:@.exe/*/signal
+         get-nodes:x:@.arguments/*/prompt
+         get-nodes:x:@.arguments/*/session
+      unwrap:x:+/*/*
+      add:x:@.exe/*/signal
+         .
+            to:x:@.to
+            from:x:@.from
+            channel:x:@.channel

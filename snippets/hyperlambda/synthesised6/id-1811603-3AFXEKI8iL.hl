@@ -1,0 +1,35 @@
+
+/*
+ * Create a scheduled task using [tasks.create] with an ID that is the result of a [strings.concat] expression. Add a [description] that indicates the task will delete a demo chatbot 7 days after creation. Use a [due] argument set by a [math.add] expression. Inside the [.lambda] of the task, perform the following steps:
+ * - Set a [.type] node from the current [.type].
+ * - Connect to the [generic|magic] database and execute a SQL delete statement on the [vss_ml_training_snippets] table where the type matches [.type], using [data.execute] with a parameterized query.
+ * - Set a [.task] node using a [strings.concat] expression.
+ * - Connect to the [generic|magic] database again and delete records from the [ml_types] table where the [type] field equals [.type], using [data.delete] with a [where] clause.
+ * - Concatenate the string "/etc/www/", the value of [.type], and ".html" using [strings.concat].
+ * - Use [io.file.delete] to delete the file with the path resulting from the previous [strings.concat].
+ * - Log an info message stating "Demo chatbot was deleted" and include the [.type].
+ * - Use [tasks.delete] to delete the task with the ID stored in [.task].
+ */
+tasks.create:x:@strings.concat
+   description:Deletes demo chatbot 7 days after creating it
+   due:x:@math.add
+   .lambda
+      .type:x:@.type
+      data.connect:[generic|magic]
+         data.execute:"\ndelete from vss_ml_training_snippets\n   where rowid in (select id as rowid from ml_training_snippets where type = @type)"
+            type:x:@.type
+      .task:x:@strings.concat
+      data.connect:[generic|magic]
+         data.delete
+            table:ml_types
+            where
+               and
+                  type.eq:x:@.type
+      strings.concat
+         .:/etc/www/
+         get-value:x:@.type
+         .:.html
+      io.file.delete:x:@strings.concat
+      log.info:Demo chatbot was deleted
+         type:x:@.type
+      tasks.delete:x:@.task

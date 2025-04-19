@@ -1,0 +1,69 @@
+
+/*
+ * Iterate through all child nodes of [urls] inside the [signal] node. For each URL, attempt the following: 
+ * 
+ * 1. Send an info-type signal to the feedback channel specified in [.arguments/*/feedback-channel] containing a long separator line as a message. 
+ * 2. Sleep for 100 milliseconds.
+ * 3. Unwrap and evaluate the next sibling node.
+ * 4. Signal the [magic.ai.url.scrape] slot, passing in the current URL (from [.dp/#]), and forward additional arguments such as [type], [threshold], [summarize], [feedback-channel], [images], [lists], [code], and [insert_url] from [.arguments].
+ * 5. If the current URL is not the first one in the list (compare [.dp/#] with the previous sibling of the first [urls] node), then:
+ *    - Concatenate a message indicating the script is waiting for a number of seconds (calculated by dividing [.arguments/*/delay] by 1000).
+ *    - Unwrap and evaluate the result.
+ *    - Send the waiting message to the feedback channel as an info-type signal.
+ *    - Sleep for 100 milliseconds, then sleep for the delay duration specified in [.arguments/*/delay].
+ * 6. If any exception occurs during processing:
+ *    - Log an error indicating the URL could not be scraped, including the URL and the error message.
+ *    - Concatenate a warning message with the error details.
+ *    - Unwrap and evaluate the result.
+ *    - Send a warning-type signal with the error message to the feedback channel, specifying the [roles] as "root".
+ *    - Sleep for 100 milliseconds after sending the warning.
+ */
+for-each:x:@signal/*/urls/*
+   try
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:------------------------------------------------------------------------------------------------------------------------
+            type:info
+      sleep:100
+      unwrap:x:+/*
+      signal:magic.ai.url.scrape
+         url:x:@.dp/#
+         type:x:@.arguments/*/type
+         threshold:x:@.arguments/*/threshold
+         summarize:x:@.arguments/*/summarize
+         feedback-channel:x:@.arguments/*/feedback-channel
+         images:x:@.arguments/*/images
+         lists:x:@.arguments/*/lists
+         code:x:@.arguments/*/code
+         insert_url:x:@.arguments/*/insert_url
+      if
+         neq:x:@.dp/#
+            get-value:x:@signal/@signal/*/urls/0/-
+         .lambda
+            strings.concat
+               .:"Waiting for "
+               math.divide:x:@.arguments/*/delay
+                  .:int:1000
+               .:" seconds to avoid exhausting web server"
+            unwrap:x:+/**
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:info
+            sleep:100
+            sleep:x:@.arguments/*/delay
+   .catch
+      log.error:Could not scrape URL
+         url:x:@.dp/#
+         message:x:@.arguments/*/message
+      strings.concat
+         .:"Could not scrape URL, error was: '"
+         get-value:x:@.arguments/*/message
+         .:"'"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/@.arguments/*/feedback-channel
+         roles:root
+         args
+            message:x:@strings.concat
+            type:warning
+      sleep:100

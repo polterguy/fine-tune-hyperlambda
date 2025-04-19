@@ -1,0 +1,87 @@
+
+/*
+ * Create Hyperlambda code that generates an image reference in markdown format, dynamically constructing the image URL based on the provided [.dp/#/*/\@src/[0,1]] value and a [.base] node. The code should:
+ * 
+ * - Check that [.dp/#/*/\@src/[0,1]] exists, is not null, and is not empty using [exists], [not-null], and [neq].
+ * - Initialize a [.url] node.
+ * - If [.dp/#/*/\@src/[0,1]] does NOT start with "http://" or "https://":
+ *   - If it starts with "://", split [.base] by "://", and concatenate the protocol part, ":", and the src value to form the URL.
+ *   - Else if it starts with "/", concatenate [.base] and the src value.
+ *   - Else, concatenate [.base], "/", and the src value.
+ * - Else, simply assign the src value to [.url].
+ * - If [@.snippets/0/-/*/completion] exists, append a markdown image string to its value, using [get-first-value] to retrieve the alt text from [.dp/#/*/\@alt/[0,1]] (defaulting to "Image "), and the generated [.url].
+ * - Else, create a new snippet with a [completion] node containing the markdown image string. Use [unwrap] to evaluate expressions and [add] to insert this into [@.snippets/0/-].
+ */
+if
+   and
+      exists:x:"@.dp/#/*/\\@src/[0,1]"
+      not-null:x:"@.dp/#/*/\\@src/[0,1]"
+      neq:x:"@.dp/#/*/\\@src/[0,1]"
+         .:
+   .lambda
+      .url
+      if
+         and
+            not
+               strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                  .:"http://"
+            not
+               strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                  .:"https://"
+         .lambda
+            if
+               strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                  .://
+               .lambda
+                  strings.split:x:@.base
+                     .:"://"
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@strings.split/0
+                        .:":"
+                        get-value:x:"@.dp/#/*/\\@src/[0,1]"
+            else-if
+               strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                  .:/
+               .lambda
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        get-value:x:"@.dp/#/*/\\@src/[0,1]"
+            else
+               set-value:x:@.url
+                  strings.concat
+                     get-value:x:@.base
+                     .:/
+                     get-value:x:"@.dp/#/*/\\@src/[0,1]"
+      else
+         set-value:x:@.url
+            get-value:x:"@.dp/#/*/\\@src/[0,1]"
+      if
+         exists:x:@.snippets/0/-/*/completion
+         .lambda
+            set-value:x:@.snippets/0/-/*/completion
+               strings.concat
+                  get-value:x:@.snippets/0/-/*/completion
+                  .:@"
+
+!["
+                  get-first-value
+                     get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                     .:"Image "
+                  .:](
+                  get-value:x:@.url
+                  .:)
+      else
+         strings.concat
+            .:![
+            get-first-value
+               get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+               .:"Image "
+            .:](
+            get-value:x:@.url
+            .:)
+         unwrap:x:+/*/*
+         add:x:@.snippets/0/-
+            .
+               completion:x:@strings.concat

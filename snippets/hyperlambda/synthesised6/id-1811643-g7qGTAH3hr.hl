@@ -1,0 +1,50 @@
+
+// If there are no child nodes under [data.read], read the "ml_types" table with the specified list of columns and a condition where "type" equals "default". If reading the table still results in no data, throw an exception with a 400 status indicating that neither the specified type nor a default type was found. Otherwise, add all fields from the data read into the [.model] node, and set the value of [.arguments] node's [type] child to "default".
+if
+   not-exists:x:@data.read/*
+   .lambda
+      data.read
+         table:ml_types
+         columns
+            model
+            max_tokens
+            max_context_tokens
+            max_request_tokens
+            temperature
+            recaptcha
+            auth
+            supervised
+            cached
+            prefix
+            use_embeddings
+            threshold
+            vector_model
+            contact_us
+            lead_email
+            api_key
+            webhook_incoming
+            webhook_outgoing
+            webhook_incoming_url
+            webhook_outgoing_url
+            system_message
+            initial_questionnaire
+            no_requests
+            max_requests
+            session_timeout
+            search_postfix
+            max_function_invocations
+            max_session_items
+            completion_slot
+         where
+            and
+               type.eq:default
+      if
+         not-exists:x:@data.read/*
+         .lambda
+            throw:No such type, and no default type was found
+               status:int:400
+               public:bool:true
+      add:x:@.model
+         get-nodes:x:@data.read/*/*
+      set-value:x:@.arguments/*/type
+         .:default

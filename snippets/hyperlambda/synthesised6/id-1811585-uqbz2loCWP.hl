@@ -1,0 +1,33 @@
+
+/*
+ * Create an [else-if] branch that checks multiple conditions using [and]: 
+ * - The expression `@.dp/#/*/\@href/[0,1]` must yield at least one node ([exists]), 
+ * - At least one of these nodes must be non-null ([not-null]), 
+ * - The value of these nodes must not be "#" ([neq]), 
+ * - The value must not be an empty string ([neq]).
+ * If all conditions pass, execute a lambda that:
+ * - Splits the value of the first [@href] node using [strings.split] with "#" as the delimiter,
+ * - Trims the trailing slash from the first part of the split result using [strings.trim-end] with "/" as the character to trim,
+ * - Uses [if] and [not-exists] to check if the trimmed value does not already exist as a child of [.urls], and
+ * - If it does not exist, uses [unwrap] to forward-evaluate the trimmed value and [add] to insert it as a new child node into [.urls].
+ */
+else-if
+   and
+      exists:x:"@.dp/#/*/\\@href/[0,1]"
+      not-null:x:"@.dp/#/*/\\@href/[0,1]"
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      neq:x:"@.dp/#/*/\\@href/[0,1]"
+         .:
+   .lambda
+      strings.split:x:"@.dp/#/*/\\@href/[0,1]"
+         .:#
+      strings.trim-end:x:@strings.split/0
+         .:/
+      if
+         not-exists:x:"@.urls/*/\"{@strings.split/0}\""
+         .lambda
+            unwrap:x:+/*/*
+            add:x:@.urls
+               .
+                  .:x:@strings.trim-end

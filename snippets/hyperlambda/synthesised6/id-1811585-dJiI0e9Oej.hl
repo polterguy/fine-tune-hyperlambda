@@ -1,0 +1,83 @@
+
+/*
+ * Handle the [img] case by checking if the [@src] attribute exists, is not null, and is not empty in the current [.dp] node. If so, generate a [.url] node that computes the absolute image URL:  
+ * - If [@src] starts with "http://" or "https://", use it directly.  
+ * - If it starts with "://", prefix it with the scheme from [.base].  
+ * - If it starts with "/", concatenate [.base] and [@src].  
+ * - Otherwise, concatenate [.base], "/", and [@src].  
+ * Then, if a [completion] node exists in the previous snippet, append a Markdown image tag using the computed [.url] and [@alt] (defaulting to "Image " if missing). Otherwise, create a new completion snippet with the Markdown image tag.
+ */
+case:img
+   if
+      and
+         exists:x:"@.dp/#/*/\\@src/[0,1]"
+         not-null:x:"@.dp/#/*/\\@src/[0,1]"
+         neq:x:"@.dp/#/*/\\@src/[0,1]"
+            .:
+      .lambda
+         .url
+         if
+            and
+               not
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:"http://"
+               not
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:"https://"
+            .lambda
+               if
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .://
+                  .lambda
+                     strings.split:x:@.base
+                        .:"://"
+                     set-value:x:@.url
+                        strings.concat
+                           get-value:x:@strings.split/0
+                           .:":"
+                           get-value:x:"@.dp/#/*/\\@src/[0,1]"
+               else-if
+                  strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+                     .:/
+                  .lambda
+                     set-value:x:@.url
+                        strings.concat
+                           get-value:x:@.base
+                           get-value:x:"@.dp/#/*/\\@src/[0,1]"
+               else
+                  set-value:x:@.url
+                     strings.concat
+                        get-value:x:@.base
+                        .:/
+                        get-value:x:"@.dp/#/*/\\@src/[0,1]"
+         else
+            set-value:x:@.url
+               get-value:x:"@.dp/#/*/\\@src/[0,1]"
+         if
+            exists:x:@.snippets/0/-/*/completion
+            .lambda
+               set-value:x:@.snippets/0/-/*/completion
+                  strings.concat
+                     get-value:x:@.snippets/0/-/*/completion
+                     .:@"
+
+!["
+                     get-first-value
+                        get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                        .:"Image "
+                     .:](
+                     get-value:x:@.url
+                     .:)
+         else
+            strings.concat
+               .:![
+               get-first-value
+                  get-value:x:"@.dp/#/*/\\@alt/[0,1]"
+                  .:"Image "
+               .:](
+               get-value:x:@.url
+               .:)
+            unwrap:x:+/*/*
+            add:x:@.snippets/0/-
+               .
+                  completion:x:@strings.concat

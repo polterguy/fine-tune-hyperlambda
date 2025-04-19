@@ -1,0 +1,47 @@
+
+/*
+ * Create a [try] block that performs the following steps: 
+ * 
+ * 1. Sends an informational message through [sockets.signal] using the [feedback-channel] argument, where the message is a long dashed line and type is "info".
+ * 2. Waits for 100 milliseconds with [sleep].
+ * 3. Unwraps the values of all sibling nodes after the current node.
+ * 4. Signals the [magic.ai.url.scrape] slot, passing in arguments for [url], [type], [threshold], [summarize], [feedback-channel], [images], [lists], [code], and [insert_url], each taken from corresponding nodes in [.arguments] or the currently iterated node.
+ * 5. If the result of the previous operation is not equal to the value found at `@signal/@signal/*/urls/0/-`, execute a lambda that:
+ *    - Concatenates the string "Waiting for ", the result of dividing the [delay] argument by 1000 (to get seconds), and the string " seconds to avoid exhausting web server" using [strings.concat] and [math.divide].
+ *    - Unwraps the values of all descendant sibling nodes.
+ *    - Sends another informational message through [sockets.signal] with the constructed message.
+ *    - Waits for 100 milliseconds, then sleeps for the duration specified by the [delay] argument.
+ */
+try
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:------------------------------------------------------------------------------------------------------------------------
+         type:info
+   sleep:100
+   unwrap:x:+/*
+   signal:magic.ai.url.scrape
+      url:x:@.dp/#
+      type:x:@.arguments/*/type
+      threshold:x:@.arguments/*/threshold
+      summarize:x:@.arguments/*/summarize
+      feedback-channel:x:@.arguments/*/feedback-channel
+      images:x:@.arguments/*/images
+      lists:x:@.arguments/*/lists
+      code:x:@.arguments/*/code
+      insert_url:x:@.arguments/*/insert_url
+   if
+      neq:x:@.dp/#
+         get-value:x:@signal/@signal/*/urls/0/-
+      .lambda
+         strings.concat
+            .:"Waiting for "
+            math.divide:x:@.arguments/*/delay
+               .:int:1000
+            .:" seconds to avoid exhausting web server"
+         unwrap:x:+/**
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:info
+         sleep:100
+         sleep:x:@.arguments/*/delay

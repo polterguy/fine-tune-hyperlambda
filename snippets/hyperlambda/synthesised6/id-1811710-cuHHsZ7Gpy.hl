@@ -1,0 +1,53 @@
+
+/*
+ * Inside an [else] branch, create two separate [if] statements. 
+ * 
+ * The first [if] should check that both a [done_reason] node exists and is not null inside the children of the [json2lambda] node. If so, set the [.finish_reason] node to the value of [done_reason], then unwrap and evaluate all children of the next sibling node, and finally send a socket signal to the session found in [.session], passing an [args] object with a [finish_reason] argument equal to [.finish_reason].
+ * 
+ * The second [if] should check that the [content] node under [message] (itself under [json2lambda]) is not null and not equal to an empty string. If true, concatenate the [content] value to [.result]. Then, use a nested [if] to check that [.result] does not contain the substring "___". If so, unwrap and evaluate the next sibling node and send a socket signal to [.session], passing an [args] object with a [message] argument equal to the [content] value.
+ * 
+ * Otherwise, use an [else-if] to check if [.result] contains the substring "FUNCTION_INVOCATION[" and [.has-sent-waiting] is not true. If so, send a socket signal to [.session] with an [args] object containing [function_waiting]:true, and set [.has-sent-waiting] to true.
+ */
+else
+   if
+      and
+         exists:x:@json2lambda/*/done_reason
+         not-null:x:@json2lambda/*/done_reason
+      .lambda
+         set-value:x:@.finish_reason
+            get-value:x:@json2lambda/*/done_reason
+         unwrap:x:+/*/*
+         sockets.signal:x:@.session
+            args
+               finish_reason:x:@.finish_reason
+   if
+      and
+         not-null:x:@json2lambda/*/message/*/content
+         neq:x:@json2lambda/*/message/*/content
+            .:
+      .lambda
+         set-value:x:@.result
+            strings.concat
+               get-value:x:@.result
+               get-value:x:@json2lambda/*/message/*/content
+         if
+            not
+               strings.contains:x:@.result
+                  .:___
+            .lambda
+               unwrap:x:+/*/*
+               sockets.signal:x:@.session
+                  args
+                     message:x:@json2lambda/*/message/*/content
+         else-if
+            and
+               strings.contains:x:@.result
+                  .:FUNCTION_INVOCATION[
+               neq:x:@.has-sent-waiting
+                  .:bool:true
+            .lambda
+               sockets.signal:x:@.session
+                  args
+                     function_waiting:bool:true
+               set-value:x:@.has-sent-waiting
+                  .:bool:true

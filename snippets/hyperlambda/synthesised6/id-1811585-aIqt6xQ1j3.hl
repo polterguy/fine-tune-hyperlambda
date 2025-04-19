@@ -1,0 +1,48 @@
+
+// Create a conditional block that checks if the name of the node referenced by [.dp/#/.] is "a", and that an [@href] attribute exists and is not null on its children. If true, initialize a [.url] node and use nested [if], [else-if], and [else] to set the value of [.url] based on whether the [@href] value starts with "/", "http://", or "https://". If it starts with "/", concatenate the [.base] value and the [@href] value. If it does not start with either "http://" or "https://", concatenate [.base], a "/", and the [@href] value. Otherwise, use the [@href] value as is. Finally, append a formatted string to [.completion], using brackets and parentheses to create a Markdown-like link, trimming and replacing whitespace characters from the string value as needed.
+if
+   and
+      eq
+         get-name:x:@.dp/#/.
+         .:a
+      exists:x:"@.dp/#/./*/\\@href/[0,1]"
+      not-null:x:"@.dp/#/./*/\\@href/[0,1]"
+   .lambda
+      .url
+      if
+         strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+            .:/
+         .lambda
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+      else-if
+         and
+            not
+               strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                  .:"http://"
+            not
+               strings.starts-with:x:"@.dp/#/./*/\\@href/[0,1]"
+                  .:"https://"
+         .lambda
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@.base
+                  .:/
+                  get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+      else
+         set-value:x:@.url
+            get-value:x:"@.dp/#/./*/\\@href/[0,1]"
+      set-value:x:@.completion
+         strings.concat
+            get-value:x:@.completion
+            .:" "
+            .:[
+            strings.trim:x:@strings.replace
+               .:@"  
+	"
+            .:](
+            get-value:x:@.url
+            .:)
+            .:" "

@@ -1,0 +1,16 @@
+
+// Create a [case:xml] block that reads an XML file stream from [.arguments/*/file/*/stream], converts it to a lambda object using [xml2lambda], then iterates through each grandchild of the root element. For each, unwrap all descendant [add] nodes, change their deepest child names to "prompt" and "completion" (using values from [.arguments/*/prompt] and [.arguments/*/completion]), and finally add a node to [.file-data] containing expressions that extract the prompt and completion text from the processed node structure.
+case:xml
+   io.stream.read:x:@.arguments/*/file/*/stream
+   xml2lambda:x:@io.stream.read
+   for-each:x:@xml2lambda/*/*
+      unwrap:x:./*/add/*/*/*
+      set-name:x:./*/add/*/*/*/prompt
+         get-value:x:@.arguments/*/prompt
+      set-name:x:./*/add/*/*/*/completion
+         get-value:x:@.arguments/*/completion
+      add:x:@.file-data
+         .
+            .
+               prompt:x:"@.dp/#/*/\"{@.arguments/*/prompt}\"/*/\\#text"
+               completion:x:"@.dp/#/*/\"{@.arguments/*/completion}\"/*/\\#text"

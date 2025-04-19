@@ -1,0 +1,53 @@
+
+// Store a prompt and its associated completion in a database table named "ml_requests". If the [no-invocation] node's value is greater than 0, construct the [prompt] node by concatenating "[" + the value of [no-invocation] + "] - " + the value of [only-prompt]. Otherwise, set [prompt] to [only-prompt]'s value. Then, if [function-result] is not null, build [tmp-completion] by appending the [result] value, followed by a formatted block labeled "Result of function invocation:" with [function-result] as JSON inside triple backticks. Otherwise, set [tmp-completion] to [result]'s value. Finally, insert a new row into the "ml_requests" table, using values from nodes such as [type], [prompt], [tmp-completion], [finish_reason], [session], [user_id], and [referrer].
+data.connect:[generic|magic]
+   .prompt
+   if
+      mt:x:@.no-invocation
+         .:int:0
+      .lambda
+         set-value:x:@.prompt
+            strings.concat
+               .:[
+               get-value:x:@.no-invocation
+               .:"] - "
+               get-value:x:@.only-prompt
+   else
+      set-value:x:@.prompt
+         get-value:x:@.only-prompt
+   .tmp-completion
+   if
+      not-null:x:@.function-result
+      .lambda
+         set-value:x:@.tmp-completion
+            strings.concat
+               get-value:x:@.result
+               .:@"
+"
+               .:@"
+"
+               .:@"Result of function invocation:
+"
+               .:@"
+"
+               .:```json
+               .:@"
+"
+               get-value:x:@.function-result
+               .:@"
+"
+               .:```
+         set-value:x:@.function-result
+   else
+      set-value:x:@.tmp-completion
+         get-value:x:@.result
+   data.create
+      table:ml_requests
+      values
+         type:x:@.arguments/*/type
+         prompt:x:@.prompt
+         completion:x:@.tmp-completion
+         finish_reason:x:@.finish_reason
+         session:x:@.arguments/*/session
+         user_id:x:@.arguments/*/user_id
+         referrer:x:@.arguments/*/referrer

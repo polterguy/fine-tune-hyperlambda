@@ -1,0 +1,36 @@
+
+// Check if both [.arguments/*/session] exists and is not null. If so, create a [.value] node and set its value to a comma-separated string of all [.ids] child nodes. Then, if the next sibling of [.tail] is not null, append its value (with a preceding comma) to [.value], trim any trailing commas, and split [.value] by commas. If the resulting node count is more than or equal to 20, remove nodes 16 through 35 from the split result, and update [.value] to be a joined string of the remaining nodes. Finally, set this value in the cache using [cache.set] with the key from [.cache-key], the value from [.value], and the expiration from [.arguments/*/session_timeout].
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      .value
+      set-value:x:@.value
+         strings.join:x:@.ids/*
+            .:,
+      if
+         not-null:x:@.tail/+
+         .lambda
+            set-value:x:@.value
+               strings.concat
+                  get-value:x:@.value
+                  .:,
+                  get-value:x:@.tail/+
+            set-value:x:@.value
+               strings.trim:x:@.value
+                  .:,
+            strings.split:x:@.value
+               .:,
+            if
+               mte
+                  get-count:x:@strings.split/*
+                  .:int:20
+               .lambda
+                  remove-nodes:x:@strings.split/*/[15,20]
+                  set-value:x:@.value
+                     strings.join:x:@strings.split/*
+                        .:,
+      cache.set:x:@.cache-key
+         value:x:@.value
+         expiration:x:@.arguments/*/session_timeout

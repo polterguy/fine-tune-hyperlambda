@@ -1,0 +1,18 @@
+
+// Create a conditional block that compares the value of the currently iterated node referenced by [.dp/#] with the value of the previous sibling of the first URL in the [urls] collection inside the [signal] node. If the values are not equal, concatenate a message indicating a waiting period (in seconds, calculated by dividing the [delay] argument by 1000), unwrap the concatenated string, send a signal to the feedback channel specified in [.arguments/*/feedback-channel] with the constructed message and a "type" of "info", then sleep for 100 milliseconds followed by another sleep for the duration specified in [.arguments/*/delay].
+if
+   neq:x:@.dp/#
+      get-value:x:@signal/@signal/*/urls/0/-
+   .lambda
+      strings.concat
+         .:"Waiting for "
+         math.divide:x:@.arguments/*/delay
+            .:int:1000
+         .:" seconds to avoid exhausting web server"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      sleep:100
+      sleep:x:@.arguments/*/delay

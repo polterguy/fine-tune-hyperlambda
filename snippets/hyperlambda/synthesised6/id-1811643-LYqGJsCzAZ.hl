@@ -1,0 +1,68 @@
+
+/*
+ * Implement authentication and reCAPTCHA validation logic in Hyperlambda:
+ * 
+ * - If the [.arguments] node does not contain a [skip-auth] child, or if [.arguments/*/skip-auth] is explicitly set to boolean false, then:
+ *   - If [.model/*/auth] is not null and not empty, verify the authentication ticket using [auth.ticket.verify] with the value from [.model/*/auth].
+ *   - If [auth.ticket.get] returns true, and [.model/*/recaptcha] (converted to decimal) is greater than 0, and [.model/*/recaptcha] is not null, then:
+ *     - If [.arguments] does not contain [recaptcha_response] or [.arguments/*/recaptcha_response] is null, set the response status to 499 and return an error message "No reCAPTCHA supplied".
+ *     - Otherwise, retrieve the reCAPTCHA site key and secret from configuration settings ("magic:auth:recaptcha:key" and "magic:auth:recaptcha:secret"), convert [.model/*/recaptcha] to decimal, and validate the reCAPTCHA response with [validators.recaptcha] using the min value from the conversion, and the retrieved site-key and secret.
+ *   - Else if [auth.ticket.get] returns true and the converted value of [.model/*/recaptcha] is not less than 0, execute the "magic.auth.captcha-verify" slot using the recaptcha_response token from [.arguments].
+ */
+if
+   or
+      not-exists:x:@.arguments/*/skip-auth
+      eq:x:@.arguments/*/skip-auth
+         .:bool:false
+   .lambda
+      if
+         and
+            not-null:x:@.model/*/auth
+            neq:x:@.model/*/auth
+               .:
+         .lambda
+            auth.ticket.verify:x:@.model/*/auth
+      if
+         and
+            eq
+               auth.ticket.get
+               .
+            mt
+               convert:x:@.model/*/recaptcha
+                  type:decimal
+               .:decimal:0
+            not-null:x:@.model/*/recaptcha
+         .lambda
+            if
+               or
+                  not-exists:x:@.arguments/*/recaptcha_response
+                  null:x:@.arguments/*/recaptcha_response
+               .lambda
+                  response.status.set:499
+                  return
+                     error:No reCAPTCHA supplied
+            .key
+            set-value:x:@.key
+               config.get:"magic:auth:recaptcha:key"
+            .secret
+            set-value:x:@.secret
+               config.get:"magic:auth:recaptcha:secret"
+            convert:x:@.model/*/recaptcha
+               type:decimal
+            validators.recaptcha:x:@.arguments/*/recaptcha_response
+               min:x:@convert
+               site-key:x:@.key
+               secret:x:@.secret
+      else-if
+         and
+            eq
+               auth.ticket.get
+               .
+            not
+               lt
+                  convert:x:@.model/*/recaptcha
+                     type:decimal
+                  .:decimal:0
+         .lambda
+            execute:magic.auth.captcha-verify
+               token:x:@.arguments/*/recaptcha_response

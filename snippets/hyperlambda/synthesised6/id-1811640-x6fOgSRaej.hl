@@ -1,0 +1,30 @@
+
+// Check if a [cached] node exists inside [signal], and if so, check if [supervised] exists and is not null inside [.arguments], and if [supervised] converted to int is equal to 1. If all these conditions are true, create a record in the [ml_requests] table with various values from [.arguments] and [signal/*/cached], marking [finish_reason] as "cached". Afterward, unwrap the next sibling nodes, and return a [result] node with the cached value, [finish_reason] set to "cached", and [stream] set to false.
+if
+   exists:x:@signal/*/cached
+   .lambda
+      if
+         and
+            exists:x:@.arguments/*/supervised
+            not-null:x:@.arguments/*/supervised
+            eq
+               convert:x:@.arguments/*/supervised
+                  type:int
+               .:int:1
+         .lambda
+            data.connect:[generic|magic]
+               data.create
+                  table:ml_requests
+                  values
+                     type:x:@.arguments/*/type
+                     prompt:x:@.arguments/*/prompt
+                     completion:x:@signal/*/cached
+                     finish_reason:cached
+                     session:x:@.arguments/*/session
+                     user_id:x:@.arguments/*/user_id
+                     referrer:x:@.arguments/*/referrer
+      unwrap:x:+/*
+      return
+         result:x:@signal/*/cached
+         finish_reason:cached
+         stream:bool:false

@@ -1,0 +1,25 @@
+
+/*
+ * Create an [else] block that performs the following actions: 
+ * - Adds an [.embedding] node.
+ * - Sets the value of [.embedding] to a string that starts with '[', then contains the comma-separated values of all nodes resulting from the expression `@http.post/*/content/*/data/0/*/embedding/*`, and ends with ']'.
+ * - Executes [data.connect] with the argument [generic|magic], and updates the [ml_training_snippets] table using [data.update], setting the [embedding] column to the value of [.embedding] and updating only the row where [id.eq] equals the value of the [id] node in the currently iterated [.dp] reference.
+ * - Increments the value of [.success] by one using [math.increment].
+ */
+else
+   .embedding
+   set-value:x:@.embedding
+      strings.concat
+         .:[
+         strings.join:x:@http.post/*/content/*/data/0/*/embedding/*
+            .:,
+         .:]
+   data.connect:[generic|magic]
+      data.update
+         table:ml_training_snippets
+         values
+            embedding:x:@.embedding
+         where
+            and
+               id.eq:x:@.dp/#/*/id
+   math.increment:x:@.success

@@ -1,0 +1,34 @@
+
+// Handle a [case:pre] node by checking if the current [.dp] reference node contains any descendant [#text] nodes. If it does, then check if there is a [completion] node inside the previous snippet in [.snippets]. If a [completion] node exists, append the trimmed text content as a Markdown code block to the existing [completion] value. If not, create a new [completion] node with the trimmed text content wrapped in Markdown code block syntax, and add it to the previous snippet in [.snippets]. Use [strings.concat], [strings.trim], and appropriate expressions to extract and format the text.
+case:pre
+   if
+      exists:x:"@.dp/#/**/\\#text"
+      .lambda
+         if
+            exists:x:@.snippets/0/-/*/completion
+            .lambda
+               set-value:x:@.snippets/0/-/*/completion
+                  strings.concat
+                     get-value:x:@.snippets/0/-/*/completion
+                     .:@"
+
+```
+"
+                     strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                        .:@"  
+	"
+                     .:@"
+```"
+         else
+            strings.concat
+               .:@"```
+"
+               strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                  .:@"  
+	"
+               .:@"
+```"
+            unwrap:x:+/*/*
+            add:x:@.snippets/0/-
+               .
+                  completion:x:@strings.concat

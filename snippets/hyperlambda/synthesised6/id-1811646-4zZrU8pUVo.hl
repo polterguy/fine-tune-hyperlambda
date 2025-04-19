@@ -1,0 +1,25 @@
+
+/*
+ * Create an [else] block that handles a failure to create a summary for a file. It should:
+ * 
+ * 1. Use [strings.concat] to concatenate the text "Could not create summary for file: " with the value referenced by `@.dp/#`.
+ * 2. Use [unwrap] to extract the [message] from the result of the previous operation.
+ * 3. Use [sockets.signal] to send a signal to the feedback channel specified in [.arguments] → [feedback-channel], with [args] containing the warning [message] and a [type] of "warning".
+ * 4. Use [unwrap] again to forward evaluate the children nodes of the result.
+ * 5. Add a new snippet to the [.snippets] node, with a child node containing a [prompt] set to the value of [.file-meta] and a [completion] set to the value of [.content].
+ */
+else
+   strings.concat
+      .:"Could not create summary for file: "
+      get-value:x:@.dp/#
+   unwrap:x:+/*/*/message
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:x:@strings.concat
+         type:warning
+   unwrap:x:+/*/*/*
+   add:x:@.snippets
+      .
+         .
+            prompt:x:@.file-meta
+            completion:x:@.content

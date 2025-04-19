@@ -1,0 +1,79 @@
+
+/*
+ * Write a Hyperlambda snippet that checks if the [.arguments/*/use_embeddings] node, after being converted to an integer, equals 1. If so, it should:
+ * 
+ * - Unwrap all following sibling nodes.
+ * - Signal [magic.ai.get-context] with the [type], [prompt], [threshold], [max_context_tokens], and [api_key] values taken from the corresponding [.arguments] nodes.
+ * - If [signal/*/cached] exists, unwrap all following siblings and return a result containing [signal/*/cached] as [result] and set [finish_reason] to "cached".
+ * - Add the [signal/*/db_time] node(s) to the [.result] node.
+ * - If [.arguments/*/prefix] contains "[CONTEXT]", "[QUESTION]", and "ANSWER:", then:
+ *   - Replace "[QUESTION]" in [.arguments/*/prefix] with the value of [.arguments/*/prompt] and set this as the new [.prompt] value.
+ *   - Replace "[CONTEXT]" in [.prompt] with the value of [signal/*/context].
+ * - Else, set [.prompt] to the concatenated string: [.arguments/*/prefix], the string "QUESTION: ", the value of [.arguments/*/prompt], a newline, "CONTEXT: ", another newline, the value of [signal/*/context], another newline, and "ANSWER: ".
+ * - If [.arguments/*/references] exists, is not null, and has a value:
+ *   - Add a [references] node to [.result].
+ *   - Add all [signal/*/snippets/*] nodes as children to [.result/*/references].
+ */
+if
+   eq
+      convert:x:@.arguments/*/use_embeddings
+         type:int
+      .:int:1
+   .lambda
+      unwrap:x:+/*
+      signal:magic.ai.get-context
+         type:x:@.arguments/*/type
+         prompt:x:@.arguments/*/prompt
+         threshold:x:@.arguments/*/threshold
+         max_tokens:x:@.arguments/*/max_context_tokens
+         api_key:x:@.arguments/*/api_key
+      if
+         exists:x:@signal/*/cached
+         .lambda
+            unwrap:x:+/*
+            return
+               result:x:@signal/*/cached
+               finish_reason:cached
+      add:x:@.result
+         get-nodes:x:@signal/*/db_time
+      if
+         and
+            strings.contains:x:@.arguments/*/prefix
+               .:[CONTEXT]
+            strings.contains:x:@.arguments/*/prefix
+               .:[QUESTION]
+            strings.contains:x:@.arguments/*/prefix
+               .:"ANSWER:"
+         .lambda
+            set-value:x:@.prompt
+               strings.replace:x:@.arguments/*/prefix
+                  .:[QUESTION]
+                  get-value:x:@.arguments/*/prompt
+            set-value:x:@.prompt
+               strings.replace:x:@.prompt
+                  .:[CONTEXT]
+                  get-value:x:@signal/*/context
+      else
+         set-value:x:@.prompt
+            strings.concat
+               get-value:x:@.arguments/*/prefix
+               .:@"
+QUESTION: "
+               get-value:x:@.arguments/*/prompt
+               .:@"
+CONTEXT: 
+"
+               get-value:x:@signal/*/context
+               .:@"
+ANSWER: "
+      if
+         and
+            exists:x:@.arguments/*/references
+            not-null:x:@.arguments/*/references
+            get-value:x:@.arguments/*/references
+         .lambda
+            add:x:@.result
+               .
+                  references
+            add:x:@.result/*/references
+               get-nodes:x:@signal/*/snippets/*

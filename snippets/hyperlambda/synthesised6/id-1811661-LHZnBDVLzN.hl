@@ -1,0 +1,14 @@
+
+// Create an [else] block that sends a warning message to the feedback channel using [sockets.signal], waits for 3 seconds with [sleep], serializes the result of [http.post] to a Hyperlambda string using [lambda2hyper], logs an error including the error message and status from [http.post], and then decrements the value of [.no] with [math.decrement].
+else
+   sockets.signal:x:@.arguments/*/feedback-channel
+      args
+         message:Could not summarize snippet, check your log for details. Trying again in 3 seconds.
+         type:warning
+   sleep:3000
+   lambda2hyper:x:@http.post
+   log.error:Something went wrong while invoking OpenAI
+      message:x:@http.post/*/content/*/error/*/message
+      status:x:@http.post
+      error:x:@lambda2hyper
+   math.decrement:x:@.no

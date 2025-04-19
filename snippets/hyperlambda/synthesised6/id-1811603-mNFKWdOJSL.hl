@@ -1,0 +1,35 @@
+
+// Create a conditional block that checks if the [.arguments] node contains a non-empty [instruction] node. If the condition is met, send a feedback signal to the channel referenced by [.feedback-channel] indicating that OpenAI is being invoked to create a custom system message. Then, within a [try] block, execute the [magic.ai.create-system-message] slot, passing in [url], [template], and [instruction] arguments from their respective lambda expressions. After execution, connect to a generic or magic data source and update the [ml_types] table, setting its [system_message] column to the result of [magic.ai.create-system-message] for the row matching the given [type]. Signal the feedback channel with a separator message. If any error occurs, log the error message from [.arguments] and notify the feedback channel that a custom system message could not be created, issuing a warning.
+if
+   and
+      exists:x:@.arguments/*/instruction
+      neq:x:@.arguments/*/instruction
+         .:
+   .lambda
+      sockets.signal:x:@.feedback-channel
+         args
+            message:Invoking OpenAI to create a custom system message. Notice, this might take some time ...
+            type:info
+      try
+         execute:magic.ai.create-system-message
+            url:x:@.url
+            template:x:@.flavor
+            instruction:x:@.instruction
+         data.connect:[generic|magic]
+            data.update
+               table:ml_types
+               values
+                  system_message:x:@execute
+               where
+                  and
+                     type.eq:x:@.type
+         sockets.signal:x:@.feedback-channel
+            args
+               message:------------------------------------------------------------------------------------------------------------------------
+               type:info
+      .catch
+         log.error:x:@.arguments/*/message
+         sockets.signal:x:@.feedback-channel
+            args
+               message:We could not create a custom system message, check your log for details
+               type:warning

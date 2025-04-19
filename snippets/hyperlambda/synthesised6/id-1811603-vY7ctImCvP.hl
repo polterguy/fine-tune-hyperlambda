@@ -1,0 +1,18 @@
+
+// Create a conditional block that checks if the value of the [count] field inside the [data.read] result (converted to integer) is equal to 0. If true, signal an error message to the feedback channel and delete from the [ml_types] table in the [data.connect:[generic|magic]] context, using a where clause that matches the [type] value.
+if
+   eq
+      convert:x:@data.connect/*/data.read/*/*/count
+         type:int
+      .:int:0
+   .lambda
+      sockets.signal:x:@.feedback-channel
+         args
+            message:We could not find any training data on your website
+            type:error
+      data.connect:[generic|magic]
+         data.delete
+            table:ml_types
+            where
+               and
+                  type.eq:x:@.type

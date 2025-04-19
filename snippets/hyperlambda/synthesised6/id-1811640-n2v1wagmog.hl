@@ -1,0 +1,24 @@
+
+// Retrieve the session from the cache if the [.arguments] node contains a valid and non-empty [session] value. If the session exists in the cache, convert [.arguments] [max_session_items] to an integer, then deserialize the session data from Hyperlambda using [hyper2lambda]. While the count of session items exceeds [max_session_items], remove the oldest session item. Finally, add all remaining session items to the [.session] node.
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+      neq:x:@.arguments/*/session
+         .:
+   .lambda
+      cache.get:x:@.arguments/*/session
+      if
+         not-null:x:@cache.get
+         .lambda
+            convert:x:@.arguments/*/max_session_items
+               type:int
+            hyper2lambda:x:@cache.get
+            while
+               mt
+                  get-count:x:@hyper2lambda/*
+                  get-value:x:@convert
+               .lambda
+                  remove-nodes:x:@hyper2lambda/0
+            add:x:@.session
+               get-nodes:x:@hyper2lambda/*

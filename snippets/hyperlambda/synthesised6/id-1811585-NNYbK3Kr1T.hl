@@ -1,0 +1,18 @@
+
+// Create a conditional block that checks multiple conditions on the [http.get] node: If the [content] child node does not exist, is null, or is an empty string; if the [headers]/[Content-Type] child node does not exist; or if the [Content-Type] does not start with "text/html"—then, inside the true branch, convert the [http.get] node to Hyperlambda using [lambda2hyper], log an error stating "URL did not return HTML content when crawling for Machine Learning snippets" (including the converted [content] and the original [url] from [.arguments]), and return an HTTP status code 415.
+if
+   or
+      not-exists:x:@http.get/*/content
+      null:x:@http.get/*/content
+      eq:x:@http.get/*/content
+         .:
+      not-exists:x:@http.get/*/headers/*/Content-Type
+      not
+         strings.starts-with:x:@http.get/*/headers/*/Content-Type
+            .:text/html
+   .lambda
+      lambda2hyper:x:@http.get
+      log.error:URL did not return HTML content when crawling for Machine Learning snippets
+         content:x:@lambda2hyper
+         url:x:@.arguments/*/url
+      return:int:415

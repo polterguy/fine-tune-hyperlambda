@@ -1,0 +1,53 @@
+
+// Create a Hyperlambda script that connects to a database using [data.connect] with either a "generic" or "magic" provider, and constructs a prompt string in the [.prompt] node. If [.no-invocation] is greater than 0, prepend its value in square brackets followed by " - " to the value from [.only-prompt]; otherwise, just use [.only-prompt]. Then, if [.function-result] is not null, create a formatted completion message in [.tmp-completion] that includes [.result] and appends the JSON-formatted [.function-result] in a code block. If [.function-result] is null, set [.tmp-completion] to [.result]. Finally, create a row in the "ml_requests" table with the collected values for type, prompt, completion, finish_reason, session, user_id, and referrer, obtaining these from the appropriate [.arguments] or local nodes.
+data.connect:[generic|magic]
+   .prompt
+   if
+      mt:x:@.no-invocation
+         .:int:0
+      .lambda
+         set-value:x:@.prompt
+            strings.concat
+               .:[
+               get-value:x:@.no-invocation
+               .:"] - "
+               get-value:x:@.only-prompt
+   else
+      set-value:x:@.prompt
+         get-value:x:@.only-prompt
+   .tmp-completion
+   if
+      not-null:x:@.function-result
+      .lambda
+         set-value:x:@.tmp-completion
+            strings.concat
+               get-value:x:@.result
+               .:@"
+"
+               .:@"
+"
+               .:@"Result of function invocation:
+"
+               .:@"
+"
+               .:```json
+               .:@"
+"
+               get-value:x:@.function-result
+               .:@"
+"
+               .:```
+         set-value:x:@.function-result
+   else
+      set-value:x:@.tmp-completion
+         get-value:x:@.result
+   data.create
+      table:ml_requests
+      values
+         type:x:@.arguments/*/type
+         prompt:x:@.prompt
+         completion:x:@.tmp-completion
+         finish_reason:x:@.finish_reason
+         session:x:@.arguments/*/session
+         user_id:x:@.arguments/*/user_id
+         referrer:x:@.arguments/*/referrer

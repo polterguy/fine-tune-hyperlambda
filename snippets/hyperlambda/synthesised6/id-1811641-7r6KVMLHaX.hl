@@ -1,0 +1,27 @@
+
+// Retrieve the most recent record from the [ml_requests] table in the [magic] database where the [prompt] and [type] columns match the values from [.arguments] nodes named [prompt] and [type]. Select only the [completion] and [cached] columns, limit the result to 1, and order by [created] in descending order. If a record exists and its [cached] column has an integer value of 1, then return the [completion] value as [result] and set [finish_reason] to "cached".
+data.connect:[generic|magic]
+   data.read
+      table:ml_requests
+      columns
+         completion
+         cached
+      where
+         and
+            prompt.eq:x:@.arguments/*/prompt
+            type.eq:x:@.arguments/*/type
+      limit:1
+      order:created
+      direction:desc
+   if
+      and
+         exists:x:@data.read/*/*
+         eq
+            convert:x:@data.read/*/*/cached
+               type:int
+            .:int:1
+      .lambda
+         unwrap:x:+/*
+         return
+            result:x:@data.read/*/*/completion
+            finish_reason:cached

@@ -1,0 +1,48 @@
+
+// Create a Hyperlambda code block that, for each node referenced by [.dp], checks if its [completion] child node does not contain the substring "{{". If this condition is true, concatenate the value of [.tmp], a newline, the [prompt] value, another newline, and the [completion] value, followed by a separator "---", and assign this result back to [.tmp]. Then, if the number of tokens in [.tmp] is less than the value of [max_tokens] from [.arguments], set [.context] to the value of [.tmp], unwrap the next sibling’s children, and add the current node’s [id] to the [ids] list. If the current node’s [uri] is not null and does not already exist in the [uri] fields of any [result] descendant, then unwrap the next sibling’s children and add a new object to [result] containing the [prompt], [uri], and [distance] from the current node. If the token count condition is not met, set [.tmp] to the value of [.context].
+if
+   not
+      strings.contains:x:@.dp/#/*/completion
+         .:{{
+   .lambda
+      set-value:x:@.tmp
+         strings.concat
+            get-value:x:@.tmp
+            .:@"
+"
+            get-value:x:@.dp/#/*/prompt
+            .:@"
+"
+            .:@"
+"
+            get-value:x:@.dp/#/*/completion
+            .:@"
+
+---
+"
+      if
+         lt
+            openai.tokenize:x:@.tmp
+            get-value:x:@.arguments/*/max_tokens
+         .lambda
+            set-value:x:@.context
+               get-value:x:@.tmp
+            unwrap:x:+/*/*
+            add:x:@.ids
+               .
+                  .:x:@.dp/#/*/id
+            if
+               and
+                  not-null:x:@.dp/#/*/uri
+                  not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+               .lambda
+                  unwrap:x:+/*/*/*
+                  add:x:@.result
+                     .
+                        .
+                           prompt:x:@.dp/#/*/prompt
+                           uri:x:@.dp/#/*/uri
+                           distance:x:@.dp/#/*/distance
+      else
+         set-value:x:@.tmp
+            get-value:x:@.context

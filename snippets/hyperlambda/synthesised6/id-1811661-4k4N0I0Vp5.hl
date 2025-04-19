@@ -1,0 +1,40 @@
+
+/*
+ * Write a conditional block that checks if no nodes exist at [data.read] (using the `not-exists:x:@data.read/*` condition). If this condition is true, then perform the following inside a [.lambda] block:
+ * 
+ * - Use an [if] statement that checks if [insert_url] under [.arguments] exists and is true (using `if:x:@.arguments/*/insert_url`). If so:
+ *   - Set the value of the [completion] node (under the currently referenced [.dp/#/*]) to a concatenated string. This string should include:
+ *     - The existing value of [completion] (from the same location),
+ *     - Two newline characters,
+ *     - The string "This information was taken from [this URL](",
+ *     - The value of [url] under [.arguments],
+ *     - The closing parenthesis.
+ * - After the above, use [data.create] to insert a new record into the "ml_training_snippets" table, with the following fields:
+ *   - [type]: value from [.arguments/*/type]
+ *   - [uri]: value from [.arguments/*/url]
+ *   - [prompt]: value from [.dp/#/*/prompt]
+ *   - [completion]: value from [.dp/#/*/completion]
+ *   - [meta]: static string "AINIRO-Website-Crawler".
+ */
+if
+   not-exists:x:@data.read/*
+   .lambda
+      if:x:@.arguments/*/insert_url
+         set-value:x:@.dp/#/*/completion
+            strings.concat
+               get-value:x:@.dp/#/*/completion
+               .:@"
+"
+               .:@"
+"
+               .:This information was taken from [this URL](
+               get-value:x:@.arguments/*/url
+               .:)
+      data.create
+         table:ml_training_snippets
+         values
+            type:x:@.arguments/*/type
+            uri:x:@.arguments/*/url
+            prompt:x:@.dp/#/*/prompt
+            completion:x:@.dp/#/*/completion
+            meta:AINIRO-Website-Crawler

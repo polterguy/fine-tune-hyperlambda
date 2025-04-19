@@ -1,0 +1,36 @@
+
+// Iterate through each child node of [.tmp-snippets] using [for-each], and for each iteration, send a POST request to the OpenAI chat completions endpoint at "https://api.openai.com/v1/chat/completions" using [http.post]. Include headers for Authorization, Content-Type, and Accept, and set the payload with model, max_tokens, temperature, and a messages array consisting of a system message (from [.arguments] node's [massagePrompt]) and a user message (from the current iteration's [completion] value). If the HTTP response status code from [http.post] is not between 200 (inclusive) and 300 (exclusive), log an error with details from the response using [lambda2hyper] and [log.error], including the error message, status, and the converted response. Otherwise, if the request is successful, update the [prompt] node of the current iteration to the response content using [set-value] and [get-value] to extract the message content from the HTTP response.
+for-each:x:@.tmp-snippets/*
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+         Accept:text/event-stream
+      payload
+         model:gpt-3.5-turbo
+         max_tokens:int:1000
+         temperature:decimal:0.3
+         messages
+            .
+               role:system
+               content:x:@.arguments/*/massagePrompt
+            .
+               role:user
+               content:x:@.dp/#/*/completion
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   else
+      set-value:x:@.dp/#/*/prompt
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content

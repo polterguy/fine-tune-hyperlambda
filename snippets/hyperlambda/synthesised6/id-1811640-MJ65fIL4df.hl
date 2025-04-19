@@ -1,0 +1,70 @@
+
+/*
+ * Create a conditional block that checks if the [.arguments] node contains a [supervised] child node, ensures its value is not null, and that its value (converted to integer) equals 1. If so, connect to the [generic] or [magic] data source and build a prompt string:  
+ * - If [.no-invocation] is greater than 0, set [.prompt] as a concatenation of "[" + value of [.no-invocation] + "] - " + value of [.only-prompt].  
+ * - Else, set [.prompt] to the value of [.only-prompt].  
+ * Then, set up a [.tmp-completion] value:  
+ * - If [.function-result] is not null, concatenate the value of [.result] with a formatted, multi-line string displaying the JSON result of [.function-result], and update [.function-result].  
+ * - Else, set [.tmp-completion] to the value of [.result].  
+ * Finally, create a new record in the [ml_requests] table with values for [type], [prompt], [completion], [finish_reason], [session], [user_id], and [referrer], using values from the corresponding nodes or arguments.
+ */
+if
+   and
+      exists:x:@.arguments/*/supervised
+      not-null:x:@.arguments/*/supervised
+      eq
+         convert:x:@.arguments/*/supervised
+            type:int
+         .:int:1
+   .lambda
+      data.connect:[generic|magic]
+         .prompt
+         if
+            mt:x:@.no-invocation
+               .:int:0
+            .lambda
+               set-value:x:@.prompt
+                  strings.concat
+                     .:[
+                     get-value:x:@.no-invocation
+                     .:"] - "
+                     get-value:x:@.only-prompt
+         else
+            set-value:x:@.prompt
+               get-value:x:@.only-prompt
+         .tmp-completion
+         if
+            not-null:x:@.function-result
+            .lambda
+               set-value:x:@.tmp-completion
+                  strings.concat
+                     get-value:x:@.result
+                     .:@"
+"
+                     .:@"
+"
+                     .:@"Result of function invocation:
+"
+                     .:@"
+"
+                     .:```json
+                     .:@"
+"
+                     get-value:x:@.function-result
+                     .:@"
+"
+                     .:```
+               set-value:x:@.function-result
+         else
+            set-value:x:@.tmp-completion
+               get-value:x:@.result
+         data.create
+            table:ml_requests
+            values
+               type:x:@.arguments/*/type
+               prompt:x:@.prompt
+               completion:x:@.tmp-completion
+               finish_reason:x:@.finish_reason
+               session:x:@.arguments/*/session
+               user_id:x:@.arguments/*/user_id
+               referrer:x:@.arguments/*/referrer

@@ -1,0 +1,49 @@
+
+// Create a new machine learning model type in the [ml_types] table, but only if a model with the specified [type] does not already exist. First, connect to the "magic" database using the [generic] connection string, then read from the [ml_types] table filtering by the value of [.type]. If a record is found, throw an error "Model already exists!". Otherwise, send the [magic.ai.can-create-machine-learning-model] signal, and if the [autocrawl] argument is provided, add the [base_url] (from [.arguments/*/url]) to the values for insertion. Set [.max-tokens] and [.max-context-tokens] to 4000, unless the [model] argument does not start with "gpt-4", in which case set both to 1000. Finally, insert a new record into the [ml_types] table with the given arguments and default values for other fields, including [type], [model], [max_tokens], [max_context_tokens], and additional configuration data.
+data.connect:[generic|magic]
+   data.read
+      table:ml_types
+      columns
+         type
+      where
+         and
+            type.eq:x:@.type
+   if
+      exists:x:@data.read/*
+      .lambda
+         throw:Model already exists!
+   try-signal:magic.ai.can-create-machine-learning-model
+   if:x:@.arguments/*/autocrawl
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/data.create/[0,1]/*/values
+         .
+            base_url:x:@.arguments/*/url
+   .max-tokens:int:4000
+   .max-context-tokens:int:4000
+   if
+      not
+         strings.starts-with:x:@.arguments/*/model
+            .:gpt-4
+      .lambda
+         set-value:x:@.max-context-tokens
+            .:int:1000
+         set-value:x:@.max-tokens
+            .:int:1000
+   data.create
+      table:ml_types
+      values
+         type:x:@.type
+         model:x:@.arguments/*/model
+         max_tokens:x:@.max-tokens
+         max_context_tokens:x:@.max-context-tokens
+         max_request_tokens:int:1000
+         temperature:decimal:0.3
+         recaptcha:decimal:0.0
+         supervised:int:1
+         cached:int:0
+         use_embeddings:int:1
+         threshold:decimal:0.3
+         vector_model:text-embedding-ada-002
+         system_message:x:@.arguments/*/flavor
+         greeting:Hi there, how can I help you?
+         conversation_starters:"* What can I ask you about?\n* How do I contact you?\n* Who created this chatbot?"

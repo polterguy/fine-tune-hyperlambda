@@ -1,0 +1,56 @@
+
+/*
+ * Check if both [.session] exists and is not null in [.arguments]. If so, perform the following steps:
+ * - If [.result] is not null and not empty, unwrap the content from the previous node and add a new assistant role message with this content to [.session].
+ * - If [.new-prompt] is not null and not empty, unwrap the content from the previous node and add a new system role message with this content to [.session].
+ * - Copy all nodes from [.session] into [.cache-session].
+ * - Set [.tmp] to the value of [.fixed].
+ * - While [.tmp] is greater than 0, remove the first node from [.cache-session] and decrement [.tmp].
+ * - Use [lambda2hyper] to convert all nodes in [.cache-session] and assign the result to [.lambda2hyper].
+ * - Store the [.lambda2hyper] value in the cache with the key from [.session] in [.arguments], using the expiration timeout from [.session_timeout] in [.arguments].
+ */
+if
+   and
+      exists:x:@.arguments/*/session
+      not-null:x:@.arguments/*/session
+   .lambda
+      if
+         and
+            not-null:x:@.result
+            neq:x:@.result
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:assistant
+                     content:x:@.result
+      if
+         and
+            not-null:x:@.new-prompt
+            neq:x:@.new-prompt
+               .:
+         .lambda
+            unwrap:x:+/*/*/*/content
+            add:x:@.session
+               .
+                  .
+                     role:system
+                     content:x:@.new-prompt
+      .cache-session
+      add:x:@.cache-session
+         get-nodes:x:@.session/*
+      .tmp
+      set-value:x:@.tmp
+         get-value:x:@.fixed
+      while
+         mt:x:@.tmp
+            .:int:0
+         .lambda
+            remove-nodes:x:@.cache-session/0
+            math.decrement:x:@.tmp
+      lambda2hyper:x:@.cache-session/*
+      cache.set:x:@.arguments/*/session
+         expiration:x:@.arguments/*/session_timeout
+         value:x:@lambda2hyper

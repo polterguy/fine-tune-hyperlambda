@@ -1,0 +1,19 @@
+
+// Create a conditional block that checks if a node named [crawl-delay] exists as a child of the [signal] node. If it does, remove the [delay] node from [.arguments], then set a default validator for [delay] using the value from [signal]'s [crawl-delay]. Next, concatenate a string that describes the crawl delay in seconds by dividing the [crawl-delay] value by 1000 and appending it to a message. After unwrapping all generated nodes, send a signal through the [feedback-channel] from [.arguments], passing an [args] node with a [message] containing the concatenated string and a [type] of "info".
+if
+   exists:x:@signal/*/crawl-delay
+   .lambda
+      remove-nodes:x:@.arguments/*/delay
+      unwrap:x:+/*
+      validators.default:x:@.arguments
+         delay:x:@signal/*/crawl-delay
+      strings.concat
+         .:"Robots.txt file contains a Crawl-Delay value of "
+         math.divide:x:@signal/*/crawl-delay
+            .:int:1000
+         .:" seconds"
+      unwrap:x:+/**
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info

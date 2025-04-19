@@ -1,0 +1,58 @@
+
+/*
+ * Create a loop that continues as long as the value of [.arguments/*/max] is more than 0 and there exists at least one node in [@sort/0]. Inside the loop, set [.allowed] to true, then for each node in [.arguments/*/disallow/*], unwrap its value, and use [invoke] to execute a [.match] slot with [url] set to [@sort/0] and [pattern] set to the current disallow pattern. If a match is found, set [.allowed] to false, and then for each node in [.arguments/*/allow/*], unwrap its value and invoke [.match] with [url] as [@sort/0] and [pattern] as the current allow pattern. If a match is found in the allow list, set [.allowed] to true.
+ * 
+ * After processing allow/disallow, check if all of the following are true: [.arguments/*/filter-on-url] is true, [.arguments/*/url] exists, [.arguments/*/url] is not null, [.arguments/*/url] is not empty, and [@sort/0] does not start with the value of [.arguments/*/url]. If so, set [.allowed] to false.
+ * 
+ * Finally, if [.allowed] is true, add [@sort/0] to [.return] and decrement [.arguments/*/max] by one. Otherwise, increment [.ignored] by one. In every iteration, remove the first node in [@sort/0].
+ */
+while
+   and
+      mt:x:@.arguments/*/max
+         .:int:0
+      exists:x:@sort/0
+   .lambda
+      .allowed:bool:true
+      for-each:x:@.arguments/*/disallow/*
+         unwrap:x:+/*
+         invoke:x:@.match
+            url:x:@sort/0
+            pattern:x:@.dp/#
+         if
+            get-value:x:@invoke
+            .lambda
+               set-value:x:@.allowed
+                  .:bool:false
+               for-each:x:@.arguments/*/allow/*
+                  unwrap:x:+/*
+                  invoke:x:@.match
+                     url:x:@sort/0
+                     pattern:x:@.dp/#
+                  if
+                     get-value:x:@invoke
+                     .lambda
+                        set-value:x:@.allowed
+                           .:bool:true
+      if
+         and
+            get-value:x:@.arguments/*/filter-on-url
+            exists:x:@.arguments/*/url
+            not-null:x:@.arguments/*/url
+            neq:x:@.arguments/*/url
+               .:
+            not
+               strings.starts-with:x:@sort/0
+                  get-value:x:@.arguments/*/url
+         .lambda
+            set-value:x:@.allowed
+               .:bool:false
+      if
+         eq:x:@.allowed
+            .:bool:true
+         .lambda
+            add:x:@.return
+               get-nodes:x:@sort/0
+            math.decrement:x:@.arguments/*/max
+      else
+         math.increment:x:@.ignored
+      remove-nodes:x:@sort/0

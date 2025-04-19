@@ -1,0 +1,22 @@
+
+// Create a loop that continues as long as [.cont] is true. In each iteration, convert all children of [.session] into Hyperlambda using [lambda2hyper]. Then, check if the sum of [max_tokens] (from [.arguments]), the number of tokens in the converted Hyperlambda (using [openai.tokenize]), and [extra-tokens] is less than [model_size] (also from [.arguments]). If this condition is true, set [.cont] to false. Otherwise, concatenate the value of [.session] with the value of [.fixed], then use [set-x] to update the [remove-nodes] node with a [convert] operation that has [type:x], and finally remove nodes using [remove-nodes].
+while:x:@.cont
+   lambda2hyper:x:@.session/*
+   if
+      lt
+         math.add
+            get-value:x:@.arguments/*/max_tokens
+            openai.tokenize:x:@lambda2hyper
+            get-value:x:@.extra-tokens
+         get-value:x:@.arguments/*/model_size
+      .lambda
+         set-value:x:@.cont
+            .:bool:false
+   else
+      strings.concat
+         .:@.session/
+         get-value:x:@.fixed
+      set-x:x:./*/remove-nodes
+         convert:x:@strings.concat
+            type:x
+      remove-nodes

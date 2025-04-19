@@ -1,0 +1,33 @@
+
+// Check if the HTTP POST request did not return a status code between 200 and 299 in the [http.post] node. If so, log the error details using [log.error], including the error message, status, and the full response as a lambda object. If the [.arguments] node does not contain a [stream] child or if [stream] is explicitly false, throw the error message from the response as a public exception with the status code. Otherwise, unwrap the next node, signal a socket error to the session provided in [.arguments/*/session], and set the [.iterations] node's value to 0.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         status:x:@http.post
+         error:x:@lambda2hyper
+      if
+         or
+            not-exists:x:@.arguments/*/stream
+            eq:x:@.arguments/*/stream
+               .:bool:false
+         .lambda
+            throw:x:@http.post/*/content/*/error/*/message
+               public:bool:true
+               status:x:@http.post
+      else
+         unwrap:x:+/*/*
+         sockets.signal:x:@.arguments/*/session
+            args
+               error:bool:true
+               status:x:@http.post
+               message:x:@http.post/*/content/*/error/*/message
+         set-value:x:@.iterations
+            .:int:0

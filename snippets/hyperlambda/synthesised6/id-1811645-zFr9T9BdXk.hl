@@ -1,0 +1,17 @@
+
+// Create a conditional block that checks if the HTTP response status code in [http.post] is not between 200 (inclusive) and 300 (exclusive). If this condition is true, log an error with the message from [http.post/*/content/*/error/*/message] and the full HTTP response using [lambda2hyper], then throw an exception with the same error message, making it public and including the HTTP status code in the exception details.
+if
+   not
+      and
+         mte:x:@http.post
+            .:int:200
+         lt:x:@http.post
+            .:int:300
+   .lambda
+      lambda2hyper:x:@http.post
+      log.error:Something went wrong while invoking OpenAI
+         message:x:@http.post/*/content/*/error/*/message
+         error:x:@lambda2hyper
+      throw:x:@http.post/*/content/*/error/*/message
+         public:bool:true
+         status:x:@http.post

@@ -1,0 +1,26 @@
+
+// Add an [else-if] conditional block that checks if the value of [@http.post] is greater than or equal to 200 and less than 300. If this condition is true, execute the following actions within its [.lambda] child: send a socket signal to the feedback channel specified in [@.arguments/*/feedback-channel] with a message indicating successful creation of the summary; wait for 100 milliseconds using [sleep]; set the value of the [completion] child node of [@.dp/#/*] to the trimmed content of the summary response from [@http.post/*/content/*/choices/0/*/message/*/content]; update the [prompt] child node of [@.dp/#/*] to a concatenated string starting with "Summary; " and followed by the first 150 characters of its previous value; finally, set the value of [.no] to 0.
+else-if
+   and
+      mte:x:@http.post
+         .:int:200
+      lt:x:@http.post
+         .:int:300
+   .lambda
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Successfully created summary of snippet
+            type:info
+      sleep:100
+      set-value:x:@.dp/#/*/completion
+         strings.trim:x:@http.post/*/content/*/choices/0/*/message/*/content
+            .:@"
+	 "
+      set-value:x:@.dp/#/*/prompt
+         strings.concat
+            .:"Summary; "
+            strings.substring:x:@.dp/#/*/prompt
+               .:int:0
+               .:int:150
+      set-value:x:@.no
+         .:int:0

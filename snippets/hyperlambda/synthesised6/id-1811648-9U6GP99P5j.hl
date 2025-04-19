@@ -1,0 +1,13 @@
+
+// Create a loop that continues as long as [.more] is true. In each iteration, generate an SQL statement to insert up to 500 new records from [ml_training_snippets] into [vss_ml_training_snippets] where [embedding] is not null, [type] matches the provided argument, and the [id] does not already exist as [rowid] in the target table. Connect to the [generic] or [magic] database, execute this SQL with the provided [type] argument, and if less than 500 records were inserted ([data.execute] < 500), set [.more] to false to break the loop.
+while:x:@.more
+   .sql:"\ninsert into vss_ml_training_snippets (rowid, embedding_vss)\n   select id as rowid, embedding as embedding_vss\n      from ml_training_snippets ts\n      where ts.embedding is not null and\n         type = @type and\n         not exists (select rowid from vss_ml_training_snippets as vss where ts.id = vss.rowid) limit 500"
+   data.connect:[generic|magic]
+      data.execute:x:@.sql
+         type:x:@.arguments/*/type
+      if
+         lt:x:@data.execute
+            .:int:500
+         .lambda
+            set-value:x:@.more
+               .:bool:false

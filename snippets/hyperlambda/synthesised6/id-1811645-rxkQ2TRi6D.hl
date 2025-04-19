@@ -1,0 +1,49 @@
+
+// Iterate through each child node of the [scan] node using [for-each]. For each node, check if the value of its [completion] child does not contain the string "{{". If so, concatenate the [prompt] and [completion] values (with line breaks) into the [tmp] node. Then, if the token count of [tmp] is less than the [max_tokens] argument, set the [context] node to [tmp], and add the [id] of the current node to the [ids] list. If the current node has a non-null [uri] and no result already exists with the same [uri], add an object with [prompt], [uri], and [distance] to the [result] node. If the token count is not less than [max_tokens], reset [tmp] to the [context] value.
+for-each:x:@.scan/*
+   if
+      not
+         strings.contains:x:@.dp/#/*/completion
+            .:{{
+      .lambda
+         set-value:x:@.tmp
+            strings.concat
+               get-value:x:@.tmp
+               .:@"
+"
+               get-value:x:@.dp/#/*/prompt
+               .:@"
+"
+               .:@"
+"
+               get-value:x:@.dp/#/*/completion
+               .:@"
+
+---
+"
+         if
+            lt
+               openai.tokenize:x:@.tmp
+               get-value:x:@.arguments/*/max_tokens
+            .lambda
+               set-value:x:@.context
+                  get-value:x:@.tmp
+               unwrap:x:+/*/*
+               add:x:@.ids
+                  .
+                     .:x:@.dp/#/*/id
+               if
+                  and
+                     not-null:x:@.dp/#/*/uri
+                     not-exists:x:"@.result/*/*/uri/\"={@.dp/#/*/uri}\""
+                  .lambda
+                     unwrap:x:+/*/*/*
+                     add:x:@.result
+                        .
+                           .
+                              prompt:x:@.dp/#/*/prompt
+                              uri:x:@.dp/#/*/uri
+                              distance:x:@.dp/#/*/distance
+         else
+            set-value:x:@.tmp
+               get-value:x:@.context

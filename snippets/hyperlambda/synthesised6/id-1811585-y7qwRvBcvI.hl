@@ -1,0 +1,43 @@
+
+/*
+ * Construct conditional logic to resolve a relative URL to an absolute URL using a [base] URL and a [src] segment. 
+ * - First, check if the [src] does not start with "http://" and does not start with "https://".
+ * - If the [src] starts with "://", split the [base] URL at "://", then concatenate the protocol part, ":", and the [src] value to form [url].
+ * - Else if [src] starts with "/", concatenate the [base] value and the [src] value to form [url].
+ * - Otherwise, concatenate the [base], "/", and [src] to form [url]. 
+ * Reference the [base] and [src] nodes using the appropriate lambda expressions in all value retrievals.
+ */
+if
+   and
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+            .:"http://"
+      not
+         strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+            .:"https://"
+   .lambda
+      if
+         strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+            .://
+         .lambda
+            strings.split:x:@.base
+               .:"://"
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@strings.split/0
+                  .:":"
+                  get-value:x:"@.dp/#/*/\\@src/[0,1]"
+      else-if
+         strings.starts-with:x:"@.dp/#/*/\\@src/[0,1]"
+            .:/
+         .lambda
+            set-value:x:@.url
+               strings.concat
+                  get-value:x:@.base
+                  get-value:x:"@.dp/#/*/\\@src/[0,1]"
+      else
+         set-value:x:@.url
+            strings.concat
+               get-value:x:@.base
+               .:/
+               get-value:x:"@.dp/#/*/\\@src/[0,1]"

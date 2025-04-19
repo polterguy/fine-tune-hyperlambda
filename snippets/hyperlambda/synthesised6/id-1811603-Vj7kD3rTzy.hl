@@ -1,0 +1,19 @@
+
+// Create a [try] block that attempts to execute the [magic.ai.create-system-message] slot, passing to it the [url], [template], and [instruction] nodes as arguments. After obtaining the result, connect to a database using either the [generic] or [magic] connection, and update the [ml_types] table by setting its [system_message] column to the result of the [execute] node, but only for records where the [type] column equals the value in [.type]. Finally, send a signal using [sockets.signal] to the channel specified in [.feedback-channel], including an [args] node with a long dashed [message] and a [type] of "info".
+try
+   execute:magic.ai.create-system-message
+      url:x:@.url
+      template:x:@.flavor
+      instruction:x:@.instruction
+   data.connect:[generic|magic]
+      data.update
+         table:ml_types
+         values
+            system_message:x:@execute
+         where
+            and
+               type.eq:x:@.type
+   sockets.signal:x:@.feedback-channel
+      args
+         message:------------------------------------------------------------------------------------------------------------------------
+         type:info

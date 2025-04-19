@@ -1,0 +1,65 @@
+
+// Create a conditional block that checks if the [.arguments/*/massage] node exists, is not empty, and the result of [openai.tokenize] executed on [.content] is less than 15,000. If these conditions are met, concatenate a string indicating a summary is being created for the referenced file using the value of [.dp/#], send a socket signal with this info to the feedback channel specified in [.arguments/*/feedback-channel], and perform an HTTP POST request to "https://api.openai.com/v1/chat/completions" with appropriate headers and a JSON payload for the OpenAI API, using [.arguments/*/massage] and [.content] as the content for the messages. If the HTTP response status is between 200 and 299 (inclusive), add a new snippet to [.snippets] containing the prompt and the content from the API response. Otherwise, send a warning signal with a failure message to the feedback channel and add a snippet containing [.file-meta] as the prompt and [.content] as the completion.
+if
+   and
+      exists:x:@.arguments/*/massage
+      neq:x:@.arguments/*/massage
+         .
+      neq:x:@.arguments/*/massage
+         .:
+      lt
+         openai.tokenize:x:@.content
+         .:int:15000
+   .lambda
+      strings.concat
+         .:"Creating summary for file: "
+         get-value:x:@.dp/#
+      unwrap:x:+/*/*/message
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      http.post:"https://api.openai.com/v1/chat/completions"
+         headers
+            Authorization:x:@.token
+            Content-Type:application/json
+         payload
+            model:gpt-3.5-turbo-1106
+            max_tokens:int:2000
+            temperature:decimal:0.5
+            messages
+               .
+                  role:system
+                  content:x:@.arguments/*/massage
+               .
+                  role:system
+                  content:x:@.content
+         convert:true
+      if
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+         .lambda
+            unwrap:x:+/*/*/*
+            add:x:@.snippets
+               .
+                  .
+                     prompt:x:@http.post/*/content/*/choices/0/*/message/*/content
+                     completion:x:@.content
+      else
+         strings.concat
+            .:"Could not create summary for file: "
+            get-value:x:@.dp/#
+         unwrap:x:+/*/*/message
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@strings.concat
+               type:warning
+         unwrap:x:+/*/*/*
+         add:x:@.snippets
+            .
+               .
+                  prompt:x:@.file-meta
+                  completion:x:@.content

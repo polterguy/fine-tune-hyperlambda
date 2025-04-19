@@ -1,0 +1,33 @@
+
+// Check if the current [.dp] node contains any descendant [#text] nodes, and if so, check if the [.snippets/0/-/*/completion] node exists. If it does, append a Markdown code block (with line breaks and the trimmed value of the first [#text] descendant node under [.dp]) to [.snippets/0/-/*/completion]. If the [.completion] node does not exist, create a Markdown code block string from the trimmed first [#text] descendant node of [.dp], and add it as a new [completion] node under [.snippets/0/-].
+if
+   exists:x:"@.dp/#/**/\\#text"
+   .lambda
+      if
+         exists:x:@.snippets/0/-/*/completion
+         .lambda
+            set-value:x:@.snippets/0/-/*/completion
+               strings.concat
+                  get-value:x:@.snippets/0/-/*/completion
+                  .:@"
+
+```
+"
+                  strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+                     .:@"  
+	"
+                  .:@"
+```"
+      else
+         strings.concat
+            .:@"```
+"
+            strings.trim:x:"@.dp/#/**/\\#text/[0,1]"
+               .:@"  
+	"
+            .:@"
+```"
+         unwrap:x:+/*/*
+         add:x:@.snippets/0/-
+            .
+               completion:x:@strings.concat

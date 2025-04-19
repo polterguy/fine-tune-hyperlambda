@@ -1,0 +1,83 @@
+
+// Create a conditional block that checks if the number of OpenAI tokens required for the value in [.embedding] is less than 8191. If so, concatenate a message that includes the value of the [prompt] node under the currently iterated [.dp] node, and then unwrap and signal this message to the feedback channel specified in [.arguments] -> [feedback-channel] with a type of "info". Proceed to POST to the OpenAI embeddings API using the model in [.vector-model] and input from [.embedding], passing the appropriate authorization and content-type headers, and convert the result. If the HTTP response status is not between 200 (inclusive) and 300 (exclusive), increment the [.failed] counter, convert the [http.post] response to Hyperlambda and log an error with the error message from the response. Also, signal a warning message with the failed [prompt] to the feedback channel. If the HTTP status is 429 or 500, signal a "cool down" info message to the feedback channel and sleep for 5 seconds before continuing. Otherwise, signal a root-level backend error, set [.continue] to false, and abort further processing. If the response is successful, format the embedding as a comma-separated list surrounded by square brackets, update the "ml_training_snippets" table in the [generic|magic] data connection by setting the [embedding] column for the current snippet's [id], and increment the [.success] counter.
+if
+   lt
+      openai.tokenize:x:@.embedding
+      .:int:8191
+   .lambda
+      strings.concat
+         .:"Vectorizing: \""
+         get-value:x:@.dp/#/*/prompt
+         .:"\""
+      unwrap:x:+/*/args/*/message
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@strings.concat
+            type:info
+      http.post:"https://api.openai.com/v1/embeddings"
+         headers
+            Authorization:x:@.token
+            Content-Type:application/json
+         payload
+            model:x:@.vector-model
+            input:x:@.embedding
+         convert:true
+      if
+         not
+            and
+               mte:x:@http.post
+                  .:int:200
+               lt:x:@http.post
+                  .:int:300
+         .lambda
+            math.increment:x:@.failed
+            lambda2hyper:x:@http.post
+            log.error:Something went wrong while invoking OpenAI
+               message:x:@http.post/*/content/*/error/*/message
+               error:x:@lambda2hyper
+            strings.concat
+               .:"OpenAI failed, could not create vectors for '"
+               get-value:x:@.dp/#/*/prompt
+               .:"'"
+            unwrap:x:+/*/args/*/message
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:x:@strings.concat
+                  type:warning
+            if
+               or
+                  eq:x:@http.post
+                     .:int:429
+                  eq:x:@http.post
+                     .:int:500
+               .lambda
+                  sockets.signal:x:@.arguments/*/feedback-channel
+                     args
+                        message:Continuing in 5 seconds with the next snippet to let OpenAI cool down first
+                        type:info
+                  sleep:5000
+            else
+               sockets.signal:magic.backend.message
+                  roles:root
+                  args
+                     message:Could not vectorize snippet and it was a non-transitional error, aborting vectorization for type
+                     type:error
+               set-value:x:@.continue
+                  .:bool:false
+      else
+         .embedding
+         set-value:x:@.embedding
+            strings.concat
+               .:[
+               strings.join:x:@http.post/*/content/*/data/0/*/embedding/*
+                  .:,
+               .:]
+         data.connect:[generic|magic]
+            data.update
+               table:ml_training_snippets
+               values
+                  embedding:x:@.embedding
+               where
+                  and
+                     id.eq:x:@.dp/#/*/id
+         math.increment:x:@.success
