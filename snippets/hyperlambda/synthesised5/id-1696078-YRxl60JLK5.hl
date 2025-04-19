@@ -1,0 +1,26 @@
+
+/*
+ * 1. The [strings.concat] slot is used to construct a dynamic SQL fragment by joining together a series of string values and expressions.
+ * 2. [get-value:x:@.sql] retrieves the current value of the [.sql] node, allowing incremental SQL statement construction.
+ * 3. Several static string segments are included, representing parts of a SQL CASE WHEN clause for counting substring occurrences in a field.
+ * 4. [get-value:x:@.fields] fetches the field name(s) to be inserted into the SQL expression, enabling field-level customization.
+ * 5. [get-value:x:@.no] and the use of `@p` allow for parameterized or dynamic input, such as a search or match string, to be injected into the SQL.
+ * 6. The end result is a conditional SQL expression that counts how many times a lower-cased parameter value appears within a lower-cased field, returning 1 if found, 0 if not.
+ * 
+ * Use Cases:
+ * - Dynamically generating SQL queries for advanced search features that determine if a substring appears in a database field.
+ * - Constructing SQL CASE statements for counting keyword occurrences as part of reporting or analytics.
+ * - Building parameterized SQL fragments for custom filtering logic in an endpoint or data access layer.
+ * - Augmenting an existing SQL statement with conditional logic based on runtime arguments or user input.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" + CASE WHEN ((length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)) > 0 THEN 1 ELSE 0 END

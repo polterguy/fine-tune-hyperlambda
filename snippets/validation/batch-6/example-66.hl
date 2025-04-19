@@ -1,0 +1,25 @@
+/*
+ * Loads support tickets from the [Tickets] table in the [support] database,
+ * filtered by a required ticket [Status.eq] value.
+ *
+ * 🔹 Although [Status.eq] is not declared as mandatory, it is
+ * **implicitly required** because it is referenced directly within [data.read].
+ *
+ * - The query will fail without this argument, as no dynamic inclusion logic is present.
+ * - The [data.read] filter assumes that [Status.eq] is always supplied.
+ *
+ * 🔸 Choose this approach when:
+ * 1. The business logic only makes sense with a status filter applied.
+ * 2. You want to avoid running unfiltered, full-table scans.
+ * 3. You prefer clearly defined input-output behavior without ambiguity.
+ */
+.arguments
+   Status.eq:string
+data.connect:support
+   data.read
+      table:Tickets
+      where
+         and
+            Status.eq:x:@.arguments/*/Status.eq
+   yield
+      tickets:x:@data.read/*

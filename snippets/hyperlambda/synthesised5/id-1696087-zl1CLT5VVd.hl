@@ -1,0 +1,66 @@
+
+/*
+ * 1. [set-name:x:@data.connect/*/data.read/*/group/*/group_column] and [set-name:x:+/*/*] dynamically rename nodes in the data structure to the value of [.group_column] from [.arguments]. This enables flexible "group by" column naming based on input arguments.
+ * 2. [insert-before:x:@data.connect/*/data.read/*/columns/0] injects a new column at the beginning of the [columns] list, labeled [.group_column], allowing the grouped column to be included in the selected results.
+ * 3. [set-value:x:@data.connect/*/data.read/*/columns/1/*/as] renames the alias of the aggregate function column to the value of [.aggregate_function] from [.arguments], ensuring result columns are clearly labeled.
+ * 4. [remove-nodes:x:@.arguments/*/group_column], [remove-nodes:x:@.arguments/*/limit], [remove-nodes:x:@.arguments/*/offset], [remove-nodes:x:@.arguments/*/order], and [remove-nodes:x:@.arguments/*/direction] clean up the [.arguments] node by removing processed parameters.
+ * 5. [add:x:@data.connect/*/data.read] and [add:x:./*/data.read] append [limit], [offset], [order], and [direction] nodes (if present) to the [data.read] node, allowing for dynamic query construction based on optional arguments.
+ * 6. [set-name:x:./*/data.read/*/columns/*/aggregate_functor] and [strings.concat] construct the aggregate function column by combining the function and target column (e.g., "COUNT(client_id)"), dynamically building the SQL aggregate expression.
+ * 7. [add:x:./*/data.read/*/where/*/and] adds any remaining argument nodes as additional where conditions under the [and] node.
+ * 8. The [data.read] node at the end defines the default table ([leads]), join with [clients], columns, where, and group structure, serving as the SQL query template.
+ * 9. [return-nodes:x:@data.read/*] returns the results from the executed [data.read] query.
+ * 
+ * Use cases:
+ * - Dynamically builds a grouped SQL aggregate query (e.g., COUNT, SUM) on the [leads] table, grouping by a user-specified column, and supports custom WHERE, LIMIT, ORDER, and OFFSET clauses.
+ * - Allows flexible reporting, such as "count leads per client" or "sum revenue per sales agent," depending on arguments provided.
+ * - Cleans up input arguments after using them for query construction, keeping execution clean and reusable.
+ * - Supports dynamic aliasing of result columns for clear, user-friendly output in custom reports or dashboards.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:leads
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  leads.client_id:client_id.client_id
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

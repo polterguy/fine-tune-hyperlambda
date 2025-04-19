@@ -1,0 +1,26 @@
+
+/*
+ * 1. The [else] node ensures this block only executes if all previous conditional branches were false, acting as a default/fallback.
+ * 2. [set-value] updates the value of [.sql] with the result of the string concatenation.
+ * 3. [strings.concat] builds a dynamic SQL fragment by joining together the current value of [.sql] and several static and dynamic pieces to form a complex SQL CASE expression.
+ * 4. Multiple [get-value] nodes are used to insert the current values of [.sql], [.fields], and [.no] at specific points in the resulting SQL string, making the SQL generation dynamic and context-sensitive.
+ * 
+ * Use cases:
+ * - Creating a dynamic SQL CASE statement for full-text search or counting word occurrences, only if earlier conditions failed.
+ * - Building complex SQL queries in a code generation or query templating system, where field and parameter names are variable.
+ * - Serving as a fallback in dynamic SQL construction to ensure [.sql] is always assigned a valid statement.
+ * - Supporting search functionalities that need to check if a parameter appears in a field and return 1 or 0 accordingly.
+ */
+else
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" + CASE WHEN ((length("
+         get-value:x:@.fields
+         .:) - length(replace(lower(
+         get-value:x:@.fields
+         .:), @p
+         get-value:x:@.no
+         .:", ''))) / length(@p"
+         get-value:x:@.no
+         .:)) > 0 THEN 1 ELSE 0 END

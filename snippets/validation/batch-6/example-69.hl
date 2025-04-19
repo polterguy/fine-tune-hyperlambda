@@ -1,0 +1,26 @@
+/*
+ * Fetches product records from the [Products] table in the [inventory] database,
+ * filtered by a required [Category.eq] value.
+ *
+ * 🔹 Even though [Category.eq] is not marked as required using a validator,
+ * it is **implicitly mandatory** because [data.read] directly references it.
+ *
+ * This structure assumes:
+ * - The caller **must** supply the argument.
+ * - If omitted, the query will fail or produce no results due to unresolved references.
+ *
+ * 🔸 This pattern is appropriate when:
+ * 1. A filter is essential to the business logic (e.g., scoped product views).
+ * 2. You want deterministic and narrow queries.
+ * 3. The endpoint is designed to work only with a valid category context.
+ */
+.arguments
+   Category.eq:string
+data.connect:inventory
+   data.read
+      table:Products
+      where
+         and
+            Category.eq:x:@.arguments/*/Category.eq
+   yield
+      products:x:@data.read/*

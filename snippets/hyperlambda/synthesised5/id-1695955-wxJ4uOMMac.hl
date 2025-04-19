@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [if] slot checks if the value of [.no] is exactly equal to 0 using the [eq] slot.
+ * 2. If the condition is true, the [.lambda] child executes, which performs a [set-value] operation on the [.sql] node.
+ * 3. The new value for [.sql] is built by [strings.concat], which concatenates the current [.sql] value with several code fragments and parameters to form a SQL expression.
+ * 4. The concatenated SQL expression uses fragments based on the value of [.fields] and dynamically inserts the value of [.no] at various points, constructing a formula that calculates the number of occurrences of a substring (parameterized by [.no]) within a field (parameterized by [.fields]).
+ * 
+ * Use cases:
+ * - Generating a SQL snippet to count the number of times a specific substring appears in a text field, when [.no] is 0.
+ * - Dynamically building complex SQL queries where the substring and field names are determined at runtime.
+ * - Enhancing or modifying the [.sql] node only if a specific condition regarding [.no] is met, such as for query optimization or reporting purposes.
+ * - Automating the construction of search or analytics queries where input parameters control the generated SQL code.
+ */
+if
+   eq:x:@.no
+      .:int:0
+   .lambda
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" (length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)

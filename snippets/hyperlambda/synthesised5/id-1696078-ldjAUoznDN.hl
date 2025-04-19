@@ -1,0 +1,25 @@
+
+/*
+ * 1. [set-value] updates the value of the [.sql] node with the result of a concatenation process.
+ * 2. [strings.concat] combines multiple string fragments and values into a single string, assembling a dynamic SQL snippet.
+ * 3. [get-value] retrieves the values from the [.sql], [.fields], and [.no] nodes at various points in the concatenation, allowing the resulting SQL to be customized based on their current values.
+ * 4. The concatenated string constructs a SQL expression using a CASE statement to check if a specified substring (from [.no]) exists within a field (from [.fields]) by comparing string lengths before and after a replacement operation. If the substring occurs at least once, the CASE returns 1; otherwise, it returns 0.
+ * 
+ * Use cases:
+ * - Dynamically appending a computed CASE WHEN clause to an existing SQL query stored in [.sql].
+ * - Building a SQL search filter to determine if a field contains a specific substring, useful for search or highlighting matches.
+ * - Generating complex SQL conditions for reporting or validation logic based on node-driven parameters.
+ * - Modifying an existing SQL statement on-the-fly by programmatically injecting logic for field analysis.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" + CASE WHEN ((length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)) > 0 THEN 1 ELSE 0 END

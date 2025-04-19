@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [if] slot checks whether the value of [.no] is equal to 0 by using the [eq] slot. If true, it executes the child lambda.
+ * 2. Inside the lambda, [set-value] updates [.sql] with a new value.
+ * 3. The new value for [.sql] is created by [strings.concat], which concatenates the current value of [.sql] with a complex SQL CASE WHEN string.
+ * 4. [get-value] is repeatedly used to insert the dynamic values of [.sql], [.fields], and [.no] into specific positions in the SQL fragment being constructed.
+ * 
+ * Use cases:
+ * - Dynamically building a SQL CASE WHEN expression to count or flag occurrences of a search term in a text field.
+ * - Conditionally augmenting a SQL query only if [.no] equals zero, such as when initializing or handling the first iteration in a loop.
+ * - Enhancing a query string for analytics or reporting purposes, where each field's contribution is appended based on logic.
+ * - Constructing parameterized SQL for advanced text search features, like case-insensitive matching or keyword counting.
+ */
+if
+   eq:x:@.no
+      .:int:0
+   .lambda
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" CASE WHEN ((length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)) > 0 THEN 1 ELSE 0 END

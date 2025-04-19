@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [strings.concat] slot is used to concatenate multiple string fragments and values into a single string, building a dynamic SQL CASE statement.
+ * 2. [get-value:x:@.sql] and [get-value:x:@.fields] retrieve the current values of the [.sql] and [.fields] nodes, respectively, and inject them into the concatenated string.
+ * 3. [get-value:x:@.no] is used multiple times to insert the value of the [.no] node at specific positions within the SQL string.
+ * 4. String literals are interleaved with dynamic values to construct a complex SQL expression involving CASE, length, replace, and lower functions, as well as parameter placeholders like @p.
+ * 
+ * Use cases:
+ * - Dynamically generating a SQL CASE statement to check for the presence of a substring within a field, where both the field name and parameter index are determined at runtime.
+ * - Constructing advanced SQL queries in search/filter features, such as case-insensitive search or pattern matching in a given column.
+ * - Building parameterized queries for reporting or analytics dashboards where field selection and search tokens are based on user input.
+ * - Supporting multi-field or multi-token search operations by iteratively updating [.sql] and [.fields] nodes and constructing corresponding SQL logic.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" CASE WHEN ((length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)) > 0 THEN 1 ELSE 0 END

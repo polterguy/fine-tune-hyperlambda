@@ -1,0 +1,36 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the [northwind] database, specifying the use of SQLite as the [database-type].
+ * 2. [add] injects nodes from [.arguments] into the [and] node under the [where] clause of [data.read], dynamically extending filtering conditions based on runtime arguments.
+ * 3. [data.read] configures an SQL SELECT operation on the [Employees] table, performing a left join to itself (aliased as [ReportsTo]) to relate employees to their managers using [Employees.ReportsTo = ReportsTo.EmployeeID].
+ * 4. [columns] specifies the query should return the count of matching records, labeled as [count].
+ * 5. [where] includes an [and] node for compound conditions, which may be populated by the dynamic [add] step.
+ * 6. [limit] restricts the result to a single record.
+ * 7. [return-nodes] outputs all nodes under [data.read], exposing the query result to the caller.
+ * 
+ * Use cases:
+ * - Counting the number of employees in the [Employees] table that match dynamic search criteria, such as filtering by department or role, supplied at runtime.
+ * - Reporting how many employees report to a specific manager by passing the appropriate argument to the endpoint.
+ * - Creating dashboard widgets that show employee counts with various filters, leveraging dynamic argument injection for flexible queries.
+ * - Verifying system connectivity and SQL query correctness by returning the count of employee records using a left self-join.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Employees
+         join:Employees
+            as:ReportsTo
+            type:left
+            on
+               and
+                  Employees.ReportsTo:ReportsTo.EmployeeID
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

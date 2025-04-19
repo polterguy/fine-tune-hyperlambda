@@ -1,0 +1,23 @@
+
+/*
+ * 1. The [strings.concat] slot is used to concatenate multiple string segments and dynamic values into a single SQL expression. It gathers its parts both from static string fragments and dynamically evaluated nodes.
+ * 2. [get-value] is used repeatedly to inject the values from [.sql], [.fields], and [.no] nodes directly into the concatenated string, allowing the constructed result to be contextually dynamic.
+ * 3. The resulting string builds a SQL fragment for counting substring occurrences: it calculates the difference in length between the original and a replaced version of a lowercased field, then divides by the length of the substring to count, effectively producing a count of occurrences.
+ * 
+ * Use cases:
+ * - Dynamically generate a SQL expression to count how many times a substring appears within a field for custom SQL analytics.
+ * - Build complex SQL queries programmatically in Hyperlambda by composing fragments from context-sensitive node values.
+ * - Create advanced reports or search features where substring frequency within database fields is needed, driven by user input or configuration nodes.
+ * - Automate query construction for data processing pipelines where the target field and substring to search for are determined at runtime.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" (length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)

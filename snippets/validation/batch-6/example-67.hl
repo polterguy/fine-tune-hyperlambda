@@ -1,0 +1,27 @@
+/*
+ * Retrieves artist records from the [Artist] table in the [chinook] database,
+ * filtering results using a [Name.like] pattern provided through [.arguments].
+ *
+ * 🔹 The filtering argument [Name.like] is defined in the [.arguments] block and is
+ * **implicitly mandatory**, even though it's not enforced using [validators.mandatory].
+ *
+ * This is because:
+ * - The argument is **directly referenced** inside the [data.read] clause.
+ * - There is no conditional logic or use of [add] to include the argument dynamically.
+ * - If the caller omits [Name.like], the invocation will not work as intended.
+ *
+ * 🔸 Why this matters:
+ * 1. If you intend to allow optional filters, consider wrapping them in a dynamic [add] or [if] block.
+ * 2. This pattern is best used when the argument is **required for the logic to execute** properly.
+ * 3. Although not technically marked mandatory, this structure behaves as if it were — and should be treated accordingly.
+ */
+.arguments
+   Name.like:string
+data.connect:chinook
+   data.read
+      table:Artist
+      where
+         and
+            Name.like:x:@.arguments/*/Name.like
+   yield
+      artists:x:@data.read/*
