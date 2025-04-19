@@ -1,40 +1,30 @@
-
 /*
- * Updates a record in the Customers table of the Northwind database.
+ * This file defines a secure and parameterized update operation for modifying records in the `Customers` table
+ * within the Northwind SQLite database.
  *
- * The following steps describe the update flow:
+ * The primary purpose is to allow authorized users to update customer information while ensuring that:
+ * - the target record is uniquely identified,
+ * - only authenticated administrators can perform the update,
+ * - and downstream systems can react to changes via real-time socket signaling.
  *
- * 1. **Input arguments**:
- *    - Receives all possible fields of a customer including the mandatory primary key `CustomerID`.
- *    - Fields like `CompanyName`, `City`, `Phone`, etc., are optional and contain the new values to apply.
+ * Core features and logic:
  *
- * 2. **Validation**:
- *    - Ensures the `CustomerID` is provided using `[validators.mandatory]`, as it is necessary to locate the record.
+ * - Requires the `CustomerID` argument as the primary key to identify which record to update.
+ * - Accepts new values for all editable fields: CompanyName, ContactName, ContactTitle, Address, City, Region,
+ *   PostalCode, Country, Phone, and Fax.
+ * - Validates that `CustomerID` is provided using `validators.mandatory` to avoid unsafe or incomplete updates.
+ * - Access is restricted to users with the `admin` role using `auth.ticket.verify`.
+ * - Dynamically constructs the SQL `UPDATE` statement by mapping all provided fields into the `values` clause,
+ *   and generating a `WHERE` clause using the primary key.
+ * - Executes the update operation via `data.update`, and immediately checks whether a matching record was found.
+ *     - If no records were updated, a `404 Not Found` status is returned.
+ *     - Otherwise, a `202 Accepted` status is returned to indicate successful processing.
+ * - Publishes a socket message named `northwind.Customers.put`, including the updated data and user roles,
+ *   enabling real-time notifications to other system components or clients.
+ * - Returns the number of affected records as the final response.
  *
- * 3. **Authorization check**:
- *    - Restricts access to users with the `admin` role using `[auth.ticket.verify]`.
- *
- * 4. **Database connection**:
- *    - Opens a connection to the `northwind` database with SQLite as the database type using `[data.connect]`.
- *
- * 5. **Preparation for update**:
- *    - Adds update values from all fields (excluding the primary key) using slicing `[1,1000]`.
- *    - Injects the `CustomerID` as a filtering condition under the `where` clause to identify the correct record.
- *
- * 6. **Update invocation**:
- *    - Executes `[data.update]` to modify the specified customer row in the `Customers` table.
- *
- * 7. **Existence check**:
- *    - Checks whether any row was actually updated. If not, returns HTTP `404` with message `"Record not found"`.
- *
- * 8. **Success response setup**:
- *    - If update was successful, responds with HTTP `202 Accepted`.
- *
- * 9. **Broadcasting changes**:
- *    - Emits a socket message (`northwind.Customers.put`) with the update arguments and user roles to notify listeners.
- *
- * 10. **Final result**:
- *    - Returns the number of affected rows under the key `affected`.
+ * This workflow is designed to support safe, auditable, and reactive updates to customer data
+ * in enterprise environments with strict authorization and real-time monitoring needs.
  */
 .arguments
 

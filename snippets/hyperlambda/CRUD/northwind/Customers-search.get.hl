@@ -1,34 +1,22 @@
-
 /*
- * This Hyperlambda endpoint performs a distinct keyword search on the [Customers] table in the [northwind] SQLite database.
+ * This file implements a dynamic full-text search mechanism over the Customers table in the Northwind database,
+ * allowing users to search multiple fields using natural language input while ranking results by keyword relevance.
  *
- * 1. [.arguments]
- *    - Requires a [query] string, which is split into individual keywords.
- *    - Supports optional pagination via [limit] and [offset].
+ * Key capabilities include:
  *
- * 2. [.words]
- *    - Splits the query into keywords using space as a delimiter.
- *    - Normalizes all keywords to lowercase to make search case-insensitive.
+ * - Accepts a mandatory `query` argument which is split into lowercase keywords for processing.
+ * - Supports optional `limit` and `offset` arguments for result pagination with a default limit of 10.
+ * - Performs case-insensitive matching across multiple pre-defined columns, specified in a `.columns` list.
+ * - Dynamically builds an SQL query that calculates:
+ *     1. `keyword_density` — how densely the search keywords appear in the target fields.
+ *     2. `keyword_count` — how many distinct search keywords are matched.
+ * - Results are sorted first by keyword_count (descending) and then by keyword_density (descending), 
+ *   prioritizing the most relevant matches.
+ * - Protects against SQL injection by parameterizing keywords and enforcing lowercase normalization.
+ * - Automatically cleans up auxiliary fields (`keyword_density` and `keyword_count`) before returning results to the caller.
  *
- * 3. [.columns]
- *    - Defines which columns to include in the full-text search. All values are concatenated together into a single string for keyword matching.
- *
- * 4. [.sql]
- *    - Dynamically builds a SQL SELECT statement with two computed fields:
- *      - [keyword_density]: Measures the relative density of keyword matches in text.
- *      - [keyword_count]: Measures how many distinct keywords from the query matched the record.
- *    - Uses `replace` and `length` functions to simulate full-text scoring.
- *
- * 5. [data.select]
- *    - Executes the composed SQL against the database with appropriate filtering, ordering, and optional pagination.
- *
- * 6. [remove-nodes]
- *    - Strips helper fields [keyword_density] and [keyword_count] from final output before returning.
- *
- * 7. [return-nodes]
- *    - Returns only matching customer records, ordered by relevance using keyword metrics.
- *
- * This is ideal for implementing a ranked full-text-like keyword search over non-indexed SQLite columns.
+ * This module is ideal for implementing robust search functionality in applications, combining relevance scoring,
+ * keyword presence logic, and efficient pagination, all declaratively defined using Hyperlambda.
  */
 .arguments
 

@@ -1,44 +1,33 @@
 
 /*
- * Performs a distinct keyword search from the [Regions] table in the [northwind] SQLite database.
+ * This file implements a keyword-based search endpoint for the `Regions` table in the Northwind SQLite database.
+ * The goal is to enable flexible, natural-language-like search functionality that ranks results based on relevance.
  *
- * 1. [.arguments]
- *    * Accepts:
- *      - [query] (required): the search string containing space-separated keywords.
- *      - [limit] (optional): max number of results, defaults to 10.
- *      - [offset] (optional): number of records to skip (used for pagination).
+ * Purpose and Design:
+ * - Accepts a free-text query from the user and splits it into keywords.
+ * - Performs case-insensitive matching across the `RegionDescription` column.
+ * - Ranks results based on two computed relevance scores: keyword density and distinct keyword count.
+ * - Supports pagination through optional `limit` and `offset` parameters.
  *
- * 2. [validators.mandatory], [validators.default]
- *    * Validates that [query] is supplied and applies a default [limit] of 10.
+ * Key Functional Components:
  *
- * 3. [.words]
- *    * Splits [query] into individual keywords and ensures all are in lowercase.
+ * - `query` is a required argument and is split into lowercase keywords using `strings.split`.
+ * - Input is normalized to prevent SQL injection by ensuring all keywords are lowercase and parameterized.
+ * - The column to search against is fixed as `RegionDescription`.
  *
- * 4. [.columns]
- *    * Specifies the searchable columns in the [Regions] table: [RegionDescription].
+ * SQL Logic (Dynamically Constructed):
+ * 1. **Concatenation of searchable fields**: In this case, only one field—`RegionDescription`—is wrapped in a `coalesce(...)` call to ensure null-safe search.
+ * 2. **Keyword Density Calculation**: For each keyword, it calculates how many times it appears and how densely it populates the field.
+ * 3. **Distinct Keyword Count**: Determines how many unique keywords are present in the field.
+ * 4. **Filtering**: Filters out any rows where `keyword_count` is zero.
+ * 5. **Ordering**: Results are ordered by `keyword_count` (descending) and `keyword_density` (descending), making matches with more diverse and dense keyword usage appear first.
+ * 6. **Pagination**: Applies `LIMIT` and optional `OFFSET` clauses based on user input.
  *
- * 5. [data.connect]
- *    * Connects to the [northwind] SQLite database using a generic connection string.
+ * Final Output:
+ * - Executes the SQL using `data.select`.
+ * - Cleans up helper fields (`keyword_density` and `keyword_count`) before returning results to the user.
  *
- * 6. [.sql] logic
- *    * Dynamically constructs a SQL query that:
- *      - Calculates a [keyword_density] score based on frequency of keywords.
- *      - Counts how many distinct keywords are matched in each row as [keyword_count].
- *      - Filters out records that match none of the keywords.
- *      - Orders results by [keyword_count] (descending), then [keyword_density].
- *
- * 7. [set-name], [unwrap]
- *    * Dynamically creates query parameters for safe SQL substitution.
- *
- * 8. [remove-nodes]
- *    * Cleans up temporary scoring fields before returning results to the caller.
- *
- * 9. [return-nodes]
- *    * Sends the final filtered and sorted dataset back to the API client.
- *
- * Use cases:
- * * Keyword-based search across geographic region metadata.
- * * Interactive region lookup with full-text relevance ranking.
+ * This module is ideal for implementing a ranked search API for region descriptors or similar textual fields, offering both relevance scoring and efficient paging.
  */
 .arguments
 

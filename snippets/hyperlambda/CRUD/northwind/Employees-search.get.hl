@@ -1,47 +1,32 @@
-
 /*
- * This Hyperlambda endpoint performs a keyword search on the [Employees] table in the 'northwind' database,
- * and returns all matching records containing one or more distinct keywords.
+ * This file implements a keyword-based search mechanism over the `Employees` table in the Northwind SQLite database,
+ * allowing natural language-like queries to retrieve and rank relevant employee records using keyword relevance scoring.
  *
- * 1. [.arguments]
- *    * Declares required input arguments:
- *      - [query]: A string of space-separated keywords to search for (mandatory).
- *      - [limit]: Optional number of rows to return, default is 10.
- *      - [offset]: Optional pagination offset for results.
+ * Purpose and Scope:
+ * - Supports free-text queries across multiple columns in the `Employees` table.
+ * - Calculates two types of relevance metrics: keyword density and keyword count.
+ * - Sorts results by relevance, enabling a basic but effective fuzzy search experience.
  *
- * 2. [validators.mandatory]
- *    * Ensures that the [query] argument is present.
+ * Functional Highlights:
  *
- * 3. [validators.default]
- *    * Sets [limit] to 10 if the user did not specify it.
+ * - Accepts a mandatory `query` argument, which is split into individual lowercase keywords to enable case-insensitive search.
+ * - Optional `limit` and `offset` arguments provide pagination support, with a default result size of 10 records.
+ * - Performs SQL-safe, normalized matching by transforming keywords to lowercase and parameterizing the query.
+ * - Searches against a predefined list of employee-related columns, such as `LastName`, `Title`, `Address`, and `Notes`.
+ * 
+ * SQL Logic Breakdown:
+ * 1. **Concatenation of searchable fields**: Uses `coalesce(...)` and `||` to form a unified search field for all rows.
+ * 2. **Keyword density calculation**: Measures how frequently each keyword appears within the concatenated fields.
+ * 3. **Distinct keyword count**: Counts how many unique keywords are matched per row.
+ * 4. **Filtering and ordering**: Only records with at least one keyword match (`keyword_count > 0`) are selected, and
+ *    results are sorted by keyword_count descending, then keyword_density descending.
  *
- * 4. [.words]
- *    * Splits the [query] into separate lowercase keywords for processing and comparison.
+ * Additional Behavior:
+ * - The final SQL is dynamically assembled using `strings.concat`, adjusted per keyword using iteration and conditional logic.
+ * - Temporary helper fields (`keyword_density`, `keyword_count`) are removed before returning the final JSON output.
+ * - The use of Hyperlambda ensures declarative, extensible design while enforcing input validation and safe data operations.
  *
- * 5. [.columns]
- *    * Defines a list of columns to search across in the [Employees] table. This list is used to construct a unified search expression.
- *
- * 6. [data.connect]
- *    * Opens a connection to the 'northwind' database using the [generic] connection string and sets [database-type] to 'sqlite'.
- *
- * 7. [.sql]
- *    * Dynamically composes a SQL SELECT query with the following computed fields:
- *      - [keyword_density]: A floating-point value estimating how dense keyword matches are across text.
- *      - [keyword_count]: An integer count of how many distinct keywords were found in the record.
- *
- * 8. [data.select]
- *    * Executes the fully composed SQL query and uses parameters to safely search for each keyword, avoiding SQL injection.
- *
- * 9. [remove-nodes]
- *    * Removes intermediate helper fields ([keyword_density], [keyword_count]) before sending the response to keep output clean.
- *
- * 10. [return-nodes]
- *     * Returns all records matching the keyword(s), ordered by distinct match count and density.
- *
- * **Use cases:**
- * * Create intelligent keyword-based filtering/search on personnel data.
- * * Power advanced admin dashboards and search forms.
- * * Reuse the logic with minimal adjustments for other tables and databases.
+ * This module is ideal for building intelligent search endpoints in admin dashboards, directory explorers, or HR systems.
  */
 .arguments
 

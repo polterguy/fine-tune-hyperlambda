@@ -1,26 +1,30 @@
-
 /*
- * How can you securely delete an employee record from the Employees table in the northwind database,
- * verify user authorization, and notify subscribed systems via sockets?
+ * This file defines a secure and parameterized delete operation for removing records from the `Employees` table
+ * in the Northwind SQLite database.
  *
- * 1. **Authorization and validation**:
- *    - Ensures that the user is authenticated with the `admin` role via `[auth.ticket.verify]`.
- *    - Confirms that the `EmployeeID` argument is provided using `[validators.mandatory]`.
-
- * 2. **Establishing database connection**:
- *    - Opens a connection to the `northwind` SQLite database using `[data.connect]`.
-
- * 3. **Delete query setup**:
- *    - Injects the `EmployeeID` argument into the `where/and` clause of the delete operation via `[add]`.
- *    - Uses `[data.delete]` to remove the corresponding employee record from the `Employees` table.
-
- * 4. **Socket-based event signaling**:
- *    - Adds both the deletion arguments and the authenticated user's roles to the `[sockets.signal]` invocation.
- *    - Emits a real-time signal with the topic `northwind.Employees.delete` to notify other systems or clients.
-
- * 5. **Returning outcome**:
- *    - Uses `[unwrap]` to simplify the response structure.
- *    - Returns the number of affected rows using `[return]`, which will typically be `1` if successful, or `0` if no record matched.
+ * Purpose:
+ * - Provides a controlled and auditable mechanism for deleting employee records.
+ * - Enforces strict validation and access control to prevent unauthorized or accidental deletions.
+ *
+ * Functional Overview:
+ *
+ * - Requires a single mandatory argument: `EmployeeID`, which serves as the primary key identifying the record to delete.
+ * - Uses `auth.ticket.verify` to ensure only users with the `admin` role can access the endpoint.
+ * - Validates the presence of the `EmployeeID` using `validators.mandatory`.
+ * - Establishes a connection to the SQLite-backed `northwind` database.
+ * - Dynamically constructs a `WHERE` clause for the `data.delete` operation based on the `EmployeeID` argument.
+ * - Executes the `DELETE` query via `data.delete`, removing the targeted employee record.
+ *
+ * Event Signaling:
+ * - After a successful deletion, the system emits a real-time socket message `northwind.Employees.delete`.
+ * - The message includes both the deleted record’s ID and the roles of the authenticated user who initiated the request.
+ * - This allows connected clients or systems to reactively update their views or caches.
+ *
+ * Output:
+ * - Returns a result object containing the number of affected rows (typically 1 if the deletion was successful, 0 otherwise).
+ *
+ * This endpoint is ideal for administrative tools that require strict access control, transparency, and real-time feedback
+ * when modifying critical data such as personnel records.
  */
 .arguments
 

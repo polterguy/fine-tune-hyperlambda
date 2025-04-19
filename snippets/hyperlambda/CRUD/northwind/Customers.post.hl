@@ -1,34 +1,24 @@
-
 /*
- * Creates a new record in the Customers table of the Northwind database.
+ * This file implements a secure and parameterized insert (create) operation for adding new records
+ * to the `Customers` table in the Northwind database.
  *
- * The following steps explain the logic in detail:
+ * Its purpose is to expose a backend endpoint that allows authenticated users with appropriate roles
+ * to insert customer data while ensuring security, type safety, and event signaling.
  *
- * 1. **Input arguments**:
- *    - Accepts values for all fields in the Customers table (e.g., `CustomerID`, `CompanyName`, `ContactName`, etc.).
- *    - All fields are expected to be provided as string values.
+ * Key functionality includes:
  *
- * 2. **Authorization check**:
- *    - Verifies the user has one of the allowed roles (`partner`, `professional`) using `[auth.ticket.verify]`.
+ * - Accepts structured input arguments corresponding to all major fields in the Customers table, including:
+ *   CustomerID, CompanyName, ContactName, ContactTitle, Address, City, Region, PostalCode, Country, Phone, and Fax.
+ * - Performs access control using `auth.ticket.verify`, limiting access to users with `partner` or `professional` roles.
+ * - Connects to a SQLite-based Northwind database and dynamically binds the input arguments into the `data.create` node.
+ * - Executes the insert operation (`data.create`) into the `Customers` table using the supplied parameters.
+ * - Sets the HTTP response status to `201 Created` upon successful insertion.
+ * - Publishes a real-time socket message (`sockets.signal`) named `northwind.Customers.post`, containing both the input
+ *   values and the authenticated user’s roles, allowing client-side systems to react to newly added data.
+ * - Returns a success result payload to the caller.
  *
- * 3. **Database connection**:
- *    - Establishes a connection to the Northwind database via `[data.connect]`, with `sqlite` as the database type.
- *
- * 4. **Parameter injection**:
- *    - All arguments are injected into the `[data.create]` invocation under the `values` section using `[add]` and `[get-nodes]`.
- *
- * 5. **Insert operation**:
- *    - Executes `[data.create]` to insert a new row into the `Customers` table using the provided values.
- *
- * 6. **HTTP response status**:
- *    - Sets the HTTP status to `201 Created` to indicate a successful creation operation.
- *
- * 7. **Socket message broadcasting**:
- *    - Prepares a socket message (`northwind.Customers.post`) by including the provided arguments and the current user's roles.
- *    - This notifies other clients or services about the new record creation.
- *
- * 8. **Final response**:
- *    - Returns a success message to the caller using `[return]`, with a key of `result` set to `"success"`.
+ * This declarative workflow supports seamless integration with client applications and enables safe, 
+ * scalable database mutations with full auditability and push-based update capabilities.
  */
 .arguments
 
