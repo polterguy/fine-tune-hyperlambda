@@ -1,0 +1,30 @@
+/*
+ * Identifies the data serialization format based on file extension.
+ *
+ * [strings.split] splits the full [.dataFile] path, and the `0/-` iterator sequence
+ * is used to reliably pull the **last** element — even with compound filenames.
+ *
+ * 🔹 Why this works:
+ * - `0` selects the first split list node.
+ * - `-` moves backward — effectively looping to the last node — making this ideal
+ *   for extracting **tail** values from any list.
+ *
+ * 🔸 Use cases:
+ * 1. Parsing files dynamically in import pipelines.
+ * 2. Applying schema validation rules based on format.
+ * 3. Enforcing format restrictions in an upload service.
+ */
+.dataFile:/data/backups/user.info.json
+.format
+strings.split:x:@.dataFile
+   .:.
+switch:x:@strings.split/0/-
+   case:json
+      set-value:x:@.format
+         .:application/json
+   case:yaml
+      set-value:x:@.format
+         .:application/x-yaml
+   case:xml
+      set-value:x:@.format
+         .:application/xml

@@ -1,0 +1,29 @@
+/*
+ * Extracts the category of a log file using its extension with [strings.split] and [switch].
+ *
+ * The [.logfile] variable contains the filename. [strings.split] breaks it down, and the 
+ * `0/-` iterator combo performs a clever **roundtrip** to extract the **last** segment.
+ *
+ * 🔹 What’s happening:
+ * - `0` navigates to the first node of the split.
+ * - `-` walks back and returns the last node — the log file type suffix.
+ *
+ * 🔸 Use cases:
+ * 1. Filtering logs by type in dashboards.
+ * 2. Applying different rotation rules by log category.
+ * 3. Routing log files to specific analyzers.
+ */
+.logfile:/var/logs/app/trace.error.log
+.logType
+strings.split:x:@.logfile
+   .:.
+switch:x:@strings.split/0/-
+   case:log
+      set-value:x:@.logType
+         .:standard
+   case:err
+      set-value:x:@.logType
+         .:error
+   case:trace
+      set-value:x:@.logType
+         .:trace
