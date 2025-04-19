@@ -1,50 +1,26 @@
 
 /*
- * This endpoint reads and returns records from the 'Appointments' table in a hospital database, 
- * supporting pagination, sorting, and a wide range of **optional filtering** parameters.
+ * Reads and lists records from the [Appointments] table in the [hospital] database,
+ * with optional joins to [Patients] and [Doctors] tables for enhanced filtering and display.
  *
- * The [.arguments] node defines several input parameters:
- * - [limit] and [offset] allow the caller to control pagination by specifying how many records 
- *   to return and where in the result set to start.
- * - [order] and [direction] enable sorting of the returned records by a fully qualified column 
- *   name in either ascending or descending order.
- * - A variety of **optional filter arguments** (e.g., 'Appointments.AppointmentDate.eq', 
- *   'DoctorID.FirstName.like') allow clients to constrain the result set. These filtering 
- *   arguments are not mandatory and can be **dynamically included or omitted**, providing 
- *   flexible query behavior based on client needs.
+ * Optional Arguments:
+ * - [limit], [offset]: Supports pagination.
+ * - [order], [direction]: Supports sorting by any fully qualified column name.
+ * - Filter options across:
+ *   - [Appointments]: Filter by AppointmentID, PatientID, DoctorID, AppointmentDate, and Reason (both eq and like).
+ *   - [Patients]: Filter by FirstName (exact or partial via LIKE).
+ *   - [Doctors]: Filter by FirstName (exact or partial via LIKE).
  *
- * The [response.headers.set] slot adds an HTTP header with 'Cache-Control: public, max-age=300' 
- * to allow client-side caching of the response for 300 seconds.
+ * Intentional:
+ * - Applies pagination, sorting, and filtering dynamically through [get-nodes] for flexible and secure query construction.
+ * - Uses LEFT JOINs to enrich appointment records with patient and doctor information.
+ * - Ensures filtered values are appended safely to the [where] clause.
+ * - Adds HTTP caching headers to improve frontend performance and reduce backend load.
  *
- * The [auth.ticket.verify] slot ensures only authenticated users with roles 'admin', 'guest', 
- * or 'root' are authorized to use this endpoint.
+ * Access:
+ * - Available to users with the [admin], [guest], or [root] roles.
  *
- * The [data.connect] slot initiates a connection to the 'hospital' database using the 
- * 'sqlite' engine through the 'generic' connector.
- *
- * Inside the database connection context:
- * - The first [add] block extracts [order] and [direction] from the argument set and appends 
- *   them to the [data.read] node to enable runtime sorting. These arguments are then removed 
- *   from the original argument set using [remove-nodes] to prevent duplication.
- *
- * - Similarly, the next [add] block injects [limit] and [offset] for pagination, followed 
- *   by their cleanup with [remove-nodes].
- *
- * - The final [add] block dynamically inserts any **remaining filter arguments** into the 
- *   [where] clause of the upcoming [data.read] operation. This design enables **optional filtering**: 
- *   only the filters provided by the caller are applied, while others are ignored, making the 
- *   filtering behavior dynamic and adaptive to the request.
- *
- * The [data.read] slot performs the actual SQL query:
- * - It queries the 'Appointments' table and joins related 'Patients' and 'Doctors' tables using 
- *   left joins to enrich the returned data.
- * - The [columns] node explicitly lists which fields to return, including the foreign key names 
- *   from joined tables and their aliases.
- * - The [where] clause starts as an empty [and] block and is dynamically populated at runtime 
- *   with any specified filters.
- *
- * Finally, the [return-nodes] slot extracts and returns the result of the [data.read] query 
- * to the client.
+ * Returns a structured list of appointment records, enriched with related names from the Patients and Doctors tables.
  */
 .arguments
 

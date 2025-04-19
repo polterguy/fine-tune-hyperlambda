@@ -1,57 +1,25 @@
-
 /*
- * This endpoint performs an aggregation (min, max, sum, or avg) on a selected column 
- * in the 'Doctors' table of a hospital database, optionally filtered by a variety of 
- * dynamic conditions.
+ * Performs an aggregate function on the [Doctors] table in the [hospital] database,
+ * returning a single result such as the minimum, maximum, sum, or average of a selected column.
  *
- * The [.arguments] node defines:
- * - [aggregate_function], a **mandatory** parameter specifying which aggregation to perform 
- *   (must be one of: 'min', 'max', 'sum', or 'avg').
- * - [aggregate_column], a **mandatory** fully qualified column name (e.g., 'Doctors.DoctorID') 
- *   that indicates which field to aggregate.
- * - A set of **optional filtering arguments** such as 'Doctors.Specialty.like' or 
- *   'Doctors.Email.eq' that allow callers to narrow the scope of the aggregation.
+ * Required Arguments:
+ * - [aggregate_function]: Must be one of [min], [max], [sum], or [avg].
+ * - [aggregate_column]: The column to apply the aggregation on, in TABLE_NAME.COLUMN_NAME format.
  *
- * The [validators.mandatory] slots ensure that both [aggregate_function] and 
- * [aggregate_column] are supplied.
+ * Optional Filtering:
+ * - Supports filtering on all key fields of the [Doctors] table:
+ *   - DoctorID, FirstName, LastName, Specialty, PhoneNumber, Email
+ *   - Filtering supports both exact matches and LIKE operations.
  *
- * The [validators.enum] slots validate that:
- * - [aggregate_function] is one of the permitted functions: 'min', 'max', 'sum', or 'avg'.
- * - [aggregate_column] is an approved column from the 'Doctors' table, ensuring both 
- *   structural and security integrity.
+ * Intentional:
+ * - Validates that both aggregation function and column are provided and match a predefined, safe list.
+ * - Dynamically builds the SQL aggregate function using [strings.concat] to prevent injection and promote flexibility.
+ * - Uses [get-nodes] to apply any additional filter arguments to the WHERE clause.
+ * - Adds public caching via HTTP headers for 5 minutes to reduce backend load on repeated queries.
+ * - Enforces role-based access control, restricting access to [admin], [guest], and [root] users.
  *
- * The [response.headers.set] slot sets 'Cache-Control' to allow public caching of the 
- * response for 300 seconds, improving performance for repeat queries.
- *
- * The [auth.ticket.verify] slot ensures that only users with roles 'admin', 'guest', or 'root' 
- * are authorized to invoke this endpoint.
- *
- * The [data.connect] slot opens a connection to the 'hospital' database using the 
- * 'sqlite' engine and the 'generic' connector.
- *
- * Within the database connection context:
- * - The [set-name] slot dynamically constructs an aggregate expression such as 
- *   'avg(Doctors.DoctorID)' using [strings.concat], assigning it to a new node named 
- *   [aggregate_functor] inside the [columns] node of the upcoming [data.read] call.
- *
- * - The [remove-nodes] slot strips out the now-handled [aggregate_function] and 
- *   [aggregate_column] arguments to streamline the argument structure before filtering.
- *
- * - The [add] slot dynamically injects any remaining filtering arguments into the [where] 
- *   clause of the SQL query. These filtering parameters are **optional** and their presence 
- *   is detected at runtime—this enables **dynamic filtering** based on whatever arguments 
- *   the client provides. If no filters are given, the query will return an aggregate 
- *   computed over all records.
- *
- * The [data.read] slot executes the query against the 'Doctors' table:
- * - It includes the dynamically constructed [aggregate_functor] in the [columns] node, 
- *   aliased as [result].
- * - The [where] clause is initialized with an empty [and] node and dynamically populated 
- *   only if any filters are provided.
- * - The [limit] is set to 1 since the result is a single aggregated value.
- *
- * Finally, the [return-nodes] slot extracts and returns the resulting aggregate value 
- * to the client.
+ * Returns:
+ * - A single aggregated value labeled as [result], suitable for analytics, reporting, or dashboard summaries.
  */
 .arguments
 

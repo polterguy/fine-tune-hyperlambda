@@ -1,41 +1,21 @@
-
 /*
- * This endpoint creates a new record in the 'Appointments' table of a hospital database, 
- * accepting all necessary input fields and returning the ID of the newly inserted entry.
+ * Creates a new record in the [Appointments] table of the [hospital] database.
  *
- * The [.arguments] node defines the input parameters required to create a new appointment:
- * - [PatientID], [DoctorID], [AppointmentDate], and [Reason] must all be provided, 
- *   corresponding to their respective columns in the 'Appointments' table.
+ * Required Arguments:
+ * - [PatientID], [DoctorID], [AppointmentDate], and [Reason]: All fields required to create a new appointment.
  *
- * The [auth.ticket.verify] slot ensures that only authenticated users with roles 
- * 'admin', 'guest', or 'root' are authorized to create new appointment entries.
+ * Security:
+ * - Accessible to users with [admin], [guest], or [root] roles.
  *
- * The [auth.ticket.get] slot retrieves information about the current authenticated user.
+ * Intentional:
+ * - Logs the creation event using [log.info], capturing both the user identity and input arguments.
+ * - Retrieves the invoking user's auth ticket via [auth.ticket.get] and formats inputs with [lambda2hyper].
+ * - Dynamically builds the [data.create] values using [get-nodes] for flexible insertion.
+ * - Inserts the appointment and returns the new record's ID in the response.
+ * - Responds with HTTP 201 (Created) status code.
+ * - Publishes a real-time WebSocket event [hospital.Appointments.post] with the input data, notifying [admin] and [root] roles.
  *
- * The [lambda2hyper] slot converts the incoming arguments to a Hyperlambda-compatible structure, 
- * which is passed to [log.info] to log the creation of the new appointment record along with 
- * the username and payload for audit purposes.
- *
- * The [data.connect] slot establishes a connection to the 'hospital' database using 
- * the 'sqlite' engine via the 'generic' connector.
- *
- * Inside the database connection context:
- * - The [add] slot dynamically moves the input arguments into the [values] section 
- *   of the upcoming [data.create] invocation, ensuring all input fields are included 
- *   in the SQL insert operation.
- *
- * - The [data.create] slot performs the actual insert into the 'Appointments' table.
- *   The [return-id:bool:true] setting instructs the operation to return the ID of 
- *   the newly created record.
- *
- * - The [response.status.set] slot sets the HTTP status code to '201 Created', indicating 
- *   that a new resource was successfully created.
- *
- * - A [sockets.signal] is published to notify subscribed clients (with roles 'admin' or 'root') 
- *   about the new appointment. The input arguments are included in the signal payload.
- *
- * - Finally, the [unwrap] slot extracts the generated ID from the result of [data.create], 
- *   and the [return] slot sends it back to the client under the key [id].
+ * Ideal for frontend forms or automated systems that create appointment bookings and expect audit logging + live event notification.
  */
 .arguments
 

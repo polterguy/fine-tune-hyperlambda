@@ -1,41 +1,21 @@
 
 /*
- * This endpoint deletes a **single record** from the 'Appointments' table in a hospital database 
- * based on a unique identifier.
+ * Deletes a record from the [Appointments] table in the [hospital] database using the primary key [AppointmentID].
  *
- * The [.arguments] node defines one **mandatory** input parameter: [AppointmentID], which serves 
- * as the primary key of the record to be deleted.
+ * Requires:
+ * - [AppointmentID]: Mandatory argument used to identify the appointment record to be deleted.
  *
- * The [auth.ticket.verify] slot ensures that only users with the 'root' role have permission 
- * to execute this deletion operation, enforcing strict access control for data modification.
+ * Security:
+ * - Only users with the [root] role are authorized to invoke this endpoint.
  *
- * The [auth.ticket.get] slot retrieves the identity of the currently authenticated user.
+ * Intentional:
+ * - Logs the delete action with full argument payload using [log.info], capturing the invoking username.
+ * - Retrieves current authentication ticket to associate the log entry with the initiating user.
+ * - Safely parameterizes the delete invocation using [get-nodes] to construct the WHERE clause.
+ * - Publishes a [hospital.Appointments.delete] WebSocket signal to notify subscribed [admin] and [root] roles of the deletion event.
  *
- * The [lambda2hyper] slot converts the argument payload into Hyperlambda structure, which is 
- * then passed to the [log.info] slot. This logs a message indicating that an 'Appointments' 
- * entry was deleted, including both the username and the arguments for traceability and auditing.
- *
- * The [validators.mandatory] slot guarantees that [AppointmentID] is provided before continuing 
- * with the deletion logic.
- *
- * The [data.connect] slot establishes a connection to the 'hospital' database using the 
- * 'sqlite' engine via the 'generic' connector.
- *
- * Inside the database context:
- * - The [add] slot dynamically inserts the deletion condition (i.e., the [AppointmentID] argument) 
- *   into the [where] clause of the upcoming [data.delete] operation.
- *
- * - The [data.delete] slot performs the actual deletion from the 'Appointments' table, 
- *   using an [and] clause under [where] to safely apply filters—though only [AppointmentID] 
- *   is expected in this case.
- *
- * - After deletion, a [sockets.signal] is triggered to notify connected clients (with roles 
- *   'admin' or 'root') that an 'Appointments' record has been deleted. This includes all 
- *   original arguments via [add] under [args].
- *
- * - Finally, the [unwrap] slot ensures the result of the [data.delete] operation is made 
- *   accessible to the [return] slot, which returns the number of affected records 
- *   under the key [affected].
+ * Returns:
+ * - The number of affected rows via [affected] after the record has been deleted.
  */
 .arguments
 

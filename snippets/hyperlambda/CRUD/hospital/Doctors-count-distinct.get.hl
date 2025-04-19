@@ -1,53 +1,24 @@
-
 /*
- * This endpoint returns the count of **unique and distinct values** from a specified column 
- * in the 'Doctors' table of a hospital database, optionally applying filters to narrow the result.
+ * Counts the number of unique (distinct) values from a specified column in the [Doctors] table of the [hospital] database.
  *
- * The [.arguments] node defines:
- * - [distinct_column], a **mandatory** parameter that specifies which column to perform 
- *   the distinct count on. It must follow the format 'TABLE_NAME.COLUMN_NAME', such as 
- *   'Doctors.Specialty'.
- * - A set of **optional filtering arguments** (e.g., 'Doctors.Email.like', 
- *   'Doctors.Specialty.eq') that allow the client to restrict the dataset prior to counting.
- *   These filters are not required and may be omitted entirely.
+ * Required Argument:
+ * - [distinct_column]: The column to evaluate for distinct values. Must be provided in TABLE_NAME.COLUMN_NAME format.
  *
- * The [validators.mandatory] slot ensures the [distinct_column] argument is present, 
- * as it is essential to form the distinct count expression.
+ * Optional Filtering:
+ * - Supports filtering on all major fields in the [Doctors] table:
+ *   - DoctorID, FirstName, LastName, Specialty, PhoneNumber, Email
+ *   - Each filter supports exact match [.eq] and partial match [.like] variants.
  *
- * The [validators.enum] slot verifies that the value of [distinct_column] is one of a predefined, 
- * safe list of columns from the 'Doctors' table. This guards against invalid or potentially 
- * dangerous column references.
+ * Intentional:
+ * - Performs validation to ensure the [distinct_column] is passed and is among allowed values.
+ * - Constructs a safe SQL statement using [strings.concat] to dynamically create a COUNT(DISTINCT ...) operation.
+ * - Filters are included via [get-nodes] into the WHERE clause, allowing precise result control.
+ * - Public caching is enabled for 5 minutes to optimize repeated frontend queries.
+ * - Access is restricted to users with [admin], [guest], or [root] roles for security.
  *
- * The [response.headers.set] slot configures client-side caching by setting the 
- * 'Cache-Control' header to a 300-second expiry.
- *
- * The [auth.ticket.verify] slot restricts access to users with roles 'admin', 'guest', or 'root'.
- *
- * The [data.connect] slot establishes a connection to the 'hospital' database using 
- * the 'sqlite' engine through the 'generic' connector.
- *
- * Within the database context:
- * - The [set-name] slot constructs a new column node called [distinct_functor] using 
- *   [strings.concat] to wrap the selected [distinct_column] in a SQL-style 
- *   `count(distinct ...)` function.
- *
- * - The [remove-nodes] slot removes the [distinct_column] argument from the input set 
- *   after it has been processed, keeping the structure clean.
- *
- * - The [add] slot dynamically inserts any remaining arguments into the [where] clause 
- *   of the query. Since all filtering arguments are **optional**, this allows the query 
- *   to flexibly adapt to whatever filters are provided. If no filters are passed, 
- *   the query will count distinct values across the entire table. This dynamic approach 
- *   enables a highly customizable and context-sensitive query without requiring rigid input.
- *
- * The [data.read] slot executes the SQL query:
- * - It reads from the 'Doctors' table and includes a single column—the [distinct_functor]—
- *   which performs the actual count.
- * - The [where] clause is initialized as an empty [and] block and populated at runtime 
- *   with any optional filters provided in the request.
- *
- * Finally, the [return-nodes] slot extracts and returns the result of the query to the caller, 
- * containing the count of distinct values matching the criteria.
+ * Returns:
+ * - A JSON object containing the total count of distinct values found, labeled as [count].
+ * - Ideal for visualizing categorical data distribution in reporting or dashboard contexts.
  */
 .arguments
 

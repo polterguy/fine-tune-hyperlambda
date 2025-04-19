@@ -1,0 +1,47 @@
+
+/*
+ * Deletes a single record from the Inventory table in the wotc database using its primary key.
+ *
+ * Required argument:
+ * - [InventoryID]: The primary key of the Inventory record to be deleted. This field is mandatory.
+ *
+ * Ensures only authorized users with the 'root' role can perform the deletion.
+ * Uses a parameterized query to safely construct the deletion condition.
+ *
+ * Opens a database connection and performs the deletion, targeting the record that matches the given InventoryID.
+ * Returns the number of affected rows as [affected] to confirm whether the operation was successful.
+ */
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   InventoryID:long
+
+// Meta data description for endpoint
+.description:Delete one record from your Inventory table in your wotc database
+
+// Type of endpoint
+.type:crud-delete
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/InventoryID
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Inventory
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

@@ -1,0 +1,86 @@
+
+/*
+ * Retrieves a list of customer records from the Customers table in the wotc database, 
+ * with support for filtering, sorting, and pagination.
+ *
+ * Optional arguments:
+ * - [limit]: The maximum number of records to return (defaults to 25; -1 returns all).
+ * - [offset]: Number of records to skip before starting to return results (used for pagination).
+ * - [order]: Fully qualified column name to sort by (e.g., Customers.Name).
+ * - [direction]: Sorting direction ('asc' or 'desc').
+ *
+ * Filtering is supported on:
+ * - CustomerID (exact match)
+ * - Name and Email (both exact and pattern-based matches)
+ *
+ * Includes custom frontend handling metadata for specific columns (e.g., Customers.Email is marked as email type).
+ * Ensures the user is authorized with roles like account_manager, admin, guest, or root.
+ * Returns the result as a list of matching customer records with selected fields.
+ */
+.arguments
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+   Customers.CustomerID.eq:long
+   Customers.Name.like:string
+   Customers.Name.eq:string
+   Customers.Email.like:string
+   Customers.Email.eq:string
+
+// Meta data description for endpoint
+.description:Read or list records from your Customers table in your wotc database
+
+// Type of endpoint
+.type:crud-read
+
+// Columns with custom handling as frontend is generated.
+.handling
+   Customers.Email:email
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:account_manager,admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our read invocation with ordering arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+
+   // Parametrising our read invocation with paging arguments if specified.
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+
+   // Parametrising our read invocation with filtering arguments.
+   add:x:./*/data.read/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Customers
+      columns
+         Customers.CustomerID
+         Customers.Name
+         Customers.Email
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*

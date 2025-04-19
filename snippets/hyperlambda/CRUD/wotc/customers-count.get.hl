@@ -1,0 +1,48 @@
+
+/*
+ * Counts the total number of records in the Customers table of the wotc database.
+ *
+ * Supports optional filtering to narrow down the count using:
+ * - CustomerID (exact match)
+ * - Name (exact or partial match)
+ * - Email (exact or partial match)
+ *
+ * Authorization is required and limited to users with roles such as account_manager, admin, guest, or root.
+ * The query is parameterized to safely apply any provided filters.
+ * Returns the total number of matching records as [count].
+ */
+.arguments
+   Customers.CustomerID.eq:long
+   Customers.Name.like:string
+   Customers.Name.eq:string
+   Customers.Email.like:string
+   Customers.Email.eq:string
+
+// Meta data description for endpoint
+.description:Counts items from your Customers table in your wotc database
+
+// Type of endpoint
+.type:crud-count
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:account_manager,admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Customers
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

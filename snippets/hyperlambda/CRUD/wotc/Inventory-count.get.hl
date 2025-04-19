@@ -1,0 +1,89 @@
+
+/*
+ * Counts the total number of records in the Inventory table of the wotc database, 
+ * with optional filtering across both Inventory and joined Card fields.
+ *
+ * Optional filters can be applied on:
+ * - Inventory fields: InventoryID, CardID, Quantity, PurchasePrice
+ * - Card fields via join: CardID.Name (exact or pattern match)
+ *
+ * If reCAPTCHA is configured on the backend, the [recaptcha] token is required and verified 
+ * to ensure the request is made by a human. This behavior is conditional based on config settings.
+ *
+ * The query joins the Cards table (aliased as CardID) using a LEFT JOIN to enable filtering by card metadata.
+ * The user must be authorized with a role such as account_manager, admin, guest, or root.
+ * Results are cached publicly for 10 minutes to improve response time on repeated queries.
+ * Returns the total count of matching records as [count].
+ */
+.arguments
+   recaptcha:string
+   Inventory.InventoryID.eq:long
+   Inventory.CardID.eq:long
+   Inventory.Quantity.eq:long
+   Inventory.PurchasePrice.eq:double
+   CardID.Name.eq:string
+   CardID.Name.like:string
+
+// Meta data description for endpoint
+.description:Counts items from your Inventory table in your wotc database
+
+// Type of endpoint
+.type:crud-count
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=600
+
+// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
+config.get:"magic:auth:recaptcha:key"
+config.get:"magic:auth:recaptcha:secret"
+if
+   and
+      neq:x:@config.get
+         .
+      neq:x:@config.get
+         .:
+      neq:x:@config.get/@config.get
+         .
+      neq:x:@config.get/@config.get
+         .:
+   .lambda
+
+      // reCAPTCHA configuration settings found.
+      validators.mandatory:x:@.arguments/*/recaptcha
+      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
+         min:decimal:0.5
+
+// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
+remove-nodes:x:@.arguments/*/recaptcha/[0,1]
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:account_manager,admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Inventory
+         join:Cards
+            as:CardID
+            type:left
+            on
+               and
+                  Inventory.CardID:CardID.CardID
+      columns
+         count(*)
+            as:count
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

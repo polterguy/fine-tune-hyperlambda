@@ -1,0 +1,47 @@
+
+/*
+ * Deletes a single record from the Sets table in the wotc database using the primary key [SetID].
+ *
+ * Required argument:
+ * - [SetID]: The unique identifier of the set to delete. This argument is mandatory and validated before execution.
+ *
+ * Access to this endpoint is restricted to users with the 'root' role to ensure administrative control.
+ * The deletion operation is safely parameterized to prevent SQL injection and ensure the correct record is targeted.
+ *
+ * Opens a secure database connection, constructs a DELETE query based on the provided SetID, and executes the operation.
+ * Returns the number of affected rows as [affected], indicating whether the record was successfully removed.
+ */
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   SetID:long
+
+// Meta data description for endpoint
+.description:Delete one record from your Sets table in your wotc database
+
+// Type of endpoint
+.type:crud-delete
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/SetID
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Sets
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

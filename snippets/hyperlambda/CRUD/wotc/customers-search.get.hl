@@ -1,29 +1,21 @@
+
 /*
- * Performs a **semantic keyword search** on the [CustomerCustomerDemo] table in the [northwind] database.
+ * Performs a distinct keyword-based full-text search across the Customers table in the wotc database.
  *
- * 🎯 Intentional Purpose:
- * This endpoint enables **fuzzy, weighted, multi-keyword full-text search** across multiple columns.
- * Records are ranked by how many distinct keywords match and how densely they match — ideal for search boxes,
- * autosuggest dropdowns, and full-text interfaces.
+ * Required argument:
+ * - [query]: A space-separated string of keywords to search for. Keywords are matched case-insensitively.
  *
- * 🔍 Features & Search Strategy:
- * - The [query] is broken into **individual words**, each converted to lowercase.
- * - Search is applied across [CustomerID] and [CustomerTypeID] using a dynamically built SQL query.
- * - Rows are scored based on:
- *    1. **`keyword_density`**: How often keywords appear (weighted frequency).
- *    2. **`keyword_count`**: How many **distinct keywords** matched.
- * - Results are **ranked by relevance**, with most matches and densest hits appearing first.
+ * Optional arguments:
+ * - [limit]: Maximum number of records to return (defaults to 10; pass -1 to return all).
+ * - [offset]: Number of records to skip before starting to return results.
  *
- * ⚙️ Mechanics:
- * - SQL is built dynamically using [strings.concat], and parameters are passed securely.
- * - [data.select] is used to execute the raw SQL.
- * - [limit] and [offset] are supported for pagination, with default [limit] set to 10.
- * - Result excludes helper fields ([keyword_density] and [keyword_count]) in the final JSON.
+ * The search is performed across the Name and Email columns. Each result is scored based on:
+ * - [keyword_count]: The number of distinct keywords matched (higher is better).
+ * - [keyword_density]: The density of matches relative to total text length.
  *
- * ✅ Use Cases:
- * - Intelligent search experiences with ranked results.
- * - Instant keyword filtering across multiple fields.
- * - Predictive suggestion and autocomplete engines.
+ * Results are ranked by keyword_count (descending), then keyword_density (descending).
+ * Uses dynamic SQL with parameterized inputs for safe and efficient searching.
+ * Returns only matching customer records, excluding any scoring metadata.
  */
 .arguments
 
@@ -35,6 +27,12 @@
 
    // Optional offset into the dataset of where to start retrieving records
    offset:long
+
+// Type of endpoint
+.type:crud-search
+
+// Make sure the user has provided a query.
+validators.mandatory:x:@.arguments/*/query
 
 // Apply defaults if not specified.
 validators.default:x:@.arguments
@@ -54,11 +52,11 @@ for-each:x:@.words/*
 
 // Specify which columns to search against.
 .columns
-   .:CustomerID
-   .:CustomerTypeID
+   .:Name
+   .:Email
 
 // Connect to the specified database.
-data.connect:[generic|northwind]
+data.connect:[generic|wotc]
    database-type:sqlite
 
    // Start building our SQL.
@@ -181,7 +179,7 @@ data.connect:[generic|northwind]
       strings.concat:x:@.sql
          get-value:x:@.sql
          .:" from "
-         .:CustomerCustomerDemo
+         .:Customers
          .:" where keyword_count > 0"
 
    // 5) Order by distinct keyword_count (higher means more distinct keywords), then keyword_density.

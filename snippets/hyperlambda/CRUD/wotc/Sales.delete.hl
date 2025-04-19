@@ -1,0 +1,47 @@
+
+/*
+ * Deletes a single record from the Sales table in the wotc database using the primary key [SaleID].
+ *
+ * Required argument:
+ * - [SaleID]: The primary key of the sales record to delete. This argument is mandatory and used to target the record.
+ *
+ * Only users with the 'root' role are authorized to perform this action.
+ * The deletion is executed using a parameterized query to ensure safe and secure data access.
+ *
+ * Opens a database connection, applies the deletion condition, and removes the matching record from the Sales table.
+ * Returns the number of affected rows as [affected] to indicate whether the deletion was successful.
+ */
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   SaleID:long
+
+// Meta data description for endpoint
+.description:Delete one record from your Sales table in your wotc database
+
+// Type of endpoint
+.type:crud-delete
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/SaleID
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Sales
+      where
+         and
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

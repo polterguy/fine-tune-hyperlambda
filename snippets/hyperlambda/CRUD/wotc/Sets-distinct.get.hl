@@ -1,0 +1,136 @@
+
+/*
+ * Returns a list of unique (distinct) values from a specified column in the Sets table of the wotc database.
+ *
+ * Required argument:
+ * - [distinct_column]: Fully qualified column name (e.g., Sets.Name) from which to return unique values. 
+ *   Must match a validated list of allowed columns.
+ *
+ * Optional arguments:
+ * - [limit]: Max number of distinct values to return (defaults to 25; -1 returns all).
+ * - [offset]: Number of records to skip (pagination support).
+ * - [order]: Column to sort results by (must be fully qualified).
+ * - [direction]: Sort direction ('asc' or 'desc').
+ *
+ * Additional filtering is supported on:
+ * - SetID (exact match)
+ * - Name (exact or partial match)
+ * - ReleaseDate (exact match)
+ *
+ * If reCAPTCHA is enabled via backend configuration, [recaptcha] becomes mandatory and is validated 
+ * to confirm that the request is human-generated.
+ *
+ * Endpoint is secured with role-based access control, allowing only users with roles like account_manager, admin, guest, or root.
+ * The query is safely parameterized and optimized for performance. 
+ * Results are publicly cacheable for 10 minutes to reduce load on repeated access.
+ *
+ * Returns a flat list of distinct values from the specified [distinct_column].
+ */
+.arguments
+
+   // Name of column to return unique and distinct values for. Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+
+   // Number of records to return, defaults to 25 if not specified. Pass in -1 to return all records.
+   limit:long
+
+   // Offset into the dataset of where to start retrieving records
+   offset:long
+
+   // Fully qualified name of column to order by, must be in TABLE_NAME.COLUMN_NAME format
+   order:string
+
+   // What direction to order, can be 'asc' or 'desc' implying ascending and descending
+   direction:string
+   recaptcha:string
+   Sets.SetID.eq:long
+   Sets.Name.like:string
+   Sets.Name.eq:string
+   Sets.ReleaseDate.eq:date
+
+// Meta data description for endpoint
+.description:Returns unique and distinct values from your Sets table in your wotc database
+
+// Type of endpoint
+.type:crud-distinct
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Sets.SetID
+   .:Sets.Name
+   .:Sets.ReleaseDate
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=600
+
+// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
+config.get:"magic:auth:recaptcha:key"
+config.get:"magic:auth:recaptcha:secret"
+if
+   and
+      neq:x:@config.get
+         .
+      neq:x:@config.get
+         .:
+      neq:x:@config.get/@config.get
+         .
+      neq:x:@config.get/@config.get
+         .:
+   .lambda
+
+      // reCAPTCHA configuration settings found.
+      validators.mandatory:x:@.arguments/*/recaptcha
+      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
+         min:decimal:0.5
+
+// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
+remove-nodes:x:@.arguments/*/recaptcha/[0,1]
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:account_manager,admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:distinct(
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+
+   // Adding [limit] and [offset] arguments
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Sets
+      columns
+         distinct_functor
+            as:.
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

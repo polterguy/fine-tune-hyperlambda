@@ -1,0 +1,127 @@
+
+/*
+ * Returns a single aggregated value (min, max, sum, or avg) from the Inventory table in the wotc database.
+ *
+ * Required arguments:
+ * - [aggregate_function]: The aggregation operation to perform. Must be one of: min, max, sum, or avg.
+ * - [aggregate_column]: Fully qualified column name to aggregate. Must be whitelisted and may reference a joined table (e.g., CardID.Name).
+ *
+ * Optional filtering can be applied on:
+ * - Inventory fields such as InventoryID, CardID, Quantity, and PurchasePrice
+ * - Joined Card fields like CardID.Name (exact or partial match)
+ *
+ * reCAPTCHA validation is conditionally enforced if backend configuration is present. If enabled, the [recaptcha] token is required and validated.
+ *
+ * The query joins the Cards table (aliased as CardID) using a LEFT JOIN for extended filtering.
+ * Ensures the user is authorized (roles: account_manager, admin, guest, or root).
+ * Response is cached publicly for 10 minutes to improve performance for similar queries.
+ * Returns the calculated result as [result].
+ */
+.arguments
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+   recaptcha:string
+   Inventory.InventoryID.eq:long
+   Inventory.CardID.eq:long
+   Inventory.Quantity.eq:long
+   Inventory.PurchasePrice.eq:double
+   CardID.Name.eq:string
+   CardID.Name.like:string
+
+// Meta data description for endpoint
+.description:Returns minimum, maximum, average or sum from your Inventory table in your wotc database
+
+// Type of endpoint
+.type:crud-aggregate
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:Inventory.InventoryID
+   .:Inventory.CardID
+   .:Inventory.Quantity
+   .:Inventory.PurchasePrice
+   .:CardID.Name
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:public, max-age=600
+
+// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
+config.get:"magic:auth:recaptcha:key"
+config.get:"magic:auth:recaptcha:secret"
+if
+   and
+      neq:x:@config.get
+         .
+      neq:x:@config.get
+         .:
+      neq:x:@config.get/@config.get
+         .
+      neq:x:@config.get/@config.get
+         .:
+   .lambda
+
+      // reCAPTCHA configuration settings found.
+      validators.mandatory:x:@.arguments/*/recaptcha
+      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
+         min:decimal:0.5
+
+// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
+remove-nodes:x:@.arguments/*/recaptcha/[0,1]
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:account_manager,admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Inventory
+         join:Cards
+            as:CardID
+            type:left
+            on
+               and
+                  Inventory.CardID:CardID.CardID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

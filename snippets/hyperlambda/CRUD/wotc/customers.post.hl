@@ -1,0 +1,69 @@
+
+/*
+ * Creates a new record in the Customers table of the wotc database.
+ *
+ * Required arguments:
+ * - [CustomerID], [Name], and [Email]: Values to be inserted into the respective columns.
+ *
+ * Custom frontend metadata is applied, marking the [Email] field with type `email` for UI generation.
+ * Only authorized users with 'admin' or 'root' roles are allowed to invoke this endpoint.
+ *
+ * The record is inserted into the database using a parameterized query to ensure safe handling of input values.
+ * Upon successful creation, a socket signal [wotc.customers.post] is emitted to notify connected clients,
+ * limited to users with the 'admin' or 'root' roles.
+ *
+ * Responds with HTTP status 201 (Created) and a success message.
+ */
+.arguments
+
+   // CustomerID column value
+   CustomerID:long
+
+   // Name column value
+   Name:string
+
+   // Email column value
+   Email:string
+
+// Meta data description for endpoint
+.description:Create one record in your Customers table in your wotc database
+
+// Type of endpoint
+.type:crud-create
+
+// Columns with custom handling as we generate a frontend
+.handling
+   Email:email
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Customers
+      return-id:bool:false
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:wotc.customers.post
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      result:success

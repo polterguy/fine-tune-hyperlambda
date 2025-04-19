@@ -1,32 +1,21 @@
 
 /*
- * Performs grouped aggregation on the [activities] table in the [crm] SQLite database, optionally joined with the [clients] table.
+ * Returns grouped aggregate values (min, max, sum, avg, or count) from the Customers table in the wotc database.
  *
- * This Web API endpoint supports:
+ * Required arguments:
+ * - [group_column]: Fully qualified column to group results by (e.g., Customers.Email). Must be on the whitelist.
+ * - [aggregate_function]: The type of aggregation to perform. Accepted values are min, max, sum, avg, or count.
+ * - [aggregate_column]: Fully qualified column to apply the aggregation to. Must be one of the allowed columns.
  *
- * 1. Grouping & Aggregation:
- *    - Group results by a specified column [group_column] (e.g., activities.type or client_id.name).
- *    - Apply aggregate operations using [aggregate_function] such as min, max, sum, avg, or count.
- *    - The target aggregation column is defined by [aggregate_column].
+ * Optional arguments:
+ * - [limit]: Max number of grouped results to return (defaults to 25; -1 returns all).
+ * - [offset]: Number of records to skip (used for pagination).
+ * - [order]: Fully qualified column name to sort by.
+ * - [direction]: Sort direction — 'asc' for ascending, 'desc' for descending.
  *
- * 2. Filtering Support:
- *    - Optional filter arguments are supported across both [activities] and joined [clients] table fields.
- *    - Common operators like eq, neq, lt, lteq, mt, mteq, and like are included for fine-grained control.
- *
- * 3. Paging & Ordering:
- *    - Supports [limit] and [offset] for paginated results.
- *    - Results can be ordered using [order] and [direction] parameters.
- *
- * 4. Validation:
- *    - All key arguments ([group_column], [aggregate_function], and [aggregate_column]) are required and validated against a whitelist.
- *
- * 5. Access & Caching:
- *    - Public access allowed for users with the 'guest' role.
- *    - Results are cached with a 300-second max-age to improve frontend efficiency.
- *
- * 6. Output:
- *    - Returns grouped results, each including the group column and the aggregate result as [result].
- *    - Useful for analytics, reporting dashboards, and insights into activity trends.
+ * Filtering is supported using optional parameters like CustomerID, Name, and Email (exact or pattern match).
+ * Ensures safe and authorized access through input validation and role-based verification.
+ * Returns a list of grouped rows with the group column and corresponding aggregate result.
  */
 .arguments
 
@@ -50,44 +39,17 @@
 
    // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
    aggregate_column:string
+   Customers.CustomerID.eq:long
+   Customers.Name.like:string
+   Customers.Name.eq:string
+   Customers.Email.like:string
+   Customers.Email.eq:string
 
-   /*
-    * Optional filtering arguments.
-    */
-   activities.activity_id.mt:long
-   activities.activity_id.lt:long
-   activities.activity_id.mteq:long
-   activities.activity_id.lteq:long
-   activities.activity_id.neq:long
-   activities.activity_id.eq:long
-   activities.client_id.mt:long
-   activities.client_id.lt:long
-   activities.client_id.mteq:long
-   activities.client_id.lteq:long
-   activities.client_id.neq:long
-   activities.client_id.eq:long
-   activities.type.like:string
-   activities.type.mt:string
-   activities.type.lt:string
-   activities.type.mteq:string
-   activities.type.lteq:string
-   activities.type.neq:string
-   activities.type.eq:string
-   activities.date.mt:date
-   activities.date.lt:date
-   activities.date.mteq:date
-   activities.date.lteq:date
-   activities.date.neq:date
-   activities.date.eq:date
-   activities.notes.like:string
-   activities.notes.mt:string
-   activities.notes.lt:string
-   activities.notes.mteq:string
-   activities.notes.lteq:string
-   activities.notes.neq:string
-   activities.notes.eq:string
-   client_id.name.eq:string
-   client_id.name.like:string
+// Meta data description for endpoint
+.description:Returns minimum, maximum, average, sum or count from your Customers table in your wotc database grouped by a column
+
+// Type of endpoint
+.type:crud-group
 
 // Sanity checking mandatory arguments.
 validators.mandatory:x:@.arguments/*/group_column
@@ -104,31 +66,21 @@ validators.enum:x:@.arguments/*/aggregate_function
 
 // Sanity checking group column.
 validators.enum:x:@.arguments/*/group_column
-   .:activities.activity_id
-   .:activities.client_id
-   .:activities.type
-   .:activities.date
-   .:activities.notes
-   .:client_id.name
+   .:Customers.CustomerID
+   .:Customers.Name
+   .:Customers.Email
 
 // Sanity checking agggregate column name.
 validators.enum:x:@.arguments/*/aggregate_column
-   .:activities.activity_id
-   .:activities.client_id
-   .:activities.type
-   .:activities.date
-   .:activities.notes
-   .:client_id.name
-
-// Adding Cache-Control HTTP header.
-response.headers.set
-   Cache-Control:public, max-age=300
+   .:Customers.CustomerID
+   .:Customers.Name
+   .:Customers.Email
 
 // Verifying user is authorized to access endpoint.
-auth.ticket.verify:guest
+auth.ticket.verify:account_manager,admin,guest,root
 
 // Opening up our database connection.
-data.connect:[generic|crm]
+data.connect:[generic|wotc]
    database-type:sqlite
 
    // Making sure we're using the correct group column
@@ -173,21 +125,13 @@ data.connect:[generic|crm]
 
    // Removing aggregate arguments to simplify adding other arguments.
    remove-nodes:x:@.arguments/*/[0,2]
-
-   // Adding filtering arguments.
-   add:x:./*/data.read/*/where/*/and
+   add:x:+/*/where/*
       get-nodes:x:@.arguments/*
 
    // Reading data from database.
    data.read
       database-type:sqlite
-      table:activities
-         join:clients
-            as:client_id
-            type:left
-            on
-               and
-                  activities.client_id:client_id.client_id
+      table:Customers
       columns
          aggregate_functor
             as:result

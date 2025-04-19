@@ -1,0 +1,72 @@
+
+/*
+ * Counts the number of unique (distinct) values in a specified column from the Customers table in the wotc database.
+ *
+ * Required argument:
+ * - [distinct_column]: The fully qualified name of the column to count distinct values from (e.g., Customers.Email).
+ *   The column name is validated against an allowed list to ensure correctness and security.
+ *
+ * Optional filters can be applied to scope the distinct count using:
+ * - CustomerID (exact match)
+ * - Name (exact or partial match)
+ * - Email (exact or partial match)
+ *
+ * Authorization is enforced for users with roles like account_manager, admin, guest, or root.
+ * The result is returned as [count], representing the number of unique values matching the given criteria.
+ */
+.arguments
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+   Customers.CustomerID.eq:long
+   Customers.Name.like:string
+   Customers.Name.eq:string
+   Customers.Email.like:string
+   Customers.Email.eq:string
+
+// Meta data description for endpoint
+.description:Count unique and distinct items from your Customers table in your wotc database
+
+// Type of endpoint
+.type:crud-count-distinct
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Customers.CustomerID
+   .:Customers.Name
+   .:Customers.Email
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:account_manager,admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Customers
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

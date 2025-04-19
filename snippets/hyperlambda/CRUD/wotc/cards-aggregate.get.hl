@@ -1,0 +1,88 @@
+
+/*
+ * Returns a single aggregate value (min, max, sum, or avg) from the Cards table in the wotc database.
+ *
+ * Requires two mandatory arguments:
+ * - [aggregate_function]: One of "min", "max", "sum", or "avg"
+ * - [aggregate_column]: Must be in the format "Cards.COLUMN_NAME", limited to a specific whitelist
+ *
+ * Also supports optional filtering on CardID, Name, SetID, and Rarity to scope the aggregation.
+ *
+ * Applies authorization checks and response caching for performance.
+ * Returns the result of the aggregation as [result].
+ */
+.arguments
+
+   // Function to aggregate upon. Argument is mandatory and legal values are min, max, sum or avg
+   aggregate_function:string
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME.
+   aggregate_column:string
+   Cards.CardID.eq:long
+   Cards.Name.like:string
+   Cards.Name.eq:string
+   Cards.SetID.eq:long
+   Cards.Rarity.like:string
+   Cards.Rarity.eq:string
+
+// Meta data description for endpoint
+.description:Returns minimum, maximum, average or sum from your Cards table in your wotc database
+
+// Type of endpoint
+.type:crud-aggregate
+
+// Sanity checking mandatory arguments.
+validators.mandatory:x:@.arguments/*/aggregate_function
+validators.mandatory:x:@.arguments/*/aggregate_column
+
+// Sanity checking name of aggregate function.
+validators.enum:x:@.arguments/*/aggregate_function
+   .:min
+   .:max
+   .:sum
+   .:avg
+
+// Sanity checking agggregate column name.
+validators.enum:x:@.arguments/*/aggregate_column
+   .:Cards.CardID
+   .:Cards.Name
+   .:Cards.SetID
+   .:Cards.Rarity
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:private, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:account_manager,admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Making sure we're using correct aggregate function.
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+
+   // Removing aggregate arguments to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Cards
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

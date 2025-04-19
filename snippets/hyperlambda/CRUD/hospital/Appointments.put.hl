@@ -1,52 +1,25 @@
-
 /*
- * This endpoint updates an existing record in the 'Appointments' table of a hospital database. 
- * It requires the primary key to identify the record and allows updating one or more column values.
+ * Updates an existing appointment record in the [Appointments] table of the [hospital] database.
  *
- * The [.arguments] node defines the input parameters:
- * - [AppointmentID] is **mandatory** and serves as the primary key used to locate the record to update.
- * - [PatientID], [DoctorID], [AppointmentDate], and [Reason] are optional update targets 
- *   representing the new values for their respective columns.
+ * Required:
+ * - [AppointmentID]: Primary key used to identify the appointment to update. Mandatory.
  *
- * The [validators.mandatory] slot ensures that [AppointmentID] is included in the request, 
- * as it is required to identify the record to modify.
+ * Optional Updates:
+ * - [PatientID], [DoctorID], [AppointmentDate], [Reason]: Fields that may be modified by the caller.
  *
- * The [auth.ticket.verify] slot limits access to users with 'root' or 'admin' roles, 
- * ensuring only authorized clients may perform updates.
+ * Security:
+ * - Only users with [admin] or [root] roles are authorized to update appointments.
  *
- * The [auth.ticket.get] slot retrieves the identity of the authenticated user.
+ * Intentional:
+ * - Logs the update operation using [log.info], capturing both the authenticated username and sanitized arguments.
+ * - Auth ticket is retrieved and arguments are serialized with [lambda2hyper] to produce a clean audit trail.
+ * - Dynamically separates update fields from the key filter using [get-nodes] with specific index ranges.
+ * - Executes [data.update] to apply changes and confirms success by validating affected rows.
+ * - Returns HTTP 404 if the specified record does not exist.
+ * - Returns HTTP 202 (Accepted) on successful update.
+ * - Broadcasts a [hospital.Appointments.put] WebSocket event with updated values to all [admin] and [root] listeners.
  *
- * The [lambda2hyper] slot transforms the argument payload into a Hyperlambda structure, 
- * which is passed to [log.info] to create an audit log entry indicating the update event, 
- * including the username and updated values.
- *
- * The [data.connect] slot initiates a connection to the 'hospital' database using the 
- * 'sqlite' engine via the 'generic' connector.
- *
- * Within the connection context:
- * - The first [add] block dynamically extracts all updateable fields (everything **except** 
- *   the primary key at index 0) and adds them under the [values] node of the [data.update] 
- *   slot, preparing them for the update operation.
- *
- * - The second [add] block extracts the [AppointmentID] field (index 0) and adds it to the 
- *   [where] clause using an [and] filter, ensuring that only the intended record is modified.
- *
- * The [data.update] slot executes the update operation on the 'Appointments' table using the 
- * defined [values] and [where] filters.
- *
- * The [if] slot performs a post-check to determine whether the update affected any rows. 
- * If no records were updated (i.e., [data.update] returns 0), a '404 Not Found' status is 
- * returned along with an appropriate error message.
- *
- * If the update succeeds, the [response.status.set] slot sets the HTTP status code to 202, 
- * indicating that the request was accepted and processed.
- *
- * A [sockets.signal] is then broadcast to subscribed clients (roles: 'admin', 'root') 
- * to notify them that an appointment has been updated. The original arguments are 
- * included as part of the payload.
- *
- * Finally, the [unwrap] slot extracts the number of updated records, and the [return] 
- * slot sends this result back to the client under the key [affected].
+ * This endpoint ensures secure and auditable updates to appointment data while supporting real-time UI updates.
  */
 .arguments
 

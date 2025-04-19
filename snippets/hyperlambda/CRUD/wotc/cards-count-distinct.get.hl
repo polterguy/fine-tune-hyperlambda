@@ -1,0 +1,75 @@
+
+/*
+ * Counts the number of unique (distinct) values in a specified column of the Cards table in the wotc database.
+ *
+ * Requires one mandatory argument:
+ * - [distinct_column]: Must follow the format "Cards.COLUMN_NAME" and be one of the allowed columns
+ *
+ * Supports optional filters on CardID, Name, SetID, and Rarity to scope the distinct count operation.
+ *
+ * Applies strict validation on input and ensures the user is authorized before accessing the database.
+ * Caches results with a private cache-control header to improve performance.
+ * Returns the count as [count].
+ */
+.arguments
+
+   // Argument is mandatory and must be in the format of TABLE_NAME.COLUMN_NAME
+   distinct_column:string
+   Cards.CardID.eq:long
+   Cards.Name.like:string
+   Cards.Name.eq:string
+   Cards.SetID.eq:long
+   Cards.Rarity.like:string
+   Cards.Rarity.eq:string
+
+// Meta data description for endpoint
+.description:Count unique and distinct items from your Cards table in your wotc database
+
+// Type of endpoint
+.type:crud-count-distinct
+
+// Sanity checking that distinct column was passed in.
+validators.mandatory:x:@.arguments/*/distinct_column
+
+// Sanity checking distinct column's name.
+validators.enum:x:@.arguments/*/distinct_column
+   .:Cards.CardID
+   .:Cards.Name
+   .:Cards.SetID
+   .:Cards.Rarity
+
+// Adding Cache-Control HTTP header.
+response.headers.set
+   Cache-Control:private, max-age=300
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:account_manager,admin,guest,root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Making sure we're using correct function.
+   set-name:x:./*/data.read/*/columns/*/distinct_functor
+      strings.concat
+         .:"count(distinct "
+         get-value:x:@.arguments/*/distinct_column
+         .:)
+
+   // Removing distinct argument to simplify adding other arguments.
+   remove-nodes:x:@.arguments/*/distinct_column
+   add:x:+/*/where/*
+      get-nodes:x:@.arguments/*
+
+   // Reading data from database.
+   data.read
+      database-type:sqlite
+      table:Cards
+      columns
+         distinct_functor
+            as:count
+      where
+         and
+
+   // Returning result of above read invocation to caller.
+   return-nodes:x:@data.read/*/*

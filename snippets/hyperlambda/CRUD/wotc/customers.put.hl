@@ -1,0 +1,88 @@
+
+/*
+ * Updates an existing record in the Customers table of the wotc database using the primary key [CustomerID].
+ *
+ * Required argument:
+ * - [CustomerID]: The primary key used to identify which customer record to update.
+ *
+ * Optional arguments:
+ * - [Name] and [Email]: New values to apply to the corresponding columns.
+ *
+ * Includes custom frontend handling metadata, where [Email] is marked with type `email` for UI rendering.
+ * Only users with the 'root' role are authorized to invoke this endpoint.
+ *
+ * The update operation is safely parameterized. If no matching record is found, the endpoint responds with
+ * HTTP status 404 and a relevant message.
+ *
+ * On success, a socket event [wotc.customers.put] is broadcast to connected clients (admin/root roles),
+ * and the endpoint returns HTTP status 202 (Accepted) with the number of affected rows.
+ */
+.arguments
+
+   // CustomerID column value being primary key of record to update, mandatory argument
+   CustomerID:long
+
+   // Name column's new value
+   Name:string
+
+   // Email column's new value
+   Email:string
+
+// Meta data description for endpoint
+.description:Update one record in your Customers table in your wotc database
+
+// Type of endpoint
+.type:crud-update
+
+// Columns with custom handling as we generate a frontend
+.handling
+   Email:email
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/CustomerID
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Customers
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:wotc.customers.put
+      args
+      roles:admin,root
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

@@ -1,39 +1,23 @@
-
 /*
- * This Hyperlambda endpoint returns grouped aggregate data from the [Categories] table in the [northwind] database.
- * 
- * The endpoint allows clients to retrieve summaries using SQL aggregate functions like [min], [max], [sum], [avg], and [count].
- * Results are grouped by a specified column and support optional filtering, sorting, and pagination.
+ * Performs grouped aggregation queries on the [Categories] table in the [northwind] database.
  *
- * 1. [.arguments]
- *    * Accepts:
- *      - [group_column]: Mandatory column name for grouping (must be TABLE.COLUMN format).
- *      - [aggregate_column]: Mandatory column name to aggregate on.
- *      - [aggregate_function]: One of [min], [max], [sum], [avg], [count].
- *      - [limit], [offset]: Optional for paging.
- *      - [order], [direction]: Optional for sorting.
- *      - Multiple [Categories.*] filters for flexible conditionals.
+ * Intentional:
+ * - This endpoint allows grouping by any valid column and applies an aggregation function such as min, max, sum, avg, or count on another column.
+ * - It supports use cases like dashboard widgets, charts, or data summaries where analytics on grouped category data are needed.
+ * - Enables flexible filtering with support for comparison and pattern matching on all table fields.
+ * - Pagination ([limit], [offset]) and result ordering ([order], [direction]) allow efficient frontend integration.
  *
- * 2. [validators.enum], [validators.mandatory]
- *    * Validates required and enumerated argument values to ensure safe SQL execution.
+ * Safety & Control:
+ * - Uses [validators.enum] to restrict [group_column] and [aggregate_column] to prevent SQL injection.
+ * - Requires mandatory input validation using [validators.mandatory] for critical arguments.
+ * - Automatically sets the alias of the aggregated result based on the aggregate function (e.g., "count", "sum").
  *
- * 3. [data.read] and [aggregate_functor]
- *    * Dynamically constructs SQL using the aggregate function and selected columns.
- *    * Uses [group_column] for the SQL GROUP BY clause.
- *    * Builds WHERE clause based on dynamic argument filters (e.g., eq, neq, mt).
- *    * Applies limit/offset/order if provided.
+ * Execution:
+ * - [data.connect] opens a connection to the SQLite [northwind] database.
+ * - [data.read] executes a GROUP BY SQL query with dynamic aggregation and optional WHERE clause filters.
  *
- * 4. [.insert-before], [.set-name], [.remove-nodes]
- *    * Dynamically modifies nodes to insert grouping and rename the returned column from the aggregate.
- *    * Strips parameters after use to prevent duplication and clutter in execution graph.
- *
- * 5. [return-nodes]
- *    * Returns aggregated dataset with optional renamed column depending on selected function.
- *
- * Use Cases:
- * * Dashboard analytics and reporting interfaces.
- * * Extracting summary statistics grouped by categories.
- * * Paging and sorting grouped values for frontend charts or reports.
+ * Output:
+ * - Returns a list of grouped rows with their corresponding aggregated values.
  */
 .arguments
 

@@ -1,51 +1,25 @@
 
 /*
- * This Hyperlambda endpoint performs a keyword search on the [campaigns] table in the 'crm' database,
- * and returns records that match one or more distinct keywords from a user-supplied [query].
+ * Performs a distinct keyword-based search on the [campaigns] table in the CRM database.
  *
- * 1. [.arguments]
- *    * Accepts user input:
- *      - [query]: Required. Space-separated string of keywords to search.
- *      - [limit]: Optional. Limits number of rows returned. Defaults to 10.
- *      - [offset]: Optional. Used for paginated results.
+ * Requires:
+ * - [query]: Space-separated search terms. This argument is mandatory and used to extract keywords.
  *
- * 2. [validators.mandatory]
- *    * Ensures the [query] argument is supplied.
+ * Optional:
+ * - [limit]: Maximum number of results to return (defaults to 10, use -1 to return all).
+ * - [offset]: Number of records to skip (for pagination).
  *
- * 3. [validators.default]
- *    * Defaults the [limit] argument to 10 if not specified by caller.
+ * Intentional:
+ * - Dynamically splits the [query] into keywords, lowercases them, and uses them to calculate:
+ *   - [keyword_count]: How many distinct keywords matched.
+ *   - [keyword_density]: Total keyword frequency per record.
+ * - Constructs a full-text-like SQL expression by joining target columns ([name], [status]) and applying 
+ *   both keyword density and distinct count logic.
+ * - Ranks results by relevance using both [keyword_count] and [keyword_density].
+ * - Executes the SQL with safe parameters and pagination support.
+ * - Removes helper fields before returning the final result set.
  *
- * 4. [.words]
- *    * Splits the [query] value into lowercase individual keyword strings, stored in a dynamic node list.
- *
- * 5. [.columns]
- *    * Defines a fixed list of columns to be searched: [name] and [status] from the [campaigns] table.
- *
- * 6. [data.connect]
- *    * Connects to the 'crm' database using the [generic] connection string.
- *
- * 7. [.sql]
- *    * Dynamically constructs a full SQL query with computed fields:
- *      - [keyword_density]: Ratio measuring keyword saturation in the record.
- *      - [keyword_count]: Number of distinct matched keywords.
- *    * Uses dynamic SQL parameters like [@p0], [@p1], etc., to securely pass keywords.
- *    * Adds WHERE condition to exclude rows with no keyword matches.
- *    * Orders by [keyword_count] (descending), then [keyword_density] (descending).
- *    * Optionally applies OFFSET for pagination.
- *
- * 8. [data.select]
- *    * Executes the final dynamic SQL statement against the [campaigns] table.
- *
- * 9. [remove-nodes]
- *    * Removes [keyword_density] and [keyword_count] helper fields before returning the result to keep the response clean.
- *
- * 10. [return-nodes]
- *     * Returns all matching rows to the caller in descending order of relevance.
- *
- * **Use cases:**
- * * CRM systems enabling keyword-based searches across marketing campaigns.
- * * Admin dashboards needing intelligent filters on campaign data.
- * * Exporting matching campaign records based on keyword relevance.
+ * Ideal for fuzzy searching and ranking CRM campaigns by semantic relevance based on keyword match quality.
  */
 .arguments
 

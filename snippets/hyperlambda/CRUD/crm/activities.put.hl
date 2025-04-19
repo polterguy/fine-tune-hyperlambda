@@ -1,21 +1,20 @@
 
 /*
- * Updates an existing record in the "activities" table of your CRM database,
- * using the provided [activity_id] as the primary key.
+ * Updates an existing record in the [activities] table in the CRM database using [activity_id] as primary key.
  *
- * The endpoint supports modifying optional fields like [client_id], [type], and [notes],
- * while ensuring that the record exists and the user has the correct access privileges.
+ * Requires:
+ * - [activity_id]: Mandatory, used to identify the record to update.
  *
- * - Requires the [activity_id] argument to identify the record to be updated.
- * - Applies optional updates to the fields specified by the caller.
- * - Uses [data.connect] to connect to the SQLite CRM database.
- * - Dynamically separates update values from primary key filters using [get-nodes] with index ranges.
- * - Executes [data.update] and checks the number of affected rows to confirm that the record existed.
- * - Returns a 404 status code and error message if no matching record is found.
- * - Returns a 202 Accepted status code upon successful update.
- * - Publishes a [crm.activities.put] socket signal to notify connected clients of the change,
- *   sharing the updated data with "admin" and "root" roles.
- * - Returns the number of affected rows to the caller.
+ * Supports:
+ * - Optional updates to [client_id], [type], and [notes] fields.
+ * - Separates update values from the primary key filter using [get-nodes] index ranges.
+ * - Authorization is restricted to users with [admin] or [root] roles.
+ * - Validates that the record exists, returning 404 if not found.
+ * - Returns 202 (Accepted) on success and the number of affected rows as [affected].
+ * - Broadcasts a [crm.activities.put] WebSocket signal with the updated values to all connected admin/root clients.
+ *
+ * Intentional: Separates mutable values from primary key to dynamically construct [data.update] payload,
+ * and confirms record existence before broadcasting change via WebSocket.
  */
 .arguments
 

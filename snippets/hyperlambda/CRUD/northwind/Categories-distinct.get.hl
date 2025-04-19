@@ -1,36 +1,19 @@
-
 /*
- * This Hyperlambda endpoint returns distinct values from a specified column in the [Categories] table of the [Northwind] database.
+ * Retrieves a list of distinct values from a specified column in the [Categories] table of the [northwind] database.
  *
- * ## Slot Documentation
+ * Intentional:
+ * - This endpoint is designed to power filter dropdowns, auto-complete inputs, or deduplicated views.
+ * - Uses a dynamic [distinct()] SQL expression to return unique values based on the specified column.
+ * - Provides advanced filtering options with support for comparison (.mt, .lt, .mteq, .lteq, .eq, .neq) and pattern matching (.like).
+ * - Supports pagination using [limit] and [offset], and result ordering via [order] and [direction] arguments.
  *
- * - [validators.mandatory]
- *   Ensures the [distinct_column] argument is supplied. This is critical because the endpoint cannot function without it.
+ * Security & Performance:
+ * - Enforces the presence of [distinct_column] using [validators.mandatory].
+ * - Ensures only whitelisted columns can be passed to avoid SQL injection through [validators.enum].
+ * - Uses [data.connect] to access a SQLite [northwind] database and composes SQL dynamically but safely.
  *
- * - [validators.enum]
- *   Restricts the [distinct_column] argument to valid column names from the [Categories] table. Prevents SQL injection or typos.
- *
- * - [data.connect]
- *   Opens a connection to the [Northwind] SQLite database using the [generic] connection string alias.
- *
- * - [set-name]
- *   Dynamically generates the distinct SQL function using [distinct(...)] around the user-specified column name. This expression is assigned to a [distinct_functor] node for use in [data.read].
- *
- * - [remove-nodes]
- *   Removes used arguments ([distinct_column], [limit], [offset], [order], [direction]) from the input to avoid polluting the remaining nodes before merging them into [data.read].
- *
- * - [add]
- *   Adds relevant arguments for pagination and sorting ([limit], [offset], [order], [direction]) into the [data.read] node.
- *   Also adds all filtering conditions defined under [.arguments] (e.g., [.like], [.eq], [.lt], etc.) to the [where] clause.
- *
- * - [data.read]
- *   Performs the SQL read operation, using the specified [distinct] function and any optional filters, sort, and pagination rules.
- *
- * - [return-nodes]
- *   Returns the resulting distinct values back to the client as a list of objects, each containing a single key corresponding to the distinct values retrieved.
- *
- * ## Summary
- * This endpoint enables a flexible way to retrieve all unique values for any specified column in the [Categories] table, while allowing for advanced query capabilities such as filtering and paging.
+ * Returns:
+ * - An array of unique values from the specified column, optionally filtered, ordered, and paginated.
  */
 .arguments
 

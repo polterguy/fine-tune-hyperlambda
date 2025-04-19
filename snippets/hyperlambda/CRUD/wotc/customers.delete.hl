@@ -1,0 +1,56 @@
+
+/*
+ * Deletes a single record from the Customers table in the wotc database using its primary key.
+ *
+ * Required argument:
+ * - [CustomerID]: The primary key of the customer record to delete.
+ *
+ * Authorization is enforced, allowing only users with the 'root' role to perform the operation.
+ * A parameterized query is constructed to safely delete the specified record.
+ *
+ * After deletion, a socket signal [wotc.customers.delete] is published, notifying connected clients
+ * (restricted to roles: admin, root) of the removal, including the deleted record's identifying data.
+ *
+ * Returns the number of affected rows as [affected].
+ */
+.arguments
+
+   // Primary key of record to delete, mandatory argument
+   CustomerID:long
+
+// Meta data description for endpoint
+.description:Delete one record from your Customers table in your wotc database
+
+// Type of endpoint
+.type:crud-delete
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+validators.mandatory:x:@.arguments/*/CustomerID
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our delete invocation.
+   add:x:./*/data.delete/*/where/*/and
+      get-nodes:x:@.arguments/*
+
+   // Deleting item from database.
+   data.delete
+      database-type:sqlite
+      table:Customers
+      where
+         and
+
+   // Publishing socket message.
+   add:x:./*/sockets.signal/*/args
+      get-nodes:x:@.arguments/*
+   sockets.signal:wotc.customers.delete
+      args
+      roles:admin,root
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.delete

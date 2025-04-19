@@ -1,0 +1,103 @@
+
+/*
+ * Updates an existing record in the Sets table of the wotc database using the primary key [SetID].
+ *
+ * Required argument:
+ * - [SetID]: Unique identifier for the record to update. This value is mandatory and used to target the correct row.
+ *
+ * Fields to update:
+ * - [Name]: New name for the set.
+ * - [ReleaseDate]: Updated release date.
+ *
+ * If reCAPTCHA is configured in the backend, the [recaptcha] token is required and validated to ensure the request is initiated by a human.
+ *
+ * Only users with the 'root' role are authorized to execute this operation.
+ * The update is safely executed through a parameterized query, and the existence of the target record is validated before applying changes.
+ * If the record does not exist, the endpoint returns HTTP status 404.
+ *
+ * On success, it returns HTTP status 202 (Accepted) and the number of affected rows as [affected].
+ */
+.arguments
+   recaptcha:string
+
+   // SetID column value being primary key of record to update, mandatory argument
+   SetID:long
+
+   // Name column's new value
+   Name:string
+
+   // ReleaseDate column's new value
+   ReleaseDate:date
+
+// Meta data description for endpoint
+.description:Update one record in your Sets table in your wotc database
+
+// Type of endpoint
+.type:crud-update
+
+// Sanity checking invocation, making sure primary key(s) are specified.
+validators.mandatory:x:@.arguments/*/SetID
+
+// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
+config.get:"magic:auth:recaptcha:key"
+config.get:"magic:auth:recaptcha:secret"
+if
+   and
+      neq:x:@config.get
+         .
+      neq:x:@config.get
+         .:
+      neq:x:@config.get/@config.get
+         .
+      neq:x:@config.get/@config.get
+         .:
+   .lambda
+
+      // reCAPTCHA configuration settings found.
+      validators.mandatory:x:@.arguments/*/recaptcha
+      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
+         min:decimal:0.5
+
+// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
+remove-nodes:x:@.arguments/*/recaptcha/[0,1]
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root
+
+// Opening up our database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our invocation.
+   add:x:./*/data.update/*/values
+      get-nodes:x:@.arguments/*/[1,1000]
+   add:x:./*/data.update/*/where/*/and
+      get-nodes:x:@.arguments/*/[0,1]
+
+   // Invoking our update slot.
+   data.update
+      database-type:sqlite
+      table:Sets
+      values
+      where
+         and
+
+   // Verifying record exists.
+   if
+      eq
+         get-value:x:@data.update
+         .:int:0
+      .lambda
+         response.status.set:404
+         return
+            result:Record not found
+
+   // Returning the correct status code.
+   response.status.set:202
+
+   // Returning success to caller.
+   unwrap:x:+/*
+   return
+      affected:x:@data.update

@@ -1,72 +1,28 @@
 
 /*
- * This endpoint performs grouped aggregation queries (e.g., min, max, avg, sum, count) 
- * on the 'Appointments' table of a hospital database, grouped by a specific column 
- * and enriched with optional pagination, sorting, and filtering capabilities.
+ * Performs grouped aggregation on the [Appointments] table in the [hospital] database,
+ * with optional joins to the [Patients] and [Doctors] tables for extended filtering and grouping support.
  *
- * The [.arguments] node defines a set of input parameters:
- * - [group_column], [aggregate_function], and [aggregate_column] are **mandatory** and 
- *   specify the grouping column, the aggregation function to apply, and the target 
- *   column to aggregate.
- * - [limit], [offset], [order], and [direction] are optional and control pagination 
- *   and sorting behavior for the result set.
- * - A comprehensive set of **optional filtering arguments** are also declared, allowing 
- *   clients to narrow the result set based on values in 'Appointments', 'Patients', 
- *   and 'Doctors' tables.
+ * Requires:
+ * - [group_column]: Fully qualified column to group results by (e.g., Appointments.AppointmentDate).
+ * - [aggregate_function]: One of min, max, sum, avg, or count.
+ * - [aggregate_column]: Column to apply the aggregation function to.
  *
- * The [validators.mandatory] slots ensure that the three required arguments are 
- * provided by the caller.
+ * Optional:
+ * - [limit], [offset]: Pagination support.
+ * - [order], [direction]: Sorting control.
+ * - Filtering across Appointments (e.g. Reason, AppointmentDate), Patients, and Doctors (e.g. FirstName).
  *
- * The [validators.enum] slots validate that [aggregate_function], [group_column], 
- * and [aggregate_column] contain only legal and pre-approved values, maintaining 
- * security and schema consistency.
+ * Intentional:
+ * - Validates required parameters and restricts group and aggregation columns to a known safe list.
+ * - Dynamically constructs [data.read] to support flexible grouping, ordering, filtering, and pagination.
+ * - Uses LEFT JOINs to allow filtering on patient and doctor data while grouping on appointment fields.
+ * - Injects group and aggregate column programmatically and safely.
+ * - Removes pre-used arguments to simplify WHERE clause generation.
+ * - Adds HTTP caching headers for 5-minute public cacheability.
  *
- * The [response.headers.set] slot adds a 'Cache-Control' HTTP header to cache responses 
- * on the client side for 300 seconds.
- *
- * The [auth.ticket.verify] slot restricts access to users with roles 'admin', 
- * 'guest', or 'root'.
- *
- * The [data.connect] slot initiates a connection to the 'hospital' database using the 
- * 'sqlite' engine via the 'generic' connector.
- *
- * Inside the database context:
- * - [set-name] dynamically sets the [group_column] as the key in the [group] node of 
- *   the [data.read] slot.
- *
- * - A second [set-name] ensures the grouped column is included in the output result, 
- *   and [insert-before] inserts it into the [columns] section to reflect this.
- *
- * - [set-value] updates the alias of the aggregated result to reflect the function 
- *   being used (e.g., "avg", "sum", etc.).
- *
- * - [remove-nodes] cleans up the already processed [group_column] argument, 
- *   simplifying further logic.
- *
- * - [add] then pulls in optional pagination parameters [limit] and [offset] to 
- *   apply result size constraints. These are also removed after use.
- *
- * - Additional [add] and [remove-nodes] pairs handle [order] and [direction] arguments 
- *   to enable runtime sorting of grouped results.
- *
- * - [set-name] creates an [aggregate_functor] node representing the complete 
- *   aggregate function expression using [strings.concat]—for example, 
- *   `sum(Appointments.DoctorID)`.
- *
- * - [remove-nodes] cleans up the [aggregate_function] and [aggregate_column] 
- *   arguments after use to keep the structure clean.
- *
- * - Crucially, the [add] slot dynamically injects **only the provided filtering arguments** 
- *   into the [where] clause. Since these arguments are optional and may or may not be present 
- *   in the incoming payload, this mechanism ensures only specified filters are applied.
- *   If no filters are passed, the [where] clause remains an empty [and] block.
- *
- * The [data.read] slot executes the actual SQL query:
- * - It joins the 'Appointments' table with 'Patients' and 'Doctors' using left joins.
- * - It uses the dynamically constructed [aggregate_functor] in the [columns] node 
- *   and groups the data by the [group_column].
- *
- * The [return-nodes] slot returns the final grouped aggregation result to the caller.
+ * Access is allowed for users with [admin], [guest], or [root] roles.
+ * Returns aggregated results as [result] alongside the [group_column] value.
  */
 .arguments
 

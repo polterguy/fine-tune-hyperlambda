@@ -1,0 +1,85 @@
+
+/*
+ * Creates a new record in the Sets table of the wotc database.
+ *
+ * Required arguments:
+ * - [SetID]: Unique identifier for the set.
+ * - [Name]: The name/title of the set.
+ * - [ReleaseDate]: The official release date of the set.
+ *
+ * If reCAPTCHA is configured in the backend, the [recaptcha] token becomes mandatory and is validated to confirm 
+ * the request originates from a human.
+ *
+ * This endpoint is secured via role-based access control, allowing access only to users with the 'admin' or 'root' roles.
+ * The insertion is performed using a parameterized query for secure handling of input data.
+ *
+ * Upon successful creation, the server responds with HTTP status 201 (Created) and a [result] field indicating success.
+ */
+.arguments
+   recaptcha:string
+
+   // SetID column value
+   SetID:long
+
+   // Name column value
+   Name:string
+
+   // ReleaseDate column value
+   ReleaseDate:date
+
+// Meta data description for endpoint
+.description:Create one record in your Sets table in your wotc database
+
+// Type of endpoint
+.type:crud-create
+
+// Checking reCAPTCHA value if backend is configured with reCAPTCHA configuration settings.
+config.get:"magic:auth:recaptcha:key"
+config.get:"magic:auth:recaptcha:secret"
+if
+   and
+      neq:x:@config.get
+         .
+      neq:x:@config.get
+         .:
+      neq:x:@config.get/@config.get
+         .
+      neq:x:@config.get/@config.get
+         .:
+   .lambda
+
+      // reCAPTCHA configuration settings found.
+      validators.mandatory:x:@.arguments/*/recaptcha
+      validators.recaptcha:x:@.arguments/*/recaptcha/[0,1]
+         site-key:x:@config.get/@config.get
+         secret:x:@config.get
+         min:decimal:0.5
+
+// To remove reCAPTCHA value preventing it from being used as an argument further down in file.
+remove-nodes:x:@.arguments/*/recaptcha/[0,1]
+
+// Verifying user is authorized to access endpoint.
+auth.ticket.verify:root,admin
+
+// Opening up database connection.
+data.connect:[generic|wotc]
+   database-type:sqlite
+
+   // Parametrising our create invocation.
+   add:x:./*/data.create/*/values
+      get-nodes:x:@.arguments/*
+
+   // Creating our record.
+   data.create
+      database-type:sqlite
+      table:Sets
+      return-id:bool:false
+      values
+
+   // Returning the correct status code.
+   response.status.set:201
+
+   // Returning result of above invocation to caller.
+   unwrap:x:+/*
+   return
+      result:success
