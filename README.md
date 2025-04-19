@@ -50,10 +50,10 @@ Below are some example prompts you can run through the model after fine tuning i
   - Wrap it into an endpoint and returns contacts.
   - Change database to chinook and table to Artist. Return ALL columns!
   - Add paging arguments
-  - Make paging arguments optional
+  - Make paging arguments optional by dynamically adding them only if they exist
   - Add sorting arguments
   - Return contacts as [result_from_db]
-  - Include Album records for each record. Use ArtistId as your foreign key!
+  - Include Album records for each record. Use ArtistId as your foreign key and use [include]!
   - Add filtering on name
 * Create an endpoint taking a message only allowing admin users to execute it, then log the message
   - Change it such that it returns success
