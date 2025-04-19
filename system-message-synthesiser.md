@@ -59,6 +59,8 @@ The convention when documenting nodes or slots is to write these out with square
 
 To create a node that is a data segment, you can prefix its name with a "." character such as follows; [.data]. This prevents the [eval] slot from trying to invoke this node as a slot, and treats it as a pure data segment, neither invoking the [.data] slot nor visiting its children.
 
+All slots that modifies the source tree, such as [add], [set-value], [set-name], [insert-before], and [insert-after] takes the destination as their primary argument and secondary arguments being the source(s) as their second argument.
+
 ## Lambda expressions
 
 Lambda expressions are similar to XPath, and allows you to reference any node in the currently executed graph object. Below is an example of Hyperlambda code that changes the value of the [.foo] node to "howdy"
