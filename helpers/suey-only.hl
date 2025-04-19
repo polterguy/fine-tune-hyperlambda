@@ -1,0 +1,135 @@
+/*
+ * Loads all Hyperlambda files from database,
+ * and creates one unique training snippet for every single file snipet that's not synthetic.
+ */
+.arguments
+   limit:long
+   offset:long
+   variations:int
+.type:public
+
+// Ensuring both arguments are specified by caller!
+validators.mandatory:x:@.arguments/*/limit
+validators.mandatory:x:@.arguments/*/offset
+
+// Applying defaults
+validators.default:x:@.arguments
+   variations:int:2
+
+log.info:Starting Suey script
+   limit:x:@.arguments/*/limit
+   offset:x:@.arguments/*/offset
+   variations:x:@.arguments/*/variations
+
+// Loading our system message file.
+.system-message
+set-value:x:@.system-message
+   io.file.load:/modules/fine-tune-hyperlambda/system-message-synthesiser.md
+
+vocabulary
+
+// Connecting to our fine-tune database.
+data.connect:fine-tune
+
+   // Selecting records.
+   data.select:"select * from hyperlambda where is_static = 0 and synthesised = 0 limit @limit offset @offset"
+      @limit:x:@.arguments/*/limit
+      @offset:x:@.arguments/*/offset
+
+   // Looping through each record returned from above.
+   for-each:x:@data.select/*
+
+      // Converting code to lambda.
+      hyper2lambda:x:@.dp/#/*/code
+
+      // Creating a lambda object exclusively containing the currently iterated node.
+      .tmp
+      add:x:@.tmp
+         get-nodes:x:@hyper2lambda/*
+
+      // Converting lambda object to Hyperlambda
+      lambda2hyper:x:@.tmp/*
+
+      // Ensuring we don't have the same code repeated more than n times already.
+      data.read
+         table:hyperlambda
+         where
+            and
+               code.eq:x:@lambda2hyper
+      if
+         lt
+            get-count:x:@data.read/*
+            get-value:x:@.arguments/*/variations
+         .lambda
+
+            // Logging
+            log.info:Creating synthetic snippet
+               snippet:x:@lambda2hyper
+
+            /*
+             * Returns context for the specified [query] from the specified [type],
+             * and returns to caller.
+             *
+             * Optionally add [threshold] and [max_tokens] to specify similarity and maximum
+             * tokens to return. [type] is a machine learning type from your ml_types database table in
+             * your magic database.
+             */
+            execute:magic.workflows.actions.execute
+               name:openai-context-from-database
+               filename:/modules/openai/workflows/actions/openai-context-from-database.hl
+               arguments
+                  type:magic-documentation
+                  query:x:@lambda2hyper
+                  threshold:decimal:0.3
+                  max_tokens:int:2000
+
+            /*
+             * Invokes OpenAI's chat API with the specified [model], [max_tokens], [context],
+             * [instruction] and [query].
+             *
+             * Will use the default API key found from configurations.
+             *
+             * [context] is additional data you can supply to OpenAI such that it responds using
+             * your data as its source for information. [instruction] is a system message allowing
+             * you to change how OpenAI responds.
+             */
+            execute:magic.workflows.actions.execute
+               name:openai-query
+               filename:/modules/openai/workflows/actions/openai-query.hl
+               arguments
+                  model:gpt-4.1-2025-04-14
+                  max_tokens:int:1500
+                  instruction:x:@.system-message
+                  temperature:decimal:0.7
+                  context:x:@execute/@execute/*/context
+                  query:x:@lambda2hyper
+
+            // Injecting comment into Hyperlambda.
+            unwrap:x:+/*/*
+            insert-before:x:@.tmp/0
+               .
+                  ..:x:@execute/*/answer
+            lambda2hyper:x:@.tmp/*
+               comments:true
+
+            // Saving with a random filename in /synthesised4/ folder
+            .filename
+            set-value:x:@.filename
+               strings.concat
+                  .:/modules/fine-tune-hyperlambda/snippets/hyperlambda/synthesised5/
+                  .:id-
+                  get-value:x:@for-each/@.dp/#/*/hyperlambda_id
+                  .:-
+                  crypto.random
+                     min:10
+                     max:10
+                  .:.hl
+            io.file.save:x:@.filename
+               get-value:x:@lambda2hyper
+
+            // To avoid double insertions.
+            data.create
+               table:hyperlambda
+               values
+                  code:x:@lambda2hyper
+                  prompt:x:@execute/*/answer
