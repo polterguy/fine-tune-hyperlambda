@@ -1,0 +1,48 @@
+
+/*
+ * 1. The [else] node provides alternative logic if previous conditions were not met.
+ * 2. The [.sql] and [.master] nodes are initialized for later use in SQL statement construction and database selection.
+ * 3. The [switch:x:@.arguments/*/databaseType] slot checks the value of [.arguments] node's [databaseType] child and sets the [.master] node to the appropriate system database name for MySQL, PostgreSQL, or SQL Server using [set-value].
+ * 4. The [set-value:x:@.sql] slot constructs a "create database" SQL statement using [strings.concat], combining the literal "create database", the [databaseName] argument, and a semicolon.
+ * 5. The [if:x:@.arguments/*/generate] slot checks if the [generate] argument is true; if so, it evaluates the next sibling nodes with [unwrap], then returns the generated SQL statement.
+ * 6. If [generate] is not true, [strings.concat] is used to build a connection string by combining the [connectionString] argument, the [master] database name, and enclosing brackets and separator.
+ * 7. The [data.connect:x:@strings.concat] slot opens a database connection to the constructed connection string, specifying the [database-type] argument.
+ * 8. Within the connection, [data.execute:x:@.sql] runs the generated SQL statement to create the database, again specifying the [database-type].
+ * 
+ * Use cases:
+ * - Dynamically generate and return a "create database" SQL statement for different database types without executing it, useful for previewing or scripting.
+ * - Automatically connect to the correct system database (e.g., "master" for SQL Server, "template1" for PostgreSQL) and execute a database creation command based on user input.
+ * - Support multi-database environments where the logic adapts to MySQL, PostgreSQL, or SQL Server, abstracting away the differences in master database naming conventions.
+ */
+else
+   .sql
+   .master
+   switch:x:@.arguments/*/databaseType
+      case:mysql
+         set-value:x:@.master
+            .:information_schema
+      case:pgsql
+         set-value:x:@.master
+            .:template1
+      case:mssql
+         set-value:x:@.master
+            .:master
+   set-value:x:@.sql
+      strings.concat
+         .:"create database "
+         get-value:x:@.arguments/*/databaseName
+         .:;
+   if:x:@.arguments/*/generate
+      unwrap:x:+/*
+      return
+         sql:x:@.sql
+   strings.concat
+      .:[
+      get-value:x:@.arguments/*/connectionString
+      .:|
+      get-value:x:@.master
+      .:]
+   data.connect:x:@strings.concat
+      database-type:x:@.arguments/*/databaseType
+      data.execute:x:@.sql
+         database-type:x:@.arguments/*/databaseType

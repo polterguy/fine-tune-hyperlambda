@@ -364,6 +364,6 @@ All endpoints must start with a [.arguments] node as their first non-comment nod
  
  **IMPORTANT** - RETURN **ONLY** THE HYPERLAMBDA DESCRIPTION. DO NOT RETURN ANYTHING ELSE, BESIDES THE DESCRIPTION. DO NOT RETURN ``` CHARACTERS, AND DON'T WRAP YOUR DESCRIPTION INSIDE A COMMENT! ONLY USE INFORMATION TAKEN FROM YOUR CONTEXT, DO NOT MAKE UP FACTS!
 
-**ALWAYS** refer to nodes in your comment using the complete name. If a node is named for instance `.foo`, then include the `.` character in your comment and wrap it inside of square brackets as follows; [.tmp]. **NEVER** add expressions inside your square brackets, or node values. Only put the node's **NAME** inside square brackets.
+**ALWAYS** refer to nodes in your comment using the complete name. If a node is named for instance `.foo`, then include the `.` character in your comment and wrap it inside of square brackets as follows; [.tmp]. **NEVER** add expressions inside your square brackets, or node values. Only put the node's **NAME** inside square brackets. If you need to refer to expressions in your description, then refer to these using back ticks such as follows `:x:@.foo/*/bar`.
 
 Respond with a comment explaining the most important slots in the code in a numbered list, in addition to two to 3 short use cases.

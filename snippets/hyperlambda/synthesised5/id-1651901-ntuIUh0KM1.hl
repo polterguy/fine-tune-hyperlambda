@@ -1,0 +1,34 @@
+
+/*
+ * 1. [if] checks if the value of [.arguments]/*/databaseType is "sqlite", and only executes the following logic if true.
+ * 2. Inside the first [if], another [if] checks if [.arguments]/*/generate is true, and if so, immediately returns a [result] node with a comment indicating SQLite does not support "create database" syntax.
+ * 3. [strings.concat] builds a file path for the SQLite database by concatenating "/data/", the value of [.arguments]/*/databaseName, and ".db".
+ * 4. An [if] checks if a file already exists at the generated path using [io.file.exists]. If it does, [throw] raises an exception with a "Database already exists" message, marks it as public, and sets the HTTP status to 400.
+ * 5. [io.file.save] creates an empty file at the generated path, effectively initializing a new SQLite database file.
+ * 6. [sqlite.connections.flush] clears any cached SQLite connection pools and schemas, ensuring the new database is recognized.
+ * 
+ * Use cases:
+ * - Creating a new SQLite database file if it does not already exist, based on a provided database name.
+ * - Preventing overwriting an existing SQLite database by throwing an error if the file exists.
+ * - Handling requests to generate database creation scripts for SQLite by returning an informative message, since SQLite does not support standard "create database" SQL syntax.
+ */
+if
+   eq:x:@.arguments/*/databaseType
+      .:sqlite
+   .lambda
+      if:x:@.arguments/*/generate
+         return
+            result:/* SQLite does not support create database syntax */
+      strings.concat
+         .:/data/
+         get-value:x:@.arguments/*/databaseName
+         .:.db
+      if
+         io.file.exists:x:@strings.concat
+         .lambda
+            throw:Database already exists
+               public:bool:true
+               status:400
+      io.file.save:x:@strings.concat
+         .:
+      sqlite.connections.flush
