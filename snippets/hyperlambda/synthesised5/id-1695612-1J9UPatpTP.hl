@@ -1,0 +1,124 @@
+
+/*
+ * 1. [data.connect] establishes a connection to a data source, allowing subsequent database operations to execute within this context.
+ * 2. [data.select] queries the [ml_permalinks] table using the messages value retrieved from [@cache.get], searching for an existing permalink.
+ * 3. The first [if] checks if the select query returned any results; if so, it immediately yields the [id] field as a [url].
+ * 4. [.token] and [set-value:x:@.token] construct the OpenAI Bearer token, either from a provided API key or from configuration.
+ * 5. [http.post] sends a request to the OpenAI API, asking for an SEO-optimized summary to serve as a title, using the cached content and a system/user message structure.
+ * 6. The second [if] checks the HTTP response code for errors; if the response isn't in the 200–299 range, it logs an error and processes the failure.
+ * 7. [.title2] and subsequent [set-value] nodes extract, trim, and sanitize the generated title from the OpenAI response.
+ * 8. Another [http.post] sends a request to generate a short, SEO-optimized description for the same content, repeating similar request/response/error handling logic.
+ * 9. [.description2] and its [set-value] nodes extract, trim, and sanitize the returned description.
+ * 10. [data.create] inserts a new record into the [ml_permalinks] table with a random id, the original messages, and the generated title and description.
+ * 
+ * Use cases:
+ * - Automatically generate SEO-friendly titles and descriptions for new content and store them in a database for later retrieval.
+ * - Deduplicate content processing by checking for existing permalinks before invoking OpenAI, reducing unnecessary API calls.
+ * - Integrate OpenAI's language model into a CMS workflow for consistent metadata generation on newly created or edited content.
+ * - Provide fallback logging and error handling for failed API requests, ensuring issues are traceable and content integrity is preserved.
+ * - Seamlessly combine data storage, retrieval, and language model API integration to automate website content optimization.
+ */
+data.connect:[generic|magic]
+   data.select:select id from ml_permalinks where messages = @messages limit 1
+      @messages:x:@cache.get
+   if
+      exists:x:@data.select/*
+      .lambda
+         yield
+            url:x:@data.select/*/*/id
+   .token
+   set-value:x:@.token
+      strings.concat
+         .:"Bearer "
+         get-first-value
+            get-value:x:@.arguments/*/api_key
+            config.get:"magic:openai:key"
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:o3-mini
+         max_completion_tokens:int:1000
+         messages
+            .
+               role:system
+               content:Create an SEO optimised summary of the following content intended to serve as a title
+            .
+               role:user
+               content:x:@cache.get
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   .title2
+   set-value:x:@.title2
+      get-first-value
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+         .:
+   set-value:x:@.title2
+      strings.trim:x:@.title2
+         .:@"""
+	 "
+   set-value:x:@.title2
+      strings.replace:x:@.title2
+         .:"\""
+         .:"'"
+   http.post:"https://api.openai.com/v1/chat/completions"
+      convert:bool:true
+      headers
+         Authorization:x:@.token
+         Content-Type:application/json
+      payload
+         model:o3-mini
+         max_completion_tokens:int:1000
+         messages
+            .
+               role:system
+               content:Create a short and SEO optimised one sentence description of the following content intended to serve as a description for an HTML page with its content
+            .
+               role:user
+               content:x:@cache.get
+   if
+      not
+         and
+            mte:x:@http.post
+               .:int:200
+            lt:x:@http.post
+               .:int:300
+      .lambda
+         lambda2hyper:x:@http.post
+         log.error:Something went wrong while invoking OpenAI
+            message:x:@http.post/*/content/*/error/*/message
+            status:x:@http.post
+            error:x:@lambda2hyper
+   .description2
+   set-value:x:@.description2
+      get-first-value
+         get-value:x:@http.post/*/content/*/choices/0/*/message/*/content
+         .:
+   set-value:x:@.description2
+      strings.trim:x:@.description2
+         .:@"""
+	 "
+   set-value:x:@.description2
+      strings.replace:x:@.description2
+         .:"\""
+         .:"'"
+   data.create
+      table:ml_permalinks
+      values
+         id:x:@crypto.random
+         messages:x:@cache.get
+         title:x:@.title2
+         description:x:@.description2

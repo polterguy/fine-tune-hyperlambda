@@ -1,0 +1,22 @@
+
+/*
+ * 1. [for-each] iterates over each child node of [.columns], assigning each to [.dp] by reference for the body to use.
+ * 2. [strings.concat] constructs a string for each column by wrapping the column name (value from [.dp]) within the SQL `coalesce()` function, appending `, '')` to handle null values.
+ * 3. [unwrap] executes the next sibling nodes (the result of [strings.concat]) to ensure any expressions inside are evaluated, especially if dynamic data is involved.
+ * 4. [add] appends the final concatenated string as a new node to [.fields], building up a collection of processed field strings.
+ * 
+ * Use cases:
+ * - Generating a list of SQL-safe column selections that replace nulls with empty strings.
+ * - Dynamically constructing a SELECT clause for SQL queries based on a variable set of columns.
+ * - Populating a set of strings representing database fields for further processing or export.
+ * - Ensuring each column in a result set is safely handled to avoid null values in SQL outputs.
+ */
+for-each:x:@.columns/*
+   strings.concat
+      .:coalesce(
+      get-value:x:@.dp/#
+      .:", '')"
+   unwrap:x:+/*/*
+   add:x:@.fields
+      .
+         .:x:@strings.concat

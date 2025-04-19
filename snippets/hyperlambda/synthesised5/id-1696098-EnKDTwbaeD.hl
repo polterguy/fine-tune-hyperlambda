@@ -1,0 +1,30 @@
+
+/*
+ * 1. The [if] slot checks if the value of [.no] is equal to 0 by using the [eq] slot with an expression `:x:@.no` and a comparison value of integer 0.
+ * 2. If this condition is true, the [.lambda] block is executed, which builds a SQL string and updates the value of [.sql] using [set-value].
+ * 3. The new value for [.sql] is constructed by [strings.concat], which concatenates the current value of [.sql] with various string fragments and dynamic parts.
+ * 4. The concatenated SQL fragment builds a substring that counts occurrences of a parameterized value (likely for generating a SQL expression that counts matches using length and replace functions).
+ * 5. Several [get-value] invocations are used to insert dynamic values from [.fields], [.no], and [.sql] into the resulting string.
+ * 
+ * Use cases:
+ * - Dynamically constructing a SQL statement to count the number of times a substring appears in a certain field, only if [.no] is 0.
+ * - Building advanced reporting or analytics queries where the logic for string composition depends on the value of [.no].
+ * - Generating complex SQL expressions in a loop or conditional scenario where each iteration or branch modifies the SQL logic differently.
+ * - Automating query generation for text analysis or search functionalities in data-driven applications.
+ */
+if
+   eq:x:@.no
+      .:int:0
+   .lambda
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" (length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)

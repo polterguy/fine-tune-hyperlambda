@@ -1,0 +1,31 @@
+
+/*
+ * 1. [for-each] iterates over every second-level child node inside [.urls], and for each node, executes the enclosed logic while passing the node as the [.dp] reference.
+ * 2. [try] attempts to execute [magic.ai.url.scrape] for the current node, passing in dynamic arguments such as the current URL, type, feedback channel, and disabling lists, images, and code.
+ * 3. If [magic.ai.url.scrape] succeeds, [sockets.signal] is called to send an info message with a separator line to the feedback channel.
+ * 4. If an error occurs, the [.catch] block sends a warning message to the feedback channel, including the exception message from the caught error.
+ * 
+ * Use cases:
+ * - Batch-scraping a list of URLs and providing live feedback on each URL's processing status.
+ * - Running automated content extraction on multiple resources, reporting progress and failures in real time.
+ * - Disabling specific scrape features (lists, images, code) for streamlined text-only extraction across many pages.
+ * - Sending exception details for failed scrapes directly to a monitoring or user notification channel.
+ */
+for-each:x:@.urls/*/*
+   try
+      execute:magic.ai.url.scrape
+         url:x:@.dp/#
+         type:x:@.arguments/*/type
+         feedback-channel:x:@.arguments/*/feedback-channel
+         lists:bool:false
+         images:bool:false
+         code:bool:false
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:------------------------------------------------------------------------------------------------------------------------
+            type:info
+   .catch
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:x:@.arguments/*/message
+            type:warning

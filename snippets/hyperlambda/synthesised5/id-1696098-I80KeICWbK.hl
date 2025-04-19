@@ -1,0 +1,23 @@
+
+/*
+ * 1. [strings.concat] is used to assemble a SQL string by concatenating several components together. It takes multiple values, some of which are fetched dynamically using [get-value] from nodes such as [.sql], [.fields], and [.no].
+ * 2. [get-value] is repeatedly used to extract the values of [.sql], [.fields], and [.no], allowing the code to insert dynamic values at specific positions within the constructed SQL string.
+ * 3. The static string fragments injected between the [get-value] calls are segments of a SQL CASE expression that calculates whether a particular substring exists within a field.
+ * 
+ * Use Cases:
+ * - Dynamically building a SQL CASE statement that checks for the presence of a substring within a field, possibly for reporting or filtering purposes.
+ * - Generating parameterized SQL queries where field names and other arguments are determined at runtime.
+ * - Assembling complex SQL statements for text search, where the existence of a pattern or keyword in a field needs to be expressed as a calculated column in the query result.
+ * - Reusing or extending the same code structure to handle different fields or patterns by simply changing the values in [.fields], [.no], or [.sql].
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" + CASE WHEN ((length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)) > 0 THEN 1 ELSE 0 END

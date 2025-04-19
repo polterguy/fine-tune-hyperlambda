@@ -1,0 +1,66 @@
+
+/*
+ * 1. [set-name] is used multiple times to rename nodes within the [data.read] structure, such as changing the group by column and dynamically composing aggregate function nodes based on arguments.
+ * 2. [insert-before] inserts a [group_column] node into the [columns] list at the first position, ensuring the group by field is included in the SQL selection.
+ * 3. [set-value] updates the alias ([as]) of the aggregate function column using the argument for the aggregate function, allowing dynamic naming in the query result.
+ * 4. [remove-nodes] cleans up argument nodes like [group_column], [limit], [offset], [order], and [direction] after their values have been injected, preventing them from appearing in the final query construction.
+ * 5. [add] appends [limit], [offset], [order], and [direction] nodes from arguments directly into the [data.read] node, integrating runtime parameters for query customization.
+ * 6. [strings.concat] inside [set-name] dynamically creates the function call string for the aggregate (e.g., "COUNT(column)") by concatenating the aggregate function name and target column.
+ * 7. The final [data.read] block constructs the SQL query, joining [notes] and [clients], and sets up columns, where conditions, and group by using the dynamically generated nodes.
+ * 8. [return-nodes] returns the result of the [data.read] operation, producing the query result set.
+ * 
+ * Use Cases:
+ * - Dynamically building aggregate SQL queries with user-specified group by and aggregate columns (e.g., grouping notes by client and returning a count).
+ * - Supporting runtime parameters for limits, offsets, ordering, and direction, making the endpoint flexible for paginated and sorted reporting.
+ * - Generating SQL queries with dynamic joins and column aliases, allowing custom analytics or reporting dashboards to fetch grouped and aggregated data.
+ * - Cleaning up argument nodes after injection to prevent polluting the query structure, keeping constructed SQL clean and precise.
+ * - Enabling low-code or no-code interfaces to generate complex SQL queries from simple UI-based argument inputs.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:notes
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  notes.client_id:client_id.client_id
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

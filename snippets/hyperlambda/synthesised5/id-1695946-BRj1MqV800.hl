@@ -1,0 +1,24 @@
+
+/*
+ * 1. [strings.concat] is used to concatenate a sequence of string segments and dynamic values into a single string. The resulting value will be a complex SQL fragment.
+ * 2. [get-value] retrieves the current value from the [.sql], [.fields], and [.no] nodes at specific points in the concatenation, dynamically inserting their values into the combined string.
+ * 3. Literal string segments are interspersed with the dynamic values to construct an SQL expression that calculates how many times a substring (parameterized as `@p` with index [.no]) occurs in a field or set of fields.
+ * 4. The constructed string leverages SQL string functions: `length`, `replace`, and `lower`, combining them to count occurrences of a substring within a string in a case-insensitive manner.
+ * 
+ * Example use cases:
+ * - Dynamically generate a SQL expression to count the number of case-insensitive matches of a search term within a database field, useful for ranking or highlighting results.
+ * - Assemble complex SQL fragments for use in full-text search queries where the number of keyword appearances is needed.
+ * - Customize SQL select statements in a reporting tool to provide word frequency analytics over text columns, where the substring and field names are determined at runtime.
+ * - Build advanced filtering or scoring logic in data APIs that require runtime SQL generation based on user input.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" + (length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)

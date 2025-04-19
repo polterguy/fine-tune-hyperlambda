@@ -1,0 +1,26 @@
+
+/*
+ * 1. The [else] slot executes its child actions only if preceding [if] or [else-if] conditions were not met, serving as the default execution branch for conditional logic.
+ * 2. The [set-value] slot is used here to update the value of the [.sql] node, effectively constructing or appending to an SQL string.
+ * 3. The [strings.concat] slot concatenates a series of values, dynamically building a SQL CASE statement that uses string length comparisons and replacements to count occurrences of a substring.
+ * 4. The [get-value] slot retrieves values from the [.sql], [.fields], and [.no] nodes, which are used as dynamic parts of the SQL fragment being built.
+ * 
+ * Use cases:
+ * - Dynamically building advanced SQL queries based on prior logical conditions, such as for search or reporting features.
+ * - Generating SQL CASE expressions to detect and flag whether a certain substring appears in a field, useful for text analysis or data validation.
+ * - Implementing fallback SQL logic if no other specific conditions apply, ensuring default query behavior.
+ * - Appending computed logic to an existing SQL command in a node-driven, reusable manner.
+ */
+else
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" + CASE WHEN ((length("
+         get-value:x:@.fields
+         .:) - length(replace(lower(
+         get-value:x:@.fields
+         .:), @p
+         get-value:x:@.no
+         .:", ''))) / length(@p"
+         get-value:x:@.no
+         .:)) > 0 THEN 1 ELSE 0 END

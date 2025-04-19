@@ -1,0 +1,65 @@
+
+/*
+ * 1. [set-name:x:@data.connect/*/data.read/*/group/*/group_column] and [set-name:x:+/*/*] dynamically set the names of grouping columns in the [group] clause and elsewhere based on the [.arguments] node's [group_column] value, ensuring the "group by" logic uses user-provided columns.
+ * 
+ * 2. [insert-before:x:@data.connect/*/data.read/*/columns/0] and [set-value:x:@data.connect/*/data.read/*/columns/1/*/as] manipulate the columns list for the SQL query, injecting the grouping column and renaming the aggregate column according to the arguments.
+ * 
+ * 3. [remove-nodes] slots are used repeatedly to clean up temporary argument nodes ([group_column], [limit], [offset], [order], [direction]) after their values have been incorporated, reducing clutter and preventing unwanted data from affecting the final query.
+ * 
+ * 4. [add] slots strategically inject [limit], [offset], [order], and [direction] nodes from [.arguments] into the correct spots in the [data.read] structure, allowing for flexible pagination and ordering in the generated SQL.
+ * 
+ * 5. [set-name:x:./*/data.read/*/columns/*/aggregate_functor] creates a dynamic aggregate function (like "sum(col)", "count(col)") by concatenating the function and column arguments, storing the result as [aggregate_functor] for use in the SQL.
+ * 
+ * 6. [add:x:./*/data.read/*/where/*/and] merges any remaining argument nodes into the [where/and] clause, supporting custom filtering.
+ * 
+ * 7. The [data.read] node constructs the actual SQL read operation, using the dynamically assembled [columns], [where], and [group] clauses, and returns the resulting dataset via [return-nodes:x:@data.read/*].
+ * 
+ * Use cases:
+ * - Dynamically generate SQL queries that group and aggregate data based on user input, e.g., total sales per category.
+ * - Support advanced reporting and analytics screens where end-users choose grouping columns, aggregation functions, and filters at runtime.
+ * - Enable generic API endpoints for dashboards, where query structure is built from incoming request parameters, supporting sorting, limiting, and custom "group by" logic.
+ * - Provide flexible data export tools that allow exporting grouped/aggregated data with custom grouping and aggregation.
+ * - Clean up argument nodes after processing to ensure a minimal and clean execution context for further processing or returning results.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Categories
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

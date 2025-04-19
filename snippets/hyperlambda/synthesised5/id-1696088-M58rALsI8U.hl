@@ -1,0 +1,25 @@
+
+/*
+ * 1. [set-value] updates the value of [.sql] by concatenating its current value with an extended SQL fragment.
+ * 2. [strings.concat] is used to assemble a complex SQL CASE WHEN expression as a string, piecing together various elements dynamically.
+ * 3. [get-value] retrieves the current values of [.sql], [.fields], and [.no] to insert them into the SQL string at appropriate locations.
+ * 4. The sequence constructs a CASE WHEN clause that checks if a certain string pattern (represented by [.no]) appears in the lowercased value(s) of [.fields], leveraging SQL functions like length, replace, and lower.
+ * 
+ * Use cases:
+ * - Dynamically adding conditional logic to a SQL statement for more advanced query filtering.
+ * - Building a query that flags rows based on the presence or absence of a substring within a column.
+ * - Programmatically extending existing SQL fragments with calculated expressions for reporting or analytics.
+ * - Generating SQL for search features where matches of a search term are counted or highlighted.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" + CASE WHEN ((length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)) > 0 THEN 1 ELSE 0 END

@@ -1,0 +1,22 @@
+
+/*
+ * 1. [strings.concat] merges a sequence of values to build a complete SQL segment, using the nodes referenced by the `.sql`, `.fields`, and `.no` nodes, as well as several string literals.
+ * 2. [get-value] retrieves the current value from the referenced nodes (`.sql`, `.fields`, `.no`), injecting their contents at specific positions in the final concatenated SQL string.
+ * 3. The slot arrangement assembles a SQL CASE WHEN expression that checks if a lowercased field contains a particular substring and, if so, returns 1; otherwise, it returns 0. This is achieved by calculating the difference in length before and after a replace operation and dividing by the substring’s length.
+ * 
+ * Use Cases:
+ * - Dynamically constructing a SQL statement to search for the presence of a substring in a given field and return a binary indicator (1 or 0).
+ * - Extending or modifying existing SQL statements programmatically based on input parameters or node values.
+ * - Creating advanced, case-insensitive search or filtering logic in SQL queries assembled at runtime.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" + CASE WHEN ((length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)) > 0 THEN 1 ELSE 0 END

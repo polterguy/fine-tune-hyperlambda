@@ -1,0 +1,22 @@
+
+/*
+ * 1. [for-each] is used to iterate over each child node of [.columns], setting each node as the current [.dp] (by reference) for the loop body.
+ * 2. [strings.concat] constructs a string by concatenating the literal "coalesce(", the value of the current [.dp] node (from [.columns]), and the literal ", '')", effectively creating a SQL-style COALESCE expression for each column.
+ * 3. [unwrap] evaluates the next sibling nodes of the current node (returned from [strings.concat]), ensuring that any expressions are resolved before use.
+ * 4. [add] appends a new node to [.fields], with its value set to the result of [strings.concat] (as evaluated by [unwrap]), building up a transformed list of field expressions.
+ * 
+ * Use cases:
+ * - Generating a list of SQL COALESCE expressions for a dynamic set of columns, for example to handle NULL values in a SELECT statement.
+ * - Transforming a collection of column names into formatted field expressions for dynamic query construction.
+ * - Building a new set of field definitions for data export or report generation, ensuring all fields have default non-null values.
+ * - Creating a batch of expressions for use in a data transformation pipeline.
+ */
+for-each:x:@.columns/*
+   strings.concat
+      .:coalesce(
+      get-value:x:@.dp/#
+      .:", '')"
+   unwrap:x:+/*/*
+   add:x:@.fields
+      .
+         .:x:@strings.concat

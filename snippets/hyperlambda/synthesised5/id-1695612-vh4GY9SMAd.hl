@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [http.post] slot sends an HTTP POST request to the OpenAI chat completions endpoint, with the URL specified as its value.
+ * 2. The [convert] node is set to boolean true, which means the response from the API will be automatically converted into a lambda object for easier manipulation in Hyperlambda.
+ * 3. The [headers] node provides HTTP headers for the request, including an Authorization header (using the value from [.token]) and a Content-Type header set to application/json, ensuring proper authentication and content type for the OpenAI API.
+ * 4. The [payload] node defines the request body sent to the API, specifying the model as "o3-mini", limiting the response to 1000 completion tokens, and providing a list of [messages] that establish the system and user context for the chat completion.
+ * 5. The [content] inside the second message references the value from [cache.get], allowing dynamic user input to be included in the API request.
+ * 
+ * Use cases:
+ * - Generating SEO-optimized HTML page descriptions from cached or dynamically generated content.
+ * - Automating content summarization for web pages using AI, with the ability to adjust the length and style based on parameters.
+ * - Creating a backend endpoint that interfaces with OpenAI to provide optimized meta descriptions for CMS platforms or content management workflows.
+ * - Integrating with other Hyperlambda logic to fetch, process, and describe content in a single pipeline, leveraging in-memory or persistent cache data.
+ */
+http.post:"https://api.openai.com/v1/chat/completions"
+   convert:bool:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json
+   payload
+      model:o3-mini
+      max_completion_tokens:int:1000
+      messages
+         .
+            role:system
+            content:Create a short and SEO optimised one sentence description of the following content intended to serve as a description for an HTML page with its content
+         .
+            role:user
+            content:x:@cache.get

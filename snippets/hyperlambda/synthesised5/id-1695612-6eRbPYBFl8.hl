@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [http.post] slot is used to make an HTTP POST request to the OpenAI API endpoint for chat completions.
+ * 2. The [convert] node is set to true, enabling automatic conversion of the response into its native object structure.
+ * 3. The [headers] node provides HTTP headers, including [Authorization] (which references a token from the current context) and [Content-Type] set to "application/json" to indicate the payload format.
+ * 4. The [payload] node constructs the JSON body for the API request, specifying the [model] as "o3-mini", a [max_completion_tokens] limit of 1000, and a [messages] array defining the chat history.
+ * 5. Inside [messages], two message objects are set: one with [role] "system" that instructs the model to create an SEO-optimized summary for a title, and one with [role] "user" whose [content] is dynamically pulled from the result of the [cache.get] node.
+ * 
+ * Use cases:
+ * - Submitting user content to OpenAI's API to automatically generate SEO-optimized titles for web pages or articles.
+ * - Integrating with a caching mechanism to retrieve previously stored user content and process it with OpenAI.
+ * - Automating content summarization tasks for digital marketing or publishing workflows.
+ * - Building a backend service that generates SEO-friendly suggestions for any arbitrary text content provided by users.
+ */
+http.post:"https://api.openai.com/v1/chat/completions"
+   convert:bool:true
+   headers
+      Authorization:x:@.token
+      Content-Type:application/json
+   payload
+      model:o3-mini
+      max_completion_tokens:int:1000
+      messages
+         .
+            role:system
+            content:Create an SEO optimised summary of the following content intended to serve as a title
+         .
+            role:user
+            content:x:@cache.get

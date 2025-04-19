@@ -1,0 +1,62 @@
+
+/*
+ * 1. [data.connect] opens a database connection to the [crm] database using the "generic" connection string and sets the [database-type] to SQLite.
+ * 2. [set-name] is used multiple times to configure node names dynamically, specifically updating [group_column] nodes and their siblings based on input arguments.
+ * 3. [insert-before] injects a [group_column] node as the first column in the SQL query, ensuring it is included in the resulting SELECT statement.
+ * 4. [set-value] assigns the alias of the aggregate function column using the value from [aggregate_function] in the arguments.
+ * 5. [remove-nodes] cleans up the [group_column], [limit], [offset], [order], and [direction] nodes from the argument list after they're incorporated into the query structure.
+ * 6. [add] appends [limit], [offset], [order], and [direction] nodes to the appropriate locations under [data.read] to control result pagination and sorting.
+ * 7. [set-name] constructs an [aggregate_functor] column by concatenating the [aggregate_function] and [aggregate_column] to create expressions like "COUNT(column)".
+ * 8. [add] merges any remaining argument nodes into the WHERE clause under an [and] node, dynamically building complex filters.
+ * 9. The [data.read] block defines the actual SQL query, specifying the [campaigns] table, selected columns, grouping, and filtering.
+ * 10. [return-nodes] outputs the results of the [data.read] operation.
+ * 
+ * Use Cases:
+ * - Generating a grouped aggregate SQL query from dynamic arguments, such as retrieving the total number of campaigns per user or category.
+ * - Supporting dynamic query customization for paginated, filtered, and grouped results in a reporting or analytics dashboard.
+ * - Allowing a low-code environment to construct complex SQL queries—including group by, aggregate functions, sorting, and filtering—based on user input or frontend configuration.
+ * - Reusing argument nodes to modify the query structure and clean up temporary data after building the SQL statement.
+ * - Returning only the relevant result set to the caller by extracting the nodes from [data.read] for further processing or display.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:campaigns
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

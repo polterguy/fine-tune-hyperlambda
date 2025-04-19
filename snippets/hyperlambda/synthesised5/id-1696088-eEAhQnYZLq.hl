@@ -1,0 +1,23 @@
+
+/*
+ * 1. [strings.concat] is used to concatenate a sequence of string fragments and dynamic values to construct a complex SQL CASE expression. The concatenation pulls together static SQL syntax and dynamic values from other nodes.
+ * 2. [get-value] is invoked multiple times to retrieve the current values from [.sql], [.fields], and [.no] nodes, ensuring that dynamic input is injected into the concatenated SQL string at the correct positions.
+ * 3. Literal string fragments (e.g., " CASE WHEN ((length(", ":) - length(replace(lower(", etc.) are added as separate nodes to build the final SQL statement in a readable and modular way.
+ * 
+ * Use cases:
+ * - Dynamically constructing a SQL CASE WHEN clause to count occurrences of a substring within a column for conditional logic in queries.
+ * - Building custom search filters where the number of matches for a given parameter in a field should influence query results.
+ * - Generating SQL statements for data processing or reporting, where field and parameter names are determined at runtime.
+ * - Creating flexible, template-based SQL generators that adapt to input structures from other nodes.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" CASE WHEN ((length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)) > 0 THEN 1 ELSE 0 END

@@ -1,0 +1,68 @@
+
+/*
+ * 1. [set-name:x:@data.connect/*/data.read/*/group/*/group_column] and [set-name:x:+/*/*] dynamically assign the name of the group by column based on the value from the [.arguments] node's [group_column].
+ * 2. [insert-before:x:@data.connect/*/data.read/*/columns/0] inserts a new [group_column] node as the first column in the columns list, ensuring the group by column is selected in the SQL result.
+ * 3. [set-value:x:@data.connect/*/data.read/*/columns/1/*/as] assigns the alias for the aggregate function column from the [aggregate_function] argument.
+ * 4. [remove-nodes:x:@.arguments/*/group_column], [remove-nodes:x:@.arguments/*/limit], [remove-nodes:x:@.arguments/*/offset], [remove-nodes:x:@.arguments/*/order], [remove-nodes:x:@.arguments/*/direction] clean up arguments after they've been processed and injected into the query structure.
+ * 5. [add:x:@data.connect/*/data.read] and [add:x:./*/data.read] add nodes for [limit], [offset], [order], and [direction] from the arguments to the appropriate locations in the [data.read] node.
+ * 6. [set-name:x:./*/data.read/*/columns/*/aggregate_functor] constructs the aggregate SQL function (like COUNT, SUM, etc.) using the function and target column from arguments.
+ * 7. [remove-nodes:x:@.arguments/*/[0,2]] removes the first two remaining argument nodes, likely to clean up aggregate_function and aggregate_column.
+ * 8. [add:x:./*/data.read/*/where/*/and] injects any other arguments as additional filter conditions into the [and] node of the [where] clause.
+ * 9. [data.read] performs the actual database query, using SQLite, targeting the [documents] table, joining [clients], and using the dynamically constructed group, aggregate, and where conditions.
+ * 10. [return-nodes:x:@data.read/*] returns the results of the data query.
+ * 
+ * Use Cases:
+ * - Dynamically generate a GROUP BY SQL query on the [documents] table using any column specified at runtime, and aggregate results using a chosen SQL function like COUNT or SUM.
+ * - Easily adapt the query to support pagination ([limit], [offset]) and ordering by passing these as arguments, which are then injected into the query.
+ * - Automatically handle SQL joins and aliases for more complex aggregate queries, such as counting documents per client or summing amounts per group.
+ * - Cleanly prepare and sanitize the input arguments, ensuring that only relevant nodes are present for the final query execution.
+ * - Useful in reporting interfaces or dashboard widgets, where end-users select columns to group by and aggregate functions to apply, and the backend adapts the SQL accordingly.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:documents
+         join:clients
+            as:client_id
+            type:left
+            on
+               and
+                  documents.client_id:client_id.client_id
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

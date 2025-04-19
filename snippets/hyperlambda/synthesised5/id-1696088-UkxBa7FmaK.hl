@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [if] slot checks if the value of [.no] is equal to the integer 0 by using the [eq] slot and a lambda expression referencing [.no].
+ * 2. If the condition is true, the nested [.lambda] block executes. This block updates the value of [.sql] by calling [set-value] and assigning it the result of a [strings.concat] operation.
+ * 3. [strings.concat] concatenates the previous value of [.sql] with a SQL "CASE WHEN" clause. It inserts dynamic field and parameter references from [.fields] and [.no] into the generated SQL fragment.
+ * 4. The generated SQL fragment counts the occurrences of a given value (parameter @p) in the lowercased version of a specified field, and appends a conditional statement to set the result to 1 if the match count is greater than zero, otherwise 0.
+ * 
+ * Use cases:
+ * - Dynamically constructing complex conditional SQL queries based on the value of [.no].
+ * - Generating SQL statements that count case-insensitive substring matches within a text column for reporting or filtering.
+ * - Building advanced search or filtering logic in a low-code/no-code environment where SQL fragments must be assembled from user input or context.
+ * - Supporting scenarios where SQL needs to adapt to dynamic field and parameter references for flexible query generation.
+ */
+if
+   eq:x:@.no
+      .:int:0
+   .lambda
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" CASE WHEN ((length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)) > 0 THEN 1 ELSE 0 END

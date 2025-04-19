@@ -1,0 +1,29 @@
+
+/*
+ * 1. [if]: Checks if the value of [.no] is exactly 0 using the [eq] slot, executing its lambda block only if this condition is true.
+ * 2. [set-value]: If the condition is met, this updates the value of [.sql] to the result of the string concatenation.
+ * 3. [strings.concat]: Concatenates several parts together to form a SQL fragment, including the previous value of [.sql], literal SQL syntax for a CASE WHEN statement, and dynamic references to [.fields] and [.no].
+ * 4. [get-value]: Used multiple times to inject the current values of [.sql], [.fields], and [.no] into the resulting string, ensuring the SQL fragment uses the correct field and parameter according to the current context.
+ * 
+ * Typical use cases:
+ * - Dynamically building a SQL CASE WHEN expression to count occurrences of a substring in a text field for the 0th parameter.
+ * - Generating part of a SQL query that conditionally flags rows based on whether a search term exists in a column.
+ * - Extending an existing SQL query string in [.sql] by appending complex logic involving parameters and fields.
+ * - Supporting dynamic filtering or scoring logic in search or reporting endpoints where the field and parameter index are determined at runtime.
+ */
+if
+   eq:x:@.no
+      .:int:0
+   .lambda
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" CASE WHEN ((length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)) > 0 THEN 1 ELSE 0 END

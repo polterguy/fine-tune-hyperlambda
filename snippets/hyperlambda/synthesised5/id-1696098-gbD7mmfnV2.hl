@@ -1,0 +1,25 @@
+
+/*
+ * 1. The [set-value] slot sets the value of the [.sql] node by concatenating several string fragments and node values together using [strings.concat].
+ * 2. The [strings.concat] slot combines its child nodes, including both static string fragments and values retrieved from [.sql], [.fields], and [.no], into a single string.
+ * 3. Multiple [get-value] slots are used to dynamically insert the current values of [.sql], [.fields], and [.no] at specific points within the constructed SQL CASE statement.
+ * 4. The resulting string is a SQL CASE WHEN expression that counts occurrences of a substring in a field (using SQL functions like length, replace, and lower), and determines if the substring occurs at least once, returning 1 if true, otherwise 0.
+ * 
+ * Use cases:
+ * - Dynamically constructing SQL queries to check for the existence of a substring within a text field.
+ * - Appending complex conditional logic to an existing SQL statement held in [.sql].
+ * - Building advanced search filters for data validation or reporting purposes based on the occurrence of certain patterns in a database field.
+ * - Automating SQL string generation for code that needs to adapt to different fields or parameters dynamically.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" CASE WHEN ((length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)) > 0 THEN 1 ELSE 0 END

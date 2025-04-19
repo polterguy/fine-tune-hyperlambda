@@ -1,0 +1,48 @@
+
+/*
+ * 1. [set-name] is used to dynamically construct an aggregate function column name (e.g., CONCAT of [.aggregate_function], an open parenthesis, the [.aggregate_column], and a close parenthesis) and assigns it to a node named [aggregate_functor]. This allows for expressions like "COUNT(OrderID)" or "SUM(Freight)" to be injected into the SQL.
+ * 2. [remove-nodes] deletes the first two argument nodes from the [.arguments] node, likely to avoid passing aggregate function details as columns or filters in subsequent processing.
+ * 3. [add] injects all remaining argument nodes into the AND clause of the [where] filter for the query, effectively building the WHERE conditions dynamically based on input.
+ * 4. [data.read] performs a SQL query on the [Orders] table in a SQLite database, joining [Employees] and [Shippers] with LEFT OUTER JOINs on their respective foreign keys, and includes the dynamically built aggregate function as a column, aliased as [result].
+ * 5. [return-nodes] returns all child nodes from the [data.read] node, exposing the raw result set from the query.
+ * 
+ * Use cases:
+ * - Dynamically generate and execute aggregate SQL queries (like COUNT or SUM) on the [Orders] table, allowing the aggregate type and column to be determined at runtime.
+ * - Support advanced reporting scenarios where the user can specify which aggregate to compute and on which column.
+ * - Build API endpoints for dashboard widgets that require joining multiple tables and aggregating data, such as total orders per employee or shipper.
+ * - Facilitate low-code analytics interfaces where business users define their own aggregation and filtering criteria.
+ * - Enable parameterized queries for statistical summaries while abstracting SQL syntax from the user.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Orders
+         join:Employees
+            as:EmployeeID
+            type:left
+            on
+               and
+                  Orders.EmployeeID:EmployeeID.EmployeeID
+         join:Shippers
+            as:ShipVia
+            type:left
+            on
+               and
+                  Orders.ShipVia:ShipVia.ShipperID
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      limit:long:1
+   return-nodes:x:@data.read/*/*

@@ -1,0 +1,60 @@
+
+/*
+ * 1. The [set-name] slot is used to rename nodes within the [data.connect] hierarchy, dynamically assigning the [group_column] value from the arguments into both the [group] and [columns] sections of a [data.read] query. This allows for flexible grouping in a generated SQL statement based on input parameters.
+ * 2. The [insert-before] slot is utilized to insert the [group_column] node into the columns list before the aggregate function, ensuring that the grouping column appears first in the resulting SQL SELECT statement.
+ * 3. The [set-value] slot updates the alias ([as]) of the aggregate function column, customizing the returned result column name according to the provided [aggregate_function] argument.
+ * 4. The [remove-nodes] slot is used multiple times to clean up the [arguments] node set by removing parameters like [group_column], [limit], [offset], [order], and [direction] after they've been processed and injected into the query, keeping the execution context clean.
+ * 5. The [add] slot is used to append optional query modifiers ([limit], [offset], [order], [direction]) into the appropriate places in the [data.read] node structure if they are present in the arguments.
+ * 6. The [strings.concat] slot constructs the function call syntax for the aggregate in the [aggregate_functor] node, combining the function name and column into a string like "COUNT(column)".
+ * 7. The [data.read] slot builds the actual SQL query object, using all the dynamically constructed nodes to select aggregate data from the [Regions] table, grouped by the specified column.
+ * 8. The [return-nodes] slot returns the result of the executed query, exposing only the children of the [data.read] node as the output.
+ * 
+ * Use cases:
+ * - Dynamically generating a SQL "GROUP BY" aggregate query in response to API arguments, allowing clients to specify which column to group by and which aggregation to apply.
+ * - Building flexible data analytics endpoints where the grouping, aggregation, and result aliasing can be controlled at runtime without hardcoding SQL.
+ * - Supporting additional query options (like [limit], [offset], [order], and [direction]) for paginated or sorted aggregate reports.
+ * - Cleaning up input arguments to prevent them from leaking into subsequent operations or responses.
+ * - Easily extending for different tables or aggregate functions by adjusting input arguments, enabling reusable analytics features.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   set-name:x:@data.connect/*/data.read/*/group/*/group_column
+      get-value:x:@.arguments/*/group_column
+   set-name:x:+/*/*
+      get-value:x:@.arguments/*/group_column
+   insert-before:x:@data.connect/*/data.read/*/columns/0
+      .
+         group_column
+   set-value:x:@data.connect/*/data.read/*/columns/1/*/as
+      get-value:x:@.arguments/*/aggregate_function
+   remove-nodes:x:@.arguments/*/group_column
+   add:x:@data.connect/*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   set-name:x:./*/data.read/*/columns/*/aggregate_functor
+      strings.concat
+         get-value:x:@.arguments/*/aggregate_function
+         .:(
+         get-value:x:@.arguments/*/aggregate_column
+         .:)
+   remove-nodes:x:@.arguments/*/[0,2]
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Regions
+      columns
+         aggregate_functor
+            as:result
+      where
+         and
+      group
+         group_column
+   return-nodes:x:@data.read/*

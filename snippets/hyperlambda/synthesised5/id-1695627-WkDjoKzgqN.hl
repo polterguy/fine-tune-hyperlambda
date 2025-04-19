@@ -1,0 +1,59 @@
+
+/*
+ * 1. [fork]: Executes all its child nodes in parallel, allowing concurrent processing of multiple URLs in the [.urls] node.
+ * 2. [for-each]: Iterates through each URL found within the child nodes of [.urls], processing each one independently.
+ * 3. [try]: Attempts to execute [magic.ai.url.scrape] for each URL, with arguments for URL, type, feedback channel, and flags for lists, images, and code extraction.
+ * 4. [.catch]: If an error occurs during scraping, sends a signal to the feedback channel with the error message and a warning type.
+ * 5. [sockets.signal]: Used multiple times to communicate progress, status updates, and completion messages to the feedback channel and to signal overall completion to [magic.backend.message].
+ * 6. [if]: Checks if the [vectorize] argument is true. If so, calls [magic.ai.vectorise] with relevant arguments and signals completion; otherwise, sends a generic "Done!" message to the feedback channel.
+ * 7. [log.info]: Logs a message indicating successful creation of OpenAI training data, including the type processed.
+ * 
+ * Use Cases:
+ * - Processing and scraping training data from a batch of URLs for OpenAI data preparation, with live feedback to a user interface or client.
+ * - Sending progress and error updates to a real-time feedback channel during long-running data processing tasks.
+ * - Optionally performing a vectorization step on the processed data if requested, and handling both success and error scenarios with clear notifications.
+ */
+fork
+   .urls
+   for-each:x:@.urls/*/*
+      try
+         execute:magic.ai.url.scrape
+            url:x:@.dp/#
+            type:x:@.arguments/*/type
+            feedback-channel:x:@.arguments/*/feedback-channel
+            lists:bool:false
+            images:bool:false
+            code:bool:false
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:------------------------------------------------------------------------------------------------------------------------
+               type:info
+      .catch
+         sockets.signal:x:@.arguments/*/feedback-channel
+            args
+               message:x:@.arguments/*/message
+               type:warning
+   sockets.signal:magic.backend.message
+      roles:root
+      args
+         message:Done creating OpenAI training data from URL list
+         type:success
+   if
+      eq:x:@.arguments/*/vectorize
+         .:bool:true
+      .lambda
+         execute:magic.ai.vectorise
+            type:x:@.arguments/*/type
+            feedback-channel:x:@.arguments/*/feedback-channel
+            .onafter
+               sockets.signal:x:@.arguments/*/feedback-channel
+                  args
+                     message:Done!
+                     type:success
+   else
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Done!
+            type:success
+   log.info:OpenAI training data successfully created from URL list
+      type:x:@.arguments/*/type

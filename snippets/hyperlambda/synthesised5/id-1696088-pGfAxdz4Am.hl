@@ -1,0 +1,25 @@
+
+/*
+ * 1. The [set-value] slot updates the value of the [.sql] node with the result of the concatenation.
+ * 2. The [strings.concat] slot merges multiple values into a single SQL CASE WHEN string, dynamically building the expression.
+ * 3. Multiple [get-value] slots retrieve the current value of [.sql], [.fields], and [.no] nodes to inject their data into the generated SQL.
+ * 4. The result is a SQL fragment that counts case-insensitive occurrences of a substring (parameterized as `@p` and using the value from [.no]) within a field, returning 1 if found, else 0.
+ * 
+ * Use cases:
+ * - Dynamically generating SQL statements for text search or filtering in a data access layer.
+ * - Building CASE WHEN conditions for reporting or computed columns in SQL queries.
+ * - Extending search logic to support case-insensitive substring matching in a flexible, reusable way.
+ * - Supporting multiple fields or parameterized substring counting within complex SQL generation scenarios.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" CASE WHEN ((length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)) > 0 THEN 1 ELSE 0 END

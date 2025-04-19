@@ -1,0 +1,54 @@
+
+/*
+ * 1. [for-each]: Iterates over each child node of [.words], processing each word individually by referencing it as [.dp].
+ * 2. [set-name]: Changes the name of nodes located at two levels below the next sibling of the current iteration, assigning them a new name formed by concatenating the value of [.p] and the current value of [.no].
+ * 3. [add]: Adds the current [.dp] node by reference as a child to each [data.select] node under [data.connect].
+ * 4. [if] / [else]: Conditionally builds an SQL fragment string in [.sql]. If [.no] equals 0, it initializes the SQL expression; otherwise, it appends to the existing SQL, handling concatenation for multiple words.
+ * 5. [math.increment]: Increments the [.no] node value for each word iteration, ensuring unique identifiers and correct SQL segment construction.
+ * 
+ * Use cases:
+ * - Dynamically constructing a SQL query that counts word occurrences in a database field for a list of words.
+ * - Renaming nodes within a processing pipeline based on parameterized values for further manipulation or lookup.
+ * - Aggregating search or filter logic for multiple keywords in a data selection scenario.
+ * - Building complex string expressions (such as SQL) by iterating through a list and conditionally appending fragments.
+ * - Attaching processed nodes into a target data structure for subsequent operations or queries.
+ */
+for-each:x:@.words/*
+   set-name:x:+/+/*/*
+      strings.concat
+         .:@p
+         get-value:x:@.no
+   unwrap:x:+/*/*
+   add:x:@data.connect/*/data.select
+      .
+         .:x:@.dp/#
+   if
+      eq:x:@.no
+         .:int:0
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" (length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)
+   else
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" + (length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)
+   math.increment:x:@.no

@@ -1,0 +1,39 @@
+
+/*
+ * 1. The [if] slot checks whether the value of [.no] is equal to 0 by using the [eq] slot, which compares [get-value:x:@.no] to the static value 0 of type int.
+ * 2. If the condition is true, the [.lambda] block is executed, which contains a [set-value:x:@.sql] slot. This updates the value of [.sql].
+ * 3. The new value for [.sql] is built by the [strings.concat:x:@.sql] slot, which concatenates several parts, including:
+ *    - The current value of [.sql]
+ *    - The string " (length("
+ *    - The value of [.fields]
+ *    - The string ") - length(replace(lower("
+ *    - The value of [.fields] again
+ *    - The string "), @p"
+ *    - The value of [.no]
+ *    - The string ", ''))) / length(@p"
+ *    - The value of [.no]
+ *    - The string ")"
+ * 4. [get-value:x:@.fields] and [get-value:x:@.no] are used multiple times to dynamically insert their respective values into the concatenated result.
+ * 
+ * Use cases:
+ * - Dynamically building a SQL expression that counts occurrences of a substring (parameterized by [.no] and [.fields]) when [.no] is zero.
+ * - Generating advanced SQL queries for analytics, such as word or substring frequency counts, where field and parameter names are dynamically inserted.
+ * - Appending computed SQL fragments to an existing [.sql] string only when a specific condition ([.no] equals 0) is met.
+ * - Creating complex SQL statements programmatically for reporting or search functionalities based on runtime conditions.
+ */
+if
+   eq:x:@.no
+      .:int:0
+   .lambda
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" (length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)

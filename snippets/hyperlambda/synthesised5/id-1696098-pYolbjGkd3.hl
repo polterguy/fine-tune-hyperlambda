@@ -1,0 +1,27 @@
+
+/*
+ * 1. The [else] node acts as a fallback branch that executes if previous [if] or [else-if] conditions are not met.
+ * 2. [set-value:x:@.sql] updates the value of the [.sql] node, constructing its new value using the result from the [strings.concat] slot.
+ * 3. [strings.concat:x:@.sql] concatenates the current value of the [.sql] node with a dynamically generated SQL CASE WHEN expression for text searching.
+ * 4. Multiple [get-value:x:@.fields] and [get-value:x:@.no] nodes insert the contents of [.fields] and [.no] dynamically into the SQL string.
+ * 5. The concatenated string forms a SQL CASE statement that checks if a search term appears in a given field, returning 1 if it does, and 0 otherwise.
+ * 
+ * Use cases:
+ * - Building a dynamic SQL query for text search scenarios, where the presence of a search term must be detected.
+ * - Generating different SQL logic depending on whether specific conditions were met earlier in the Hyperlambda flow.
+ * - Extending or modifying existing SQL fragments in a search/filter module based on user input or preceding logic.
+ * - Creating a CASE WHEN clause in SQL for highlighting or filtering results in a database-driven application.
+ */
+else
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" + CASE WHEN ((length("
+         get-value:x:@.fields
+         .:) - length(replace(lower(
+         get-value:x:@.fields
+         .:), @p
+         get-value:x:@.no
+         .:", ''))) / length(@p"
+         get-value:x:@.no
+         .:)) > 0 THEN 1 ELSE 0 END

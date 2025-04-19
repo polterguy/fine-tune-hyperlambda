@@ -1,0 +1,46 @@
+
+/*
+ * 1. [for-each:x:@.words/*] iterates over each child node of [.words], processing each word in the collection sequentially.
+ * 2. [if] checks if the current value of [.no] is equal to 0. This is used to determine whether the loop is at its first iteration.
+ * 3. [set-value:x:@.sql] updates the value of [.sql] by concatenating SQL string fragments to build a CASE WHEN expression. The construction is slightly different depending on whether this is the first word or a subsequent word.
+ * 4. [strings.concat:x:@.sql] combines the existing [.sql] value with several additional string pieces and dynamic field/parameter references to build up a complex SQL fragment.
+ * 5. [else] handles all iterations after the first, prepending a " + " to the SQL string to concatenate multiple CASE WHEN statements together.
+ * 6. [math.increment:x:@.no] increases the value of [.no] by one at the end of each iteration, ensuring the loop tracks its position correctly.
+ * 
+ * Use Cases:
+ * - Dynamically generates a SQL statement that counts or flags the occurrence of search words within a database field, building the query from a list of words.
+ * - Can be used to construct advanced search or scoring logic within SQL queries, where each word contributes to a composite score.
+ * - Useful for applications where flexible, dynamic SQL generation is needed based on user input or variable word lists.
+ * - Suitable for constructing full-text search ranking expressions or for implementing keyword-based filtering in data retrieval endpoints.
+ */
+for-each:x:@.words/*
+   if
+      eq:x:@.no
+         .:int:0
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" CASE WHEN ((length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)) > 0 THEN 1 ELSE 0 END
+   else
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" + CASE WHEN ((length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)) > 0 THEN 1 ELSE 0 END
+   math.increment:x:@.no

@@ -1,0 +1,45 @@
+
+/*
+ * 1. The [for-each] slot iterates over each child node of [.words], processing each word individually.
+ * 2. The [if] slot checks whether the [.no] node has a value of 0, which identifies the first iteration in the loop.
+ * 3. If it is the first iteration ([.no] equals 0), [set-value] assigns a generated SQL string to the [.sql] node using [strings.concat]. This constructs a SQL CASE WHEN expression for the first word, without a leading " + ".
+ * 4. The [else] slot handles all subsequent iterations, appending additional SQL CASE WHEN expressions to [.sql] with a leading " + " separator, again using [strings.concat].
+ * 5. The [math.increment] slot increments the [.no] node, ensuring the next iteration knows its position in the loop.
+ * 
+ * Use Cases:
+ * - Dynamically building a SQL expression to count the presence of multiple search words in a text column, where each word is parameterized.
+ * - Generating complex SQL conditional aggregation statements by iterating over a list of input values to create reusable query logic.
+ * - Constructing a search relevance scoring formula in SQL, where each word contributes to the total score, and the generated SQL is stored in [.sql] for execution or further processing.
+ * - Automating the creation of SQL fragments in batch processes where the number and content of fields or parameters are variable at runtime.
+ */
+for-each:x:@.words/*
+   if
+      eq:x:@.no
+         .:int:0
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" CASE WHEN ((length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)) > 0 THEN 1 ELSE 0 END
+   else
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" + CASE WHEN ((length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)) > 0 THEN 1 ELSE 0 END
+   math.increment:x:@.no

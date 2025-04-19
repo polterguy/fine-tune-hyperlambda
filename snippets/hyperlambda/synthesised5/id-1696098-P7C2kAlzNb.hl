@@ -1,0 +1,22 @@
+
+/*
+ * 1. The [for-each] slot iterates over each child node under [.columns], executing its children for every column node found.
+ * 2. Inside each iteration, [strings.concat] combines three pieces: the static string "coalesce(", the value of the current column (via [get-value] and [.dp]), and the string ", '')", resulting in an SQL-like coalesce expression for each column.
+ * 3. The [unwrap] slot evaluates the next sibling node's children, ensuring any inner expressions within the concatenated string are resolved.
+ * 4. The [add] slot appends the result of [strings.concat] as a new child node under [.fields], wrapping the result in a node whose value is the concatenated string.
+ * 
+ * Use cases:
+ * - Dynamically generating SQL select statements that handle nullable columns by wrapping each column name with a coalesce fallback.
+ * - Building a list of field expressions for a report, where each field is ensured to never be null.
+ * - Creating a reusable pattern for transforming column lists into formatted expressions for later use in database queries.
+ * - Automating the construction of select expressions in data export or integration scenarios where null-safe output is required.
+ */
+for-each:x:@.columns/*
+   strings.concat
+      .:coalesce(
+      get-value:x:@.dp/#
+      .:", '')"
+   unwrap:x:+/*/*
+   add:x:@.fields
+      .
+         .:x:@strings.concat

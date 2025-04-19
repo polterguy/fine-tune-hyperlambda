@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [set-value] slot updates the value of the [.sql] node to a new string constructed from the result of the [strings.concat] slot.
+ * 2. The [strings.concat] slot builds a complex string by concatenating several parts, including the value of [.sql], string literals representing SQL statements, the value of [.fields], and the value of [.no], to create a dynamic SQL expression.
+ * 3. Multiple [get-value] slots are used to fetch the values of [.sql], [.fields], and [.no] nodes, which are then interpolated into the resulting SQL string at the appropriate positions.
+ * 
+ * Use cases:
+ * - Generating a SQL statement to count occurrences of a substring within a field by calculating the difference in length before and after replacement.
+ * - Dynamically constructing SQL queries based on user-provided or previously computed node values.
+ * - Building advanced SQL expressions for analytics or reporting scenarios requiring custom string manipulation in queries.
+ * - Automating the assembly of parameterized SQL queries for use in a data pipeline or ETL process.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" (length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)

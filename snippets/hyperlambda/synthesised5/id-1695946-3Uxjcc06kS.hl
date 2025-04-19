@@ -1,0 +1,26 @@
+
+/*
+ * 1. The [else] node is a conditional branch that is executed if all previous [if] and [else-if] conditions are false.
+ * 2. [set-value:x:@.sql] updates the value of the [.sql] node. The new value is constructed by concatenating several string fragments.
+ * 3. [strings.concat:x:@.sql] performs the concatenation, combining the current value of [.sql] with a SQL CASE WHEN expression.
+ * 4. [get-value:x:@.fields] and [get-value:x:@.no] dynamically insert the values of the [.fields] and [.no] nodes into the constructed string.
+ * 5. The resulting string builds a SQL CASE statement that counts the number of occurrences of a substring, and returns 1 if the substring is present, otherwise 0.
+ * 
+ * Use cases:
+ * - Dynamically appending a CASE WHEN search condition to a SQL query if previous conditions were not met.
+ * - Constructing a SQL statement to check for the presence of a substring in a text field.
+ * - Building advanced SQL WHERE clauses based on user-defined fields and search values.
+ */
+else
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" + CASE WHEN ((length("
+         get-value:x:@.fields
+         .:) - length(replace(lower(
+         get-value:x:@.fields
+         .:), @p
+         get-value:x:@.no
+         .:", ''))) / length(@p"
+         get-value:x:@.no
+         .:)) > 0 THEN 1 ELSE 0 END

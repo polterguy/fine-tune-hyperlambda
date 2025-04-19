@@ -1,0 +1,25 @@
+
+/*
+ * 1. The [set-value] slot assigns a new value to the node referenced by the expression `:x:@.sql`. 
+ * 2. The [strings.concat] slot concatenates multiple string segments and slot results together to form a complex SQL segment, which is then used as the new value for [.sql].
+ * 3. The [get-value] slot is used repeatedly to fetch values from the nodes [.sql], [.fields], and [.no] to dynamically build the SQL string.
+ * 4. The string manipulation constructs a piece of SQL code that calculates the number of occurrences of a parameter within a field by comparing the length of the original string and the string after replacing the parameter, adjusted by the length of the parameter itself.
+ * 
+ * Use cases:
+ * - Generating dynamic SQL statements that count occurrences of a substring within a text field.
+ * - Building complex string expressions programmatically based on runtime data in [.fields] and [.no].
+ * - Modifying an existing SQL clause in [.sql] to include new computed columns or filters.
+ * - Automating SQL string composition for analytics or reporting purposes where such substring counting is required.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" + (length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)

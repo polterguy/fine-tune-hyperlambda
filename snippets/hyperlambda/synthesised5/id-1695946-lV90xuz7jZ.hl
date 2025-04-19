@@ -1,0 +1,24 @@
+
+/*
+ * 1. [set-value] updates the value of the [.sql] node using the result of [strings.concat].
+ * 2. [strings.concat] creates a single string by joining multiple values, including the current value of [.sql] and fragments that together form a SQL CASE WHEN expression.
+ * 3. [get-value] nodes retrieve values from [.sql], [.fields], and [.no], injecting their values into the concatenated string at the appropriate places.
+ * 
+ * Use cases:
+ * - Dynamically appending a SQL CASE WHEN clause to an existing SQL query in [.sql] to check if a substring occurs within a column specified by [.fields].
+ * - Building complex SQL queries on the fly, for example, to create a computed column indicating presence or count of a substring, where the searched substring is stored in [.no].
+ * - Automating SQL generation in a scenario where user input or dynamic values determine the fields and search terms.
+ * - Supporting advanced string-matching or pattern-detection logic in SQL via Hyperlambda, with all fragments and parameters sourced from nodes.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" + CASE WHEN ((length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)) > 0 THEN 1 ELSE 0 END

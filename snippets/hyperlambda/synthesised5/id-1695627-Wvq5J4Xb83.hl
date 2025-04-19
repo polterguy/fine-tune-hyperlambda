@@ -1,0 +1,26 @@
+
+/*
+ * 1. [if]: Checks if the value of [.vectorize] inside [.arguments] is true, determining whether the inner logic should execute.
+ * 2. [eq]: Compares the value of [.vectorize] in [.arguments] to boolean true to decide the conditional branch.
+ * 3. [execute]: Invokes the [magic.ai.vectorise] slot, passing in [type] and [feedback-channel] from [.arguments].
+ * 4. [.onafter]: Specifies a post-processing action after [magic.ai.vectorise] completes.
+ * 5. [sockets.signal]: Sends a signal to the specified [feedback-channel] with a message indicating completion and a type set to "success".
+ * 
+ * Use cases:
+ * - Automatically vectorizing data when a user sets [.vectorize] to true and notifying the client when the operation completes.
+ * - Integrating AI embedding workflows with live feedback channels for user-facing applications.
+ * - Implementing conditional execution of resource-intensive AI tasks based on user input.
+ * - Sending real-time status updates through sockets after asynchronous AI operations finish.
+ */
+if
+   eq:x:@.arguments/*/vectorize
+      .:bool:true
+   .lambda
+      execute:magic.ai.vectorise
+         type:x:@.arguments/*/type
+         feedback-channel:x:@.arguments/*/feedback-channel
+         .onafter
+            sockets.signal:x:@.arguments/*/feedback-channel
+               args
+                  message:Done!
+                  type:success

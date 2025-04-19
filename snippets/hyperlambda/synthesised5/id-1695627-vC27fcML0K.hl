@@ -1,0 +1,37 @@
+
+/*
+ * 1. The [if] slot evaluates a conditional block to determine if the provided CSV file is in a valid URL list format.
+ * 2. The [or] slot checks if either of two conditions is true: 
+ *    - The [mt] slot combined with [get-count] checks if the number of columns in the first row of the CSV (using `@csv2lambda/0/*`) is greater than one.
+ *    - The [and] slot ensures that the first cell in the first row does not start with "http://" nor "https://", using [strings.starts-with] and [not] to validate the first value.
+ * 3. If either condition is met, the [.lambda] block logs an error message via [log.info], including the filename from [.arguments/*/file/*/name].
+ * 4. The [sockets.signal] slot sends an error message to a feedback channel, specifying that a valid URL list must have only one column containing only URLs.
+ * 5. The [return] slot exits the execution and returns a [result] node with a value of "error".
+ * 
+ * Use Cases:
+ * - Used to validate uploaded URL list files in a web application, ensuring they follow the required format before processing.
+ * - Helps inform users in real-time via socket feedback if their file does not meet the expected structure.
+ * - Can be integrated into an import workflow for bulk URL operations, preventing malformed files from proceeding.
+ * - Useful in server-side automation where only single-column URL lists are accepted, catching format errors early and providing clear feedback.
+ */
+if
+   or
+      mt
+         get-count:x:@csv2lambda/0/*
+         .:int:1
+      and
+         not
+            strings.starts-with:x:@csv2lambda/0/0
+               .:"http://"
+         not
+            strings.starts-with:x:@csv2lambda/0/0
+               .:"https://"
+   .lambda
+      log.info:URL list file not in correct format
+         filename:x:@.arguments/*/file/*/name
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:File not valid. A URL list file must have only one column, and contain only URLs in its single column.
+            type:error
+      return
+         result:error

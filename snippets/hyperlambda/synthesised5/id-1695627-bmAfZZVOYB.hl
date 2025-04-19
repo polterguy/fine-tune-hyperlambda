@@ -1,0 +1,20 @@
+
+/*
+ * 1. The [execute] slot is used to trigger the [magic.ai.vectorise] slot, passing in evaluated arguments for [type] and [feedback-channel] from the [.arguments] node. This ensures that the latest values from the input context are supplied to the vectorisation process.
+ * 2. The [.onafter] node defines a callback to be executed after [magic.ai.vectorise] completes. Inside this callback, [sockets.signal] is used to send a real-time notification to the specified [feedback-channel]. 
+ * 3. The [sockets.signal] slot constructs a message containing a [message] node with the value "Done!" and a [type] node set to "success", informing subscribers on the [feedback-channel] that the operation has finished successfully.
+ * 
+ * Use cases:
+ * - Notifying a user via a WebSocket channel when an AI vectorisation task has finished processing.
+ * - Integrating asynchronous feedback into a client application, such as a chat or dashboard, to display completion status.
+ * - Sending automated success messages to a group or user after data processing tasks.
+ * - Chaining post-processing actions, like logging or additional messaging, based on the result of an AI operation.
+ */
+execute:magic.ai.vectorise
+   type:x:@.arguments/*/type
+   feedback-channel:x:@.arguments/*/feedback-channel
+   .onafter
+      sockets.signal:x:@.arguments/*/feedback-channel
+         args
+            message:Done!
+            type:success

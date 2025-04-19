@@ -1,0 +1,29 @@
+
+/*
+ * 1. The [if] slot checks if the value of [.no] is exactly 0 by using the [eq] slot with an integer comparison.
+ * 2. If the condition is true, within the [.lambda] block, the [set-value] slot updates [.sql] by concatenating its current value with a dynamically generated SQL fragment using [strings.concat].
+ * 3. [strings.concat] builds a SQL expression by assembling several pieces: it uses [get-value] to pull the current [.sql] and [.fields] values, as well as various SQL string fragments and the value of [.no].
+ * 4. The resulting SQL fragment calculates the number of occurrences of a substring (parameterized by @p and [.no]) within the field(s) specified by [.fields].
+ * 
+ * Use cases:
+ * - Dynamically building SQL queries for string occurrence counting based on specific conditions.
+ * - Iteratively creating or modifying SQL statements in scenarios where the number of fields or parameters is variable.
+ * - Generating advanced SQL for reporting or analytics, such as counting instances of a substring in a database column when [.no] is zero.
+ * - Template-driven construction of SQL expressions for code generation tools.
+ */
+if
+   eq:x:@.no
+      .:int:0
+   .lambda
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" (length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)

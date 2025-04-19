@@ -1,0 +1,46 @@
+
+/*
+ * 1. [data.connect] establishes a connection to the [northwind] database using a generic connection and specifies [sqlite] as the database type for subsequent operations.
+ * 2. [add] is used (three times) to inject argument nodes ([order], [direction], [limit], [offset], and all argument nodes for the [and] clause) from [.arguments] into appropriate places under the [data.read] node, effectively allowing dynamic filtering, ordering, paging, and more based on caller input.
+ * 3. [remove-nodes] removes the [order], [direction], [limit], and [offset] nodes from [.arguments] after they have been processed, preventing duplication or conflict.
+ * 4. [data.read] executes a SELECT query on the [Customers] table, retrieving a fixed set of columns, and applies any dynamically injected filter or query modifiers.
+ * 5. [return-nodes] returns the result set from the [data.read] query as the output of this operation.
+ * 
+ * Use cases:
+ * - Create an API endpoint that lists customers from the Northwind database, supporting dynamic ordering, filtering, and pagination via HTTP arguments.
+ * - Enable flexible querying of the [Customers] table from a UI, where users can specify which column to sort by, how many results to return, and custom filters.
+ * - Reuse this logic as a backend service for reporting tools that require customer listing with advanced search capabilities.
+ * - Easily adapt the structure to support similar queries on other tables by modifying the [data.read] configuration.
+ */
+data.connect:[generic|northwind]
+   database-type:sqlite
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/order
+      get-nodes:x:@.arguments/*/direction
+   remove-nodes:x:@.arguments/*/order
+   remove-nodes:x:@.arguments/*/direction
+   add:x:./*/data.read
+      get-nodes:x:@.arguments/*/limit
+      get-nodes:x:@.arguments/*/offset
+   remove-nodes:x:@.arguments/*/limit
+   remove-nodes:x:@.arguments/*/offset
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*
+   data.read
+      database-type:sqlite
+      table:Customers
+      columns
+         Customers.CustomerID
+         Customers.CompanyName
+         Customers.ContactName
+         Customers.ContactTitle
+         Customers.Address
+         Customers.City
+         Customers.Region
+         Customers.PostalCode
+         Customers.Country
+         Customers.Phone
+         Customers.Fax
+      where
+         and
+   return-nodes:x:@data.read/*

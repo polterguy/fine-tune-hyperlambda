@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [strings.concat] slot is used here to concatenate multiple strings and dynamic values into a single SQL statement segment, with the base expression `:x:@.sql` indicating the concatenated result will be appended to the current value of [.sql].
+ * 2. [get-value:x:@.sql], [get-value:x:@.fields], and [get-value:x:@.no] are used several times to inject the current values of the [.sql], [.fields], and [.no] nodes respectively at specific points within the concatenated string, enabling dynamic construction of a SQL CASE expression.
+ * 3. The various static string nodes represent SQL code fragments, and together with the injected node values, they build a CASE WHEN clause that checks, using SQL string functions, whether a certain pattern occurs within a field, and conditionally outputs 1 or 0.
+ * 4. The structure is intended to generate a SQL segment like: `CASE WHEN ((length([fields]) - length(replace(lower([fields]), @p[no], ''))) / length(@p[no])) > 0 THEN 1 ELSE 0 END`, where [fields] and [no] are replaced by their actual values from the nodes.
+ * 
+ * Use cases:
+ * - Dynamically constructing SQL queries in Hyperlambda where field names and parameters are not hard-coded but determined at runtime.
+ * - Creating complex CASE expressions in SQL through Hyperlambda, allowing for advanced conditional logic in generated queries.
+ * - Supporting dynamic search or filter features in applications by programmatically building SQL based on user input or configuration.
+ * - Automating the generation of repetitive SQL patterns across different fields and parameter sets for reporting or analytics.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" + CASE WHEN ((length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)) > 0 THEN 1 ELSE 0 END

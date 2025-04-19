@@ -1,0 +1,139 @@
+
+/*
+ * 1. [data.connect] establishes a connection to a SQLite database using the "crm" configuration and ensures all subsequent database operations use this context.
+ * 2. The code dynamically builds an SQL statement in [.sql] that calculates keyword density and count for a set of words across concatenated fields in the "notes" table. It uses [for-each] loops over [.columns] and [.words], and constructs SQL fragments with [strings.concat], [strings.join], and [set-value].
+ * 3. [math.increment] is used to manage loop counters within [for-each], iterating through each keyword.
+ * 4. The SQL statement is finalized with SELECT, WHERE, ORDER BY, LIMIT, and optional OFFSET clauses, all set dynamically based on input arguments.
+ * 5. [data.select] executes the generated SQL, and the results are further cleaned by [remove-nodes], which strips out the [keyword_density] and [keyword_count] fields from the result set.
+ * 6. [return-nodes] returns the final, filtered result set to the caller.
+ * 
+ * Use Cases:
+ * - Ranking database records by how frequently specific keywords appear in selected fields, useful for search or content analysis.
+ * - Paginating ranked search results by passing [limit] and [offset] as arguments for efficient UI presentation.
+ * - Filtering out internal calculation fields from the results before returning to clients or APIs, exposing only relevant data.
+ * - Dynamically customizing keyword lists and fields to analyze in each request, supporting flexible keyword-based searching.
+ * - Implementing a server-side search ranking feature for notes or documents stored in a SQLite database.
+ */
+data.connect:[generic|crm]
+   database-type:sqlite
+   .sql:select *, (
+   .fields
+   for-each:x:@.columns/*
+      strings.concat
+         .:coalesce(
+         get-value:x:@.dp/#
+         .:", '')"
+      unwrap:x:+/*/*
+      add:x:@.fields
+         .
+            .:x:@strings.concat
+   set-value:x:@.fields
+      strings.join:x:@.fields/*
+         .:" || "
+   remove-nodes:x:@.fields/*
+   .no:int:0
+   for-each:x:@.words/*
+      set-name:x:+/+/*/*
+         strings.concat
+            .:@p
+            get-value:x:@.no
+      unwrap:x:+/*/*
+      add:x:@data.connect/*/data.select
+         .
+            .:x:@.dp/#
+      if
+         eq:x:@.no
+            .:int:0
+         .lambda
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" (length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:), @p
+                  get-value:x:@.no
+                  .:", ''))) / length(@p"
+                  get-value:x:@.no
+                  .:)
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + (length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)
+      math.increment:x:@.no
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) * 1.0 / length(
+         get-value:x:@.fields
+         .:) as keyword_density, (
+   .no:int:0
+   for-each:x:@.words/*
+      if
+         eq:x:@.no
+            .:int:0
+         .lambda
+            set-value:x:@.sql
+               strings.concat:x:@.sql
+                  get-value:x:@.sql
+                  .:" CASE WHEN ((length("
+                  get-value:x:@.fields
+                  .:) - length(replace(lower(
+                  get-value:x:@.fields
+                  .:), @p
+                  get-value:x:@.no
+                  .:", ''))) / length(@p"
+                  get-value:x:@.no
+                  .:)) > 0 THEN 1 ELSE 0 END
+      else
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" + CASE WHEN ((length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)) > 0 THEN 1 ELSE 0 END
+      math.increment:x:@.no
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:) as keyword_count
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" from "
+         .:notes
+         .:" where keyword_count > 0"
+   set-value:x:@.sql
+      strings.concat:x:@.sql
+         get-value:x:@.sql
+         .:" order by keyword_count desc, keyword_density desc limit "
+         get-value:x:@.arguments/*/limit
+   if
+      exists:x:@.arguments/*/offset
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" offset "
+               get-value:x:@.arguments/*/offset
+   data.select:x:@.sql
+      database-type:sqlite
+   remove-nodes:x:@data.select/*/*/keyword_density
+   remove-nodes:x:@data.select/*/*/keyword_count
+   return-nodes:x:@data.select/*
