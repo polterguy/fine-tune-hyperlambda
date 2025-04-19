@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [set-value] slot updates the value of the [.sql] node by assigning it a new value constructed from concatenated parts.
+ * 2. [strings.concat] merges multiple string components together; it sources the current SQL string, builds a SQL CASE WHEN clause, inserts the field name from [.fields], and references parameter placeholders from [.no].
+ * 3. [get-value] retrieves the current values from [.sql], [.fields], and [.no] to dynamically build the SQL fragment, ensuring the final string incorporates the correct field and parameter references.
+ * 
+ * Use cases:
+ * - Dynamically constructing a SQL CASE WHEN statement to check if a substring exists in a field and updating an SQL command accordingly.
+ * - Enhancing a search query to flag records where a field contains a given parameter value, using parameterized placeholders for security.
+ * - Generating complex SQL expressions for reporting or filtering logic without hardcoding field names or search patterns.
+ * - Building SQL commands where the targeted field and search parameter are determined at runtime, allowing for highly flexible query templates.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" CASE WHEN ((length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)) > 0 THEN 1 ELSE 0 END

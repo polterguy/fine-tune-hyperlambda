@@ -1,0 +1,24 @@
+
+/*
+ * 1. The [strings.concat] slot is used to concatenate a series of string fragments and values together, constructing a single SQL expression as its result.
+ * 2. The [get-value:x:@.sql] slot fetches the current value of the [.sql] node, which is likely a partial SQL statement being built.
+ * 3. The [get-value:x:@.fields] slot retrieves the value of the [.fields] node, which is assumed to be a database column name or expression.
+ * 4. The [get-value:x:@.no] slot inserts the value of the [.no] node, which is probably a parameter used within the SQL expression for dynamic construction.
+ * 5. The sequence of static strings and inserted node values together forms a SQL CASE WHEN clause that checks the occurrence of a substring (likely a parameter) within the lowercased field, using SQL string functions.
+ * 
+ * Use Cases:
+ * - Dynamically append a CASE WHEN clause to an existing SQL query to flag rows where a specific substring appears in a given field.
+ * - Construct complex SQL expressions in a modular way by combining static SQL fragments with dynamic values held in nodes.
+ * - Generate conditional SQL logic for text searching or pattern matching, such as highlighting rows where a search term appears.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" + CASE WHEN ((length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)) > 0 THEN 1 ELSE 0 END

@@ -1,0 +1,22 @@
+
+/*
+ * 1. [strings.concat] collects and concatenates a sequence of string fragments and expressions to form a single SQL string, using the nodes referenced by the [.sql], [.fields], and [.no] nodes.
+ * 2. [get-value] retrieves the values of [.sql], [.fields], and [.no] to dynamically inject them at specific points in the final concatenated string.
+ * 3. The various [.] nodes provide static string fragments that, when combined with the dynamic values, build a SQL CASE WHEN expression that checks if a lowercased field contains a certain substring, returning 1 if true and 0 otherwise.
+ * 
+ * Use cases:
+ * - Dynamically generating a SQL expression to count occurrences of a substring in a column for pattern matching.
+ * - Building complex SQL CASE statements in Hyperlambda by piecing together both static and dynamic components.
+ * - Automating the creation of search filters for data queries, such as highlighting or flagging rows based on substring presence.
+ */
+strings.concat:x:@.sql
+   get-value:x:@.sql
+   .:" CASE WHEN ((length("
+   get-value:x:@.fields
+   .:) - length(replace(lower(
+   get-value:x:@.fields
+   .:), @p
+   get-value:x:@.no
+   .:", ''))) / length(@p"
+   get-value:x:@.no
+   .:)) > 0 THEN 1 ELSE 0 END

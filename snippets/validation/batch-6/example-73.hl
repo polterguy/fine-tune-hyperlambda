@@ -1,0 +1,25 @@
+/*
+ * Retrieves client records from the [Clients] table in the [crm] database.
+ * Optionally filters the results by country using the [Country.eq] argument.
+ *
+ * 🔹 The filter condition is **dynamically injected** into the [data.read] query using [add].
+ * - This makes [Country.eq] an optional argument.
+ * - If it's present, the condition is applied under [where → and].
+ * - If omitted, no filtering occurs, and all client records are returned.
+ *
+ * 🔸 This pattern is beneficial when:
+ * 1. You want flexible filters that don't require fallback logic.
+ * 2. Your queries should support both narrow and broad results.
+ * 3. You want to avoid validation errors on unused filters.
+ */
+.arguments
+   Country.eq:string
+data.connect:crm
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/Country.eq
+   data.read
+      table:Clients
+      where
+         and
+   yield
+      clients:x:@data.read/*

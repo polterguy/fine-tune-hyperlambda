@@ -1,0 +1,46 @@
+
+/*
+ * 1. [for-each] iterates over all child nodes of [.words], processing each word node individually.
+ * 2. [if] checks whether the value of [.no] is 0 for the current iteration.
+ * 3. [set-value] updates the value of [.sql] by concatenating its current value with a CASE WHEN SQL expression fragment.
+ * 4. [strings.concat] is used to construct a dynamic SQL string piece by piece, inserting field names and parameter indices dynamically using [get-value] on [.fields] and [.no].
+ * 5. [else] handles cases where [.no] is not 0, appending a " + " and another CASE WHEN SQL fragment to [.sql].
+ * 6. [math.increment] increases the value of [.no] by 1 after processing each word node.
+ * 
+ * Use cases:
+ * - Dynamically building a SQL expression that counts occurrences of multiple words in a text search query, with each word processed as a parameterized input.
+ * - Generating complex SQL CASE WHEN segments for scoring or filtering database results based on word matches.
+ * - Constructing an aggregated SQL formula for highlighting or ranking records according to how many of the search terms are present.
+ * - Automating the creation of parameterized SQL statements for secure and efficient text search queries.
+ */
+for-each:x:@.words/*
+   if
+      eq:x:@.no
+         .:int:0
+      .lambda
+         set-value:x:@.sql
+            strings.concat:x:@.sql
+               get-value:x:@.sql
+               .:" CASE WHEN ((length("
+               get-value:x:@.fields
+               .:) - length(replace(lower(
+               get-value:x:@.fields
+               .:), @p
+               get-value:x:@.no
+               .:", ''))) / length(@p"
+               get-value:x:@.no
+               .:)) > 0 THEN 1 ELSE 0 END
+   else
+      set-value:x:@.sql
+         strings.concat:x:@.sql
+            get-value:x:@.sql
+            .:" + CASE WHEN ((length("
+            get-value:x:@.fields
+            .:) - length(replace(lower(
+            get-value:x:@.fields
+            .:), @p
+            get-value:x:@.no
+            .:", ''))) / length(@p"
+            get-value:x:@.no
+            .:)) > 0 THEN 1 ELSE 0 END
+   math.increment:x:@.no

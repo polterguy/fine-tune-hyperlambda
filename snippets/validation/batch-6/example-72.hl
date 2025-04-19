@@ -1,0 +1,29 @@
+/*
+ * Retrieves student records from the [Students] table in the [school] database.
+ * Optionally filters the result by a minimum grade using the [Grade.gt] argument.
+ *
+ * 🔹 The key aspect of this implementation is the use of [add] to **dynamically insert**
+ * the filter condition into the [data.read] query only if the argument exists.
+ *
+ * - [Grade.gt] is defined in [.arguments], but it is not required.
+ * - If the caller provides a value, the comparison is injected into [where → and].
+ * - If the argument is **not provided**, no filter condition is added — and the query returns all students.
+ *
+ * 🔸 Why this matters:
+ * 1. This approach supports optional filters without requiring conditional logic or [if] blocks.
+ * 2. It avoids runtime errors due to missing arguments.
+ * 3. The [data.read] query remains flexible, allowing both filtered and unfiltered execution.
+ *
+ * This is a clean and modular way to handle optional query parameters in Hyperlambda.
+ */
+.arguments
+   Grade.gt:int
+data.connect:school
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/Grade.gt
+   data.read
+      table:Students
+      where
+         and
+   yield
+      students:x:@data.read/*

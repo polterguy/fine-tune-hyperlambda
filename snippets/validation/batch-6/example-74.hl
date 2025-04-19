@@ -1,0 +1,25 @@
+/*
+ * Retrieves product entries from the [Products] table in the [inventory] database.
+ * Optionally filters results by maximum price using the [Price.lt] argument.
+ *
+ * 🔹 [Price.lt] is inserted dynamically into the [data.read] query using [add],
+ * making it a **non-mandatory** parameter.
+ * - If provided, the price condition is added to [where → and].
+ * - If not, all products are returned regardless of price.
+ *
+ * 🔸 Advantages of this approach:
+ * 1. It avoids hard failures if the filter is missing.
+ * 2. It simplifies client integration — users can choose whether to filter.
+ * 3. It keeps the query logic modular and reusable.
+ */
+.arguments
+   Price.lt:decimal
+data.connect:inventory
+   add:x:./*/data.read/*/where/*/and
+      get-nodes:x:@.arguments/*/Price.lt
+   data.read
+      table:Products
+      where
+         and
+   yield
+      products:x:@data.read/*

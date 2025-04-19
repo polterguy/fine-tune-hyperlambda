@@ -1,0 +1,26 @@
+
+/*
+ * 1. [set-value] updates the value of the [.sql] node with a newly constructed string.
+ * 2. [strings.concat] concatenates a sequence of string fragments and node values to build a dynamic SQL fragment.
+ * 3. [get-value] fetches the current values of [.sql], [.fields], and [.no] nodes to be included in the concatenation.
+ * 4. Static string nodes are used to insert pieces of a SQL CASE WHEN expression for counting substring occurrences.
+ * 
+ * Use Cases:
+ * - Dynamically appending a CASE WHEN block to an existing SQL string for conditional calculations.
+ * - Building SQL expressions that check if a substring appears at least once in a given field and returns 1 or 0 accordingly.
+ * - Generating complex, parameterized SQL statements for advanced filtering or reporting logic.
+ * - Implementing custom search or analytics features that require runtime SQL assembly based on user input.
+ * - Enhancing queries to include computed columns without hardcoding SQL, leveraging Hyperlambda's dynamic node referencing.
+ */
+set-value:x:@.sql
+   strings.concat:x:@.sql
+      get-value:x:@.sql
+      .:" + CASE WHEN ((length("
+      get-value:x:@.fields
+      .:) - length(replace(lower(
+      get-value:x:@.fields
+      .:), @p
+      get-value:x:@.no
+      .:", ''))) / length(@p"
+      get-value:x:@.no
+      .:)) > 0 THEN 1 ELSE 0 END
